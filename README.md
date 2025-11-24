@@ -1,1 +1,2 @@
 # SKN18-FINAL-3TEAM
+# AI 기반 인플루언서
