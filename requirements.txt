@@ -1,0 +1,18 @@
+python-dotenv==1.2.1
+
+# rag
+pandas==2.3.3
+langchain-core==1.0.5
+psycopg2==2.9.11
+psycopg2-binary==2.9.11
+
+# langgraph
+langchain==1.0.7
+langchain-community==0.4.1
+langchain-openai==1.0.3
+langgraph==1.0.3
+langgraph-cli[inmem]==0.4.7
+langsmith==0.4.46
+
+# api requests
+requests==2.32.5
