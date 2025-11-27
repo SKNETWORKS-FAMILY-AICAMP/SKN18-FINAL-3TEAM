@@ -6,10 +6,13 @@ Entity Extractor Node
 - 사건: 임진왜란, 명량해전, 가덕도해전 등
 - 연도: 1592, 1597 등
 - 장소: 한산도, 부산 등
+
++ 추출된 엔티티 타입에 맞는 온톨로지 스키마 정보 제공
 """
 
 import os
 from langgraph_structure.state import GraphState
+from langgraph_structure.ontology_schema import get_schema_summary
 from langchain_openai import ChatOpenAI
 
 
@@ -58,14 +61,34 @@ def entity_extractor_node(state: GraphState) -> GraphState:
 
         entities = json.loads(content)
 
-        print(f"🔍 추출된 엔티티: {entities}")
+        print(f"\n🔍 추출된 엔티티: {len(entities)}개")
+        for i, entity in enumerate(entities, 1):
+            name = entity.get("name") or entity.get("value", "")
+            entity_type = entity.get("type", "")
+            print(f"   {i}. [{entity_type}] {name}")
 
     except Exception as e:
         print(f"⚠️ 엔티티 추출 실패: {e}")
         entities = []
 
+    # 온톨로지 스키마 정보 가져오기
+    ontology_schema = get_schema_summary()
+
+    print(f"\n📐 온톨로지 스키마:")
+    print(f"   - 클래스: {', '.join(ontology_schema['classes'])}")
+
+    # 추출된 엔티티 타입에 해당하는 속성만 출력
+    entity_types = list(set([e.get("type", "") for e in entities if e.get("type")]))
+    if entity_types:
+        print(f"   - 추출된 타입의 속성:")
+        for entity_type in entity_types:
+            props = ontology_schema["properties_by_class"].get(entity_type, [])
+            if props:
+                print(f"     • {entity_type}: {len(props)}개 ({', '.join(props[:3])}...)")
+
     return {
         **state,
         "extracted_entities": entities,
+        "ontology_schema": ontology_schema,
         "executed_nodes": state.get("executed_nodes", []) + ["entity_extractor"]
     }

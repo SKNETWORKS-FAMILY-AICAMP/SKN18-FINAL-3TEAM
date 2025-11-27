@@ -287,15 +287,24 @@ def execute_inference_thread(query_type, sparql, hypothetical):
 
 ---
 
-#### **5가지 병렬 추론 타입**
+#### **5가지 병렬 추론 타입 (5-Stage Analysis Plan 기반)**
 
-| Thread       | 추론 타입 | Rules 파일                | SPARQL 패턴                       |
-| ------------ | --------- | ------------------------- | --------------------------------- |
-| **Thread 1** | 인과관계  | `causal_inference.rules`  | `?a hist:leadsTo ?b`              |
-| **Thread 2** | 인물관계  | `person_relation.rules`   | `?p1 hist:colleagueOf ?p2`        |
-| **Thread 3** | 시대배경  | `temporal_context.rules`  | `?event hist:year ?year`          |
-| **Thread 4** | 패턴      | `pattern_detection.rules` | `?e1 hist:similarPattern ?e2`     |
-| **Thread 5** | 동기분석  | `motive_analysis.rules`   | `?person hist:motivation ?motive` |
+| Thread       | 추론 타입         | Rules 파일                | Stage | 주요 추론 프로퍼티                                                                 |
+| ------------ | ----------------- | ------------------------- | ----- | ---------------------------------------------------------------------------------- |
+| **Thread 1** | 인과관계          | `causal_inference.rules`  | 2     | `hist:leadsTo`, `hist:indirectlyCausedBy`, `hist:hasStrategicAdvantage`           |
+| **Thread 2** | 인물 분석         | `person_inference.rules`  | 1, 3  | `hist:hasRelationshipWith`, `hist:hasEnemyRelationship`, `hist:hasInfluence`      |
+| **Thread 3** | 시대적 배경       | `temporal_inference.rules`| 4     | `hist:occursBefore`, `hist:contemporaryWith`, `hist:hasLifespan`                   |
+| **Thread 4** | 패턴 분석         | `pattern_inference.rules` | 5     | `hist:hasStrategyPattern`, `hist:hasWinningStreak`, `hist:hasComebackPattern`     |
+| **Thread 5** | 동기 분석         | `motive_inference.rules`  | 1     | `hist:hasMotive` (revenge, national_defense, invasion, survival 등)                |
+
+**📌 5-Stage Analysis Plan 매핑:**
+- **Stage 1** (비하인드 스토리): Thread 2 (인물 관계) + Thread 5 (동기 분석)
+- **Stage 2** (역사 시뮬레이터): Thread 1 (인과관계)
+- **Stage 3** (인물 분석): Thread 2 (인물 분석)
+- **Stage 4** (시대적 배경): Thread 3 (시대적 배경)
+- **Stage 5** (심화 분석): Thread 4 (패턴 분석)
+
+**Note:** Stage 1과 3은 `person_inference.rules`와 `motive_inference.rules`로 통합 처리됩니다.
 
 ---
 
@@ -355,18 +364,89 @@ def execute_inference_thread(query_type, sparql, hypothetical):
 
 ---
 
+## 🆕 주요 개선사항
+
+### **1. LLM 기반 SPARQL 쿼리 생성**
+
+기존 템플릿 방식에서 **LLM 동적 생성**으로 변경:
+
+```python
+# multi_query_generator_node.py
+def generate_sparql_with_llm(llm, query, thread_type, entities, properties):
+    """
+    LLM이 질문과 엔티티를 분석하여 최적의 SPARQL 생성
+
+    Input: "이순신이 명량해전에서 왜 승리했을까?"
+    Stage: person (인물 분석)
+    Available Properties: hist:commands, hist:hasRelationshipWith, hist:hasInfluence
+
+    Output (LLM 생성):
+    PREFIX hist: <http://www.example.org/korean-history#>
+    SELECT ?person ?battle ?influence WHERE {
+        ?person hist:commands ?battle .
+        OPTIONAL { ?person hist:hasInfluence ?influence }
+        FILTER (?person = hist:YiSunSin && ?battle = hist:Myeongnyang)
+    } LIMIT 100
+    """
+```
+
+**장점:**
+- 질문 의도에 맞는 정확한 쿼리 생성
+- 추론 프로퍼티만 사용하도록 제한
+- 엔티티 자동 URI 변환
+
+### **2. 추론 결과 → TTL Triple 자동 저장**
+
+병렬 추론 실행 후 결과를 TTL 파일로 자동 저장:
+
+```python
+# parallel_inference_executor_node.py
+generator = InferenceTripleGenerator()
+generator.save_triples_to_file(
+    inference_results=results,
+    output_path="./inference_results/inference_20251127_140532.ttl"
+)
+```
+
+**생성 예시 (inference_20251127_140532.ttl):**
+```turtle
+@prefix hist: <http://www.example.org/korean-history#> .
+
+# CAUSAL 추론 결과 (2개)
+hist:Myeongnyang hist:leadsTo hist:JapanRetreat .
+hist:JapanRetreat hist:indirectlyCausedBy hist:YiSunSinLeadership .
+
+# PERSON 추론 결과 (3개)
+hist:YiSunSin hist:hasRelationshipWith hist:JoseonNavy .
+hist:YiSunSin hist:hasEnemyRelationship hist:ToyotomiHideyoshi .
+hist:YiSunSin hist:hasInfluence "high" .
+
+# 추론 메타데이터
+hist:InferenceSession_20251127_140532 a hist:InferenceSession ;
+    hist:sessionId "20251127_140532" ;
+    hist:query "이순신이 명량해전에서 왜 승리했을까?" ;
+    hist:executionTime "5.2"^^xsd:float .
+```
+
+**활용:**
+- Fuseki에 재업로드하여 영구 저장
+- 추론 결과 추적 및 분석
+- 다른 시스템과의 데이터 공유
+
+---
+
 ## 📚 기술 스택
 
-| 컴포넌트                | 기술                            | 역할                    |
-| ----------------------- | ------------------------------- | ----------------------- |
-| **Query Classifier**    | LLM (GPT-4o-mini)               | 질문 유형 분류          |
-| **Entity Extractor**    | **Milvus pgvector**             | 엔티티 매핑/검색/스키마 |
-| **Embedding**           | OpenAI `text-embedding-3-small` | 벡터 임베딩 생성        |
-| **Multi-Query Gen**     | Template + LLM + Milvus         | SPARQL 생성             |
-| **Agent Orchestration** | **LangGraph**                   | 병렬 실행 관리          |
-| **Inference Engine**    | Apache Jena + SWRL              | 추론 규칙 실행          |
-| **Triple Store**        | Apache Jena Fuseki              | RDF 데이터 저장/SPARQL  |
-| **Story Generator**     | LLM (GPT-4o)                    | 최종 스토리 생성        |
+| 컴포넌트                | 기술                            | 역할                         |
+| ----------------------- | ------------------------------- | ---------------------------- |
+| **Query Classifier**    | LLM (GPT-4o-mini)               | 질문 유형 분류               |
+| **Entity Extractor**    | LLM (GPT-4o-mini)               | 엔티티 추출                  |
+| **Multi-Query Gen**     | **LLM + ontology_schema.py**    | **동적 SPARQL 생성**         |
+| **Agent Orchestration** | **LangGraph**                   | 병렬 실행 관리               |
+| **Inference Engine**    | Apache Jena + Jena Rules        | 추론 규칙 실행               |
+| **Triple Store**        | Apache Jena Fuseki              | RDF 데이터 저장/SPARQL       |
+| **Triple Generator**    | **InferenceTripleGenerator**    | **추론 결과 → TTL 변환**     |
+| **Story Generator**     | LLM (GPT-4o)                    | 최종 스토리 생성             |
 
 ---
 

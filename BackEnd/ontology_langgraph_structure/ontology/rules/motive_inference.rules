@@ -1,0 +1,146 @@
+# ============================================================
+# Motive Inference Rules (동기 추론)
+# ============================================================
+#
+# 목적: 비하인드 스토리 (Stage 1)
+# CSV 추출: commands, bornIn, affiliatedWith
+# 추론 결과: hasMotive (복수, 방어, 침략, 충성 등)
+#
+
+@prefix hist: <http://www.example.org/korean-history#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+
+# ============================================================
+# Rule 1: 복수 동기 추론
+# ============================================================
+[revenge_motive:
+    (?person1 hist:commands ?battle1)
+    (?person1 hist:commands ?battle2)
+    (?battle1 hist:hasDefeated ?nation1)
+    (?battle2 hist:hasVictor ?nation1)
+    (?person1 hist:affiliatedWith ?nation1)
+    (?battle1 hist:occursBefore ?battle2)
+    noValue(?person1 hist:hasMotive "revenge")
+    ->
+    (?person1 hist:hasMotive "revenge")
+]
+
+
+# ============================================================
+# Rule 2: 국가 방어 동기
+# ============================================================
+[national_defense_motive:
+    (?person hist:commands ?battle)
+    (?battle hist:occursAt ?place)
+    (?place hist:controlledBy ?nation)
+    (?person hist:affiliatedWith ?nation)
+    (?battle hist:hasVictor ?nation)
+    noValue(?person hist:hasMotive "national_defense")
+    ->
+    (?person hist:hasMotive "national_defense")
+]
+
+
+# ============================================================
+# Rule 3: 침략 동기
+# ============================================================
+[invasion_motive:
+    (?person hist:commands ?battle)
+    (?battle hist:occursAt ?place)
+    (?place hist:controlledBy ?nation1)
+    (?person hist:affiliatedWith ?nation2)
+    notEqual(?nation1, ?nation2)
+    noValue(?person hist:hasMotive "invasion")
+    ->
+    (?person hist:hasMotive "invasion")
+]
+
+
+# ============================================================
+# Rule 4: 명예 회복 동기
+# ============================================================
+[honor_restoration_motive:
+    (?person hist:commands ?battle1)
+    (?person hist:commands ?battle2)
+    (?battle1 hist:hasDefeated ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    (?person hist:affiliatedWith ?nation)
+    (?battle1 hist:occursBefore ?battle2)
+    noValue(?person hist:hasMotive "honor_restoration")
+    ->
+    (?person hist:hasMotive "honor_restoration")
+]
+
+
+# ============================================================
+# Rule 5: 동맹 지원 동기
+# ============================================================
+[alliance_support_motive:
+    (?person hist:participatesIn ?battle)
+    (?person hist:affiliatedWith ?nation1)
+    (?battle hist:involves ?nation2)
+    (?nation1 hist:alliedWith ?nation2)
+    notEqual(?nation1, ?nation2)
+    noValue(?person hist:hasMotive "alliance_support")
+    ->
+    (?person hist:hasMotive "alliance_support")
+]
+
+
+# ============================================================
+# Rule 6: 생존 동기
+# ============================================================
+[survival_motive:
+    (?person hist:commands ?battle)
+    (?battle hist:occursAt ?place)
+    (?person hist:bornIn ?place)
+    (?battle hist:hasVictor ?nation)
+    (?person hist:affiliatedWith ?nation)
+    noValue(?person hist:hasMotive "survival")
+    ->
+    (?person hist:hasMotive "survival")
+]
+
+
+# ============================================================
+# Rule 7: 가족 보호 동기
+# ============================================================
+[family_protection_motive:
+    (?person hist:commands ?battle)
+    (?battle hist:occursAt ?place)
+    (?person hist:bornIn ?place)
+    (?person hist:hasLocalTies ?place)
+    noValue(?person hist:hasMotive "family_protection")
+    ->
+    (?person hist:hasMotive "family_protection")
+]
+
+
+# ============================================================
+# Rule 8: 충성심 동기
+# ============================================================
+[loyalty_motive:
+    (?person hist:commands ?battle)
+    (?person hist:affiliatedWith ?nation)
+    (?nation hist:hasLeader ?leader)
+    noValue(?person hist:hasMotive "loyalty_to_leader")
+    ->
+    (?person hist:hasMotive "loyalty_to_leader")
+]
+
+
+# ============================================================
+# Rule 9: 보복 동기
+# ============================================================
+[retaliation_motive:
+    (?battle1 hist:hasDefeated ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    (?battle1 hist:leadsTo ?battle2)
+    (?person hist:commands ?battle2)
+    (?person hist:affiliatedWith ?nation)
+    noValue(?person hist:hasMotive "retaliation")
+    ->
+    (?person hist:hasMotive "retaliation")
+]

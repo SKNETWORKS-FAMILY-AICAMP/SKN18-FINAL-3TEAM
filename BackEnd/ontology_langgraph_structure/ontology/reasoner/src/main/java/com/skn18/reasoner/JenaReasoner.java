@@ -28,7 +28,7 @@ import java.util.List;
  */
 public class JenaReasoner {
 
-    private static final String NAMESPACE = "http://www.semanticweb.org/ontologies/test-basic#";
+    private static final String NAMESPACE = "http://www.example.org/korean-history#";
 
     public static void main(String[] args) {
         if (args.length != 4) {
