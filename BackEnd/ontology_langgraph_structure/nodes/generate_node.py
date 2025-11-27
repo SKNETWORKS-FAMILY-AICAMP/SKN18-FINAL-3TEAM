@@ -68,8 +68,6 @@ def story_generator_node(state: GraphState) -> GraphState:
 
 출력 형식:
 [스토리 본문]
-
-📌 핵심: [한 문장 요약]
 """
 
     try:
