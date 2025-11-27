@@ -1,16 +1,16 @@
 services:
   fuseki:
     image: stain/jena-fuseki:latest
-    platform: linux/amd64  # Windows/Mac (Intel/Apple Silicon) 호환
+    platform: linux/amd64 # Windows/Mac (Intel/Apple Silicon) 호환
     container_name: fuseki
     restart: unless-stopped
     environment:
       - ADMIN_PASSWORD=${FUSEKI_ADMIN_PASSWORD:-admin}
-      - JVM_ARGS=-Xmx2g -Xms1g  # 메모리 설정 (선택 사항)
+      - JVM_ARGS=-Xmx2g -Xms1g # 메모리 설정 (선택 사항)
     ports:
       - "3030:3030"
     volumes:
-      - fuseki-data:/fuseki  # Named volume (권장)
+      - fuseki-data:/fuseki # Named volume (권장)
       - ./knowledge_engineering:/knowledge_engineering:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3030/$/ping"]
