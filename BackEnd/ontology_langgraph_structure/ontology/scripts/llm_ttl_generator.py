@@ -1,340 +1,333 @@
-#!/usr/bin/env python3
 """
-LLM을 사용한 TTL 자동 생성 스크립트
+LLM 기반 TTL 생성기
 
-사용법:
-    python llm_ttl_generator.py --input raw_data.txt --output generated.ttl
+CSV 데이터를 읽어서 LLM을 사용하여 온톨로지 트리플(TTL)로 변환
 
-기능:
-    1. 텍스트 데이터를 LLM에 전달
-    2. LLM이 온톨로지 구조에 맞게 TTL 생성
-    3. 자동으로 관계 추론 (leadsTo, causedBy 등)
+처리 과정:
+1. CSV 읽기 (category, title, summary, contents)
+2. LLM으로 엔티티 추출 및 관계 파악
+3. TTL 트리플 생성
+4. 파일 저장
 """
 
 import os
+import csv
 import json
-import argparse
-from anthropic import Anthropic
+from typing import List, Dict, Any
+from langchain_openai import ChatOpenAI
 
-# ============================================================
-# LLM 기반 TTL 생성기
-# ============================================================
 
 class LLMTTLGenerator:
-    def __init__(self, api_key=None):
-        """
-        LLM TTL 생성기 초기화
+    """LLM 기반 TTL 생성기"""
 
+    def __init__(self, csv_path: str, output_dir: str):
+        """
         Args:
-            api_key: Anthropic API 키 (없으면 환경변수에서 읽음)
+            csv_path: CSV 파일 경로
+            output_dir: TTL 출력 디렉토리
         """
-        self.client = Anthropic(api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
-        self.model = "claude-3-5-sonnet-20241022"
+        self.csv_path = csv_path
+        self.output_dir = output_dir
 
-        # 온톨로지 스키마 정의 (프롬프트에 포함)
-        self.ontology_schema = """
-# 온톨로지 스키마
-
-## 클래스
-- Person: 역사적 인물
-- Event: 역사적 사건
-- Concept: 추상 개념
-- Invention: 발명품
-- Period: 시대
-- Folktale: 민담/설화
-
-## Object Properties
-- leadsTo: 직접적 인과관계 (A가 B를 초래함)
-- causedBy: 역방향 인과관계 (B가 A로 인해 발생)
-- convergesTo: 수렴 관계 (여러 사건이 하나로 모임)
-- relatedTo: 일반적 관련성
-
-## Data Properties
-- nodeName: 이름 (xsd:string)
-- description: 설명 (xsd:string)
-- year: 연도 (xsd:integer)
-- order: 순서 (xsd:integer)
-- chainId: 체인 ID (xsd:string)
-- targetAudience: 대상 독자 (xsd:string)
-"""
-
-    def generate_ttl_from_text(self, raw_text, context=""):
-        """
-        텍스트로부터 TTL 생성
-
-        Args:
-            raw_text: 원본 텍스트 (역사 설명, 위키피디아 등)
-            context: 추가 컨텍스트 (시대, 주제 등)
-
-        Returns:
-            생성된 TTL 문자열
-        """
-        prompt = f"""
-당신은 한국사 온톨로지 전문가입니다. 주어진 텍스트를 분석하여 RDF Turtle (TTL) 형식으로 변환하세요.
-
-{self.ontology_schema}
-
-## 변환 규칙
-1. 인물, 사건, 개념을 식별하고 적절한 클래스로 분류
-2. 인과관계를 분석하여 leadsTo, causedBy 관계 생성
-3. 연도, 설명 등 속성 추출
-4. URI는 한글을 영어로 변환 (예: 임진왜란 → ImjinWar)
-
-## 입력 텍스트
-{raw_text}
-
-## 추가 컨텍스트
-{context}
-
-## 출력 형식
-반드시 아래 형식으로만 출력하세요:
-
-```turtle
-@prefix hist: <http://example.org/history#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-
-# 여기에 TTL 데이터 작성
-```
-
-JSON이나 다른 설명 없이 TTL 코드만 출력하세요.
-"""
-
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=4096,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
+        # LLM 초기화
+        self.llm = ChatOpenAI(
+            model=os.getenv("OPENAI_MODEL", "gpt-5-mini"),
+            temperature=0
         )
 
-        # 응답에서 TTL 추출
-        ttl_content = response.content[0].text
+        # URI 카운터 (중복 방지)
+        self.uri_counter = {}
 
-        # ```turtle 블록 제거
-        if "```turtle" in ttl_content:
-            ttl_content = ttl_content.split("```turtle")[1].split("```")[0].strip()
-        elif "```" in ttl_content:
-            ttl_content = ttl_content.split("```")[1].split("```")[0].strip()
-
-        return ttl_content
-
-    def generate_ttl_from_json(self, json_data):
+    def generate_uri(self, entity_type: str, name: str) -> str:
         """
-        JSON 데이터로부터 TTL 생성 (구조화된 데이터용)
+        엔티티 URI 생성 (중복 방지)
 
         Args:
-            json_data: JSON 형식의 구조화된 데이터
+            entity_type: Person, Event, Place, Nation, Battle
+            name: 엔티티 이름
 
         Returns:
-            생성된 TTL 문자열
+            hist:YiSunSin, hist:ImjinWar 등
         """
-        prompt = f"""
-당신은 한국사 온톨로지 전문가입니다. 주어진 JSON 데이터를 RDF Turtle (TTL) 형식으로 변환하세요.
+        # 공백 제거 및 카멜케이스 변환
+        clean_name = name.replace(" ", "").replace("-", "")
 
-{self.ontology_schema}
+        # 중복 체크
+        key = f"{entity_type}:{clean_name}"
+        if key in self.uri_counter:
+            self.uri_counter[key] += 1
+            return f"hist:{clean_name}{self.uri_counter[key]}"
+        else:
+            self.uri_counter[key] = 0
+            return f"hist:{clean_name}"
 
-## JSON 데이터
-```json
-{json.dumps(json_data, ensure_ascii=False, indent=2)}
-```
-
-## 출력 형식
-반드시 아래 형식으로만 출력하세요:
-
-```turtle
-@prefix hist: <http://example.org/history#> .
-@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-
-# 여기에 TTL 데이터 작성
-```
-
-JSON이나 다른 설명 없이 TTL 코드만 출력하세요.
-"""
-
-        response = self.client.messages.create(
-            model=self.model,
-            max_tokens=4096,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
-
-        ttl_content = response.content[0].text
-
-        # ```turtle 블록 제거
-        if "```turtle" in ttl_content:
-            ttl_content = ttl_content.split("```turtle")[1].split("```")[0].strip()
-        elif "```" in ttl_content:
-            ttl_content = ttl_content.split("```")[1].split("```")[0].strip()
-
-        return ttl_content
-
-    def batch_generate(self, input_file, output_file, format="text"):
+    def extract_entities_and_relations(self, row: Dict[str, str]) -> Dict[str, Any]:
         """
-        파일로부터 배치 생성
+        LLM을 사용하여 CSV 행에서 엔티티 및 관계 추출
 
         Args:
-            input_file: 입력 파일 (txt 또는 json)
-            output_file: 출력 TTL 파일
-            format: "text" 또는 "json"
-        """
-        with open(input_file, 'r', encoding='utf-8') as f:
-            if format == "json":
-                data = json.load(f)
-                ttl_content = self.generate_ttl_from_json(data)
-            else:
-                text = f.read()
-                ttl_content = self.generate_ttl_from_text(text)
+            row: CSV 행 (category, title, summary, contents)
 
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write(ttl_content)
-
-        print(f"✅ TTL 생성 완료: {output_file}")
-
-
-# ============================================================
-# 사용 예시
-# ============================================================
-
-def example_text_to_ttl():
-    """텍스트에서 TTL 생성 예시"""
-
-    generator = LLMTTLGenerator()
-
-    raw_text = """
-    1592년, 도요토미 히데요시가 조선을 침략하여 임진왜란이 발발했다.
-    이에 맞서 이순신 장군이 수군을 이끌고 한산도 대첩에서 대승을 거두었다.
-    이순신의 활약으로 일본군은 큰 타격을 입었고, 전쟁은 장기화되었다.
-    """
-
-    ttl = generator.generate_ttl_from_text(raw_text, context="임진왜란 시대")
-
-    print("생성된 TTL:")
-    print(ttl)
-
-    # 파일로 저장
-    with open('generated_example.ttl', 'w', encoding='utf-8') as f:
-        f.write(ttl)
-
-
-def example_json_to_ttl():
-    """JSON에서 TTL 생성 예시"""
-
-    generator = LLMTTLGenerator()
-
-    json_data = {
-        "events": [
+        Returns:
             {
-                "id": "imjin_war",
-                "name": "임진왜란",
-                "year": 1592,
-                "description": "도요토미 히데요시의 조선 침략",
-                "type": "Event",
-                "leadsTo": ["yi_sun_sin_appointed"]
-            },
-            {
-                "id": "yi_sun_sin_appointed",
-                "name": "이순신 수군통제사 임명",
-                "year": 1592,
-                "description": "조선 수군의 리더십 확립",
-                "type": "Event",
-                "leadsTo": ["hansando_victory"]
-            },
-            {
-                "id": "hansando_victory",
-                "name": "한산도 대첩",
-                "year": 1592,
-                "description": "이순신의 학익진 전법으로 대승",
-                "type": "Event"
+                "main_entity": {...},
+                "related_entities": [...],
+                "relations": [...]
             }
+        """
+
+        category = row['category']
+        title = row['title']
+        summary = row['summary']
+        contents = row['contents'][:1000]  # 처음 1000자만
+
+        prompt = f"""당신은 조선시대 역사 데이터를 온톨로지 트리플로 변환하는 전문가입니다.
+
+아래 데이터에서 **엔티티**와 **관계**를 추출하세요.
+
+**입력 데이터:**
+- 카테고리: {category}
+- 제목: {title}
+- 요약: {summary}
+- 내용: {contents}
+
+**출력 형식 (JSON):**
+{{
+  "main_entity": {{
+    "type": "Person|Event|Battle|Place|Nation",
+    "name": "이순신",
+    "properties": {{
+      "hasAlias": ["충무공"],
+      "hasBirthYear": 1545,
+      "hasDeathYear": 1598,
+      "hasRank": ["삼도수군통제사"],
+      "hasAchievement": "임진왜란 수군 지휘"
+    }}
+  }},
+  "related_entities": [
+    {{"type": "Event", "name": "임진왜란"}},
+    {{"type": "Battle", "name": "명량해전"}},
+    {{"type": "Place", "name": "한산도"}},
+    {{"type": "Nation", "name": "조선"}}
+  ],
+  "relations": [
+    {{"subject": "이순신", "predicate": "participatesIn", "object": "임진왜란"}},
+    {{"subject": "이순신", "predicate": "commands", "object": "명량해전"}},
+    {{"subject": "명량해전", "predicate": "partOf", "object": "임진왜란"}},
+    {{"subject": "명량해전", "predicate": "hasYear", "object": 1597}},
+    {{"subject": "이순신", "predicate": "affiliatedWith", "object": "조선"}}
+  ]
+}}
+
+**주의사항:**
+- main_entity는 제목(title)에 해당하는 핵심 엔티티
+- related_entities는 내용에 언급된 다른 엔티티들
+- relations는 엔티티 간 관계 (participatesIn, commands, leadsTo, occursAt, hasYear 등)
+- 반드시 유효한 JSON만 출력
+"""
+
+        try:
+            response = self.llm.invoke(prompt)
+            content = response.content.strip()
+
+            # JSON 파싱
+            if content.startswith("```json"):
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif content.startswith("```"):
+                content = content.split("```")[1].split("```")[0].strip()
+
+            result = json.loads(content)
+            return result
+
+        except Exception as e:
+            print(f"⚠️ LLM 추출 실패 ({title}): {e}")
+            return {
+                "main_entity": {"type": category, "name": title, "properties": {}},
+                "related_entities": [],
+                "relations": []
+            }
+
+    def entity_to_ttl(self, entity: Dict[str, Any]) -> List[str]:
+        """
+        엔티티를 TTL 트리플로 변환
+
+        Args:
+            entity: {"type": "Person", "name": "이순신", "properties": {...}}
+
+        Returns:
+            ["hist:YiSunSin rdf:type hist:Person .", ...]
+        """
+        triples = []
+
+        entity_type = entity.get("type", "")
+        name = entity.get("name", "")
+        properties = entity.get("properties", {})
+
+        if not entity_type or not name:
+            return []
+
+        # URI 생성
+        uri = self.generate_uri(entity_type, name)
+
+        # rdf:type 트리플
+        triples.append(f"{uri} rdf:type hist:{entity_type} .")
+
+        # rdfs:label
+        triples.append(f'{uri} rdfs:label "{name}"@ko .')
+
+        # 속성 트리플
+        for prop, value in properties.items():
+            if isinstance(value, list):
+                for v in value:
+                    if isinstance(v, str):
+                        triples.append(f'{uri} hist:{prop} "{v}"@ko .')
+                    else:
+                        triples.append(f'{uri} hist:{prop} {v} .')
+            elif isinstance(value, str):
+                triples.append(f'{uri} hist:{prop} "{value}"@ko .')
+            elif isinstance(value, int):
+                triples.append(f'{uri} hist:{prop} {value} .')
+
+        return triples
+
+    def relation_to_ttl(self, relation: Dict[str, Any], entity_uris: Dict[str, str]) -> str:
+        """
+        관계를 TTL 트리플로 변환
+
+        Args:
+            relation: {"subject": "이순신", "predicate": "participatesIn", "object": "임진왜란"}
+            entity_uris: {"이순신": "hist:YiSunSin", ...}
+
+        Returns:
+            "hist:YiSunSin hist:participatesIn hist:ImjinWar ."
+        """
+        subject = relation.get("subject", "")
+        predicate = relation.get("predicate", "")
+        obj = relation.get("object")
+
+        subject_uri = entity_uris.get(subject, f"hist:{subject.replace(' ', '')}")
+
+        # object가 숫자인 경우 (연도 등)
+        if isinstance(obj, int):
+            return f"{subject_uri} hist:{predicate} {obj} ."
+        # object가 엔티티인 경우
+        elif isinstance(obj, str) and obj in entity_uris:
+            object_uri = entity_uris[obj]
+            return f"{subject_uri} hist:{predicate} {object_uri} ."
+        # object가 문자열인 경우
+        elif isinstance(obj, str):
+            return f'{subject_uri} hist:{predicate} "{obj}"@ko .'
+
+        return ""
+
+    def process_csv_row(self, row: Dict[str, str]) -> List[str]:
+        """
+        CSV 행을 처리하여 TTL 트리플 생성
+
+        Args:
+            row: CSV 행
+
+        Returns:
+            TTL 트리플 리스트
+        """
+        # 1. LLM으로 엔티티 및 관계 추출
+        extraction_result = self.extract_entities_and_relations(row)
+
+        # 2. 엔티티 → TTL 변환
+        all_triples = []
+        entity_uris = {}
+
+        # Main entity
+        main_entity = extraction_result.get("main_entity", {})
+        if main_entity:
+            main_name = main_entity.get("name", "")
+            main_type = main_entity.get("type", "")
+            if main_name and main_type:
+                entity_uris[main_name] = self.generate_uri(main_type, main_name)
+                all_triples.extend(self.entity_to_ttl(main_entity))
+
+        # Related entities
+        for entity in extraction_result.get("related_entities", []):
+            name = entity.get("name", "")
+            etype = entity.get("type", "")
+            if name and etype:
+                entity_uris[name] = self.generate_uri(etype, name)
+                all_triples.extend(self.entity_to_ttl(entity))
+
+        # 3. 관계 → TTL 변환
+        for relation in extraction_result.get("relations", []):
+            triple = self.relation_to_ttl(relation, entity_uris)
+            if triple:
+                all_triples.append(triple)
+
+        return all_triples
+
+    def generate_ttl_file(self, limit: int = None):
+        """
+        CSV 전체를 읽어서 TTL 파일 생성
+
+        Args:
+            limit: 처리할 행 수 제한 (None이면 전체)
+        """
+        print(f"📖 CSV 읽기: {self.csv_path}")
+
+        # TTL 헤더
+        ttl_lines = [
+            "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .",
+            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .",
+            "@prefix owl: <http://www.w3.org/2002/07/owl#> .",
+            "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .",
+            "@prefix hist: <http://www.example.org/korean-history#> .",
+            "",
+            "# 조선시대 역사 인스턴스 데이터",
+            ""
         ]
-    }
 
-    ttl = generator.generate_ttl_from_json(json_data)
+        # CSV 읽기
+        with open(self.csv_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
 
-    print("생성된 TTL:")
-    print(ttl)
+            for i, row in enumerate(reader):
+                if limit and i >= limit:
+                    break
 
+                print(f"  처리 중: {i+1}. {row['title']}")
 
-def example_batch_wikipedia():
-    """위���피디아 텍스트를 TTL로 변환"""
+                # 트리플 생성
+                triples = self.process_csv_row(row)
 
-    generator = LLMTTLGenerator()
+                # TTL에 추가
+                if triples:
+                    ttl_lines.append(f"# {row['title']} ({row['category']})")
+                    ttl_lines.extend(triples)
+                    ttl_lines.append("")
 
-    wiki_text = """
-    조선 태조 이성계(1335~1408)는 고려 말 무신으로, 위화도 회군을 통해
-    권력을 장악한 후 1392년 조선을 건국했다. 이성계는 신진 사대부 세력과
-    연합하여 고려 왕조를 무너뜨리고 새로운 왕조를 세웠다. 조선은 성리학을
-    통치 이념으로 채택하고, 한양을 새로운 수도로 정했다.
-    """
+        # 파일 저장
+        output_path = os.path.join(self.output_dir, "korean_history_instances.ttl")
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write("\n".join(ttl_lines))
 
-    # 파일로 저장
-    with open('temp_wiki_input.txt', 'w', encoding='utf-8') as f:
-        f.write(wiki_text)
+        print(f"\n✅ TTL 생성 완료: {output_path}")
+        print(f"   총 라인 수: {len(ttl_lines)}")
 
-    generator.batch_generate(
-        'temp_wiki_input.txt',
-        'wiki_generated.ttl',
-        format='text'
-    )
-
-
-# ============================================================
-# CLI 인터페이스
-# ============================================================
 
 def main():
-    parser = argparse.ArgumentParser(
-        description='LLM을 사용한 TTL 자동 생성 도구'
-    )
+    """메인 함수"""
 
-    parser.add_argument(
-        '--input',
-        type=str,
-        help='입력 파일 (txt 또는 json)'
-    )
+    # 경로 설정
+    csv_path = "/Users/jina/Documents/GitHub/SKN18-FINAL-3TEAM/backend/RAG/data/encykorea_cleaned6.csv"
+    output_dir = "/Users/jina/Documents/GitHub/SKN18-FINAL-3TEAM/backend/ontology_langgraph_structure/ontology/instances"
 
-    parser.add_argument(
-        '--output',
-        type=str,
-        help='출력 TTL 파일'
-    )
+    # 출력 디렉토리 생성
+    os.makedirs(output_dir, exist_ok=True)
 
-    parser.add_argument(
-        '--format',
-        type=str,
-        choices=['text', 'json'],
-        default='text',
-        help='입력 형식 (기본값: text)'
-    )
+    # 생성기 초기화
+    generator = LLMTTLGenerator(csv_path, output_dir)
 
-    parser.add_argument(
-        '--example',
-        type=str,
-        choices=['text', 'json', 'wiki'],
-        help='예시 실행'
-    )
-
-    args = parser.parse_args()
-
-    # 예시 실행
-    if args.example:
-        if args.example == 'text':
-            example_text_to_ttl()
-        elif args.example == 'json':
-            example_json_to_ttl()
-        elif args.example == 'wiki':
-            example_batch_wikipedia()
-        return
-
-    # 실제 파일 처리
-    if not args.input or not args.output:
-        parser.print_help()
-        return
-
-    generator = LLMTTLGenerator()
-    generator.batch_generate(args.input, args.output, args.format)
+    # TTL 생성 (처음 50개만 테스트)
+    print("🚀 TTL 생성 시작...")
+    generator.generate_ttl_file(limit=50)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

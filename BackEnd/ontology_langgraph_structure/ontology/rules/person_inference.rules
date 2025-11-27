@@ -1,0 +1,188 @@
+# ============================================================
+# Person Inference Rules (인물 추론)
+# ============================================================
+#
+# 목적: 비하인드 스토리 (Stage 1) + 인물 분석 (Stage 3)
+# CSV 추출: commands, participatesIn, affiliatedWith, bornIn, diedIn
+# 추론 결과: hasRole, hasRelationshipWith, hasEnemyRelationship 등
+#
+
+@prefix hist: <http://www.example.org/korean-history#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+
+# ============================================================
+# Rule 1: 여러 전투 지휘 → 명장
+# ============================================================
+[multiple_battles_implies_great_general:
+    (?person hist:commands ?battle1)
+    (?person hist:commands ?battle2)
+    (?person hist:commands ?battle3)
+    notEqual(?battle1, ?battle2)
+    notEqual(?battle2, ?battle3)
+    notEqual(?battle1, ?battle3)
+    noValue(?person hist:hasRole "great_general")
+    ->
+    (?person hist:hasRole "great_general")
+]
+
+
+# ============================================================
+# Rule 2: 전투 승리 → 업적 추론
+# ============================================================
+[battle_victory_achievement:
+    (?person hist:commands ?battle)
+    (?battle hist:hasVictor ?nation)
+    (?person hist:affiliatedWith ?nation)
+    noValue(?person hist:hasAchievement "battle_victory")
+    ->
+    (?person hist:hasAchievement "battle_victory")
+]
+
+
+# ============================================================
+# Rule 3: 같은 전투 참여 → 동료 관계
+# ============================================================
+[same_battle_implies_comrade:
+    (?person1 hist:participatesIn ?battle)
+    (?person2 hist:participatesIn ?battle)
+    (?person1 hist:affiliatedWith ?nation)
+    (?person2 hist:affiliatedWith ?nation)
+    notEqual(?person1, ?person2)
+    noValue(?person1 hist:hasRelationshipWith ?person2)
+    ->
+    (?person1 hist:hasRelationshipWith ?person2)
+    (?person2 hist:hasRelationshipWith ?person1)
+]
+
+
+# ============================================================
+# Rule 4: 반대편 전투 → 적대 관계
+# ============================================================
+[opposite_sides_implies_enemy:
+    (?person1 hist:commands ?battle)
+    (?battle hist:hasVictor ?nation1)
+    (?battle hist:hasDefeated ?nation2)
+    (?person1 hist:affiliatedWith ?nation1)
+    (?person2 hist:affiliatedWith ?nation2)
+    (?person2 hist:participatesIn ?battle)
+    notEqual(?person1, ?person2)
+    noValue(?person1 hist:hasEnemyRelationship ?person2)
+    ->
+    (?person1 hist:hasEnemyRelationship ?person2)
+    (?person2 hist:hasEnemyRelationship ?person1)
+]
+
+
+# ============================================================
+# Rule 5: 국가 지도자 → 정치적 역할
+# ============================================================
+[leader_implies_political_role:
+    (?nation hist:hasLeader ?person)
+    noValue(?person hist:hasRole "political_leader")
+    ->
+    (?person hist:hasRole "political_leader")
+]
+
+
+# ============================================================
+# Rule 6: 전투 중 사망 → 전사
+# ============================================================
+[died_in_battle_implies_war_death:
+    (?person hist:commands ?battle)
+    (?battle hist:occursAt ?place)
+    (?person hist:diedIn ?place)
+    noValue(?person hist:causeOfDeath "killed_in_battle")
+    ->
+    (?person hist:causeOfDeath "killed_in_battle")
+]
+
+
+# ============================================================
+# Rule 7: 여러 사건 참여 → 영향력 있는 인물
+# ============================================================
+[multiple_events_implies_influential:
+    (?person hist:participatesIn ?event1)
+    (?person hist:participatesIn ?event2)
+    (?person hist:participatesIn ?event3)
+    (?person hist:participatesIn ?event4)
+    (?person hist:participatesIn ?event5)
+    notEqual(?event1, ?event2)
+    notEqual(?event2, ?event3)
+    notEqual(?event3, ?event4)
+    notEqual(?event4, ?event5)
+    noValue(?person hist:hasInfluence "high")
+    ->
+    (?person hist:hasInfluence "high")
+]
+
+
+# ============================================================
+# Rule 8: 동일 장소 출생/사망 → 지역 연고
+# ============================================================
+[same_birthplace_deathplace_implies_local_ties:
+    (?person hist:bornIn ?place)
+    (?person hist:diedIn ?place)
+    noValue(?person hist:hasLocalTies ?place)
+    ->
+    (?person hist:hasLocalTies ?place)
+]
+
+
+# ============================================================
+# Rule 9: 전투 패배 → 책임 추론
+# ============================================================
+[battle_defeat_implies_responsibility:
+    (?person hist:commands ?battle)
+    (?battle hist:hasDefeated ?nation)
+    (?person hist:affiliatedWith ?nation)
+    noValue(?person hist:hasResponsibility "defeat_responsibility")
+    ->
+    (?person hist:hasResponsibility "defeat_responsibility")
+]
+
+
+# ============================================================
+# Rule 10: 국가 소속 + 여러 전투 → 충성도 높음
+# ============================================================
+[affiliation_and_participation_implies_loyalty:
+    (?person hist:affiliatedWith ?nation)
+    (?person hist:participatesIn ?event1)
+    (?person hist:participatesIn ?event2)
+    (?event1 hist:involves ?nation)
+    (?event2 hist:involves ?nation)
+    notEqual(?event1, ?event2)
+    noValue(?person hist:hasLoyalty "high")
+    ->
+    (?person hist:hasLoyalty "high")
+]
+
+
+# ============================================================
+# Rule 11: 동기 추론 - 국가 방어
+# ============================================================
+[defending_homeland_implies_defensive_motive:
+    (?person hist:commands ?battle)
+    (?battle hist:occursAt ?place)
+    (?place hist:controlledBy ?nation)
+    (?person hist:affiliatedWith ?nation)
+    noValue(?person hist:hasMotive "defend_homeland")
+    ->
+    (?person hist:hasMotive "defend_homeland")
+]
+
+
+# ============================================================
+# Rule 12: 동기 추론 - 침략
+# ============================================================
+[attacking_foreign_land_implies_aggressive_motive:
+    (?person hist:commands ?battle)
+    (?battle hist:occursAt ?place)
+    (?place hist:controlledBy ?nation1)
+    (?person hist:affiliatedWith ?nation2)
+    notEqual(?nation1, ?nation2)
+    noValue(?person hist:hasMotive "invade_territory")
+    ->
+    (?person hist:hasMotive "invade_territory")
+]

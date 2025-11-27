@@ -1,0 +1,189 @@
+# ============================================================
+# Temporal Inference Rules (시간 추론)
+# ============================================================
+#
+# 목적: 시대적 배경 분석 (Stage 4)
+# CSV 추출: hasYear, hasBirthYear, hasDeathYear
+# 추론 결과: occursBefore, contemporaryWith, hasLifespan 등
+#
+
+@prefix hist: <http://www.example.org/korean-history#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+
+# ============================================================
+# Rule 1: 사건 시간 순서 추론
+# ============================================================
+[temporal_order_events:
+    (?event1 hist:hasYear ?year1)
+    (?event2 hist:hasYear ?year2)
+    lessThan(?year1, ?year2)
+    noValue(?event1 hist:occursBefore ?event2)
+    ->
+    (?event1 hist:occursBefore ?event2)
+    (?event2 hist:occursAfter ?event1)
+]
+
+
+# ============================================================
+# Rule 2: 동시대 인물 추론
+# ============================================================
+[contemporary_persons:
+    (?person1 hist:hasBirthYear ?birth1)
+    (?person1 hist:hasDeathYear ?death1)
+    (?person2 hist:hasBirthYear ?birth2)
+    (?person2 hist:hasDeathYear ?death2)
+    lessThan(?birth1, ?death2)
+    lessThan(?birth2, ?death1)
+    notEqual(?person1, ?person2)
+    noValue(?person1 hist:contemporaryWith ?person2)
+    ->
+    (?person1 hist:contemporaryWith ?person2)
+    (?person2 hist:contemporaryWith ?person1)
+]
+
+
+# ============================================================
+# Rule 3: 선배/후배 관계 추론
+# ============================================================
+[senior_junior_relationship:
+    (?person1 hist:hasBirthYear ?birth1)
+    (?person2 hist:hasBirthYear ?birth2)
+    lessThan(?birth1, ?birth2)
+    notEqual(?person1, ?person2)
+    noValue(?person1 hist:seniorTo ?person2)
+    ->
+    (?person1 hist:seniorTo ?person2)
+    (?person2 hist:juniorTo ?person1)
+]
+
+
+# ============================================================
+# Rule 4: 세대 차이 추론 (30년 기준)
+# ============================================================
+[different_generation:
+    (?person1 hist:hasBirthYear ?birth1)
+    (?person2 hist:hasBirthYear ?birth2)
+    difference(?diff, ?birth2, ?birth1)
+    greaterThan(?diff, 30)
+    notEqual(?person1, ?person2)
+    noValue(?person1 hist:differentGenerationFrom ?person2)
+    ->
+    (?person1 hist:differentGenerationFrom ?person2)
+    (?person2 hist:differentGenerationFrom ?person1)
+]
+
+
+# ============================================================
+# Rule 5: 같은 시기 사건 추론 (동일 연도)
+# ============================================================
+[simultaneous_events:
+    (?event1 hist:hasYear ?year)
+    (?event2 hist:hasYear ?year)
+    notEqual(?event1, ?event2)
+    noValue(?event1 hist:simultaneousWith ?event2)
+    ->
+    (?event1 hist:simultaneousWith ?event2)
+    (?event2 hist:simultaneousWith ?event1)
+]
+
+
+# ============================================================
+# Rule 6: 수명 추론
+# ============================================================
+[calculate_lifespan:
+    (?person hist:hasBirthYear ?birth)
+    (?person hist:hasDeathYear ?death)
+    difference(?lifespan, ?death, ?birth)
+    noValue(?person hist:hasLifespan ?lifespan)
+    ->
+    (?person hist:hasLifespan ?lifespan)
+]
+
+
+# ============================================================
+# Rule 7: 전쟁 기간 추론
+# ============================================================
+[war_duration_inference:
+    (?battle1 hist:partOf ?war)
+    (?battle2 hist:partOf ?war)
+    (?battle1 hist:hasYear ?year1)
+    (?battle2 hist:hasYear ?year2)
+    lessThan(?year1, ?year2)
+    difference(?duration, ?year2, ?year1)
+    noValue(?war hist:hasDuration ?duration)
+    ->
+    (?war hist:hasDuration ?duration)
+]
+
+
+# ============================================================
+# Rule 8: 역사적 시대 분류 - 임진왜란 시기
+# ============================================================
+[classify_imjin_war_period:
+    (?event hist:hasYear ?year)
+    greaterThanOrEqual(?year, 1592)
+    lessThanOrEqual(?year, 1598)
+    noValue(?event hist:belongsToPeriod ?period)
+    ->
+    (?event hist:belongsToPeriod "imjin_war_period")
+]
+
+
+# ============================================================
+# Rule 9: 인물 생존 여부 추론
+# ============================================================
+[person_alive_during_event:
+    (?person hist:participatesIn ?event)
+    (?event hist:hasYear ?eventYear)
+    (?person hist:hasBirthYear ?birth)
+    (?person hist:hasDeathYear ?death)
+    greaterThanOrEqual(?eventYear, ?birth)
+    lessThanOrEqual(?eventYear, ?death)
+    noValue(?person hist:aliveDuring ?event)
+    ->
+    (?person hist:aliveDuring ?event)
+]
+
+
+# ============================================================
+# Rule 10: 장기 전쟁 추론 (5년 이상)
+# ============================================================
+[long_war_classification:
+    (?war hist:hasDuration ?duration)
+    greaterThanOrEqual(?duration, 5)
+    noValue(?war hist:warType ?type)
+    ->
+    (?war hist:warType "prolonged_war")
+]
+
+
+# ============================================================
+# Rule 11: 연속 사건 추론
+# ============================================================
+[consecutive_events:
+    (?event1 hist:hasYear ?year1)
+    (?event2 hist:hasYear ?year2)
+    sum(?nextYear, ?year1, 1)
+    equal(?year2, ?nextYear)
+    noValue(?event1 hist:followedBy ?event2)
+    ->
+    (?event1 hist:followedBy ?event2)
+    (?event2 hist:precededBy ?event1)
+]
+
+
+# ============================================================
+# Rule 12: 인물 나이 추론 (사건 발생 시)
+# ============================================================
+[person_age_during_event:
+    (?person hist:participatesIn ?event)
+    (?event hist:hasYear ?eventYear)
+    (?person hist:hasBirthYear ?birth)
+    difference(?age, ?eventYear, ?birth)
+    noValue(?person hist:ageAt ?event)
+    ->
+    (?person hist:ageAt ?event)
+]

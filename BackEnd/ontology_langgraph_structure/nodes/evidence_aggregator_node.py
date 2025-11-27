@@ -1,67 +1,70 @@
 """
 Evidence Aggregator Node
 
-다중 추론 경로를 집계하여 근거 구성
-- 여러 인과 체인 병합
-- 근거 우선순위 정렬 (체인 길이, 관련성 등)
-- 중복 제거
+5개 Thread의 추론 경로를 통합하여 최종 근거 구성
+- Thread별 가중치 적용
+- 우선순위 정렬
+- 상위 근거 선택
 """
 
-from langgraph_structure.state import GraphState
+from state import GraphState
 
 
 def evidence_aggregator_node(state: GraphState) -> GraphState:
-    """다중 근거 집계"""
+    """5가지 관점의 근거 통합"""
 
-    causal_chains = state.get("causal_chains", [])
-    inference_paths = state.get("inference_paths", [])
+    inference_paths = state.get("inference_paths", {})
+    thread_weights = state.get("thread_weights", {})
     query_type = state.get("query_type", "causal")
-    entities = state.get("extracted_entities", [])
 
-    print(f"📚 근거 집계 중... (경로 {len(inference_paths)}개)")
+    print(f"\n📚 근거 통합 중... ({len(inference_paths)}개 Thread)")
 
-    # 1. 엔티티 관련성 점수 계산
-    entity_names = {e.get("name", "").lower() for e in entities if "name" in e}
+    # 1. 모든 Thread의 경로를 하나로 병합
+    all_evidences = []
 
-    for path in inference_paths:
-        # 엔티티와 관련된 노드 개수
-        chain_nodes = {node.get("node", "").lower() for node in path["chain"]}
-        overlap = len(entity_names & chain_nodes)
+    for thread_type, paths in inference_paths.items():
+        base_weight = thread_weights.get(thread_type, 0.2)
 
-        path["relevance_score"] = overlap / len(entity_names) if entity_names else 0
-        path["weight"] = path["length"] * 0.3 + path["relevance_score"] * 0.7
+        for path in paths:
+            # Thread 가중치 적용
+            final_weight = path.get("weight", base_weight) * base_weight
 
-    # 2. 우선순위 정렬 (weight 높은 순)
-    sorted_paths = sorted(inference_paths, key=lambda x: x.get("weight", 0), reverse=True)
+            evidence = {
+                "type": thread_type,
+                "description": path.get("description", ""),
+                "weight": final_weight,
+                "source": f"Thread: {thread_type}",
+                "raw_data": path
+            }
 
-    # 3. 근거 구성 (상위 5개)
-    evidences = []
+            all_evidences.append(evidence)
 
-    for i, path in enumerate(sorted_paths[:5]):
-        evidence = {
-            "rank": i + 1,
-            "type": "causal_chain",
-            "chain": path["chain"],
-            "weight": path.get("weight", 0),
-            "description": format_chain_description(path["chain"])
-        }
-        evidences.append(evidence)
+    # 2. 가중치 기준으로 정렬
+    sorted_evidences = sorted(all_evidences, key=lambda x: x["weight"], reverse=True)
 
-    print(f"   - 집계된 근거: {len(evidences)}개")
-    for ev in evidences:
-        print(f"   {ev['rank']}. {ev['description']} (가중치: {ev['weight']:.2f})")
+    # 3. 상위 5-10개 선택
+    top_evidences = sorted_evidences[:10]
+
+    # 4. 순위 부여
+    for i, ev in enumerate(top_evidences, 1):
+        ev["rank"] = i
+
+    print(f"   - 통합 근거: {len(top_evidences)}개")
+    for ev in top_evidences[:5]:  # 상위 5개만 출력
+        print(f"   {ev['rank']}. [{ev['type']}] {ev['description']} (가중치: {ev['weight']:.2%})")
+
+    # 5. Thread별 통계
+    thread_stats = {}
+    for ev in top_evidences:
+        thread_type = ev["type"]
+        thread_stats[thread_type] = thread_stats.get(thread_type, 0) + 1
+
+    print(f"\n   - Thread별 근거 분포:")
+    for thread_type, count in sorted(thread_stats.items(), key=lambda x: -x[1]):
+        print(f"     • {thread_type}: {count}개")
 
     return {
         **state,
-        "evidences": evidences,
+        "evidences": top_evidences,
         "executed_nodes": state.get("executed_nodes", []) + ["evidence_aggregator"]
     }
-
-
-def format_chain_description(chain: list) -> str:
-    """체인을 한글 설명으로 변환"""
-    if len(chain) < 2:
-        return "근거 부족"
-
-    nodes = [node.get("node", "?") for node in chain]
-    return " → ".join(nodes)

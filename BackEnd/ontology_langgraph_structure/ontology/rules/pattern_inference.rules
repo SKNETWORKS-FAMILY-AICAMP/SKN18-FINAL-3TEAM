@@ -1,0 +1,135 @@
+# ============================================================
+# Pattern Inference Rules (패턴 추론)
+# ============================================================
+#
+# 목적: 심화 분석 (Stage 5)
+# CSV 추출: commands, occursAt, hasVictor
+# 추론 결과: hasStrategyPattern, hasWinningStreak 등
+#
+
+@prefix hist: <http://www.example.org/korean-history#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+
+# ============================================================
+# Rule 1: 방어 전략 패턴
+# ============================================================
+[defensive_strategy_pattern:
+    (?battle1 hist:occursAt ?place)
+    (?battle2 hist:occursAt ?place)
+    (?battle1 hist:hasVictor ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    (?place hist:controlledBy ?nation)
+    notEqual(?battle1, ?battle2)
+    noValue(?nation hist:hasStrategyPattern "defensive_warfare")
+    ->
+    (?nation hist:hasStrategyPattern "defensive_warfare")
+]
+
+
+# ============================================================
+# Rule 2: 기동 전략 패턴
+# ============================================================
+[mobile_strategy_pattern:
+    (?person hist:commands ?battle1)
+    (?person hist:commands ?battle2)
+    (?person hist:commands ?battle3)
+    (?battle1 hist:occursAt ?place1)
+    (?battle2 hist:occursAt ?place2)
+    (?battle3 hist:occursAt ?place3)
+    (?battle1 hist:hasVictor ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    (?battle3 hist:hasVictor ?nation)
+    notEqual(?place1, ?place2)
+    notEqual(?place2, ?place3)
+    notEqual(?place1, ?place3)
+    noValue(?person hist:hasStrategyPattern "mobile_warfare")
+    ->
+    (?person hist:hasStrategyPattern "mobile_warfare")
+]
+
+
+# ============================================================
+# Rule 3: 연합 전략 패턴
+# ============================================================
+[alliance_pattern:
+    (?battle hist:hasVictor ?nation1)
+    (?battle hist:involves ?nation2)
+    (?person1 hist:affiliatedWith ?nation1)
+    (?person2 hist:affiliatedWith ?nation2)
+    (?person1 hist:participatesIn ?battle)
+    (?person2 hist:participatesIn ?battle)
+    notEqual(?nation1, ?nation2)
+    noValue(?nation1 hist:alliedWith ?nation2)
+    ->
+    (?nation1 hist:alliedWith ?nation2)
+    (?nation2 hist:alliedWith ?nation1)
+]
+
+
+# ============================================================
+# Rule 4: 승리 패턴 - 연속 승리
+# ============================================================
+[winning_streak_pattern:
+    (?person hist:commands ?battle1)
+    (?person hist:commands ?battle2)
+    (?person hist:commands ?battle3)
+    (?battle1 hist:hasVictor ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    (?battle3 hist:hasVictor ?nation)
+    (?person hist:affiliatedWith ?nation)
+    (?battle1 hist:occursBefore ?battle2)
+    (?battle2 hist:occursBefore ?battle3)
+    noValue(?person hist:hasWinningStreak "three_consecutive_wins")
+    ->
+    (?person hist:hasWinningStreak "three_consecutive_wins")
+]
+
+
+# ============================================================
+# Rule 5: 패배 후 반전 패턴
+# ============================================================
+[comeback_pattern:
+    (?person hist:commands ?battle1)
+    (?person hist:commands ?battle2)
+    (?battle1 hist:hasDefeated ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    (?person hist:affiliatedWith ?nation)
+    (?battle1 hist:occursBefore ?battle2)
+    noValue(?person hist:hasComebackPattern "comeback_victory")
+    ->
+    (?person hist:hasComebackPattern "comeback_victory")
+]
+
+
+# ============================================================
+# Rule 6: 장소 재점령 패턴
+# ============================================================
+[territory_recapture_pattern:
+    (?battle1 hist:occursAt ?place)
+    (?battle2 hist:occursAt ?place)
+    (?battle1 hist:hasVictor ?nation1)
+    (?battle2 hist:hasVictor ?nation2)
+    (?battle1 hist:occursBefore ?battle2)
+    notEqual(?nation1, ?nation2)
+    noValue(?place hist:hasContestedStatus "contested_territory")
+    ->
+    (?place hist:hasContestedStatus "contested_territory")
+]
+
+
+# ============================================================
+# Rule 7: 지휘관 교체 패턴
+# ============================================================
+[commander_rotation_pattern:
+    (?person1 hist:commands ?battle1)
+    (?person2 hist:commands ?battle2)
+    (?battle1 hist:partOf ?war)
+    (?battle2 hist:partOf ?war)
+    (?battle1 hist:occursBefore ?battle2)
+    notEqual(?person1, ?person2)
+    noValue(?war hist:hasCommandPattern "commander_rotation")
+    ->
+    (?war hist:hasCommandPattern "commander_rotation")
+]
