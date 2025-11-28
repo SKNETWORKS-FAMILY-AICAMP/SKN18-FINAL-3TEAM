@@ -1,5 +1,6 @@
 # 질문과 답변이 연관성 있는지 평가하는 노드
 from langgraph_structure.state import GraphState
+from langgraph.graph import END
 from typing import Dict, Any, List
 
 def evaluate_node(state: GraphState) -> GraphState:
@@ -41,4 +42,4 @@ def route_evaluate(state: GraphState) -> str:
     if state.get("related_num", 0) >= 1:
         return "generate_node"
     else:
-        return "generate_cypher_node"
+        return END

@@ -19,8 +19,6 @@ def create_graph_flow():
     workflow.add_node("classify_node",classify_node)
     workflow.add_node("retrieval_node", retrieval_node)
     workflow.add_node("evaluate_node", evaluate_node)
-    workflow.add_node("generate_cypher_node", generate_cypher_node)
-    workflow.add_node("neo4j_query_node",neo4j_query_node)
     workflow.add_node("generate_node", generate_node)
     workflow.add_node("tone_adjust_node",tone_adjust_node)
     workflow.add_node("scene_split_node",scene_split_node)
@@ -39,35 +37,14 @@ def create_graph_flow():
         },
     )
 
-    # retrieval_node → route_retrieval 로 분기
-    # route_retrieval(state) 가 "generate_cypher_node" 또는 "evaluate_node"를 리턴
-    workflow.add_conditional_edges(
-        "retrieval_node",
-        route_retrieval,
-        {
-            "generate_cypher_node": "generate_cypher_node",
-            "evaluate_node": "evaluate_node",
-        },
-    )
+    # retrieval_node → evaluate_node 로 연결
+    workflow.add_edge("retrieval_node", "evaluate_node")
 
     # evaluate_node → route_evaluate 로 분기
-    # route_evaluate(state) 가 "generate_node" 또는 generate_cypher_node를 리턴
+    # route_evaluate(state) 가 "generate_node" 또는 END로 리턴
     workflow.add_conditional_edges(
         "evaluate_node",
         route_evaluate,
-        {
-            "generate_node": "generate_node",
-            "generate_cypher_node": "generate_cypher_node",
-        },
-    )
-    
-    workflow.add_edge("generate_cypher_node", "neo4j_query_node")
-
-    # neo4j_query_node → route_neo4j_query 로 분기
-    # route_neo4j_query(state) 가 "generate_node" 또는 END를 리턴
-    workflow.add_conditional_edges(
-        "neo4j_query_node",
-        route_neo4j_query,
         {
             "generate_node": "generate_node",
             END: END,
