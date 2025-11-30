@@ -8,8 +8,13 @@ Story Generator Node
 """
 
 import os
-from langgraph_structure.state import GraphState
+import sys
+from pathlib import Path
 from langchain_openai import ChatOpenAI
+
+# 상위 디렉토리를 경로에 추가
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from state import GraphState
 
 
 def story_generator_node(state: GraphState) -> GraphState:

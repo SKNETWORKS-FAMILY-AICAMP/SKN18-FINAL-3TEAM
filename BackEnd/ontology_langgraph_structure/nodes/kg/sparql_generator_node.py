@@ -7,8 +7,13 @@ LLM을 사용하여 자연어 질문을 SPARQL 쿼리로 변환
 """
 
 import os
-from langgraph_structure.state import GraphState
+import sys
+from pathlib import Path
 from langchain_openai import ChatOpenAI
+
+# 상위 디렉토리를 경로에 추가
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from state import GraphState
 
 
 # 온톨로지 스키마 예시 (실제로는 OWL 파일에서 로드)
@@ -31,7 +36,7 @@ ONTOLOGY_SCHEMA = """
 - hist:relatedTo (관련)
 
 ## 네임스페이스
-PREFIX hist: <http://www.semanticweb.org/ontologies/korean-history#>
+PREFIX hist: <http://www.example.org/korean-history#>
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 """
@@ -116,7 +121,7 @@ def sparql_generator_node(state: GraphState) -> GraphState:
         print(f"⚠️ SPARQL 생성 실패: {e}")
         # 기본 쿼리
         sparql_query = """
-PREFIX hist: <http://www.semanticweb.org/ontologies/korean-history#>
+PREFIX hist: <http://www.example.org/korean-history#>
 SELECT ?s ?p ?o WHERE {
     ?s ?p ?o
 } LIMIT 100

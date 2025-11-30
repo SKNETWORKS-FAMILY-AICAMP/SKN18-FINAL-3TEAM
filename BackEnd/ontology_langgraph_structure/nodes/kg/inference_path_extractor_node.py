@@ -7,7 +7,12 @@ Inference Path Extractor Node
 - 근거 트리플 수집
 """
 
-from langgraph_structure.state import GraphState
+import sys
+from pathlib import Path
+
+# 상위 디렉토리를 경로에 추가
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from state import GraphState
 
 
 def extract_causal_chains(bindings: list) -> list:

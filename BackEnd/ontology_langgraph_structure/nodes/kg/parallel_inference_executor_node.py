@@ -157,7 +157,7 @@ def execute_inference_thread(thread_type: str, sparql: str, hypothetical: list, 
         # What-if API 엔드포인트
         payload = {
             "base_ontology": "korean_history.owl",
-            "base_instances": ["joseon_era.ttl"],
+            "base_instances": [],  # 빈 리스트 → 모든 .ttl 파일 자동 로드
             "rules": rules_file,
             "hypothetical_triples": hypothetical,
             "query": sparql
@@ -167,7 +167,7 @@ def execute_inference_thread(thread_type: str, sparql: str, hypothetical: list, 
         # 일반 추론 API 엔드포인트
         payload = {
             "ontology": "korean_history.owl",
-            "instances": ["joseon_era.ttl"],
+            "instances": [],  # 빈 리스트 → 모든 .ttl 파일 자동 로드
             "rules": rules_file
         }
         endpoint = f"{API_URL}/infer"

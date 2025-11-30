@@ -8,9 +8,14 @@ Query Classifier Node
 """
 
 import os
+import sys
+from pathlib import Path
 from typing import Literal
-from langgraph_structure.state import GraphState
 from langchain_openai import ChatOpenAI
+
+# 상위 디렉토리를 경로에 추가
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from state import GraphState
 
 
 def query_classifier_node(state: GraphState) -> GraphState:

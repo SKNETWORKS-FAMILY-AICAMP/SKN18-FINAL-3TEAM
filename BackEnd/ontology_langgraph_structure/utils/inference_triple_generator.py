@@ -150,6 +150,20 @@ class InferenceTripleGenerator:
             if not predicate:
                 predicate = {"type": "uri", "value": f"{self.namespace}hasMotive"}
 
+        elif thread_type == "policy":
+            subject = subject or binding.get("policy")
+            obj = obj or binding.get("event") or binding.get("person") or binding.get("impact")
+            if not predicate:
+                # 기본 술어 (policy → event)
+                predicate = {"type": "uri", "value": f"{self.namespace}leadsTo"}
+
+        elif thread_type == "institution":
+            subject = subject or binding.get("institution")
+            obj = obj or binding.get("policy") or binding.get("person")
+            if not predicate:
+                # 기본 술어 (institution → policy)
+                predicate = {"type": "uri", "value": f"{self.namespace}relatedToPolicy"}
+
         if not all([subject, predicate, obj]):
             return ""
 

@@ -191,6 +191,58 @@ ONTOLOGY_SCHEMA: Dict[str, Dict[str, List[str]]] = {
         "inverse_properties": [
             "hist:hasRelationship",     # 인간관계를 갖다
         ]
+    },
+
+    # 정책 (Policy) - Event의 하위 클래스
+    "Policy": {
+        "properties": [
+            # 기본 정보
+            "hist:hasDate",             # 날짜
+            "hist:hasYear",             # 연도
+            "hist:initiatedBy",         # 정책을 시작한 인물
+            "hist:hasObjective",        # 정책 목표
+            "hist:hasParticipant",      # 참여자
+
+            # 인과관계
+            "hist:leadsTo",             # ~로 이어지다
+            "hist:causedBy",            # ~에 의해 발생하다
+            "hist:hasImpact",           # 영향
+            "hist:hasOutcome",          # 결과
+
+            # 맥락
+            "hist:partOf",              # ~의 일부
+            "hist:hasContext",          # 시대적 맥락
+            "hist:involves",            # 국가 포함
+
+            # 시간 추론 결과 (Stage 4)
+            "hist:occursBefore",        # [추론] ~보다 먼저
+            "hist:occursAfter",         # [추론] ~보다 나중에
+            "hist:simultaneousWith",    # [추론] 동일 시기
+            "hist:belongsToPeriod",     # [추론] 역사적 시대
+
+            # 인과관계 추론 결과 (Stage 2)
+            "hist:indirectlyCausedBy",  # [추론] 간접 인과관계
+        ],
+        "inverse_properties": [
+            "hist:participatesIn",      # 참여하다
+        ]
+    },
+
+    # 제도 (Institution)
+    "Institution": {
+        "properties": [
+            # 기본 정보
+            "hist:establishedBy",       # 설립자
+            "hist:hasPurpose",          # 목적
+            "hist:relatedToPolicy",     # 관련 정책
+            "hist:hasDate",             # 설립 날짜
+            "hist:hasYear",             # 설립 연도
+
+            # 맥락
+            "hist:hasContext",          # 시대적 맥락
+            "hist:partOf",              # ~의 일부
+        ],
+        "inverse_properties": []
     }
 }
 
@@ -202,6 +254,8 @@ ENTITY_URI_PREFIX: Dict[str, str] = {
     "Battle": "hist:",
     "Place": "hist:",
     "Nation": "hist:",
+    "Policy": "hist:",
+    "Institution": "hist:",
     "Year": ""  # 연도는 리터럴
 }
 

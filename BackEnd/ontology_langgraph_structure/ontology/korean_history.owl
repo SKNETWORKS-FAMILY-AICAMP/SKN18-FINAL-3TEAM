@@ -65,6 +65,19 @@
         <rdfs:comment>인물 간 관계 (동료, 적대, 스승-제자 등)</rdfs:comment>
     </owl:Class>
 
+    <!-- Policy (정책) - Event의 하위 클래스 -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Policy">
+        <rdfs:subClassOf rdf:resource="http://www.example.org/korean-history#Event"/>
+        <rdfs:label>Policy</rdfs:label>
+        <rdfs:comment>국가 정책 (훈민정음 창제, 쇄국정책 등)</rdfs:comment>
+    </owl:Class>
+
+    <!-- Institution (제도) -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Institution">
+        <rdfs:label>Institution</rdfs:label>
+        <rdfs:comment>국가 제도 (집현전, 의금부 등)</rdfs:comment>
+    </owl:Class>
+
 
 
     <!--
@@ -680,5 +693,51 @@
         <rdfs:label>hasCommandPattern</rdfs:label>
         <rdfs:comment>[추론] 지휘 교체 패턴 (commander_rotation)</rdfs:comment>
     </owl:DatatypeProperty>
+
+
+    <!-- ========== Policy 관련 속성 ========== -->
+
+    <!-- initiatedBy -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#initiatedBy">
+        <rdfs:domain rdf:resource="http://www.example.org/korean-history#Policy"/>
+        <rdfs:range rdf:resource="http://www.example.org/korean-history#Person"/>
+        <rdfs:label>initiatedBy</rdfs:label>
+        <rdfs:comment>정책이 인물에 의해 시작되다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- hasObjective -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasObjective">
+        <rdfs:domain rdf:resource="http://www.example.org/korean-history#Policy"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasObjective</rdfs:label>
+        <rdfs:comment>정책의 목표</rdfs:comment>
+    </owl:DatatypeProperty>
+
+
+    <!-- ========== Institution 관련 속성 ========== -->
+
+    <!-- establishedBy -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#establishedBy">
+        <rdfs:domain rdf:resource="http://www.example.org/korean-history#Institution"/>
+        <rdfs:range rdf:resource="http://www.example.org/korean-history#Person"/>
+        <rdfs:label>establishedBy</rdfs:label>
+        <rdfs:comment>제도가 인물에 의해 설립되다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- hasPurpose -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasPurpose">
+        <rdfs:domain rdf:resource="http://www.example.org/korean-history#Institution"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasPurpose</rdfs:label>
+        <rdfs:comment>제도의 목적</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- relatedToPolicy -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#relatedToPolicy">
+        <rdfs:domain rdf:resource="http://www.example.org/korean-history#Institution"/>
+        <rdfs:range rdf:resource="http://www.example.org/korean-history#Policy"/>
+        <rdfs:label>relatedToPolicy</rdfs:label>
+        <rdfs:comment>제도가 정책과 관련되다</rdfs:comment>
+    </owl:ObjectProperty>
 
 </rdf:RDF>

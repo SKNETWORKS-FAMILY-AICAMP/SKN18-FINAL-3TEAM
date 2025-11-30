@@ -187,3 +187,63 @@
     ->
     (?person hist:ageAt ?event)
 ]
+
+
+# ============================================================
+# Rule 13: 정책 시간 순서 추론
+# ============================================================
+[temporal_order_policies:
+    (?policy1 rdf:type hist:Policy)
+    (?policy2 rdf:type hist:Policy)
+    (?policy1 hist:hasYear ?year1)
+    (?policy2 hist:hasYear ?year2)
+    lessThan(?year1, ?year2)
+    noValue(?policy1 hist:occursBefore ?policy2)
+    ->
+    (?policy1 hist:occursBefore ?policy2)
+    (?policy2 hist:occursAfter ?policy1)
+]
+
+
+# ============================================================
+# Rule 14: 제도 설립 시대 분류 - 세종대왕 시기
+# ============================================================
+[classify_sejong_period:
+    (?institution rdf:type hist:Institution)
+    (?institution hist:hasYear ?year)
+    greaterThanOrEqual(?year, 1418)
+    lessThanOrEqual(?year, 1450)
+    noValue(?institution hist:belongsToPeriod ?period)
+    ->
+    (?institution hist:belongsToPeriod "sejong_period")
+]
+
+
+# ============================================================
+# Rule 15: 정책과 사건 동시성 추론
+# ============================================================
+[policy_event_simultaneity:
+    (?policy rdf:type hist:Policy)
+    (?event rdf:type hist:Event)
+    (?policy hist:hasYear ?year)
+    (?event hist:hasYear ?year)
+    noValue(?policy hist:simultaneousWith ?event)
+    ->
+    (?policy hist:simultaneousWith ?event)
+    (?event hist:simultaneousWith ?policy)
+]
+
+
+# ============================================================
+# Rule 16: 제도 존속 기간 추론 (설립-폐지)
+# ============================================================
+[institution_duration:
+    (?institution rdf:type hist:Institution)
+    (?institution hist:establishedBy ?person)
+    (?person hist:hasBirthYear ?birth)
+    (?person hist:hasDeathYear ?death)
+    difference(?duration, ?death, ?birth)
+    noValue(?institution hist:hasDuration ?duration)
+    ->
+    (?institution hist:hasDuration ?duration)
+]

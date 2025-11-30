@@ -133,3 +133,51 @@
     ->
     (?war hist:hasCommandPattern "commander_rotation")
 ]
+
+
+# ============================================================
+# Rule 8: 연속 정책 시행 → 개혁 전략 패턴
+# ============================================================
+[reform_policy_pattern:
+    (?person hist:initiatedBy ?policy1)
+    (?person hist:initiatedBy ?policy2)
+    (?person hist:initiatedBy ?policy3)
+    (?policy1 rdf:type hist:Policy)
+    (?policy2 rdf:type hist:Policy)
+    (?policy3 rdf:type hist:Policy)
+    (?policy1 hist:occursBefore ?policy2)
+    (?policy2 hist:occursBefore ?policy3)
+    noValue(?person hist:hasStrategyPattern "systematic_reform")
+    ->
+    (?person hist:hasStrategyPattern "systematic_reform")
+]
+
+
+# ============================================================
+# Rule 9: 제도 설립 → 문화 발전 패턴
+# ============================================================
+[institution_culture_pattern:
+    (?institution1 rdf:type hist:Institution)
+    (?institution2 rdf:type hist:Institution)
+    (?person hist:establishedBy ?institution1)
+    (?person hist:establishedBy ?institution2)
+    notEqual(?institution1, ?institution2)
+    noValue(?person hist:hasStrategyPattern "cultural_advancement")
+    ->
+    (?person hist:hasStrategyPattern "cultural_advancement")
+]
+
+
+# ============================================================
+# Rule 10: 정책 → 제도 설립 → 시스템 구축 패턴
+# ============================================================
+[systemic_building_pattern:
+    (?policy rdf:type hist:Policy)
+    (?institution rdf:type hist:Institution)
+    (?policy hist:initiatedBy ?person)
+    (?institution hist:establishedBy ?person)
+    (?institution hist:relatedToPolicy ?policy)
+    noValue(?person hist:hasStrategyPattern "systemic_building")
+    ->
+    (?person hist:hasStrategyPattern "systemic_building")
+]

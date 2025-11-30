@@ -15,9 +15,10 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 
 # ==================== 설정 ====================
 
-PROJECT_ROOT = Path(__file__).parent.parent.parent
-REASONER_JAR = PROJECT_ROOT / "knowledge_engineering/ontology/reasoner/target/swrl-reasoner-0.1.0.jar"
-ONTOLOGY_DIR = PROJECT_ROOT / "knowledge_engineering/ontology"
+# 현재 스크립트 위치: backend/ontology_langgraph_structure/ontology/scripts/
+# ontology 디렉토리로 이동
+ONTOLOGY_DIR = Path(__file__).parent.parent
+REASONER_JAR = ONTOLOGY_DIR / "reasoner/target/swrl-reasoner-0.1.0.jar"
 TEMP_FUSEKI_URL = "http://localhost:3030/temp_inference"  # 임시 데이터셋
 
 app = FastAPI(title="SWRL Inference API")
@@ -27,16 +28,16 @@ app = FastAPI(title="SWRL Inference API")
 
 class InferenceRequest(BaseModel):
     """일반 추론 요청"""
-    ontology: str = "test_basic.owl"
-    instances: list[str] = ["test_scenario_all.ttl"]
-    rules: str = "test_inference.rules"
+    ontology: str = "korean_history.owl"
+    instances: list[str] = []  # 빈 리스트면 instances 폴더의 모든 .ttl 파일 사용
+    rules: str = "all_rules.rules"  # 병합된 규칙 파일
 
 
 class WhatIfRequest(BaseModel):
     """What-if 시나리오 요청"""
-    base_ontology: str = "test_basic.owl"
-    base_instances: list[str] = ["test_scenario_all.ttl"]
-    rules: str = "test_inference.rules"
+    base_ontology: str = "korean_history.owl"
+    base_instances: list[str] = []  # 빈 리스트면 instances 폴더의 모든 .ttl 파일 사용
+    rules: str = "all_rules.rules"  # 병합된 규칙 파일
     hypothetical_triples: list[str] = []  # 가상 트리플 (Turtle 형식)
     query: str = "SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 50"  # 결과 조회용 SPARQL
 
@@ -48,7 +49,7 @@ def infer(req: InferenceRequest):
     """일반 실시간 추론 실행"""
     
     # 파일 경로 확인
-    ontology = ONTOLOGY_DIR / "schemas" / req.ontology
+    ontology = ONTOLOGY_DIR / req.ontology  # korean_history.owl은 ontology 디렉토리 바로 아래
     rules = ONTOLOGY_DIR / "rules" / req.rules
     
     if not ontology.exists():
@@ -90,9 +91,9 @@ def infer(req: InferenceRequest):
 @app.post("/what-if")
 def what_if(req: WhatIfRequest):
     """What-if 시나리오 실시간 추론"""
-    
+
     # 파일 경로 확인
-    ontology = ONTOLOGY_DIR / "schemas" / req.base_ontology
+    ontology = ONTOLOGY_DIR / req.base_ontology  # korean_history.owl은 ontology/ 바로 아래
     rules = ONTOLOGY_DIR / "rules" / req.rules
     
     if not ontology.exists():
@@ -156,10 +157,21 @@ def _merge_instances(files: list[str], output: Path):
     from rdflib import Graph
     
     g = Graph()
+    instances_dir = ONTOLOGY_DIR / "instances"
+    
+    # files가 비어있으면 instances 폴더의 모든 .ttl 파일 사용
+    if not files:
+        if instances_dir.exists():
+            files = [f.name for f in instances_dir.glob("*.ttl")]
+            print(f"📂 자동으로 {len(files)}개 인스턴스 파일 발견: {files}")
+        else:
+            raise ValueError(f"인스턴스 디렉토리가 없습니다: {instances_dir}")
+    
     for file in files:
-        path = ONTOLOGY_DIR / "instances" / file
+        path = instances_dir / file
         if path.exists():
             g.parse(str(path), format="turtle")
+            print(f"   ✅ 로드: {file}")
         else:
             print(f"⚠️ 경고: 인스턴스 파일을 찾을 수 없습니다: {path}")
     
@@ -167,6 +179,7 @@ def _merge_instances(files: list[str], output: Path):
         raise ValueError("병합할 인스턴스가 없습니다")
     
     g.serialize(str(output), format="turtle")
+    print(f"   ✅ 병합 완료: {len(g)} 트리플")
 
 
 def _add_hypothetical_triples(ttl_file: Path, triples: list[str]):

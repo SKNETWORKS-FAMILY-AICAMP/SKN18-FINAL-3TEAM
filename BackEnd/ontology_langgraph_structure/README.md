@@ -476,3 +476,137 @@ python main.py
 | **추론 시간**   | 21.5초    | 5초         | 76% ↓  |
 | **근거 다양성** | 1가지     | 5가지       | 400% ↑ |
 | **답변 품질**   | 단편적    | 다각도 분석 | -      |
+
+---
+
+## 🔥 LLM 버전 아키텍처 (최신)
+
+### ontology_schema.py 기반 스키마 검색
+
+```mermaid
+graph TD
+    Start([사용자 질문]) --> QueryClassifier[Query Classifier<br/>LLM 기반 질문 분류]
+
+    QueryClassifier --> EntityExtractor[Entity Extractor<br/>LLM 기반 엔티티 추출]
+
+    EntityExtractor --> MultiQueryGen[Multi-Query Generator<br/>LLM + ontology_schema.py]
+
+    %% ontology_schema.py 제공
+    OntologySchema[(ontology_schema.py<br/>INFERENCE_PROPERTIES_BY_STAGE)] -.->|Stage별 추론 프로퍼티 제공| MultiQueryGen
+
+    MultiQueryGen --> WhatIfCheck{What-if?}
+
+    WhatIfCheck -->|Yes| HypoTriple[Hypothetical Triple Generator<br/>가상 시나리오 TTL 생성]
+    WhatIfCheck -->|No| ParallelInference
+
+    HypoTriple --> ParallelInference
+
+    ParallelInference[Parallel Inference Executor<br/>ThreadPoolExecutor 병렬 실행] --> Thread1[Thread 1: CAUSAL<br/>causal_inference.rules<br/>Stage 2: 역사 시뮬레이터]
+    ParallelInference --> Thread2[Thread 2: PERSON<br/>person_inference.rules<br/>Stage 1,3: 인물 분석]
+    ParallelInference --> Thread3[Thread 3: TEMPORAL<br/>temporal_inference.rules<br/>Stage 4: 시대적 배경]
+    ParallelInference --> Thread4[Thread 4: PATTERN<br/>pattern_inference.rules<br/>Stage 5: 심화 분석]
+    ParallelInference --> Thread5[Thread 5: MOTIVE<br/>motive_inference.rules<br/>Stage 1: 동기 분석]
+
+    Thread1 --> Jena1[Jena Reasoner API<br/>POST /what-if or /infer]
+    Thread2 --> Jena2[Jena Reasoner API<br/>POST /what-if or /infer]
+    Thread3 --> Jena3[Jena Reasoner API<br/>POST /what-if or /infer]
+    Thread4 --> Jena4[Jena Reasoner API<br/>POST /what-if or /infer]
+    Thread5 --> Jena5[Jena Reasoner API<br/>POST /what-if or /infer]
+
+    Jena1 --> Fuseki1[(Fuseki Triple Store<br/>temp_inference_*)]
+    Jena2 --> Fuseki2[(Fuseki Triple Store<br/>temp_inference_*)]
+    Jena3 --> Fuseki3[(Fuseki Triple Store<br/>temp_inference_*)]
+    Jena4 --> Fuseki4[(Fuseki Triple Store<br/>temp_inference_*)]
+    Jena5 --> Fuseki5[(Fuseki Triple Store<br/>temp_inference_*)]
+
+    Fuseki1 --> Results1[SPARQL 결과<br/>인과관계 Bindings]
+    Fuseki2 --> Results2[SPARQL 결과<br/>인물관계 Bindings]
+    Fuseki3 --> Results3[SPARQL 결과<br/>시대배경 Bindings]
+    Fuseki4 --> Results4[SPARQL 결과<br/>패턴 Bindings]
+    Fuseki5 --> Results5[SPARQL 결과<br/>동기 Bindings]
+
+    Results1 --> TTLGenerator[InferenceTripleGenerator<br/>SPARQL Bindings → TTL 변환]
+    Results2 --> TTLGenerator
+    Results3 --> TTLGenerator
+    Results4 --> TTLGenerator
+    Results5 --> TTLGenerator
+
+    TTLGenerator --> TTLFile[TTL 파일 저장<br/>inference_YYYYMMDD_HHMMSS.ttl]
+
+    Results1 --> EvidenceAgg[Evidence Aggregator<br/>5가지 근거 통합 + 가중치 정렬]
+    Results2 --> EvidenceAgg
+    Results3 --> EvidenceAgg
+    Results4 --> EvidenceAgg
+    Results5 --> EvidenceAgg
+
+    EvidenceAgg --> StoryGen[Story Generator<br/>LLM 기반 스토리 생성]
+
+    StoryGen --> Output([최종 답변<br/>다중 근거 + 풍부한 스토리])
+
+    %% 스타일
+    classDef llmNode fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef dbNode fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef jenaNode fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef parallelNode fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef schemaNode fill:#ffebee,stroke:#b71c1c,stroke-width:3px
+    classDef ttlNode fill:#e0f2f1,stroke:#004d40,stroke-width:2px
+
+    class QueryClassifier,EntityExtractor,StoryGen llmNode
+    class Fuseki1,Fuseki2,Fuseki3,Fuseki4,Fuseki5 dbNode
+    class Jena1,Jena2,Jena3,Jena4,Jena5 jenaNode
+    class Thread1,Thread2,Thread3,Thread4,Thread5,ParallelInference parallelNode
+    class OntologySchema schemaNode
+    class TTLGenerator,TTLFile ttlNode
+```
+
+### 주요 변경사항 (Milvus → LLM 버전)
+
+| 컴포넌트              | Milvus 버전                          | LLM 버전                                      |
+| --------------------- | ------------------------------------ | --------------------------------------------- |
+| **Entity Extractor**  | Milvus pgvector 유사도 검색          | **LLM 기반 엔티티 추출**                      |
+| **Schema 검색**       | Milvus 스키마 컬렉션 벡터 검색       | **ontology_schema.py INFERENCE_PROPERTIES**   |
+| **Multi-Query Gen**   | Milvus 유사 프로퍼티 검색 → 템플릿   | **LLM + ontology_schema.py 동적 SPARQL 생성** |
+| **추론 결과 저장**    | -                                    | **InferenceTripleGenerator → TTL 파일**       |
+
+### ontology_schema.py의 역할
+
+```python
+# ontology_schema.py에서 제공하는 Stage별 추론 프로퍼티
+INFERENCE_PROPERTIES_BY_STAGE = {
+    "causal": {
+        "description": "Stage 2: 역사 시뮬레이터 (인과관계 추론)",
+        "properties": [
+            "hist:leadsTo",
+            "hist:indirectlyCausedBy",
+            "hist:hasStatus",
+            "hist:hasStrategicAdvantage",
+            "hist:strategicImportance"
+        ]
+    },
+    "person": {
+        "description": "Stage 1, 3: 비하인드 스토리 + 인물 분석",
+        "properties": [
+            "hist:commands",
+            "hist:participatesIn",
+            "hist:hasRelationshipWith",
+            "hist:hasEnemyRelationship",
+            "hist:hasInfluence",
+            "hist:hasLoyalty"
+        ]
+    },
+    # ... temporal, pattern, motive
+}
+```
+
+**사용 흐름:**
+1. Multi-Query Generator Node가 `ontology_schema.py`에서 Stage별 프로퍼티 로드
+2. LLM에게 프로퍼티 목록과 함께 SPARQL 생성 요청
+3. LLM이 질문에 맞는 프로퍼티만 선택하여 정확한 SPARQL 생성
+
+**장점:**
+- ✅ Milvus 의존성 제거 (벡터 검색 불필요)
+- ✅ 빠른 실행 (파일 import만으로 스키마 로드)
+- ✅ 정확한 스키마 정의 (Python 코드로 명시)
+- ✅ LLM이 추론 프로퍼티만 사용하도록 강제
+
+---

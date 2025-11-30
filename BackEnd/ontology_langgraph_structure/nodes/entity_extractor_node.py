@@ -11,9 +11,14 @@ Entity Extractor Node
 """
 
 import os
-from langgraph_structure.state import GraphState
-from langgraph_structure.ontology_schema import get_schema_summary
+import sys
+from pathlib import Path
 from langchain_openai import ChatOpenAI
+
+# 상위 디렉토리를 경로에 추가
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from state import GraphState
+from ontology_schema import get_schema_summary
 
 
 def entity_extractor_node(state: GraphState) -> GraphState:
