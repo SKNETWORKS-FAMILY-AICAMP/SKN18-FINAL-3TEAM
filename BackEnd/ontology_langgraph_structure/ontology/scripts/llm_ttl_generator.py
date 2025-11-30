@@ -93,7 +93,7 @@ class LLMTTLGenerator:
 **출력 형식 (JSON):**
 {{
   "main_entity": {{
-    "type": "Person|Event|Battle|Place|Nation|Policy|Institution",
+    "type": "Person|Event|Battle|Place|Nation|Policy|Institution|Object|Role|SocialClass|Document",
     "name": "이순신",
     "properties": {{
       "hasAlias": ["충무공"],
@@ -265,63 +265,120 @@ class LLMTTLGenerator:
 
         return all_triples
 
-    def generate_ttl_file(self, limit: int = None):
+    def generate_ttl_file(self, limit: int = None, resume: bool = True, batch_size: int = 50):
         """
-        CSV 전체를 읽어서 TTL 파일 생성 (메모리 기반 방식)
+        CSV 전체를 읽어서 TTL 파일 생성 (체크포인트 기능 포함)
 
         Args:
             limit: 처리할 행 수 제한 (None이면 전체)
+            resume: True면 이전 진행 상황에서 재개
+            batch_size: 몇 개마다 저장할지 (기본 50개)
         """
         print(f"📖 CSV 읽기: {self.csv_path}")
 
         output_path = os.path.join(self.output_dir, "korean_history_instances.ttl")
+        checkpoint_path = os.path.join(self.output_dir, ".checkpoint")
+        error_log_path = os.path.join(self.output_dir, "error_log.txt")
 
-        # TTL 헤더
-        header = [
-            "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .",
-            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .",
-            "@prefix owl: <http://www.w3.org/2002/07/owl#> .",
-            "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .",
-            "@prefix hist: <http://www.example.org/korean-history#> .",
-            "",
-            "# 조선시대 역사 인스턴스 데이터",
-            ""
-        ]
+        # 체크포인트에서 시작 위치 읽기
+        start_index = 0
+        if resume and os.path.exists(checkpoint_path):
+            with open(checkpoint_path, 'r') as f:
+                start_index = int(f.read().strip())
+            print(f"🔄 체크포인트에서 재개: {start_index}번째부터")
 
-        # 메모리에 모든 트리플 저장
-        all_triples = ["\n".join(header)]
+        # 첫 시작인 경우 기존 파일 백업
+        if start_index == 0 and os.path.exists(output_path):
+            backup_path = output_path + ".backup"
+            if os.path.exists(backup_path):
+                os.remove(backup_path)
+            os.rename(output_path, backup_path)
+            print(f"📦 기존 파일 백업: {os.path.basename(backup_path)}")
+
+        # TTL 헤더 (첫 시작인 경우에만)
+        if start_index == 0:
+            header = [
+                "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .",
+                "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .",
+                "@prefix owl: <http://www.w3.org/2002/07/owl#> .",
+                "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .",
+                "@prefix hist: <http://www.example.org/korean-history#> .",
+                "",
+                "# 조선시대 역사 인스턴스 데이터",
+                ""
+            ]
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write("\n".join(header))
+
+        # 배치 저장용 버퍼
+        batch_triples = []
+        processed_count = 0
+        error_count = 0
 
         # CSV 읽기 (BOM 처리)
         with open(self.csv_path, 'r', encoding='utf-8-sig') as csv_file:
             reader = csv.DictReader(csv_file)
 
             for i, row in enumerate(reader):
+                # 시작 위치 이전은 건너뛰기
+                if i < start_index:
+                    continue
+
                 if limit and i >= limit:
                     break
 
                 print(f"  처리 중: {i+1}. {row['title']}")
 
-                # 트리플 생성
-                triples = self.process_csv_row(row)
+                try:
+                    # 트리플 생성
+                    triples = self.process_csv_row(row)
 
-                # 메모리에 추가
-                if triples:
-                    all_triples.append(f"# {row['title']} ({row['category']})")
-                    all_triples.extend(triples)
-                    all_triples.append("")  # 빈 줄
+                    # 배치에 추가
+                    if triples:
+                        batch_triples.append(f"\n# {row['title']} ({row['category']})")
+                        batch_triples.extend(triples)
+                        batch_triples.append("")
 
-        # 한 번에 파일 저장
-        print(f"\n💾 파일 저장 중...")
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write("\n".join(all_triples))
+                    processed_count += 1
+
+                except Exception as e:
+                    error_count += 1
+                    print(f"    ❌ 에러: {e}")
+                    # 에러 로그 기록
+                    with open(error_log_path, 'a', encoding='utf-8') as f:
+                        f.write(f"{i+1}. {row['title']}: {e}\n")
+
+                # 배치 저장 (batch_size마다)
+                if processed_count > 0 and processed_count % batch_size == 0:
+                    with open(output_path, 'a', encoding='utf-8') as f:
+                        f.write("\n".join(batch_triples))
+                    batch_triples = []
+
+                    # 체크포인트 저장
+                    with open(checkpoint_path, 'w') as f:
+                        f.write(str(i + 1))
+
+                    print(f"    💾 저장 완료 ({i+1}개 처리됨)")
+
+        # 남은 배치 저장
+        if batch_triples:
+            with open(output_path, 'a', encoding='utf-8') as f:
+                f.write("\n".join(batch_triples))
+
+        # 체크포인트 삭제 (완료 시)
+        if os.path.exists(checkpoint_path):
+            os.remove(checkpoint_path)
 
         print(f"\n✅ TTL 생성 완료: {output_path}")
-        print(f"   총 데이터 항목: {i+1}개")
-        print(f"   총 라인 수: {len(all_triples)}")
+        print(f"   총 처리: {processed_count}개")
+        print(f"   에러: {error_count}개")
+        if error_count > 0:
+            print(f"   에러 로그: {error_log_path}")
 
 
 def main():
     """메인 함수"""
+    import sys
 
     # 경로 설정 (상대 경로 사용)
     script_dir = Path(__file__).parent
@@ -335,9 +392,27 @@ def main():
     # 생성기 초기화
     generator = LLMTTLGenerator(csv_path, output_dir)
 
-    # TTL 생성 (처음 10개만 테스트)
-    print("🚀 TTL 생성 시작...")
-    generator.generate_ttl_file(limit=10)
+    # 명령줄 인자 처리
+    # --all: 전체 처리
+    # --limit N: N개만 처리 (기본: 10)
+    # --no-resume: 처음부터 시작
+    limit = 10
+    resume = True
+
+    if "--all" in sys.argv:
+        limit = None
+        print("🚀 전체 데이터 TTL 생성 시작...")
+    else:
+        for i, arg in enumerate(sys.argv):
+            if arg == "--limit" and i + 1 < len(sys.argv):
+                limit = int(sys.argv[i + 1])
+        print(f"🚀 TTL 생성 시작 (limit={limit})...")
+
+    if "--no-resume" in sys.argv:
+        resume = False
+        print("   (처음부터 시작)")
+
+    generator.generate_ttl_file(limit=limit, resume=resume)
 
 
 if __name__ == "__main__":

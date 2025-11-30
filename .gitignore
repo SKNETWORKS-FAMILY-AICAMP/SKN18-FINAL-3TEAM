@@ -255,3 +255,8 @@ $RECYCLE.BIN/
 # Langsmith cache
 .langsmith/
 .langgraph_api/
+
+# TTL Generator
+.checkpoint
+error_log.txt
+*/logs/*.log
