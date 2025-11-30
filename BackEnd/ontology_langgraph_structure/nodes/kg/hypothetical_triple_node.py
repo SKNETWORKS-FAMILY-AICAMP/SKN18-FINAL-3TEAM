@@ -8,10 +8,16 @@ What-if 질문을 분석하여 가상 트리플 생성
 import os
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
 # 상위 디렉토리를 경로에 추가
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+# .env 파일 로드 (프로젝트 루트에서)
+env_path = Path(__file__).parent.parent.parent.parent.parent / ".env"
+load_dotenv(env_path, override=True)
+
 from state import GraphState
 
 
@@ -39,7 +45,7 @@ def hypothetical_triple_node(state: GraphState) -> GraphState:
     entities = state.get("extracted_entities", [])
 
     llm = ChatOpenAI(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        model=os.getenv("OPENAI_MODEL"),
         temperature=0.3  # What-if는 약간의 창의성 허용
     )
 

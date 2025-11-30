@@ -1,0 +1,83 @@
+# TTL 데이터에 확실히 있는 내용으로 테스트 쿼리
+
+# ============================================
+# 1. 인과관계 테스트 (causal)
+# ============================================
+# "기사환국의 결과로 어떤 사건이 발생했나요?"
+PREFIX hist: <http://www.example.org/korean-history#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?cause ?effect ?causeLabel ?effectLabel WHERE {
+    ?cause hist:causes ?effect .
+    ?cause rdfs:label ?causeLabel .
+    ?effect rdfs:label ?effectLabel .
+    FILTER(contains(?causeLabel, "기사환국"))
+} LIMIT 10
+
+# ============================================
+# 2. 인물 참여 테스트 (person)
+# ============================================
+# "인조가 참여한 사건은 무엇인가요?"
+PREFIX hist: <http://www.example.org/korean-history#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?person ?event ?personLabel ?eventLabel WHERE {
+    ?person hist:participatesIn ?event .
+    ?person rdfs:label ?personLabel .
+    ?event rdfs:label ?eventLabel .
+    FILTER(contains(?personLabel, "인조"))
+} LIMIT 10
+
+# ============================================
+# 3. 시간순 연결 테스트 (temporal)
+# ============================================
+# "심기원 역모사건 이후 어떤 일이 일어났나요?"
+PREFIX hist: <http://www.example.org/korean-history#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?event1 ?event2 ?event1Label ?event2Label WHERE {
+    ?event1 hist:leadsTo ?event2 .
+    ?event1 rdfs:label ?event1Label .
+    ?event2 rdfs:label ?event2Label .
+    FILTER(contains(?event1Label, "심기원"))
+} LIMIT 10
+
+# ============================================
+# 4. 정조 개혁 테스트
+# ============================================
+# "정조가 개혁한 제도는 무엇인가요?"
+PREFIX hist: <http://www.example.org/korean-history#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?person ?institution ?personLabel ?institutionLabel WHERE {
+    ?person hist:reformed ?institution .
+    ?person rdfs:label ?personLabel .
+    ?institution rdfs:label ?institutionLabel .
+    FILTER(contains(?personLabel, "정조"))
+} LIMIT 10
+
+# ============================================
+# 5. 기본 데이터 확인 (모든 엔티티)
+# ============================================
+PREFIX hist: <http://www.example.org/korean-history#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?entity ?label ?type WHERE {
+    ?entity rdfs:label ?label .
+    ?entity rdf:type ?type .
+    FILTER(?type IN (hist:Person, hist:Event, hist:Institution, hist:Document))
+} LIMIT 20
+
+# ============================================
+# 6. 모든 관계 확인
+# ============================================
+PREFIX hist: <http://www.example.org/korean-history#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?subject ?predicate ?object ?subjectLabel ?objectLabel WHERE {
+    ?subject ?predicate ?object .
+    ?subject rdfs:label ?subjectLabel .
+    OPTIONAL { ?object rdfs:label ?objectLabel }
+    FILTER(strstarts(str(?predicate), "http://www.example.org/korean-history#"))
+} LIMIT 30
+

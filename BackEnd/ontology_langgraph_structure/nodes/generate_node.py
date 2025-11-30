@@ -10,10 +10,16 @@ Story Generator Node
 import os
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
 # 상위 디렉토리를 경로에 추가
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# .env 파일 로드 (프로젝트 루트에서)
+env_path = Path(__file__).parent.parent.parent.parent / ".env"
+load_dotenv(env_path, override=True)
+
 from state import GraphState
 
 
@@ -26,7 +32,7 @@ def story_generator_node(state: GraphState) -> GraphState:
     causal_chains = state.get("causal_chains", [])
 
     llm = ChatOpenAI(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o"),
+        model=os.getenv("OPENAI_MODEL"),
         temperature=0.7  # 스토리 생성은 창의성 필요
     )
 

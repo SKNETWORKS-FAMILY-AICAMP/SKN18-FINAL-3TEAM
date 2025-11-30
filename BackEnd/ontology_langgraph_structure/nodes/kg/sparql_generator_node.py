@@ -9,10 +9,16 @@ LLM을 사용하여 자연어 질문을 SPARQL 쿼리로 변환
 import os
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
 # 상위 디렉토리를 경로에 추가
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+# .env 파일 로드 (프로젝트 루트에서)
+env_path = Path(__file__).parent.parent.parent.parent.parent / ".env"
+load_dotenv(env_path, override=True)
+
 from state import GraphState
 
 
@@ -70,7 +76,7 @@ def sparql_generator_node(state: GraphState) -> GraphState:
     query_type = state.get("query_type", "causal")
 
     llm = ChatOpenAI(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        model=os.getenv("OPENAI_MODEL"),
         temperature=0
     )
 

@@ -1059,3 +1059,95 @@
     ->
     (?person hist:hasMotive "national_protection")
 ]
+
+
+# ============================================================
+# Rule 14: 학문 추구 동기 - 저술 활동
+# ============================================================
+[scholarly_pursuit_motive:
+    (?person rdf:type hist:Person)
+    (?document rdf:type hist:Document)
+    (?person hist:authored ?document)
+    noValue(?person hist:hasMotive "scholarly_pursuit")
+    ->
+    (?person hist:hasMotive "scholarly_pursuit")
+]
+
+
+# ============================================================
+# Rule 15: 교육 진흥 동기 - 스승 역할
+# ============================================================
+[education_promotion_motive:
+    (?person rdf:type hist:Person)
+    (?student rdf:type hist:Person)
+    (?person hist:teacherOf ?student)
+    noValue(?person hist:hasMotive "education_promotion")
+    ->
+    (?person hist:hasMotive "education_promotion")
+]
+
+
+# ============================================================
+# Rule 16: 민생 개혁 동기 - 제도 개혁
+# ============================================================
+[public_welfare_motive:
+    (?person rdf:type hist:Person)
+    (?institution rdf:type hist:Institution)
+    (?person hist:reformed ?institution)
+    noValue(?person hist:hasMotive "public_welfare")
+    ->
+    (?person hist:hasMotive "public_welfare")
+]
+
+
+# ============================================================
+# Rule 17: 지식 전파 동기 - 편찬 활동
+# ============================================================
+[knowledge_dissemination_motive:
+    (?person rdf:type hist:Person)
+    (?document rdf:type hist:Document)
+    (?person hist:compiled ?document)
+    noValue(?person hist:hasMotive "knowledge_dissemination")
+    ->
+    (?person hist:hasMotive "knowledge_dissemination")
+]
+
+
+# ============================================================
+# Rule 18: 충절 동기 - 군주 섬김
+# ============================================================
+[loyalty_to_monarch_motive:
+    (?person rdf:type hist:Person)
+    (?monarch rdf:type hist:Person)
+    (?person hist:servedUnder ?monarch)
+    noValue(?person hist:hasMotive "loyalty_to_monarch")
+    ->
+    (?person hist:hasMotive "loyalty_to_monarch")
+]
+
+
+# ============================================================
+# Rule 19: 학문 계승 동기 - 제자로서 학문 전승
+# ============================================================
+[scholarly_succession_motive:
+    (?person rdf:type hist:Person)
+    (?teacher rdf:type hist:Person)
+    (?person hist:studentOf ?teacher)
+    (?teacher hist:hasField ?field)
+    noValue(?person hist:hasMotive "scholarly_succession")
+    ->
+    (?person hist:hasMotive "scholarly_succession")
+]
+
+
+# ============================================================
+# Rule 20: 기관 설립 동기 - 사회 발전
+# ============================================================
+[institutional_building_motive:
+    (?person rdf:type hist:Person)
+    (?institution rdf:type hist:Institution)
+    (?person hist:founded ?institution)
+    noValue(?person hist:hasMotive "institutional_building")
+    ->
+    (?person hist:hasMotive "institutional_building")
+]
