@@ -13,8 +13,10 @@ from pathlib import Path
 from typing import Literal
 from langchain_openai import ChatOpenAI
 
-# 상위 디렉토리를 경로에 추가
+# 환경변수 로드
 sys.path.insert(0, str(Path(__file__).parent.parent))
+import __init__  # 환경변수 및 LangSmith 설정 로드
+
 from state import GraphState
 
 
@@ -25,7 +27,7 @@ def query_classifier_node(state: GraphState) -> GraphState:
 
     # LLM을 사용한 질문 분류
     llm = ChatOpenAI(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        model=os.getenv("OPENAI_MODEL"),
         temperature=0
     )
 

@@ -26,6 +26,16 @@ ONTOLOGY_SCHEMA: Dict[str, Dict[str, List[str]]] = {
             "hist:servesIn",            # 복무하다
             "hist:affiliatedWith",      # 소속되다 (국가)
 
+            # 학문/문헌/교육 관련
+            "hist:authored",            # 저술하다 (문헌)
+            "hist:compiled",            # 편찬하다 (문헌)
+            "hist:teacherOf",           # 스승이다
+            "hist:studentOf",           # 제자이다
+            "hist:servedUnder",         # 섬기다 (군주)
+            "hist:hasField",            # 학문 분야
+            "hist:founded",             # 설립하다 (기관)
+            "hist:reformed",            # 개혁하다 (제도)
+
             # 분석용 (비하인드 스토리, 인물 분석)
             "hist:hasMotive",           # 동기
             "hist:hasAchievement",      # 업적
@@ -242,7 +252,36 @@ ONTOLOGY_SCHEMA: Dict[str, Dict[str, List[str]]] = {
             "hist:hasContext",          # 시대적 맥락
             "hist:partOf",              # ~의 일부
         ],
-        "inverse_properties": []
+        "inverse_properties": [
+            "hist:founded",             # 설립하다
+            "hist:reformed",            # 개혁하다
+        ]
+    },
+
+    # 문헌 (Document)
+    "Document": {
+        "properties": [
+            # 기본 정보
+            "hist:authoredBy",          # 저자
+            "hist:hasYear",             # 저술 연도
+            "hist:hasDate",             # 저술 날짜
+
+            # 내용/분류
+            "hist:hasSubject",          # 주제
+            "hist:hasField",            # 분야 (실학, 성리학 등)
+
+            # 영향
+            "hist:influences",          # 영향을 주다
+            "hist:leadsTo",             # ~로 이어지다
+
+            # 맥락
+            "hist:hasContext",          # 시대적 맥락
+            "hist:partOf",              # ~의 일부 (총서 등)
+        ],
+        "inverse_properties": [
+            "hist:authored",            # 저술하다
+            "hist:compiled",            # 편찬하다
+        ]
     }
 }
 
@@ -256,6 +295,7 @@ ENTITY_URI_PREFIX: Dict[str, str] = {
     "Nation": "hist:",
     "Policy": "hist:",
     "Institution": "hist:",
+    "Document": "hist:",
     "Year": ""  # 연도는 리터럴
 }
 

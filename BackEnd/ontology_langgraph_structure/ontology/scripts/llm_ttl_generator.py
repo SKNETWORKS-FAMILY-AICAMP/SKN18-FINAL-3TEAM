@@ -36,7 +36,7 @@ class LLMTTLGenerator:
 
         # LLM 초기화
         self.llm = ChatOpenAI(
-            model=os.getenv("OPENAI_MODEL", "gpt-5-mini"),
+            model=os.getenv("OPENAI_MODEL"),
             temperature=0
         )
 
@@ -49,11 +49,17 @@ class LLMTTLGenerator:
 
         Args:
             entity_type: Person, Event, Place, Nation, Battle
-            name: 엔티티 이름
+            name: 엔티티 이름 (문자열 또는 정수)
 
         Returns:
             hist:Person_이순신, hist:Nation_중국 등
         """
+        # 정수인 경우 문자열로 변환
+        if isinstance(name, int):
+            name = str(name)
+        elif not isinstance(name, str):
+            name = str(name)
+        
         # 공백 제거
         clean_name = name.replace(" ", "").replace("-", "")
 
@@ -78,54 +84,81 @@ class LLMTTLGenerator:
         category = row['category']
         title = row['title']
         summary = row['summary']
-        contents = row['contents'][:1000]  # 처음 1000자만
+        contents = row['contents'][:700]
 
-        prompt = f"""당신은 조선시대 역사 데이터를 온톨로지 트리플로 변환하는 전문가입니다.
+        # 5가지 추론 + 이전 데이터 분석 결과 기반 최적화 프롬프트
+        prompt = f"""조선시대 역사 데이터에서 **명시적 관계**만 추출하세요.
 
-아래 데이터에서 **엔티티**와 **관계**를 추출하세요.
+[입력]
+카테고리: {category} | 제목: {title}
+요약: {summary}
+내용: {contents}
 
-**입력 데이터:**
-- 카테고리: {category}
-- 제목: {title}
-- 요약: {summary}
-- 내용: {contents}
+[허용된 타입] Person, Event, Battle, Place, Nation, Policy, Institution, Document
 
-**출력 형식 (JSON):**
+[허용된 속성 - 이것만 사용]
+Person: hasRank(관직), hasBirthYear, hasDeathYear, hasAchievement, hasField(학문분야)
+Event/Battle: hasYear, hasStartYear, hasEndYear
+Institution: hasYear, hasPurpose, hasFunction
+Document: hasYear
+Place: hasYear, hasLocation
+
+[허용된 관계 - 명시적으로 언급된 경우만]
+- Person→Event: participatesIn, commands (전투 지휘)
+- Person→Person: teacherOf, studentOf, servedUnder (군주), contemporaryWith
+- Person→Nation: affiliatedWith
+- Person→Institution: affiliatedWith, founded, reformed
+- Person→Document: authored, compiled
+- Event→Event: leadsTo, causes, partOf
+- Institution→Person: establishedBy
+- Policy→Person: initiatedBy
+- hasMotive: Person의 행동 동기 (학문추구/개혁/충절/방어/민생안정)
+
+[카테고리별 JSON 예시]
+
+인물 예시:
 {{
-  "main_entity": {{
-    "type": "Person|Event|Battle|Place|Nation|Policy|Institution|Object|Role|SocialClass|Document",
-    "name": "이순신",
-    "properties": {{
-      "hasAlias": ["충무공"],
-      "hasBirthYear": 1545,
-      "hasDeathYear": 1598,
-      "hasRank": ["삼도수군통제사"],
-      "hasAchievement": "임진왜란 수군 지휘"
-    }}
-  }},
-  "related_entities": [
-    {{"type": "Event", "name": "임진왜란"}},
-    {{"type": "Battle", "name": "명량해전"}},
-    {{"type": "Place", "name": "한산도"}},
-    {{"type": "Nation", "name": "조선"}},
-    {{"type": "Policy", "name": "쇄국정책"}},
-    {{"type": "Institution", "name": "집현전"}}
-  ],
+  "main_entity": {{"type": "Person", "name": "강거효", "properties": {{"hasRank": "병조정랑", "hasAchievement": "학문과 절의로 명성"}}}},
+  "related_entities": [{{"type": "Institution", "name": "사헌부"}}, {{"type": "Event", "name": "무오사화"}}],
   "relations": [
-    {{"subject": "이순신", "predicate": "participatesIn", "object": "임진왜란"}},
-    {{"subject": "이순신", "predicate": "commands", "object": "명량해전"}},
-    {{"subject": "명량해전", "predicate": "partOf", "object": "임진왜란"}},
-    {{"subject": "명량해전", "predicate": "hasYear", "object": 1597}},
-    {{"subject": "이순신", "predicate": "affiliatedWith", "object": "조선"}},
-    {{"subject": "쇄국정책", "predicate": "initiatedBy", "object": "흥선대원군"}},
-    {{"subject": "집현전", "predicate": "establishedBy", "object": "세종대왕"}}
+    {{"subject": "강거효", "predicate": "affiliatedWith", "object": "사헌부"}},
+    {{"subject": "강거효", "predicate": "participatesIn", "object": "무오사화"}}
   ]
 }}
 
-**주의사항:**
-- main_entity는 제목(title)에 해당하는 핵심 엔티티
-- related_entities는 내용에 언급된 다른 엔티티들
-- relations는 엔티티 간 관계 (participatesIn, commands, leadsTo, occursAt, hasYear 등)
+제도 예시:
+{{
+  "main_entity": {{"type": "Institution", "name": "선공감", "properties": {{"hasYear": 1392, "hasFunction": "토목공사 감독"}}}},
+  "related_entities": [{{"type": "Nation", "name": "조선"}}],
+  "relations": [{{"subject": "선공감", "predicate": "affiliatedWith", "object": "조선"}}]
+}}
+
+문헌 예시:
+{{
+  "main_entity": {{"type": "Document", "name": "목민심서", "properties": {{"hasYear": 1818}}}},
+  "related_entities": [{{"type": "Person", "name": "정약용"}}],
+  "relations": [{{"subject": "정약용", "predicate": "authored", "object": "목민심서"}}]
+}}
+
+[금지 규칙]
+❌ 단순 언급만으로 관계 생성 금지 (내용에 "정종이 언급됨" → 관계 생성 X)
+❌ Person→Place 직접 관계 금지 (leadsTo, influences, causes)
+❌ Event→Place 직접 관계 금지 (방향 오류)
+❌ Person resultsIn Person 금지 (출산 관계 추출 X)
+❌ 허용되지 않은 속성 생성 금지 (hasClan, hasFather, hasCourtesyName 등)
+
+[출력 규칙]
+JSON 구조:
+{{
+  "main_entity": {{"type": "...", "name": "...", "properties": {{...}}}}  // 1개 (필수)
+  "related_entities": [{{...}}, {{...}}]  // 최대 4개 (배열)
+  "relations": [{{...}}, {{...}}]  // 최대 6개 (배열)
+}}
+
+- main_entity: 1개 (필수, properties 개수 제한 없음)
+- related_entities: 최대 4개 (명시적 관계가 있는 엔티티만)
+- relations: 최대 6개 (허용된 predicate만 사용)
+- properties: 개수 제한 없음 (허용된 속성만 사용, 내용에 있는 만큼 추출)
 - 반드시 유효한 JSON만 출력
 """
 
@@ -165,6 +198,12 @@ class LLMTTLGenerator:
         entity_type = entity.get("type", "")
         name = entity.get("name", "")
         properties = entity.get("properties", {})
+
+        # name이 정수인 경우 문자열로 변환
+        if isinstance(name, int):
+            name = str(name)
+        elif not isinstance(name, str):
+            name = str(name) if name else ""
 
         if not entity_type or not name:
             return []
@@ -208,6 +247,12 @@ class LLMTTLGenerator:
         predicate = relation.get("predicate", "")
         obj = relation.get("object")
 
+        # subject가 정수인 경우 문자열로 변환
+        if isinstance(subject, int):
+            subject = str(subject)
+        elif not isinstance(subject, str):
+            subject = str(subject)
+        
         subject_uri = entity_uris.get(subject, f"hist:{subject.replace(' ', '')}")
 
         # object가 숫자인 경우 (연도 등)
@@ -223,20 +268,17 @@ class LLMTTLGenerator:
 
         return ""
 
-    def process_csv_row(self, row: Dict[str, str]) -> List[str]:
+    def process_extraction_result(self, extraction_result: Dict[str, Any]) -> List[str]:
         """
-        CSV 행을 처리하여 TTL 트리플 생성
+        추출 결과를 TTL 트리플로 변환
 
         Args:
-            row: CSV 행
+            extraction_result: LLM 추출 결과
 
         Returns:
             TTL 트리플 리스트
         """
-        # 1. LLM으로 엔티티 및 관계 추출
-        extraction_result = self.extract_entities_and_relations(row)
-
-        # 2. 엔티티 → TTL 변환
+        # 엔티티 → TTL 변환
         all_triples = []
         entity_uris = {}
 
@@ -257,13 +299,29 @@ class LLMTTLGenerator:
                 entity_uris[name] = self.generate_uri(etype, name)
                 all_triples.extend(self.entity_to_ttl(entity))
 
-        # 3. 관계 → TTL 변환
+        # 관계 → TTL 변환
         for relation in extraction_result.get("relations", []):
             triple = self.relation_to_ttl(relation, entity_uris)
             if triple:
                 all_triples.append(triple)
 
         return all_triples
+
+    def process_csv_row(self, row: Dict[str, str]) -> List[str]:
+        """
+        CSV 행을 처리하여 TTL 트리플 생성 (단일 항목 처리)
+
+        Args:
+            row: CSV 행
+
+        Returns:
+            TTL 트리플 리스트
+        """
+        # 1. LLM으로 엔티티 및 관계 추출
+        extraction_result = self.extract_entities_and_relations(row)
+
+        # 2. 추출 결과 → TTL 변환
+        return self.process_extraction_result(extraction_result)
 
     def generate_ttl_file(self, limit: int = None, resume: bool = True, batch_size: int = 50):
         """

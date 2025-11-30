@@ -12,6 +12,13 @@ LLM 기반 5가지 관점의 SPARQL 쿼리 생성 + Thread 가중치 설정
 """
 
 import os
+import sys
+from pathlib import Path
+
+# 환경변수 로드
+sys.path.insert(0, str(Path(__file__).parent.parent))
+import __init__  # 환경변수 및 LangSmith 설정 로드
+
 from state import GraphState
 from langchain_openai import ChatOpenAI
 from ontology_schema import get_schema_summary
@@ -139,7 +146,7 @@ def multi_query_generator_node(state: GraphState) -> GraphState:
 
     # 2. LLM 초기화
     llm = ChatOpenAI(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        model=os.getenv("OPENAI_MODEL"),
         temperature=0
     )
 
