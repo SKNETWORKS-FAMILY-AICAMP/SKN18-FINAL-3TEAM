@@ -186,3 +186,62 @@
     ->
     (?person hist:hasMotive "invade_territory")
 ]
+
+
+# ============================================================
+# Rule 13: 정책 시행 인물 → 정치적 업적
+# ============================================================
+[policy_initiator_achievement:
+    (?person rdf:type hist:Person)
+    (?policy rdf:type hist:Policy)
+    (?policy hist:initiatedBy ?person)
+    noValue(?person hist:hasAchievement "policy_initiator")
+    ->
+    (?person hist:hasAchievement "policy_initiator")
+]
+
+
+# ============================================================
+# Rule 14: 제도 설립자 → 문화적 업적
+# ============================================================
+[institution_founder_achievement:
+    (?person rdf:type hist:Person)
+    (?institution rdf:type hist:Institution)
+    (?institution hist:establishedBy ?person)
+    noValue(?person hist:hasAchievement "institution_founder")
+    ->
+    (?person hist:hasAchievement "institution_founder")
+]
+
+
+# ============================================================
+# Rule 15: 여러 정책 시행 → 개혁가 역할
+# ============================================================
+[multiple_policies_implies_reformer:
+    (?person hist:initiatedBy ?policy1)
+    (?person hist:initiatedBy ?policy2)
+    (?person hist:initiatedBy ?policy3)
+    (?policy1 rdf:type hist:Policy)
+    (?policy2 rdf:type hist:Policy)
+    (?policy3 rdf:type hist:Policy)
+    notEqual(?policy1, ?policy2)
+    notEqual(?policy2, ?policy3)
+    notEqual(?policy1, ?policy3)
+    noValue(?person hist:hasRole "reformer")
+    ->
+    (?person hist:hasRole "reformer")
+]
+
+
+# ============================================================
+# Rule 16: 제도 설립 + 정책 시행 → 국가 개혁자
+# ============================================================
+[institution_and_policy_implies_nation_reformer:
+    (?person hist:establishedBy ?institution)
+    (?person hist:initiatedBy ?policy)
+    (?institution rdf:type hist:Institution)
+    (?policy rdf:type hist:Policy)
+    noValue(?person hist:hasRole "nation_reformer")
+    ->
+    (?person hist:hasRole "nation_reformer")
+]

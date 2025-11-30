@@ -7,8 +7,13 @@ Jena Reasoner API를 호출하여 실시간 추론 수행
 """
 
 import os
+import sys
 import requests
-from langgraph_structure.state import GraphState
+from pathlib import Path
+
+# 상위 디렉토리를 경로에 추가
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from state import GraphState
 
 API_URL = os.getenv("INFERENCE_API_URL", "http://localhost:8001")
 
@@ -24,9 +29,9 @@ def realtime_inference_node(state: GraphState) -> GraphState:
     if query_type == "what_if" and hypothetical_triples:
         # What-if: 가상 트리플 포함
         payload = {
-            "base_ontology": "test_basic.owl",  # TODO: 실제 온톨로지로 변경
-            "base_instances": ["test_scenario_all.ttl"],  # TODO: 실제 데이터로 변경
-            "rules": "test_inference.rules",
+            "base_ontology": "korean_history.owl",
+            "base_instances": [],  # 빈 리스트면 자동으로 모든 .ttl 파일 사용
+            "rules": "all_rules.rules",
             "hypothetical_triples": hypothetical_triples,
             "query": sparql_query or "SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 100"
         }
@@ -36,9 +41,9 @@ def realtime_inference_node(state: GraphState) -> GraphState:
     else:
         # 일반 추론
         payload = {
-            "ontology": "test_basic.owl",
-            "instances": ["test_scenario_all.ttl"],
-            "rules": "test_inference.rules"
+            "ontology": "korean_history.owl",
+            "instances": [],  # 빈 리스트면 자동으로 모든 .ttl 파일 사용
+            "rules": "all_rules.rules"
         }
         endpoint = f"{API_URL}/infer"
         print(f"📊 일반 추론 실행")

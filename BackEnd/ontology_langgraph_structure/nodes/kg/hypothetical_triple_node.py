@@ -6,8 +6,13 @@ What-if 질문을 분석하여 가상 트리플 생성
 """
 
 import os
-from langgraph_structure.state import GraphState
+import sys
+from pathlib import Path
 from langchain_openai import ChatOpenAI
+
+# 상위 디렉토리를 경로에 추가
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from state import GraphState
 
 
 TRIPLE_EXAMPLES = """

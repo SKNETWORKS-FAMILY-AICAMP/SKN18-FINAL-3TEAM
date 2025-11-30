@@ -48,10 +48,14 @@ INFERENCE_PROPERTIES_BY_STAGE = {
         "description": "Stage 2: 역사 시뮬레이터 (인과관계 추론)",
         "properties": [
             "hist:leadsTo",              # 직접 인과
+            "hist:causedBy",             # 원인
+            "hist:hasImpact",            # 영향
+            "hist:hasOutcome",           # 결과
             "hist:indirectlyCausedBy",   # [추론] 간접 인과 (2-3단계)
             "hist:hasStatus",            # [추론] 국가 상태
             "hist:hasStrategicAdvantage",# [추론] 전략적 우위
-            "hist:strategicImportance"   # [추론] 전략적 중요도
+            "hist:strategicImportance",  # [추론] 전략적 중요도
+            "hist:relatedToPolicy"       # 제도-정책 연계
         ]
     },
     "person": {
@@ -62,6 +66,8 @@ INFERENCE_PROPERTIES_BY_STAGE = {
             "hist:affiliatedWith",          # 소속
             "hist:hasRole",                 # 역할
             "hist:hasAchievement",          # 업적
+            "hist:initiatedBy",             # 정책 시행 (역방향)
+            "hist:establishedBy",           # 제도 설립 (역방향)
             "hist:hasRelationshipWith",     # [추론] 동료 관계
             "hist:hasEnemyRelationship",    # [추론] 적대 관계
             "hist:hasLocalTies",            # [추론] 지역 연고
@@ -73,14 +79,16 @@ INFERENCE_PROPERTIES_BY_STAGE = {
         "description": "Stage 4: 시대적 배경 분석",
         "properties": [
             "hist:hasYear",              # 연도
+            "hist:hasDate",              # 날짜
             "hist:hasBirthYear",         # 출생년도
             "hist:hasDeathYear",         # 사망년도
             "hist:occursBefore",         # [추론] 시간 순서
             "hist:occursAfter",          # [추론] 시간 순서
             "hist:contemporaryWith",     # [추론] 동시대 인물
-            "hist:simultaneousWith",     # [추론] 동시 사건
+            "hist:simultaneousWith",     # [추론] 동시 사건 (Policy-Event 동시성)
             "hist:hasLifespan",          # [추론] 수명
-            "hist:belongsToPeriod"       # [추론] 역사적 시대
+            "hist:hasDuration",          # [추론] 지속 기간 (전쟁, 제도)
+            "hist:belongsToPeriod"       # [추론] 역사적 시대 (세종대왕 시기 등)
         ]
     },
     "pattern": {
@@ -102,7 +110,11 @@ INFERENCE_PROPERTIES_BY_STAGE = {
             "hist:commands",             # 지휘한 전투
             "hist:bornIn",              # 출생지
             "hist:affiliatedWith",       # 소속 국가
-            "hist:hasMotive",           # [추론] 동기 (revenge, national_defense, invasion 등)
+            "hist:initiatedBy",         # 정책을 시작한 인물
+            "hist:establishedBy",       # 제도를 설립한 인물
+            "hist:hasObjective",        # 정책 목표
+            "hist:hasPurpose",          # 제도 목적
+            "hist:hasMotive",           # [추론] 동기 (revenge, national_defense, national_development, cultural_promotion 등)
             "hist:hasLocalTies"         # [추론] 지역 연고
         ]
     }

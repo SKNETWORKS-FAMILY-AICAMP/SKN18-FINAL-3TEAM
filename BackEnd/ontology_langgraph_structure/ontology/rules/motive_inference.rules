@@ -144,3 +144,63 @@
     ->
     (?person hist:hasMotive "retaliation")
 ]
+
+
+# ============================================================
+# Rule 10: 정책 시행 동기 - 국가 발전
+# ============================================================
+[national_development_motive:
+    (?person rdf:type hist:Person)
+    (?policy rdf:type hist:Policy)
+    (?policy hist:initiatedBy ?person)
+    (?policy hist:hasObjective ?objective)
+    noValue(?person hist:hasMotive "national_development")
+    ->
+    (?person hist:hasMotive "national_development")
+]
+
+
+# ============================================================
+# Rule 11: 제도 설립 동기 - 문화 진흥
+# ============================================================
+[cultural_promotion_motive:
+    (?person rdf:type hist:Person)
+    (?institution rdf:type hist:Institution)
+    (?institution hist:establishedBy ?person)
+    (?institution hist:hasPurpose ?purpose)
+    noValue(?person hist:hasMotive "cultural_promotion")
+    ->
+    (?person hist:hasMotive "cultural_promotion")
+]
+
+
+# ============================================================
+# Rule 12: 정책 시행 동기 - 외교적 목적
+# ============================================================
+[diplomatic_policy_motive:
+    (?person rdf:type hist:Person)
+    (?policy rdf:type hist:Policy)
+    (?policy hist:initiatedBy ?person)
+    (?policy hist:involves ?nation1)
+    (?policy hist:involves ?nation2)
+    (?person hist:affiliatedWith ?nation1)
+    notEqual(?nation1, ?nation2)
+    noValue(?person hist:hasMotive "diplomatic_strategy")
+    ->
+    (?person hist:hasMotive "diplomatic_strategy")
+]
+
+
+# ============================================================
+# Rule 13: 쇄국정책 동기 - 국가 보호
+# ============================================================
+[isolationist_policy_motive:
+    (?person rdf:type hist:Person)
+    (?policy rdf:type hist:Policy)
+    (?policy hist:initiatedBy ?person)
+    (?nation hist:atWarWith ?foreignNation)
+    (?person hist:affiliatedWith ?nation)
+    noValue(?person hist:hasMotive "national_protection")
+    ->
+    (?person hist:hasMotive "national_protection")
+]

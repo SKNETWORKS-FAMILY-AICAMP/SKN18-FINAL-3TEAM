@@ -13,8 +13,13 @@ CSV 데이터를 읽어서 LLM을 사용하여 온톨로지 트리플(TTL)로 �
 import os
 import csv
 import json
+from pathlib import Path
 from typing import List, Dict, Any
 from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
 
 
 class LLMTTLGenerator:
@@ -40,26 +45,20 @@ class LLMTTLGenerator:
 
     def generate_uri(self, entity_type: str, name: str) -> str:
         """
-        엔티티 URI 생성 (중복 방지)
+        엔티티 URI 생성 (타입 포함으로 동명이인 구분)
 
         Args:
             entity_type: Person, Event, Place, Nation, Battle
             name: 엔티티 이름
 
         Returns:
-            hist:YiSunSin, hist:ImjinWar 등
+            hist:Person_이순신, hist:Nation_중국 등
         """
-        # 공백 제거 및 카멜케이스 변환
+        # 공백 제거
         clean_name = name.replace(" ", "").replace("-", "")
 
-        # 중복 체크
-        key = f"{entity_type}:{clean_name}"
-        if key in self.uri_counter:
-            self.uri_counter[key] += 1
-            return f"hist:{clean_name}{self.uri_counter[key]}"
-        else:
-            self.uri_counter[key] = 0
-            return f"hist:{clean_name}"
+        # 타입_이름 형식으로 URI 생성 (타입별로 구분)
+        return f"hist:{entity_type}_{clean_name}"
 
     def extract_entities_and_relations(self, row: Dict[str, str]) -> Dict[str, Any]:
         """
@@ -94,7 +93,7 @@ class LLMTTLGenerator:
 **출력 형식 (JSON):**
 {{
   "main_entity": {{
-    "type": "Person|Event|Battle|Place|Nation",
+    "type": "Person|Event|Battle|Place|Nation|Policy|Institution",
     "name": "이순신",
     "properties": {{
       "hasAlias": ["충무공"],
@@ -108,14 +107,18 @@ class LLMTTLGenerator:
     {{"type": "Event", "name": "임진왜란"}},
     {{"type": "Battle", "name": "명량해전"}},
     {{"type": "Place", "name": "한산도"}},
-    {{"type": "Nation", "name": "조선"}}
+    {{"type": "Nation", "name": "조선"}},
+    {{"type": "Policy", "name": "쇄국정책"}},
+    {{"type": "Institution", "name": "집현전"}}
   ],
   "relations": [
     {{"subject": "이순신", "predicate": "participatesIn", "object": "임진왜란"}},
     {{"subject": "이순신", "predicate": "commands", "object": "명량해전"}},
     {{"subject": "명량해전", "predicate": "partOf", "object": "임진왜란"}},
     {{"subject": "명량해전", "predicate": "hasYear", "object": 1597}},
-    {{"subject": "이순신", "predicate": "affiliatedWith", "object": "조선"}}
+    {{"subject": "이순신", "predicate": "affiliatedWith", "object": "조선"}},
+    {{"subject": "쇄국정책", "predicate": "initiatedBy", "object": "흥선대원군"}},
+    {{"subject": "집현전", "predicate": "establishedBy", "object": "세종대왕"}}
   ]
 }}
 
@@ -172,19 +175,19 @@ class LLMTTLGenerator:
         # rdf:type 트리플
         triples.append(f"{uri} rdf:type hist:{entity_type} .")
 
-        # rdfs:label
-        triples.append(f'{uri} rdfs:label "{name}"@ko .')
+        # rdfs:label (언어 태그 제거)
+        triples.append(f'{uri} rdfs:label "{name}" .')
 
-        # 속성 트리플
+        # 속성 트리플 (언어 태그 제거)
         for prop, value in properties.items():
             if isinstance(value, list):
                 for v in value:
                     if isinstance(v, str):
-                        triples.append(f'{uri} hist:{prop} "{v}"@ko .')
+                        triples.append(f'{uri} hist:{prop} "{v}" .')
                     else:
                         triples.append(f'{uri} hist:{prop} {v} .')
             elif isinstance(value, str):
-                triples.append(f'{uri} hist:{prop} "{value}"@ko .')
+                triples.append(f'{uri} hist:{prop} "{value}" .')
             elif isinstance(value, int):
                 triples.append(f'{uri} hist:{prop} {value} .')
 
@@ -214,9 +217,9 @@ class LLMTTLGenerator:
         elif isinstance(obj, str) and obj in entity_uris:
             object_uri = entity_uris[obj]
             return f"{subject_uri} hist:{predicate} {object_uri} ."
-        # object가 문자열인 경우
+        # object가 문자열인 경우 (언어 태그 제거)
         elif isinstance(obj, str):
-            return f'{subject_uri} hist:{predicate} "{obj}"@ko .'
+            return f'{subject_uri} hist:{predicate} "{obj}" .'
 
         return ""
 
@@ -264,15 +267,17 @@ class LLMTTLGenerator:
 
     def generate_ttl_file(self, limit: int = None):
         """
-        CSV 전체를 읽어서 TTL 파일 생성
+        CSV 전체를 읽어서 TTL 파일 생성 (메모리 기반 방식)
 
         Args:
             limit: 처리할 행 수 제한 (None이면 전체)
         """
         print(f"📖 CSV 읽기: {self.csv_path}")
 
+        output_path = os.path.join(self.output_dir, "korean_history_instances.ttl")
+
         # TTL 헤더
-        ttl_lines = [
+        header = [
             "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .",
             "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .",
             "@prefix owl: <http://www.w3.org/2002/07/owl#> .",
@@ -283,9 +288,12 @@ class LLMTTLGenerator:
             ""
         ]
 
-        # CSV 읽기
-        with open(self.csv_path, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
+        # 메모리에 모든 트리플 저장
+        all_triples = ["\n".join(header)]
+
+        # CSV 읽기 (BOM 처리)
+        with open(self.csv_path, 'r', encoding='utf-8-sig') as csv_file:
+            reader = csv.DictReader(csv_file)
 
             for i, row in enumerate(reader):
                 if limit and i >= limit:
@@ -296,27 +304,30 @@ class LLMTTLGenerator:
                 # 트리플 생성
                 triples = self.process_csv_row(row)
 
-                # TTL에 추가
+                # 메모리에 추가
                 if triples:
-                    ttl_lines.append(f"# {row['title']} ({row['category']})")
-                    ttl_lines.extend(triples)
-                    ttl_lines.append("")
+                    all_triples.append(f"# {row['title']} ({row['category']})")
+                    all_triples.extend(triples)
+                    all_triples.append("")  # 빈 줄
 
-        # 파일 저장
-        output_path = os.path.join(self.output_dir, "korean_history_instances.ttl")
+        # 한 번에 파일 저장
+        print(f"\n💾 파일 저장 중...")
         with open(output_path, 'w', encoding='utf-8') as f:
-            f.write("\n".join(ttl_lines))
+            f.write("\n".join(all_triples))
 
         print(f"\n✅ TTL 생성 완료: {output_path}")
-        print(f"   총 라인 수: {len(ttl_lines)}")
+        print(f"   총 데이터 항목: {i+1}개")
+        print(f"   총 라인 수: {len(all_triples)}")
 
 
 def main():
     """메인 함수"""
 
-    # 경로 설정
-    csv_path = "/Users/jina/Documents/GitHub/SKN18-FINAL-3TEAM/backend/RAG/data/encykorea_cleaned6.csv"
-    output_dir = "/Users/jina/Documents/GitHub/SKN18-FINAL-3TEAM/backend/ontology_langgraph_structure/ontology/instances"
+    # 경로 설정 (상대 경로 사용)
+    script_dir = Path(__file__).parent
+    project_root = script_dir.parent.parent.parent.parent
+    csv_path = project_root / "backend/db_pipeline/data/encykorea_cleaned6.csv"
+    output_dir = script_dir.parent / "instances"
 
     # 출력 디렉토리 생성
     os.makedirs(output_dir, exist_ok=True)
@@ -324,9 +335,9 @@ def main():
     # 생성기 초기화
     generator = LLMTTLGenerator(csv_path, output_dir)
 
-    # TTL 생성 (처음 50개만 테스트)
+    # TTL 생성 (처음 10개만 테스트)
     print("🚀 TTL 생성 시작...")
-    generator.generate_ttl_file(limit=50)
+    generator.generate_ttl_file(limit=10)
 
 
 if __name__ == "__main__":

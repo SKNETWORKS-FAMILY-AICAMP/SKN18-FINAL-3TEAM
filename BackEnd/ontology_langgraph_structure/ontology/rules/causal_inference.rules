@@ -134,3 +134,43 @@
     ->
     (?event2 hist:causedBy ?event1)
 ]
+
+
+# ============================================================
+# Rule 10: 정책 → 사건 인과관계
+# ============================================================
+[policy_leads_to_event:
+    (?policy rdf:type hist:Policy)
+    (?policy hist:leadsTo ?event)
+    (?event rdf:type hist:Event)
+    noValue(?event hist:causedBy ?policy)
+    ->
+    (?event hist:causedBy ?policy)
+]
+
+
+# ============================================================
+# Rule 11: 제도 설립 → 정책 연계
+# ============================================================
+[institution_policy_connection:
+    (?institution rdf:type hist:Institution)
+    (?policy rdf:type hist:Policy)
+    (?institution hist:establishedBy ?person)
+    (?policy hist:initiatedBy ?person)
+    noValue(?institution hist:relatedToPolicy ?policy)
+    ->
+    (?institution hist:relatedToPolicy ?policy)
+]
+
+
+# ============================================================
+# Rule 12: 정책 시행 → 국가 관계
+# ============================================================
+[policy_affects_nation_relations:
+    (?policy rdf:type hist:Policy)
+    (?policy hist:involves ?nation)
+    (?policy hist:hasImpact ?impact)
+    noValue(?nation hist:hasStatus ?impact)
+    ->
+    (?nation hist:hasStatus ?impact)
+]
