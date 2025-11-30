@@ -7,1572 +7,754 @@
 # 조선시대 역사 인스턴스 데이터
 
 # 가 (물품)
-hist:가1 rdf:type hist:Object .
-hist:가1 rdfs:label "가"@ko .
-hist:가1 hist:hasAlias "칼"@ko .
-hist:가1 hist:description "죄수의 목에 채우는 나무형틀(형구)"@ko .
-hist:가1 hist:madeOf "마른 나무널판"@ko .
-hist:가1 hist:function "죄수의 목에 씌워 보행을 불가능하게 하는 형구"@ko .
-hist:가1 hist:pairedWith "추"@ko .
-hist:가1 hist:pairedWith "질"@ko .
-hist:가1 hist:inscription "규격을 나무칼에 새겨놓음"@ko .
-hist:가1 hist:usageNote "양반에게는 원칙적으로 금지"@ko .
-hist:가1 hist:relatedTerm "가수"@ko .
-hist:칼1 rdf:type hist:Alias .
-hist:칼1 rdfs:label "칼"@ko .
-hist:추1 rdf:type hist:Object .
-hist:추1 rdfs:label "추"@ko .
-hist:추1 hist:description "손에 채우는 나무형틀"@ko .
-hist:질1 rdf:type hist:Object .
-hist:질1 rdfs:label "질"@ko .
-hist:질1 hist:description "발에 채우는 나무형틀"@ko .
-hist:옥관령1 rdf:type hist:LegalCode .
-hist:옥관령1 rdfs:label "옥관령"@ko .
-hist:옥관령1 hist:description "당·송시대의 옥법 규정(가·추 등에 관한 규정 포함)"@ko .
-hist:당·송시대1 rdf:type hist:Era .
-hist:당·송시대1 rdfs:label "당·송시대"@ko .
-hist:조선시대1 rdf:type hist:Era .
-hist:조선시대1 rdfs:label "조선시대"@ko .
-hist:정조1 rdf:type hist:Person .
-hist:정조1 rdfs:label "정조"@ko .
-hist:정조1 hist:role "조선의 왕(규격을 일부 완화한 시기와 관련)"@ko .
-hist:양반1 rdf:type hist:SocialClass .
-hist:양반1 rdfs:label "양반"@ko .
-hist:가수1 rdf:type hist:Class .
-hist:가수1 rdfs:label "가수"@ko .
-hist:가수1 hist:description "칼(가)을 쓰고 추국이나 고신을 받은 죄인"@ko .
-hist:추국1 rdf:type hist:PunishmentProcedure .
-hist:추국1 rdfs:label "추국"@ko .
-hist:고신1 rdf:type hist:PunishmentProcedure .
-hist:고신1 rdfs:label "고신"@ko .
-hist:가 hist:hasAlias hist:칼 .
-hist:가 hist:madeOf "마른 나무널판"@ko .
-hist:가 hist:usedFor "죄수의 목에 채워 보행을 불가능하게 함"@ko .
-hist:가 hist:pairedWith hist:추 .
-hist:가 hist:pairedWith hist:질 .
-hist:추 hist:isFor "손"@ko .
-hist:질 hist:isFor "발"@ko .
-hist:가 hist:regulatedIn hist:옥관령 .
-hist:옥관령 hist:originatesIn hist:당·송시대 .
-hist:조선시대 hist:adoptedRegulationFrom hist:옥관령 .
-hist:정조 hist:revised hist:가 .
-hist:정조 hist:changedProperty "가의 길이 및 두활, 무게(규격 완화)"@ko .
-hist:가 hist:hasDimension "length 5자 5치"@ko .
-hist:가 hist:hasDimension "두활 1자 5치"@ko .
-hist:가 hist:hasWeight "사죄인 25근 / 도형·유형 20근 / 장죄 15근 (원래 규정)"@ko .
-hist:가 hist:hasWeight "사죄인 22근 / 도형·유형 18근 / 장죄 14근 (정조기 규정)"@ko .
-hist:가 hist:inscribedWith "규격을 나무칼에 새겨놓음"@ko .
-hist:가수 hist:definedAs "가를 쓰고 추국이나 고신을 받은 죄인"@ko .
-hist:가수 hist:undergoes hist:추국 .
-hist:가수 hist:undergoes hist:고신 .
-hist:가 hist:prohibitedFor hist:양반 .
+hist:Policy_가 rdf:type hist:Policy .
+hist:Policy_가 rdfs:label "가" .
+hist:Policy_가 hist:category "물품 (형구)" .
+hist:Policy_가 hist:hasAlias "칼" .
+hist:Policy_가 hist:hasAlias "나무칼" .
+hist:Policy_가 hist:description "죄수의 목에 채우는 나무널판으로 만든 형틀로 보행을 불가능하게 하는 형구" .
+hist:Policy_가 hist:material "마른 나무널판" .
+hist:Policy_가 hist:paired_with "추 (손에 채우는 나무형틀)" .
+hist:Policy_가 hist:paired_with "질 (발에 채우는 형구)" .
+hist:Policy_가 hist:origin_regulation "당·송시대의 옥관령 규정에서 유래" .
+hist:Policy_가 hist:usage "죄수의 목에 씌워 보행을 불가능하게 함; 추국이나 고신을 받을 때 사용" .
+hist:Policy_가 hist:term_for_wearer "가수 (가를 쓰고 추국이나 고신을 받은 죄인)" .
+hist:Policy_가 hist:prohibition "양반에게는 원칙적으로 금지" .
+hist:Nation_당 rdf:type hist:Nation .
+hist:Nation_당 rdfs:label "당" .
+hist:Nation_송 rdf:type hist:Nation .
+hist:Nation_송 rdfs:label "송" .
+hist:Policy_옥관령 rdf:type hist:Policy .
+hist:Policy_옥관령 rdfs:label "옥관령" .
+hist:Nation_조선 rdf:type hist:Nation .
+hist:Nation_조선 rdfs:label "조선" .
+hist:Person_정조 rdf:type hist:Person .
+hist:Person_정조 rdfs:label "정조" .
+hist:Object_추 rdf:type hist:Object .
+hist:Object_추 rdfs:label "추" .
+hist:Object_질 rdf:type hist:Object .
+hist:Object_질 rdfs:label "질" .
+hist:Role_가수 rdf:type hist:Role .
+hist:Role_가수 rdfs:label "가수" .
+hist:SocialClass_양반 rdf:type hist:SocialClass .
+hist:SocialClass_양반 rdfs:label "양반" .
+hist:Policy_가 hist:hasAlias "칼" .
+hist:Policy_가 hist:madeOf "마른 나무널판" .
+hist:Policy_가 hist:pairedWith hist:Object_추 .
+hist:Policy_가 hist:pairedWith hist:Object_질 .
+hist:Policy_가 hist:derivedFrom hist:Policy_옥관령 .
+hist:Policy_옥관령 hist:originatedIn hist:Nation_당 .
+hist:Policy_옥관령 hist:originatedIn hist:Nation_송 .
+hist:Policy_가 hist:appliedIn hist:Nation_조선 .
+hist:Person_정조 hist:regulated hist:Policy_가 .
+hist:Policy_가 hist:hasDimension "5자 5치 (길이), 두활 1자 5치" .
+hist:Person_정조 hist:revisedDimension "두활 1자 2치; 무게 경감 규정" .
+hist:Policy_가 hist:hasWeight "사죄인 25근, 도형·유형 20근, 장죄 15근" .
+hist:Policy_가 hist:hasWeight "정조 규정: 사죄인 22근, 도형·유형 18근, 장죄 14근" .
+hist:Policy_가 hist:usedOn "죄수" .
+hist:Policy_가 hist:designatesWornPrisonerAs hist:Role_가수 .
+hist:Policy_가 hist:prohibitedFor hist:SocialClass_양반 .
 
 # 20공신회맹축 - 보사공신녹훈후 (문헌)
-hist:20공신회맹축보사공신녹훈후1 rdf:type hist:Institution .
-hist:20공신회맹축보사공신녹훈후1 rdfs:label "20공신회맹축 - 보사공신녹훈후"@ko .
-hist:20공신회맹축보사공신녹훈후1 hist:category "문헌"@ko .
-hist:20공신회맹축보사공신녹훈후1 hist:summary "1694년 갑술환국으로 재집권한 서인이 보사공신 회맹 때의 회맹문과 복훈 때의 축문 등을 모아 엮은 관찬서."@ko .
-hist:20공신회맹축보사공신녹훈후1 hist:hasCreationYear 1694 .
-hist:20공신회맹축보사공신녹훈후1 hist:hasContentYears 1680 .
-hist:20공신회맹축보사공신녹훈후1 hist:hasContentYears 1689 .
-hist:20공신회맹축보사공신녹훈후1 hist:hasContentYears 1694 .
-hist:20공신회맹축보사공신녹훈후1 hist:format "권축장 (축에 동일한 기록을 남긴 장문서)"@ko .
-hist:20공신회맹축보사공신녹훈후1 hist:hasDesignations {'designation': '보물', 'year': 2007} .
-hist:20공신회맹축보사공신녹훈후1 hist:hasDesignations {'designation': '국보', 'year': 2021} .
-hist:20공신회맹축보사공신녹훈후1 hist:currentHolder "한국학중앙연구원 (경기도 성남시 분당구)"@ko .
-hist:경신대출척(1680)1 rdf:type hist:Event .
-hist:경신대출척(1680)1 rdfs:label "경신대출척 (1680)"@ko .
-hist:보사공신회맹(1680)1 rdf:type hist:Event .
-hist:보사공신회맹(1680)1 rdfs:label "보사공신회맹 (1680)"@ko .
-hist:기사환국(1689)1 rdf:type hist:Event .
-hist:기사환국(1689)1 rdfs:label "기사환국 (1689)"@ko .
-hist:갑술환국(1694)1 rdf:type hist:Event .
-hist:갑술환국(1694)1 rdfs:label "갑술환국 (1694)"@ko .
-hist:보사공신복훈(1694)1 rdf:type hist:Event .
-hist:보사공신복훈(1694)1 rdfs:label "보사공신 복훈 (1694)"@ko .
-hist:보사공신1 rdf:type hist:Policy .
-hist:보사공신1 rdfs:label "보사공신"@ko .
-hist:숙종1 rdf:type hist:Person .
-hist:숙종1 rdfs:label "숙종"@ko .
-hist:서인(정파)1 rdf:type hist:Institution .
-hist:서인(정파)1 rdfs:label "서인 (정파)"@ko .
-hist:남인(정파)1 rdf:type hist:Institution .
-hist:남인(정파)1 rdfs:label "남인 (정파)"@ko .
-hist:종묘1 rdf:type hist:Place .
-hist:종묘1 rdfs:label "종묘"@ko .
-hist:한국학중앙연구원1 rdf:type hist:Institution .
-hist:한국학중앙연구원1 rdfs:label "한국학중앙연구원"@ko .
-hist:경기도성남시분당구1 rdf:type hist:Place .
-hist:경기도성남시분당구1 rdfs:label "경기도 성남시 분당구"@ko .
-hist:보물지정1 rdf:type hist:Policy .
-hist:보물지정1 rdfs:label "보물 지정"@ko .
-hist:국보지정1 rdf:type hist:Policy .
-hist:국보지정1 rdfs:label "국보 지정"@ko .
-hist:20공신회맹축보사공신녹훈후 hist:describes hist:보사공신회맹(1680) .
-hist:20공신회맹축보사공신녹훈후 hist:recordsEvent hist:보사공신복훈(1694) .
-hist:20공신회맹축보사공신녹훈후 hist:hasCreationYear 1694 .
-hist:20공신회맹축보사공신녹훈후 hist:storedAt hist:한국학중앙연구원 .
-hist:20공신회맹축보사공신녹훈후 hist:relatesToPlace hist:종묘 .
-hist:20공신회맹축보사공신녹훈후 hist:designatedAs "보물 지정 (2007)"@ko .
-hist:20공신회맹축보사공신녹훈후 hist:designatedAs "국보 지정 (2021)"@ko .
-hist:경신대출척(1680) hist:leadsTo hist:보사공신 .
-hist:보사공신회맹(1680) hist:records "보사공신 (정책·호칭)"@ko .
-hist:기사환국(1689) hist:leadsTo "파훈 (공신호 취소)"@ko .
-hist:갑술환국(1694) hist:leadsTo hist:보사공신복훈(1694) .
-hist:서인(정파) hist:regainsPowerIn hist:갑술환국(1694) .
-hist:남인(정파) hist:prevailsIn hist:기사환국(1689) .
-hist:보사공신복훈(1694) hist:reportedTo hist:종묘 .
-hist:보사공신회맹(1680) hist:includesRecordType "회맹문 / 회맹록 / 축문"@ko .
-hist:보사공신 hist:isTitleGivenFor "공신 (1680 경신대출척 이후 수여)"@ko .
-hist:한국학중앙연구원 hist:locatedAt hist:경기도성남시분당구 .
+hist:Institution_20공신회맹축보사공신녹훈후 rdf:type hist:Institution .
+hist:Institution_20공신회맹축보사공신녹훈후 rdfs:label "20공신회맹축 - 보사공신녹훈후" .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:hasCategory "문헌" .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:hasCreationYear 1694 .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:hasSummary "1694년 갑술환국으로 재집권한 서인이 보사공신 회맹 때의 회맹문과 복훈 때의 축문 등을 모아 엮은 관찬서. 보사공신 회맹문·회맹록·축문을 동일 축에 기록하여 권축장으로 완성한 문서." .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:hasDimensions "세로 88.5㎝, 가로 2414㎝" .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:hasFormat "권축장" .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:hasDesignations "보물(2007)" .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:hasDesignations "국보(2021-02)" .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:hasCurrentLocation "한국학중앙연구원 (경기도 성남시 분당구)" .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:hasSignificance "조선 숙종대 공신 녹훈·삭훈 과정과 정국 변동 연구의 귀중한 자료" .
+hist:Event_경신대출척 rdf:type hist:Event .
+hist:Event_경신대출척 rdfs:label "경신대출척" .
+hist:Event_경신대출척 hist:hasYear 1680 .
+hist:Event_경신대출척 hist:description "1680년 숙종 6년에 있었던 사건으로 보사공신호가 내려지게 된 계기" .
+hist:Policy_보사공신 rdf:type hist:Policy .
+hist:Policy_보사공신 rdfs:label "보사공신" .
+hist:Policy_보사공신 hist:description "1680년 공신으로 녹훈된 공신 호칭(공신호)" .
+hist:Event_기사환국 rdf:type hist:Event .
+hist:Event_기사환국 rdfs:label "기사환국" .
+hist:Event_기사환국 hist:hasYear 1689 .
+hist:Event_기사환국 hist:description "1689년 숙종 15년에 남인이 득세하면서 일부 공신호가 파훼된 환국" .
+hist:Event_갑술환국 rdf:type hist:Event .
+hist:Event_갑술환국 rdfs:label "갑술환국" .
+hist:Event_갑술환국 hist:hasYear 1694 .
+hist:Event_갑술환국 hist:description "1694년 숙종 20년에 서인이 재집권한 정치적 변동" .
+hist:Event_보사공신회맹 rdf:type hist:Event .
+hist:Event_보사공신회맹 rdfs:label "보사공신회맹" .
+hist:Event_보사공신회맹 hist:hasYear 1680 .
+hist:Event_보사공신회맹 hist:description "1680년 8월에 열린 보사공신의 회맹(맹세) 의식과 그 회맹문·회맹록" .
+hist:Event_보사공신복훈(복훈·녹훈추록) rdf:type hist:Event .
+hist:Event_보사공신복훈(복훈·녹훈추록) rdfs:label "보사공신 복훈(복훈·녹훈추록)" .
+hist:Event_보사공신복훈(복훈·녹훈추록) hist:hasYear 1694 .
+hist:Event_보사공신복훈(복훈·녹훈추록) hist:hasMonth 6 .
+hist:Event_보사공신복훈(복훈·녹훈추록) hist:description "갑술환국으로 서인 재집권 후 1689년에 파훼되었던 일부 공신을 복훈하고 이를 종묘에 고한 축문 기록" .
+hist:Person_숙종 rdf:type hist:Person .
+hist:Person_숙종 rdfs:label "숙종" .
+hist:Person_숙종 hist:hasReignStart 1674 .
+hist:Person_숙종 hist:hasReignEnd 1720 .
+hist:Person_숙종 hist:description "조선 제19대 임금, 본문에 나오는 주요 환국과 녹훈·삭훈이 일어난 시기의 군주" .
+hist:Institution_서인 rdf:type hist:Institution .
+hist:Institution_서인 rdfs:label "서인" .
+hist:Institution_서인 hist:description "조선시대 정치적 당파(서인). 1680년 보사공신 다수 차지, 1694년 갑술환국으로 재집권" .
+hist:Institution_남인 rdf:type hist:Institution .
+hist:Institution_남인 rdfs:label "남인" .
+hist:Institution_남인 hist:description "조선시대 정치적 당파(남인). 1689년 기사환국으로 득세" .
+hist:Place_종묘 rdf:type hist:Place .
+hist:Place_종묘 rdfs:label "종묘" .
+hist:Place_종묘 hist:description "공신 복훈 사실을 고한 장소(종묘)" .
+hist:Institution_한국학중앙연구원 rdf:type hist:Institution .
+hist:Institution_한국학중앙연구원 rdfs:label "한국학중앙연구원" .
+hist:Institution_한국학중앙연구원 hist:description "이 문서를 소장한 기관" .
+hist:Institution_한국학중앙연구원 hist:location "경기도 성남시 분당구" .
+hist:Place_성남시분당구 rdf:type hist:Place .
+hist:Place_성남시분당구 rdfs:label "성남시 분당구" .
+hist:Place_성남시분당구 hist:description "한국학중앙연구원이 위치한 행정구역" .
+hist:Policy_녹훈(복훈)·삭훈(파훈) rdf:type hist:Policy .
+hist:Policy_녹훈(복훈)·삭훈(파훈) rdfs:label "녹훈(복훈)·삭훈(파훈)" .
+hist:Policy_녹훈(복훈)·삭훈(파훈) hist:description "공신의 품계(공신호)를 부여하거나 삭제하는 조치(녹훈·삭훈 과정)" .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:documents hist:Event_보사공신회맹 .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:documents hist:Event_보사공신복훈(복훈·녹훈추록) .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:isStoredAt hist:Institution_한국학중앙연구원 .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:hasDesignation "보물(2007)" .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:hasDesignation "국보(2021-02)" .
+hist:Event_경신대출척 hist:ledTo hist:Policy_보사공신 .
+hist:Policy_보사공신 hist:wasMostlyAffiliatedWith hist:Institution_서인 .
+hist:Event_기사환국 hist:caused "파훈(공신호 취소)" .
+hist:Event_기사환국 hist:occurredInYear 1689 .
+hist:Event_갑술환국 hist:restoredPowerTo hist:Institution_서인 .
+hist:Event_갑술환국 hist:ledTo hist:Event_보사공신복훈(복훈·녹훈추록) .
+hist:Event_갑술환국 hist:occurredInYear 1694 .
+hist:Event_보사공신복훈(복훈·녹훈추록) hist:wasAnnouncedAt hist:Place_종묘 .
+hist:Event_보사공신회맹 hist:occurredInYear 1680 .
+hist:Event_경신대출척 hist:occurredInYear 1680 .
+hist:Event_보사공신복훈(복훈·녹훈추록) hist:occurredInYear 1694 .
+hist:Person_숙종 hist:reignedDuring hist:Event_경신대출척 .
+hist:Person_숙종 hist:reignedDuring hist:Event_기사환국 .
+hist:Person_숙종 hist:reignedDuring hist:Event_갑술환국 .
+hist:Institution_20공신회맹축보사공신녹훈후 hist:contains "회맹문·회맹록·축문(회맹문, 회맹록, 축문의 기록)" .
 
 # 20공신회맹축 - 영국공신녹훈후 (문헌)
-hist:20공신회맹축(이십공신회맹축)1 rdf:type hist:Event .
-hist:20공신회맹축(이십공신회맹축)1 rdfs:label "20공신회맹축 (이십공신회맹축)"@ko .
-hist:20공신회맹축(이십공신회맹축)1 hist:description "1646년 인조가 영국공신을 녹훈한 이후 20공신 및 그 자손들과 함께 회맹제를 거행하고 회맹문·회맹록 등을 문서화한 관찬 회맹 문서(권축)."@ko .
-hist:20공신회맹축(이십공신회맹축)1 hist:hasYear 1646 .
-hist:20공신회맹축(이십공신회맹축)1 hist:hasMonth 9 .
-hist:20공신회맹축(이십공신회맹축)1 hist:hasType "관찬서 / 회맹 문서"@ko .
-hist:20공신회맹축(이십공신회맹축)1 hist:designatedAs "보물(2007)"@ko .
-hist:20공신회맹축(이십공신회맹축)1 hist:storedAt "한국학중앙연구원(경기도 성남시 분당구)"@ko .
-hist:20공신회맹축(이십공신회맹축)1 hist:dimensions "세로 89.2cm, 가로 2413cm"@ko .
-hist:20공신회맹축(이십공신회맹축)1 hist:hasParticipants "인조"@ko .
-hist:20공신회맹축(이십공신회맹축)1 hist:hasParticipants "왕자"@ko .
-hist:20공신회맹축(이십공신회맹축)1 hist:hasParticipants "20공신"@ko .
-hist:20공신회맹축(이십공신회맹축)1 hist:hasParticipants "공신의 자손"@ko .
-hist:20공신회맹축(이십공신회맹축)1 hist:affiliatedWith "조선"@ko .
-hist:인조1 rdf:type hist:Person .
-hist:인조1 rdfs:label "인조"@ko .
-hist:심기원1 rdf:type hist:Person .
-hist:심기원1 rdfs:label "심기원"@ko .
-hist:김유1 rdf:type hist:Person .
-hist:김유1 rdfs:label "김유"@ko .
-hist:회은군1 rdf:type hist:Person .
-hist:회은군1 rdfs:label "회은군"@ko .
-hist:왕자1 rdf:type hist:Person .
-hist:왕자1 rdfs:label "왕자"@ko .
-hist:영국공신1 rdf:type hist:Institution .
-hist:영국공신1 rdfs:label "영국공신"@ko .
-hist:개국공신1 rdf:type hist:Institution .
-hist:개국공신1 rdfs:label "개국공신"@ko .
-hist:20공신1 rdf:type hist:Institution .
-hist:20공신1 rdfs:label "20공신"@ko .
-hist:회맹제1 rdf:type hist:Event .
-hist:회맹제1 rdfs:label "회맹제"@ko .
-hist:회맹문1 rdf:type hist:Institution .
-hist:회맹문1 rdfs:label "회맹문"@ko .
-hist:회맹록1 rdf:type hist:Institution .
-hist:회맹록1 rdfs:label "회맹록"@ko .
-hist:한국학중앙연구원3 rdf:type hist:Institution .
-hist:한국학중앙연구원3 rdfs:label "한국학중앙연구원"@ko .
-hist:경기도성남시분당구3 rdf:type hist:Place .
-hist:경기도성남시분당구3 rdfs:label "경기도 성남시 분당구"@ko .
-hist:천지산천1 rdf:type hist:Place .
-hist:천지산천1 rdfs:label "천지산천"@ko .
-hist:종묘사직1 rdf:type hist:Place .
-hist:종묘사직1 rdfs:label "종묘사직"@ko .
-hist:조선1 rdf:type hist:Nation .
-hist:조선1 rdfs:label "조선"@ko .
-hist:2007년보물지정1 rdf:type hist:Event .
-hist:2007년보물지정1 rdfs:label "2007년 보물 지정"@ko .
-hist:20공신회맹축(이십공신회맹축) hist:hasYear 1646 .
-hist:20공신회맹축(이십공신회맹축) hist:hasMonth 9 .
-hist:20공신회맹축(이십공신회맹축) hist:documents hist:회맹제 .
-hist:20공신회맹축(이십공신회맹축) hist:storedAt hist:한국학중앙연구원2 .
-hist:20공신회맹축(이십공신회맹축) hist:designatedAs hist:2007년보물지정 .
-hist:20공신회맹축(이십공신회맹축) hist:hasParticipant hist:20공신 .
-hist:20공신회맹축(이십공신회맹축) hist:hasParticipant hist:인조 .
-hist:20공신회맹축(이십공신회맹축) hist:affiliatedWith hist:조선 .
-hist:회맹제 hist:invokedAt hist:천지산천 .
-hist:회맹제 hist:invokedAt hist:종묘사직 .
-hist:인조 hist:conferred hist:영국공신 .
-hist:영국공신 hist:conferredInYear 1646 .
-hist:심기원 hist:wasExecutedInYear 1644 .
-hist:심기원 hist:accusedOf "역모(인조 제거 및 회은군 옹립 시도)"@ko .
-hist:영국공신 hist:includedIn hist:20공신 .
-hist:개국공신 hist:includedIn hist:20공신 .
-hist:회맹록 hist:records hist:김유 .
-hist:회맹록 hist:records hist:영국공신 .
-hist:회맹록 hist:records hist:개국공신 .
-hist:한국학중앙연구원2 hist:locatedIn hist:경기도성남시분당구2 .
-hist:20공신 hist:composedOf hist:개국공신 .
-hist:20공신 hist:composedOf hist:영국공신 .
+hist:Institution_20공신회맹축영국공신녹훈후 rdf:type hist:Institution .
+hist:Institution_20공신회맹축영국공신녹훈후 rdfs:label "20공신회맹축 - 영국공신녹훈후" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:category "문헌" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:hasTitle "20공신회맹축 - 영국공신녹훈후" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:hasCreationYear 1646 .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:hasCreationMonth "9" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:hasSummary "1646년 9월 인조가 영국공신을 녹훈한 이후 20공신 및 그 자손들과 함께 회맹하여 천지산천과 종묘사직에 고하고 연명한 것을 모아 엮은 관찬서(회맹문과 회맹록을 권축으로 꾸민 문서)." .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:hasDesignation "보물" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:hasDesignationYear 2007 .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:storedAt "한국학중앙연구원 (경기도 성남시 분당구)" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:hasDimensions "세로 89.2cm, 가로 2413cm" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:hasFormat "권축(권으로 된 축문 형태)" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:documents "회맹문" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:documents "회맹록" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:subjects "20공신" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:subjects "영국공신" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:subjects "개국공신" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:subjects "공신 및 그 자손" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:subjects "회맹제" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:subjects "종묘사직에 고함" .
+hist:Nation_조선 rdf:type hist:Nation .
+hist:Nation_조선 rdfs:label "조선" .
+hist:Person_인조 rdf:type hist:Person .
+hist:Person_인조 rdfs:label "인조" .
+hist:Institution_영국공신 rdf:type hist:Institution .
+hist:Institution_영국공신 rdfs:label "영국공신" .
+hist:Institution_개국공신 rdf:type hist:Institution .
+hist:Institution_개국공신 rdfs:label "개국공신" .
+hist:Institution_20공신 rdf:type hist:Institution .
+hist:Institution_20공신 rdfs:label "20공신" .
+hist:Event_회맹제 rdf:type hist:Event .
+hist:Event_회맹제 rdfs:label "회맹제" .
+hist:Person_심기원 rdf:type hist:Person .
+hist:Person_심기원 rdfs:label "심기원" .
+hist:Person_회은군 rdf:type hist:Person .
+hist:Person_회은군 rdfs:label "회은군" .
+hist:Person_김유 rdf:type hist:Person .
+hist:Person_김유 rdfs:label "김유" .
+hist:Institution_한국학중앙연구원 rdf:type hist:Institution .
+hist:Institution_한국학중앙연구원 rdfs:label "한국학중앙연구원" .
+hist:Place_종묘사직 rdf:type hist:Place .
+hist:Place_종묘사직 rdfs:label "종묘사직" .
+hist:Place_경기도성남시분당구 rdf:type hist:Place .
+hist:Place_경기도성남시분당구 rdfs:label "경기도 성남시 분당구" .
+hist:Policy_보물(문화재지정) rdf:type hist:Policy .
+hist:Policy_보물(문화재지정) rdfs:label "보물(문화재 지정)" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:hasCreationYear 1646 .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:hasCreationMonth "9" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:documents hist:Event_회맹제 .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:records "회맹록" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:storedAt hist:Institution_한국학중앙연구원 .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:designatedAs "보물(2007)" .
+hist:Person_인조 hist:awardsTitle hist:Institution_영국공신 .
+hist:Institution_영국공신 hist:awardedInResponseTo "심기원 역모사건(1644)" .
+hist:Person_심기원 hist:executedInYear 1644 .
+hist:Event_회맹제 hist:attendedBy hist:Person_인조 .
+hist:Event_회맹제 hist:attendedBy "왕자" .
+hist:Event_회맹제 hist:attendedBy "공신 및 그 자손" .
+hist:회맹록 hist:lists hist:Person_김유 .
+hist:회맹록 hist:lists "영국공신 및 기타 공신과 적장손들의 이름·직함·공신호" .
+hist:회맹록 hist:records "불참자 명단 및 불참 사유(신병·재상 등)" .
+hist:Institution_20공신 hist:includesRange "개국공신부터 영국공신까지" .
+hist:Place_종묘사직 hist:mentionedIn hist:Institution_20공신회맹축영국공신녹훈후 .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:hasDimensions "세로 89.2cm, 가로 2413cm" .
+hist:Institution_20공신회맹축영국공신녹훈후 hist:hasFormat "권축" .
 
 # 가감역관 (제도)
-hist:가감역관1 rdf:type hist:Institution .
-hist:가감역관1 rdfs:label "가감역관"@ko .
-hist:가감역관1 hist:hasCategory "제도"@ko .
-hist:가감역관1 hist:hasRank "종9품"@ko .
-hist:가감역관1 hist:isTemporaryPosition True .
-hist:가감역관1 hist:establishedYear 1718 .
-hist:가감역관1 hist:establishedDuring "숙종"@ko .
-hist:가감역관1 hist:quota 3 .
-hist:가감역관1 hist:affiliatedWith "선공감"@ko .
-hist:가감역관1 hist:duties "국가의 토목 사업 감독"@ko .
-hist:가감역관1 hist:duties "영선 사업 감독"@ko .
-hist:가감역관1 hist:promotionRule "실직(감역관)에 결원이 있을 때 임용 차례에 따라 승진; 임시직 때의 근무 일수를 포함하여 900일을 채우면 참상관으로 승진"@ko .
-hist:선공감1 rdf:type hist:Institution .
-hist:선공감1 rdfs:label "선공감"@ko .
-hist:감역관1 rdf:type hist:Institution .
-hist:감역관1 rdfs:label "감역관"@ko .
-hist:실직(감역관)1 rdf:type hist:Institution .
-hist:실직(감역관)1 rdfs:label "실직(감역관)"@ko .
-hist:참상관1 rdf:type hist:Institution .
-hist:참상관1 rdfs:label "참상관"@ko .
-hist:국가의토목사업1 rdf:type hist:Event .
-hist:국가의토목사업1 rdfs:label "국가의 토목 사업"@ko .
-hist:영선사업1 rdf:type hist:Event .
-hist:영선사업1 rdfs:label "영선 사업"@ko .
-hist:숙종3 rdf:type hist:Person .
-hist:숙종3 rdfs:label "숙종"@ko .
-hist:1718년(숙종44)1 rdf:type hist:Event .
-hist:1718년(숙종44)1 rdfs:label "1718년(숙종 44)"@ko .
-hist:가감역관 hist:affiliatedWith hist:선공감 .
-hist:가감역관 hist:establishedInYear 1718 .
-hist:가감역관 hist:establishedDuring hist:숙종2 .
-hist:가감역관 hist:hasQuota 3 .
-hist:가감역관 hist:hasRank "종9품"@ko .
-hist:가감역관 hist:isTemporaryPosition True .
-hist:가감역관 hist:worksWith hist:감역관 .
-hist:가감역관 hist:supervises hist:국가의토목사업 .
-hist:가감역관 hist:supervises hist:영선사업 .
-hist:가감역관 hist:promotionPath hist:실직(감역관) .
-hist:가감역관 hist:promotionCondition "임시직 근무 일수 포함 900일 달성 시 참상관으로 승진"@ko .
-hist:1718년(숙종44) hist:relatedTo hist:가감역관 .
+hist:Institution_가감역관 rdf:type hist:Institution .
+hist:Institution_가감역관 rdfs:label "가감역관" .
+hist:Institution_가감역관 hist:hasCategory "제도" .
+hist:Institution_가감역관 hist:hasSummary "조선 후기 선공감의 종9품 임시관직" .
+hist:Institution_가감역관 hist:establishedYear 1718 .
+hist:Institution_가감역관 hist:establishedDuringReign "숙종 (숙종 44)" .
+hist:Institution_가감역관 hist:hasQuota 3 .
+hist:Institution_가감역관 hist:hasRank "종9품" .
+hist:Institution_가감역관 hist:isTemporaryPosition True .
+hist:Institution_가감역관 hist:affiliatedWith "선공감" .
+hist:Institution_가감역관 hist:affiliatedNation "조선" .
+hist:Institution_선공감 rdf:type hist:Institution .
+hist:Institution_선공감 rdfs:label "선공감" .
+hist:Institution_감역관 rdf:type hist:Institution .
+hist:Institution_감역관 rdfs:label "감역관" .
+hist:Institution_실직(감역관) rdf:type hist:Institution .
+hist:Institution_실직(감역관) rdfs:label "실직(감역관)" .
+hist:Institution_참상관 rdf:type hist:Institution .
+hist:Institution_참상관 rdfs:label "참상관" .
+hist:Person_숙종 rdf:type hist:Person .
+hist:Person_숙종 rdfs:label "숙종" .
+hist:Event_토목사업 rdf:type hist:Event .
+hist:Event_토목사업 rdfs:label "토목 사업" .
+hist:Event_영선사업 rdf:type hist:Event .
+hist:Event_영선사업 rdfs:label "영선 사업" .
+hist:Nation_조선 rdf:type hist:Nation .
+hist:Nation_조선 rdfs:label "조선" .
+hist:Institution_가감역관 hist:establishedInYear 1718 .
+hist:Institution_가감역관 hist:establishedDuringReign hist:Person_숙종 .
+hist:Institution_가감역관 hist:hasQuota 3 .
+hist:Institution_가감역관 hist:affiliatedWith hist:Institution_선공감 .
+hist:Institution_가감역관 hist:affiliatedWith hist:Nation_조선 .
+hist:Institution_가감역관 hist:hasRank "종9품" .
+hist:Institution_가감역관 hist:status "임시관직" .
+hist:Institution_가감역관 hist:supervises hist:Event_토목사업 .
+hist:Institution_가감역관 hist:supervises hist:Event_영선사업 .
+hist:Institution_가감역관 hist:worksWith hist:Institution_감역관 .
+hist:Institution_감역관 hist:supervises hist:Event_토목사업 .
+hist:Institution_감역관 hist:supervises hist:Event_영선사업 .
+hist:Institution_가감역관 hist:promotesTo hist:Institution_실직(감역관) .
+hist:Institution_가감역관 hist:promotionCondition "감역관(실직)에 결원이 있을 때 임용 차례에 따라 승진" .
+hist:Institution_가감역관 hist:promotesTo hist:Institution_참상관 .
+hist:Institution_가감역관 hist:promotionCondition "임시직 때의 근무 일수를 포함하여 900일을 채우면 승진" .
 
 # 가경전 (제도)
-hist:가경전1 rdf:type hist:Policy .
-hist:가경전1 rdfs:label "가경전"@ko .
-hist:가경전1 hist:hasDefinition "조선시대에 기존 양안에 등록되지 않았다가 양전을 통해 새로 양안에 등록된 토지"@ko .
-hist:가경전1 hist:hasPeriod "조선시대"@ko .
-hist:가경전1 hist:hasTypicalOrigin "개간"@ko .
-hist:가경전1 hist:contrastedWith "원전"@ko .
-hist:가경전1 hist:classifiedAs "속전 (대개)"@ko .
-hist:가경전1 hist:taxTreatmentSummary "양안에 새로 등재되었으나 대체로 세금부과 대상에 포함되었고, 불안정한 생산성으로 속전과 함께 경작하는 경우에만 과세하는 규정 존재"@ko .
-hist:가경전1 hist:exampleYearMentioned 1720 .
-hist:조선3 rdf:type hist:Nation .
-hist:조선3 rdfs:label "조선"@ko .
-hist:양전1 rdf:type hist:Policy .
-hist:양전1 rdfs:label "양전"@ko .
-hist:양안1 rdf:type hist:Policy .
-hist:양안1 rdfs:label "양안"@ko .
-hist:원전1 rdf:type hist:Policy .
-hist:원전1 rdfs:label "원전"@ko .
-hist:속전1 rdf:type hist:Policy .
-hist:속전1 rdfs:label "속전"@ko .
-hist:진전1 rdf:type hist:Policy .
-hist:진전1 rdfs:label "진전"@ko .
-hist:갑술양전1 rdf:type hist:Event .
-hist:갑술양전1 rdfs:label "갑술양전"@ko .
-hist:경자양안1 rdf:type hist:Event .
-hist:경자양안1 rdfs:label "경자양안"@ko .
-hist:숙종5 rdf:type hist:Person .
-hist:숙종5 rdfs:label "숙종"@ko .
-hist:권농관1 rdf:type hist:Institution .
-hist:권농관1 rdfs:label "권농관"@ko .
-hist:수령1 rdf:type hist:Institution .
-hist:수령1 rdfs:label "수령"@ko .
-hist:관찰사1 rdf:type hist:Institution .
-hist:관찰사1 rdfs:label "관찰사"@ko .
-hist:호조1 rdf:type hist:Institution .
-hist:호조1 rdfs:label "호조"@ko .
-hist:수조안1 rdf:type hist:Policy .
-hist:수조안1 rdfs:label "수조안"@ko .
-hist:개간1 rdf:type hist:Event .
-hist:개간1 rdfs:label "개간"@ko .
-hist:경작자1 rdf:type hist:Person .
-hist:경작자1 rdfs:label "경작자"@ko .
-hist:가경전 hist:definedAs "조선시대에 기존 양안에 등록되지 않았다가 양전을 통해 새로 양안에 등록된 토지"@ko .
-hist:가경전 hist:registeredThrough hist:양전 .
-hist:양전 hist:conductedEveryYears 20 .
-hist:가경전 hist:contrastsWith hist:원전 .
-hist:가경전 hist:oftenClassifiedAs hist:속전 .
-hist:가경전 hist:oftenOriginatesFrom hist:개간 .
-hist:경자양안 hist:hasYear 1720 .
-hist:숙종4 hist:reignYearLabel "숙종 46 (1720)"@ko .
-hist:갑술양전 hist:precedes hist:경자양안 .
-hist:가경전 hist:markedIn hist:경자양안 .
-hist:경자양안 hist:usesLabelFor hist:가경전 .
-hist:가경전 hist:taxRecordsOftenIncludedIn hist:수조안 .
-hist:수령 hist:recordsNewlyCultivatedLand hist:가경전 .
-hist:경작자 hist:reportsTo hist:권농관 .
-hist:권농관 hist:investigatedBy hist:수령 .
-hist:수령 hist:investigatedBy hist:관찰사 .
-hist:가경전 hist:taxationRegulatedBy hist:경자양안 .
-hist:호조 hist:maintains hist:수조안 .
-hist:가경전 hist:mayBeExcludedFromRegisterBeforeSurvey hist:양안 .
+hist:Policy_가경전 rdf:type hist:Policy .
+hist:Policy_가경전 rdfs:label "가경전" .
+hist:Policy_가경전 hist:hasDefinition "조선시대에 기존 양안에 등록되지 않았다가 양전을 통해 새로 양안에 등록된 토지" .
+hist:Policy_가경전 hist:period "조선시대" .
+hist:Policy_가경전 hist:registeredThrough "양전" .
+hist:Policy_가경전 hist:contrastsWith "원전" .
+hist:Policy_가경전 hist:typicallyClassifiedAs "속전" .
+hist:Policy_가경전 hist:oftenNewlyReclaimed True .
+hist:Policy_가경전 hist:mayAlsoBeLongCultivated True .
+hist:Policy_가경전 hist:taxTreatmentSummary "불안정한 생산성을 고려하여 속전과 함께 경작하는 경우에만 세금을 거두는 등 조사·신고 절차를 거쳐 세액을 정함" .
+hist:Policy_원전 rdf:type hist:Policy .
+hist:Policy_원전 rdfs:label "원전" .
+hist:Event_양전 rdf:type hist:Event .
+hist:Event_양전 rdfs:label "양전" .
+hist:Institution_양안 rdf:type hist:Institution .
+hist:Institution_양안 rdfs:label "양안" .
+hist:Policy_속전 rdf:type hist:Policy .
+hist:Policy_속전 rdfs:label "속전" .
+hist:Policy_진전 rdf:type hist:Policy .
+hist:Policy_진전 rdfs:label "진전" .
+hist:Event_갑술양전 rdf:type hist:Event .
+hist:Event_갑술양전 rdfs:label "갑술양전" .
+hist:Event_경자양안 rdf:type hist:Event .
+hist:Event_경자양안 rdfs:label "경자양안" .
+hist:Person_숙종 rdf:type hist:Person .
+hist:Person_숙종 rdfs:label "숙종" .
+hist:Institution_호조 rdf:type hist:Institution .
+hist:Institution_호조 rdfs:label "호조" .
+hist:Institution_수령 rdf:type hist:Institution .
+hist:Institution_수령 rdfs:label "수령" .
+hist:Institution_관찰사 rdf:type hist:Institution .
+hist:Institution_관찰사 rdfs:label "관찰사" .
+hist:Institution_권농관 rdf:type hist:Institution .
+hist:Institution_권농관 rdfs:label "권농관" .
+hist:Institution_수조안 rdf:type hist:Institution .
+hist:Institution_수조안 rdfs:label "수조안" .
+hist:Policy_부세(세금) rdf:type hist:Policy .
+hist:Policy_부세(세금) rdfs:label "부세(세금)" .
+hist:Policy_가경전 hist:definedAs "양안을 통해 새로 등록된 토지" .
+hist:Policy_가경전 hist:registeredThrough hist:Event_양전 .
+hist:Policy_가경전 hist:contrastsWith hist:Policy_원전 .
+hist:Policy_가경전 hist:oftenClassifiedAs hist:Policy_속전 .
+hist:Policy_가경전 hist:doesNotInclude "진전(이미 양안에 진전으로 기재되어 있던 토지)" .
+hist:Event_양전 hist:occursEveryYears 20 .
+hist:Event_경자양안 hist:hasYear 1720 .
+hist:Event_경자양안 hist:duringReignOf hist:Person_숙종 .
+hist:Policy_가경전 hist:taxedTogetherWith hist:Policy_속전 .
+hist:Policy_가경전 hist:requiresReportTo hist:Institution_권농관 .
+hist:Policy_가경전 hist:investigatedBy hist:Institution_수령 .
+hist:Policy_가경전 hist:investigatedBy hist:Institution_관찰사 .
+hist:Institution_수령 hist:identifies hist:Policy_가경전 .
+hist:Policy_가경전 hist:includedInTaxRecords hist:Institution_수조안 .
+hist:Institution_수조안 hist:maintainedBy hist:Institution_호조 .
+hist:Institution_호조 hist:responsibleFor "부세(세금) 관리·수취" .
 
 # 가고 (문헌)
-hist:가고1 rdf:type hist:Institution .
-hist:가고1 rdfs:label "가고"@ko .
-hist:가고1 hist:hasCategory "문헌"@ko .
-hist:가고1 hist:hasForm "판례집"@ko .
-hist:가고1 hist:hasVolumes 2 .
-hist:가고1 hist:compiledInCentury "19세기 후반"@ko .
-hist:가고1 hist:repository "서울대학교 규장각"@ko .
-hist:가고1 hist:hasSubject "형사 사건 판례"@ko .
-hist:가고1 hist:hasSubject "시체 검안"@ko .
-hist:가고1 hist:hasSubject "일반 상해사건"@ko .
-hist:가고1 hist:hasSubject "분묘 도굴"@ko .
-hist:가고1 hist:hasSubject "위조 공문서"@ko .
-hist:가고1 hist:hasSubject "채무 변제"@ko .
-hist:가고1 hist:hasSubject "환곡 관리"@ko .
-hist:가고1 hist:intendedAudience "형관"@ko .
-hist:가고1 hist:intendedAudience "지방관"@ko .
-hist:가고1 hist:intendedAudience "형조"@ko .
-hist:가고1 hist:significance "조선 후기 형사 제도 및 판례 연구와 당시 사회상 이해에 유용한 자료"@ko .
-hist:형조1 rdf:type hist:Institution .
-hist:형조1 rdfs:label "형조"@ko .
-hist:형관1 rdf:type hist:Institution .
-hist:형관1 rdfs:label "형관"@ko .
-hist:지방관1 rdf:type hist:Institution .
-hist:지방관1 rdfs:label "지방관"@ko .
-hist:서울대학교규장각1 rdf:type hist:Institution .
-hist:서울대학교규장각1 rdfs:label "서울대학교 규장각"@ko .
-hist:서울삼청동1 rdf:type hist:Place .
-hist:서울삼청동1 rdfs:label "서울 삼청동"@ko .
-hist:경상도비안외서면1 rdf:type hist:Place .
-hist:경상도비안외서면1 rdfs:label "경상도 비안 외서면"@ko .
-hist:이용재1 rdf:type hist:Person .
-hist:이용재1 rdfs:label "이용재"@ko .
-hist:박세은1 rdf:type hist:Person .
-hist:박세은1 rdfs:label "박세은"@ko .
-hist:자살확인판결(삼청동변사자)1 rdf:type hist:Event .
-hist:자살확인판결(삼청동변사자)1 rdfs:label "자살 확인 판결 (삼청동 변사자)"@ko .
-hist:분묘도굴사건(비안외서면)1 rdf:type hist:Event .
-hist:분묘도굴사건(비안외서면)1 rdfs:label "분묘 도굴 사건 (비안 외서면)"@ko .
-hist:격쟁사건(이용재,징을침)1 rdf:type hist:Event .
-hist:격쟁사건(이용재,징을침)1 rdfs:label "격쟁 사건 (이용재, 징을 침)"@ko .
-hist:상주박세은의상해사건1 rdf:type hist:Event .
-hist:상주박세은의상해사건1 rdfs:label "상주 박세은의 상해 사건"@ko .
-hist:조선후기형사제도1 rdf:type hist:Policy .
-hist:조선후기형사제도1 rdfs:label "조선 후기 형사 제도"@ko .
-hist:조선5 rdf:type hist:Nation .
-hist:조선5 rdfs:label "조선"@ko .
-hist:가고 hist:hasCategory "문헌"@ko .
-hist:가고 hist:hasForm "판례집"@ko .
-hist:가고 hist:hasVolumes 2 .
-hist:가고 hist:compiledInCentury "19세기 후반"@ko .
-hist:가고 hist:storedAt hist:서울대학교규장각 .
-hist:가고 hist:hasSubject "형사 사건 판례"@ko .
-hist:가고 hist:containsCases "상권: 시체 검안 36건"@ko .
-hist:가고 hist:containsCases "상권: 일반 사안 11건"@ko .
-hist:가고 hist:containsCases "하권: 형사 사건 56건"@ko .
-hist:가고 hist:containsCases "하권: 조사 보고서 7건"@ko .
-hist:가고 hist:documents hist:자살확인판결(삼청동변사자) .
-hist:자살확인판결(삼청동변사자) hist:occursAt hist:서울삼청동 .
-hist:가고 hist:documents hist:분묘도굴사건(비안외서면) .
-hist:분묘도굴사건(비안외서면) hist:occursAt hist:경상도비안외서면 .
-hist:가고 hist:documents hist:격쟁사건(이용재,징을침) .
-hist:격쟁사건(이용재,징을침) hist:involvesPerson hist:이용재 .
-hist:가고 hist:documents hist:상주박세은의상해사건 .
-hist:상주박세은의상해사건 hist:involvesPerson hist:박세은 .
-hist:가고 hist:compiledFrom hist:형조 .
-hist:가고 hist:editedFor hist:형관 .
-hist:가고 hist:editedFor hist:지방관 .
-hist:가고 hist:usefulFor hist:조선후기형사제도 .
-hist:가고 hist:relatedToNation hist:조선4 .
+hist:Institution_가고 rdf:type hist:Institution .
+hist:Institution_가고 rdfs:label "가고" .
+hist:Institution_가고 hist:hasCategory "문헌 (판례집)" .
+hist:Institution_가고 hist:hasVolumes 2 .
+hist:Institution_가고 hist:hasCompilationPeriod "19세기 후반" .
+hist:Institution_가고 hist:hasSummary "19세기 후반 형사사건 판결사례를 모아 편찬한 판례집으로, 주로 피살자·변사자의 시체 검안 사례와 일반 상해, 분묘 도굴, 위조 공문서, 채무 변제 및 환곡 관리 관련 조사 보고서를 수록함." .
+hist:Institution_가고 hist:hasFocusTopics "피살자·변사자의 시체 검안(법의학적 검안)" .
+hist:Institution_가고 hist:hasFocusTopics "일반 상해사건" .
+hist:Institution_가고 hist:hasFocusTopics "분묘 도굴" .
+hist:Institution_가고 hist:hasFocusTopics "위조 공문서" .
+hist:Institution_가고 hist:hasFocusTopics "채무 변제" .
+hist:Institution_가고 hist:hasFocusTopics "환곡의 관리" .
+hist:Institution_가고 hist:heldAt "서울대학교 규장각" .
+hist:Institution_가고 hist:role "형관 및 지방관의 재판 참고자료(판례집)" .
+hist:Event_삼청동변사자자살확인판결 rdf:type hist:Event .
+hist:Event_삼청동변사자자살확인판결 rdfs:label "삼청동 변사자 자살 확인 판결" .
+hist:Event_경상도비안외서면의분묘도굴사건 rdf:type hist:Event .
+hist:Event_경상도비안외서면의분묘도굴사건 rdfs:label "경상도 비안 외서면의 분묘 도굴 사건" .
+hist:Event_상주박세은의상해사건 rdf:type hist:Event .
+hist:Event_상주박세은의상해사건 rdfs:label "상주 박세은의 상해 사건" .
+hist:Event_이용재격쟁사건 rdf:type hist:Event .
+hist:Event_이용재격쟁사건 rdfs:label "이용재 격쟁사건" .
+hist:Institution_형조 rdf:type hist:Institution .
+hist:Institution_형조 rdfs:label "형조" .
+hist:Institution_서울대학교규장각 rdf:type hist:Institution .
+hist:Institution_서울대학교규장각 rdfs:label "서울대학교 규장각" .
+hist:Place_서울삼청동 rdf:type hist:Place .
+hist:Place_서울삼청동 rdfs:label "서울 삼청동" .
+hist:Place_경상도비안외서면 rdf:type hist:Place .
+hist:Place_경상도비안외서면 rdfs:label "경상도 비안 외서면" .
+hist:Person_박세은 rdf:type hist:Person .
+hist:Person_박세은 rdfs:label "박세은" .
+hist:Person_이용재 rdf:type hist:Person .
+hist:Person_이용재 rdfs:label "이용재" .
+hist:Policy_조선후기의형사제도 rdf:type hist:Policy .
+hist:Policy_조선후기의형사제도 rdfs:label "조선 후기의 형사 제도" .
+hist:Policy_환곡의관리 rdf:type hist:Policy .
+hist:Policy_환곡의관리 rdfs:label "환곡의 관리" .
+hist:Event_격쟁사건 rdf:type hist:Event .
+hist:Event_격쟁사건 rdfs:label "격쟁사건" .
+hist:Institution_가고 hist:hasCategory "문헌 (판례집)" .
+hist:Institution_가고 hist:hasCompilationPeriod "19세기 후반" .
+hist:Institution_가고 hist:hasVolumes 2 .
+hist:Institution_가고 hist:heldAt hist:Institution_서울대학교규장각 .
+hist:Institution_가고 hist:containsTopic "피살자·변사자의 시체 검안" .
+hist:Institution_가고 hist:containsTopic "일반 상해사건" .
+hist:Institution_가고 hist:containsTopic "분묘 도굴 사건" .
+hist:Institution_가고 hist:containsTopic "위조 공문서 사건" .
+hist:Institution_가고 hist:containsTopic "채무 변제 및 환곡의 관리" .
+hist:Institution_가고 hist:topVolumeHasAutopsyCases 36 .
+hist:Institution_가고 hist:topVolumeHasGeneralCases 11 .
+hist:Institution_가고 hist:bottomVolumeHasCriminalCases 56 .
+hist:Institution_가고 hist:bottomVolumeHasInvestigationReports 7 .
+hist:Institution_가고 hist:documentsEvent hist:Event_삼청동변사자자살확인판결 .
+hist:Event_삼청동변사자자살확인판결 hist:occursAt hist:Place_서울삼청동 .
+hist:Institution_가고 hist:documentsEvent hist:Event_경상도비안외서면의분묘도굴사건 .
+hist:Event_경상도비안외서면의분묘도굴사건 hist:occursAt hist:Place_경상도비안외서면 .
+hist:Institution_가고 hist:documentsEvent hist:Event_상주박세은의상해사건 .
+hist:Event_상주박세은의상해사건 hist:involvesPerson hist:Person_박세은 .
+hist:Institution_가고 hist:documentsEvent hist:Event_이용재격쟁사건 .
+hist:Event_이용재격쟁사건 hist:involvesPerson hist:Person_이용재 .
+hist:Institution_가고 hist:relatedToInstitution hist:Institution_형조 .
+hist:Institution_가고 hist:usedAsReferenceFor "형관 및 지방관의 재판" .
+hist:Institution_가고 hist:contributesToResearchOn hist:Policy_조선후기의형사제도 .
+hist:Institution_가고 hist:documentsTopic hist:Policy_환곡의관리 .
+hist:Institution_가고 hist:isTypeOf "판례집" .
 
 # 가관 (제도)
-hist:가관1 rdf:type hist:Policy .
-hist:가관1 rdfs:label "가관"@ko .
-hist:가관1 hist:hasDefinition "조선시대 법정 정원 외에 추가로 임용하거나 중요 관직에 결원이 생겼을 경우 타관이 겸임하는 임시 관직 제도"@ko .
-hist:가관1 hist:hasEra "조선시대"@ko .
-hist:가관1 hist:hasPurpose "정원 초과 인원 임용"@ko .
-hist:가관1 hist:hasPurpose "중요 관직의 결원 보충"@ko .
-hist:가관1 hist:hasPurpose "업무 공백의 임시 대리"@ko .
-hist:가관1 hist:hasProblems "남용(업무가 적은 관서까지 확대)"@ko .
-hist:가관1 hist:hasProblems "추가예산 발생"@ko .
-hist:가관1 hist:hasProblems "정식관원의 직무위임으로 인한 기강해이"@ko .
-hist:가관1 hist:hasProblems "가관의 직권남용"@ko .
-hist:가관1 hist:hasFormalizedExamples "통례원 가인"@ko .
-hist:가관1 hist:hasFormalizedExamples "선공감 가감역관"@ko .
-hist:가관1 hist:hasFormalizedExamples "승정원 가주서"@ko .
-hist:가관1 hist:notableYears 1517 .
-hist:가관1 hist:notableYears 1522 .
-hist:조선7 rdf:type hist:Nation .
-hist:조선7 rdfs:label "조선"@ko .
-hist:연산군1 rdf:type hist:Person .
-hist:연산군1 rdfs:label "연산군"@ko .
-hist:중종1 rdf:type hist:Person .
-hist:중종1 rdfs:label "중종"@ko .
-hist:선공감3 rdf:type hist:Institution .
-hist:선공감3 rdfs:label "선공감"@ko .
-hist:사옹원1 rdf:type hist:Institution .
-hist:사옹원1 rdfs:label "사옹원"@ko .
-hist:통례원1 rdf:type hist:Institution .
-hist:통례원1 rdfs:label "통례원"@ko .
-hist:승정원1 rdf:type hist:Institution .
-hist:승정원1 rdfs:label "승정원"@ko .
-hist:6조1 rdf:type hist:Institution .
-hist:6조1 rdfs:label "6조"@ko .
-hist:3사1 rdf:type hist:Institution .
-hist:3사1 rdfs:label "3사"@ko .
-hist:내의원1 rdf:type hist:Institution .
-hist:내의원1 rdfs:label "내의원"@ko .
-hist:한성부1 rdf:type hist:Institution .
-hist:한성부1 rdfs:label "한성부"@ko .
-hist:내시부1 rdf:type hist:Institution .
-hist:내시부1 rdfs:label "내시부"@ko .
-hist:군기시1 rdf:type hist:Institution .
-hist:군기시1 rdfs:label "군기시"@ko .
-hist:사부1 rdf:type hist:Institution .
-hist:사부1 rdfs:label "사부"@ko .
-hist:별와서1 rdf:type hist:Institution .
-hist:별와서1 rdfs:label "별와서"@ko .
-hist:상서원1 rdf:type hist:Institution .
-hist:상서원1 rdfs:label "상서원"@ko .
-hist:상사관(통례원상사관)1 rdf:type hist:Institution .
-hist:상사관(통례원상사관)1 rdfs:label "상사관(통례원 상사관)"@ko .
-hist:군적청1 rdf:type hist:Institution .
-hist:군적청1 rdfs:label "군적청"@ko .
-hist:원유사1 rdf:type hist:Institution .
-hist:원유사1 rdfs:label "원유사"@ko .
-hist:1517년가관실태와감축(중종12,7월)1 rdf:type hist:Event .
-hist:1517년가관실태와감축(중종12,7월)1 rdfs:label "1517년 가관 실태와 감축(중종 12, 7월)"@ko .
-hist:1522년가승지임명·운용사례1 rdf:type hist:Event .
-hist:1522년가승지임명·운용사례1 rdfs:label "1522년 가승지 임명·운용 사례"@ko .
-hist:가관 hist:appliesInEra hist:조선6 .
-hist:가관 hist:expandedAfter hist:연산군 .
-hist:가관 hist:wasDiscussedIn hist:1517년가관실태와감축(중종12,7월) .
-hist:1517년가관실태와감축(중종12,7월) hist:records hist:한성부 .
-hist:1517년가관실태와감축(중종12,7월) hist:records hist:사옹원 .
-hist:1517년가관실태와감축(중종12,7월) hist:records hist:선공감2 .
-hist:가관 hist:frequentlyUsedIn hist:선공감2 .
-hist:가관 hist:frequentlyUsedIn hist:사옹원 .
-hist:가관 hist:frequentlyUsedIn hist:통례원 .
-hist:가관 hist:appointedIn hist:승정원 .
-hist:가관 hist:appointedIn hist:6조 .
-hist:가관 hist:appointedIn hist:3사 .
-hist:가관 hist:usedAsTemporaryIn hist:내의원 .
-hist:가관 hist:usedAsTemporaryIn hist:한성부 .
-hist:가관 hist:ledToProblems "추가예산 발생"@ko .
-hist:가관 hist:ledToProblems "정식관원의 기강해이"@ko .
-hist:가관 hist:ledToProblems "가관의 직권남용"@ko .
-hist:가관 hist:formalizedAs "통례원 가인"@ko .
-hist:가관 hist:formalizedAs "선공감 가감역관"@ko .
-hist:가관 hist:formalizedAs "승정원 가주서"@ko .
-hist:1522년가승지임명·운용사례 hist:involves hist:승정원 .
-hist:1522년가승지임명·운용사례 hist:documentsUseOf hist:가관 .
-hist:가관 hist:oftenFilledBy "타관서의 관원"@ko .
+hist:Policy_가관 rdf:type hist:Policy .
+hist:Policy_가관 rdfs:label "가관" .
+hist:Policy_가관 hist:description "조선시대 법정 정원 외에 추가로 임용하거나 중요 관직에 결원이 생겼을 경우 타관이 겸임하는 임시관직 제도" .
+hist:Policy_가관 hist:period "조선시대" .
+hist:Policy_가관 hist:began "조선초기" .
+hist:Policy_가관 hist:becameWidespreadAfter "연산군 이후" .
+hist:Policy_가관 hist:typicalUsage "인력이 부족한 관서의 임시직 보충" .
+hist:Policy_가관 hist:typicalUsage "중요관직의 갑작스러운 결원 보충" .
+hist:Policy_가관 hist:typicalUsage "관직자의 질병·탄핵 등으로 인한 일시적 업무 공백 대체" .
+hist:Policy_가관 hist:notedProblems "추가예산 소요" .
+hist:Policy_가관 hist:notedProblems "정식관원 직무위임에 따른 기강해이" .
+hist:Policy_가관 hist:notedProblems "가관의 직권남용" .
+hist:Policy_가관 hist:notedProblems "낭비적·남용적 운영" .
+hist:Policy_가관 hist:examplesRegularizedLater "통례원 가인(정직화)" .
+hist:Policy_가관 hist:examplesRegularizedLater "선공감 가감역관(정직화)" .
+hist:Policy_가관 hist:examplesRegularizedLater "승정원 가주서(정직화)" .
+hist:Policy_가관 hist:commonInstitutions "선공감" .
+hist:Policy_가관 hist:commonInstitutions "사옹원" .
+hist:Policy_가관 hist:commonInstitutions "통례원" .
+hist:Policy_가관 hist:commonInstitutions "승정원" .
+hist:Policy_가관 hist:commonInstitutions "6조" .
+hist:Policy_가관 hist:commonInstitutions "3사" .
+hist:Policy_가관 hist:commonInstitutions "내의원" .
+hist:Policy_가관 hist:commonInstitutions "의장고" .
+hist:Policy_가관 hist:commonInstitutions "군기시" .
+hist:Policy_가관 hist:commonInstitutions "한성부" .
+hist:Policy_가관 hist:commonInstitutions "내시부" .
+hist:Policy_가관 hist:commonInstitutions "상서원" .
+hist:Policy_가관 hist:commonInstitutions "별와서" .
+hist:Policy_가관 hist:commonInstitutions "군적청" .
+hist:Policy_가관 hist:commonInstitutions "원유사종사관" .
+hist:Institution_선공감 rdf:type hist:Institution .
+hist:Institution_선공감 rdfs:label "선공감" .
+hist:Institution_사옹원 rdf:type hist:Institution .
+hist:Institution_사옹원 rdfs:label "사옹원" .
+hist:Institution_통례원 rdf:type hist:Institution .
+hist:Institution_통례원 rdfs:label "통례원" .
+hist:Institution_승정원 rdf:type hist:Institution .
+hist:Institution_승정원 rdfs:label "승정원" .
+hist:Institution_6조 rdf:type hist:Institution .
+hist:Institution_6조 rdfs:label "6조" .
+hist:Institution_3사 rdf:type hist:Institution .
+hist:Institution_3사 rdfs:label "3사" .
+hist:Institution_내의원 rdf:type hist:Institution .
+hist:Institution_내의원 rdfs:label "내의원" .
+hist:Institution_의장고 rdf:type hist:Institution .
+hist:Institution_의장고 rdfs:label "의장고" .
+hist:Institution_군기시 rdf:type hist:Institution .
+hist:Institution_군기시 rdfs:label "군기시" .
+hist:Institution_한성부 rdf:type hist:Institution .
+hist:Institution_한성부 rdfs:label "한성부" .
+hist:Institution_내시부 rdf:type hist:Institution .
+hist:Institution_내시부 rdfs:label "내시부" .
+hist:Institution_상서원 rdf:type hist:Institution .
+hist:Institution_상서원 rdfs:label "상서원" .
+hist:Institution_별와서 rdf:type hist:Institution .
+hist:Institution_별와서 rdfs:label "별와서" .
+hist:Institution_군적청 rdf:type hist:Institution .
+hist:Institution_군적청 rdfs:label "군적청" .
+hist:Institution_원유사종사관 rdf:type hist:Institution .
+hist:Institution_원유사종사관 rdfs:label "원유사종사관" .
+hist:Institution_왕자군 rdf:type hist:Institution .
+hist:Institution_왕자군 rdfs:label "왕자군" .
+hist:Event_1517년(중종12)가관실태·감축내역 rdf:type hist:Event .
+hist:Event_1517년(중종12)가관실태·감축내역 rdfs:label "1517년(중종12) 가관 실태·감축 내역" .
+hist:Event_1522년가승지임명(6승지해직등) rdf:type hist:Event .
+hist:Event_1522년가승지임명(6승지해직등) rdfs:label "1522년 가승지 임명(6승지 해직 등)" .
+hist:Event_연산군이후가관확대양상 rdf:type hist:Event .
+hist:Event_연산군이후가관확대양상 rdfs:label "연산군 이후 가관 확대 양상" .
+hist:Institution_가승지(임시승지) rdf:type hist:Institution .
+hist:Institution_가승지(임시승지) rdfs:label "가승지(임시 승지)" .
+hist:Institution_가인(임시가인) rdf:type hist:Institution .
+hist:Institution_가인(임시가인) rdfs:label "가인(임시 가인)" .
+hist:Institution_가감역관(선공감임시관직) rdf:type hist:Institution .
+hist:Institution_가감역관(선공감임시관직) rdfs:label "가감역관(선공감 임시 관직)" .
+hist:Institution_가주서(승정원임시직) rdf:type hist:Institution .
+hist:Institution_가주서(승정원임시직) rdfs:label "가주서(승정원 임시 직)" .
+hist:Institution_가참지 rdf:type hist:Institution .
+hist:Institution_가참지 rdfs:label "가참지" .
+hist:Institution_가낭관 rdf:type hist:Institution .
+hist:Institution_가낭관 rdfs:label "가낭관" .
+hist:Event_가관정직화(일부직제의정식화) rdf:type hist:Event .
+hist:Event_가관정직화(일부직제의정식화) rdfs:label "가관 정직화(일부 직제의 정식화)" .
+hist:Policy_가관 hist:isA "임시관직" .
+hist:Policy_가관 hist:startedIn "조선초기" .
+hist:Policy_가관 hist:becameWidespreadAfter "연산군 이후" .
+hist:Policy_가관 hist:usedIn hist:Institution_선공감 .
+hist:Policy_가관 hist:usedIn hist:Institution_사옹원 .
+hist:Policy_가관 hist:usedIn hist:Institution_통례원 .
+hist:Policy_가관 hist:usedIn hist:Institution_승정원 .
+hist:Policy_가관 hist:usedIn hist:Institution_6조 .
+hist:Policy_가관 hist:usedIn hist:Institution_3사 .
+hist:Policy_가관 hist:usedIn hist:Institution_내의원 .
+hist:Policy_가관 hist:usedIn hist:Institution_의장고 .
+hist:Policy_가관 hist:usedIn hist:Institution_군기시 .
+hist:Policy_가관 hist:usedIn hist:Institution_한성부 .
+hist:Policy_가관 hist:usedIn hist:Institution_내시부 .
+hist:Policy_가관 hist:addressedIssue "인력부족" .
+hist:Policy_가관 hist:ledTo "추가예산 소요" .
+hist:Policy_가관 hist:ledTo "정식관원 직무위임에 따른 기강해이" .
+hist:Policy_가관 hist:ledTo "직권남용" .
+hist:Event_1517년(중종12)가관실태·감축내역 hist:hasYear 1517 .
+hist:Event_1517년(중종12)가관실태·감축내역 hist:documents "여러 관서의 가관 배치 및 예비체아 수" .
+hist:Policy_가관 hist:documentedIn hist:Event_1517년(중종12)가관실태·감축내역 .
+hist:Event_1522년가승지임명(6승지해직등) hist:hasYear 1522 .
+hist:Policy_가관 hist:usedAsTemporaryReplacementIn hist:Institution_승정원 .
+hist:Policy_가관 hist:usedAsTemporaryReplacementIn hist:Institution_6조 .
+hist:Policy_가관 hist:usedAsTemporaryReplacementIn hist:Institution_3사 .
+hist:Policy_가관 hist:includesPositions hist:Institution_가승지(임시승지) .
+hist:Policy_가관 hist:includesPositions hist:Institution_가인(임시가인) .
+hist:Policy_가관 hist:includesPositions hist:Institution_가감역관(선공감임시관직) .
+hist:Policy_가관 hist:includesPositions hist:Institution_가주서(승정원임시직) .
+hist:Policy_가관 hist:includesPositions hist:Institution_가참지 .
+hist:Policy_가관 hist:includesPositions hist:Institution_가낭관 .
+hist:Policy_가관 hist:occasionallyRegularizedInto "정직화(일부 직제의 정식화)" .
+hist:정직화(일부직제의정식화) hist:examples "통례원 가인, 선공감 가감역관, 승정원 가주서" .
+hist:병조당상관·낭관 hist:used "가참지 · 가낭관을 숙직 대리로 차출" .
+hist:Policy_가관 hist:wasSubjectToDebate "가관의 감축 및 운영 문제" .
 
 # 가극 (제도)
-hist:가극1 rdf:type hist:Policy .
-hist:가극1 rdfs:label "가극"@ko .
-hist:가극1 hist:hasDefinition "조선시대에 귀양 간 사람에게 내리던 형벌의 하나로, 귀양살이하는 집 둘레에 가시가 많은 탱자나무를 둘러치고 그 안에 가두어 외부와의 접촉을 제한한 가택연금 형식의 형벌"@ko .
-hist:가극1 hist:usedInPeriod "조선시대"@ko .
-hist:가극1 hist:isFormOf "가택연금"@ko .
-hist:가극1 hist:isFormOf "위리안치"@ko .
-hist:가극1 hist:isFormOf "유형주의 일종"@ko .
-hist:가극1 hist:method "죄인의 집 둘레에 탱자나무 울타리를 치고 내부로 출입을 제한함"@ko .
-hist:가극1 hist:keyCharacteristics "죄인이 집을 스스로 마련해야 함"@ko .
-hist:가극1 hist:keyCharacteristics "문지기(감시인)를 두어 외부 출입 통제"@ko .
-hist:가극1 hist:keyCharacteristics "수령의 불시 점검과 규칙 위반 시 처벌"@ko .
-hist:가극1 hist:keyCharacteristics "외부와의 접촉 및 물자 교환 제한"@ko .
-hist:가극1 hist:severity "혹독함"@ko .
-hist:가극1 hist:involvesPlant "탱자나무"@ko .
-hist:조선9 rdf:type hist:Nation .
-hist:조선9 rdfs:label "조선"@ko .
-hist:위리안치1 rdf:type hist:Policy .
-hist:위리안치1 rdfs:label "위리안치"@ko .
-hist:유형주1 rdf:type hist:Policy .
-hist:유형주1 rdfs:label "유형주"@ko .
-hist:제주도1 rdf:type hist:Place .
-hist:제주도1 rdfs:label "제주도"@ko .
-hist:오시복1 rdf:type hist:Person .
-hist:오시복1 rdfs:label "오시복"@ko .
-hist:이형상1 rdf:type hist:Person .
-hist:이형상1 rdfs:label "이형상"@ko .
-hist:제주목사1 rdf:type hist:Institution .
-hist:제주목사1 rdfs:label "제주목사"@ko .
-hist:수령3 rdf:type hist:Institution .
-hist:수령3 rdfs:label "수령"@ko .
-hist:오시복의편지(1702)1 rdf:type hist:Event .
-hist:오시복의편지(1702)1 rdfs:label "오시복의 편지 (1702)"@ko .
-hist:이형상관직변경사건1 rdf:type hist:Event .
-hist:이형상관직변경사건1 rdfs:label "이형상 관직 변경 사건"@ko .
-hist:탱자나무1 rdf:type hist:Thing .
-hist:탱자나무1 rdfs:label "탱자나무"@ko .
-hist:가극 hist:occursInPeriod hist:조선8 .
-hist:가극 hist:isTypeOf hist:위리안치 .
-hist:가극 hist:isVariantOf hist:유형주 .
-hist:가극 hist:isFormOf "가택연금"@ko .
-hist:가극 hist:involvesPlant hist:탱자나무 .
-hist:가극 hist:restricts "외부와의 접촉"@ko .
-hist:가극 hist:enforcedBy hist:수령2 .
-hist:가극 hist:punishedAt hist:제주도 .
-hist:오시복 hist:punishedBy hist:가극 .
-hist:오시복 hist:punishedAt hist:제주도 .
-hist:오시복의편지(1702) hist:authoredBy hist:오시복 .
-hist:오시복의편지(1702) hist:addressedTo hist:이형상 .
-hist:오시복의편지(1702) hist:hasYear 1702 .
-hist:이형상 hist:heldOffice hist:제주목사 .
-hist:이형상 hist:providedAssistanceTo hist:오시복 .
-hist:이형상관직변경사건 hist:resultedFrom "이형상이 오시복에게 편의(도움)를 준 일"@ko .
-hist:이형상 hist:experienced hist:이형상관직변경사건 .
-hist:가극 hist:oftenLedTo "죄인이 뇌물을 써서 읍내로 이주하려다 적발되는 사례"@ko .
-hist:가극 hist:requires "죄인의 집 마련 및 울타리(탱자나무) 설치, 문지기 배치"@ko .
+hist:Policy_가극 rdf:type hist:Policy .
+hist:Policy_가극 rdfs:label "가극" .
+hist:Policy_가극 hist:hasAlias "위리안치" .
+hist:Policy_가극 hist:hasAlias "유형주(일종)" .
+hist:Policy_가극 hist:hasAlias "가택연금형식" .
+hist:Policy_가극 hist:hasCategory "제도" .
+hist:Policy_가극 hist:hasEra "조선시대" .
+hist:Policy_가극 hist:hasDefinition "귀양 간 사람에게 내리던 형벌의 하나로, 귀양살이하는 죄인의 집 둘레에 가시가 많은 탱자나무를 둘러치고 그 안에 가두어 외부와의 접촉을 제한한 가택연금 형식의 형벌." .
+hist:Policy_가극 hist:hasCharacteristics "죄인의 집 둘레에 탱자나무 울타리 설치" .
+hist:Policy_가극 hist:hasCharacteristics "외부와의 접촉 제한(출입 금지, 물·불·물품 대여 금지)" .
+hist:Policy_가극 hist:hasCharacteristics "집 앞에 문지기 배치" .
+hist:Policy_가극 hist:hasCharacteristics "수령의 불시 점검 및 규칙 위반 시 처벌" .
+hist:Policy_위리안치 rdf:type hist:Policy .
+hist:Policy_위리안치 rdfs:label "위리안치" .
+hist:Policy_유형주 rdf:type hist:Policy .
+hist:Policy_유형주 rdfs:label "유형주" .
+hist:Policy_가택연금 rdf:type hist:Policy .
+hist:Policy_가택연금 rdfs:label "가택연금" .
+hist:Event_귀양(유배) rdf:type hist:Event .
+hist:Event_귀양(유배) rdfs:label "귀양(유배)" .
+hist:Person_오시복 rdf:type hist:Person .
+hist:Person_오시복 rdfs:label "오시복" .
+hist:Person_이형상 rdf:type hist:Person .
+hist:Person_이형상 rdfs:label "이형상" .
+hist:Place_제주도 rdf:type hist:Place .
+hist:Place_제주도 rdfs:label "제주도" .
+hist:Institution_제주목사 rdf:type hist:Institution .
+hist:Institution_제주목사 rdfs:label "제주목사" .
+hist:Institution_수령 rdf:type hist:Institution .
+hist:Institution_수령 rdfs:label "수령" .
+hist:Institution_문지기 rdf:type hist:Institution .
+hist:Institution_문지기 rdfs:label "문지기" .
+hist:Institution_노복 rdf:type hist:Institution .
+hist:Institution_노복 rdfs:label "노복" .
+hist:Place_읍내 rdf:type hist:Place .
+hist:Place_읍내 rdfs:label "읍내" .
+hist:Event_오시복의편지(1702) rdf:type hist:Event .
+hist:Event_오시복의편지(1702) rdfs:label "오시복의 편지 (1702)" .
+hist:Policy_가극 hist:sameAs hist:Policy_위리안치 .
+hist:Policy_가극 hist:subtypeOf hist:Policy_유형주 .
+hist:Policy_가극 hist:hasForm hist:Policy_가택연금 .
+hist:Policy_가극 hist:implementedInContextOf hist:Event_귀양(유배) .
+hist:Policy_가극 hist:implementedAt hist:Place_제주도 .
+hist:Policy_가극 hist:requires hist:Institution_문지기 .
+hist:Institution_수령 hist:inspects hist:Policy_가극 .
+hist:Person_오시복 hist:punishedBy hist:Policy_가극 .
+hist:Event_오시복의편지(1702) hist:sentBy hist:Person_오시복 .
+hist:Event_오시복의편지(1702) hist:sentTo hist:Person_이형상 .
+hist:Event_오시복의편지(1702) hist:hasYear 1702 .
+hist:Event_오시복의편지(1702) hist:describes hist:Policy_가극 .
+hist:Person_이형상 hist:heldOffice hist:Institution_제주목사 .
+hist:Person_이형상 hist:assisted hist:Person_오시복 .
+hist:Person_이형상 hist:experiencedOfficeChangeRelatedTo hist:Event_오시복의편지(1702) .
+hist:Policy_가극 hist:restrictsMovementTo hist:Place_읍내 .
+hist:Policy_가극 hist:involves hist:Institution_노복 .
 
 # 가교 (물품)
-hist:가교1 rdf:type hist:Institution .
-hist:가교1 rdfs:label "가교"@ko .
-hist:가교1 hist:hasAlias "어가"@ko .
-hist:가교1 hist:hasAlias "대가"@ko .
-hist:가교1 hist:hasAlias "공가교"@ko .
-hist:가교1 hist:hasDescription "조선시대 왕과 왕세자의 능행 및 열무 참관 등 장거리 행차 때에 사용하던 가마. 들채를 앞뒤 두 마리 말의 멍에에 매달아 운행하였으며, 연을 간편하게 개량한 형태이다."@ko .
-hist:가교1 hist:usedBy "왕"@ko .
-hist:가교1 hist:usedBy "왕세자"@ko .
-hist:가교1 hist:usedBy "왕비"@ko .
-hist:가교1 hist:usedBy "모후"@ko .
-hist:가교1 hist:originatedFrom "고려(상로·초요)"@ko .
-hist:가교1 hist:isVariantOf "연"@ko .
-hist:가교1 hist:hasParts "들채"@ko .
-hist:가교1 hist:hasParts "옥교"@ko .
-hist:가교1 hist:hasParts "옥개"@ko .
-hist:가교1 hist:hasParts "용두"@ko .
-hist:가교1 hist:hasParts "창틀"@ko .
-hist:가교1 hist:ledBy "가교봉도"@ko .
-hist:가교1 hist:examples "1795년(정조 19) 혜경궁 홍씨의 수원 현륭원 행차에서 사용"@ko .
-hist:왕1 rdf:type hist:Person .
-hist:왕1 rdfs:label "왕"@ko .
-hist:왕세자1 rdf:type hist:Person .
-hist:왕세자1 rdfs:label "왕세자"@ko .
-hist:왕비1 rdf:type hist:Person .
-hist:왕비1 rdfs:label "왕비"@ko .
-hist:모후1 rdf:type hist:Person .
-hist:모후1 rdfs:label "모후"@ko .
-hist:하례1 rdf:type hist:Person .
-hist:하례1 rdfs:label "하례"@ko .
-hist:가교봉도1 rdf:type hist:Person .
-hist:가교봉도1 rdfs:label "가교봉도"@ko .
-hist:들채1 rdf:type hist:Institution .
-hist:들채1 rdfs:label "들채"@ko .
-hist:옥교1 rdf:type hist:Institution .
-hist:옥교1 rdfs:label "옥교"@ko .
-hist:옥개1 rdf:type hist:Institution .
-hist:옥개1 rdfs:label "옥개"@ko .
-hist:연1 rdf:type hist:Institution .
-hist:연1 rdfs:label "연"@ko .
-hist:용두1 rdf:type hist:Institution .
-hist:용두1 rdfs:label "용두"@ko .
-hist:창틀1 rdf:type hist:Institution .
-hist:창틀1 rdfs:label "창틀"@ko .
-hist:고려1 rdf:type hist:Nation .
-hist:고려1 rdfs:label "고려"@ko .
-hist:조선11 rdf:type hist:Nation .
-hist:조선11 rdfs:label "조선"@ko .
-hist:능행1 rdf:type hist:Event .
-hist:능행1 rdfs:label "능행"@ko .
-hist:열무참관1 rdf:type hist:Event .
-hist:열무참관1 rdfs:label "열무 참관"@ko .
-hist:1795년혜경궁홍씨의수원현륭원행차1 rdf:type hist:Event .
-hist:1795년혜경궁홍씨의수원현륭원행차1 rdfs:label "1795년 혜경궁 홍씨의 수원 현륭원 행차"@ko .
-hist:혜경궁홍씨1 rdf:type hist:Person .
-hist:혜경궁홍씨1 rdfs:label "혜경궁 홍씨"@ko .
-hist:정조3 rdf:type hist:Person .
-hist:정조3 rdfs:label "정조"@ko .
-hist:현륭원1 rdf:type hist:Place .
-hist:현륭원1 rdfs:label "현륭원"@ko .
-hist:가교 hist:usedBy hist:왕 .
-hist:가교 hist:usedBy hist:왕세자 .
-hist:가교 hist:usedBy hist:왕비 .
-hist:가교 hist:usedBy hist:모후 .
-hist:가교 hist:originatedFrom hist:고려 .
-hist:가교 hist:isVariantOf hist:연 .
-hist:가교 hist:hasPart hist:들채 .
-hist:가교 hist:hasPart hist:옥교 .
-hist:가교 hist:hasPart hist:옥개 .
-hist:가교 hist:hasPart hist:용두 .
-hist:가교 hist:hasPart hist:창틀 .
-hist:가교 hist:hasColor "왕: 붉은색 바탕에 황금색 장식"@ko .
-hist:가교 hist:hasColor "왕세자: 들채와 창틀 검정색"@ko .
-hist:가교 hist:hasFeature "옥개 아청색, 앞뒤 용두, 정상 주석 연화무늬 장식"@ko .
-hist:가교 hist:carriedBy hist:하례 .
-hist:가교 hist:carrierCountFor "왕: 8"@ko .
-hist:가교 hist:carrierCountFor "왕세자: 4"@ko .
-hist:가교 hist:ledBy hist:가교봉도 .
-hist:1795년혜경궁홍씨의수원현륭원행차 hist:uses hist:가교 .
-hist:1795년혜경궁홍씨의수원현륭원행차 hist:hasYear 1795 .
-hist:1795년혜경궁홍씨의수원현륭원행차 hist:occursAt hist:현륭원 .
-hist:혜경궁홍씨 hist:participatesIn hist:1795년혜경궁홍씨의수원현륭원행차 .
-hist:정조2 hist:supervises hist:1795년혜경궁홍씨의수원현륭원행차 .
-hist:가교 hist:documentedInPeriod "조선 후기 문헌"@ko .
-hist:가교 hist:usedIn hist:능행 .
-hist:가교 hist:usedIn hist:열무참관 .
-hist:가교 hist:describedAsOriginatingFrom "고려의 상로·초요"@ko .
+hist:Place_가교 rdf:type hist:Place .
+hist:Place_가교 rdfs:label "가교" .
+hist:Place_가교 hist:category "물품" .
+hist:Place_가교 hist:description "조선시대 왕과 왕세자의 능행 및 원거리 행차 때 사용하던 가마" .
+hist:Place_가교 hist:hasVariant "어가" .
+hist:Place_가교 hist:hasVariant "대가" .
+hist:Place_가교 hist:hasVariant "공가교" .
+hist:Place_가교 hist:originPeriod "고려시대(상로·초요 계통에서 유래)" .
+hist:Place_가교 hist:derivedFrom "연" .
+hist:Place_가교 hist:parts "들채" .
+hist:Place_가교 hist:parts "옥개" .
+hist:Place_가교 hist:parts "용두" .
+hist:Place_가교 hist:parts "주석" .
+hist:Place_가교 hist:roofColor "아청색" .
+hist:Person_왕 rdf:type hist:Person .
+hist:Person_왕 rdfs:label "왕" .
+hist:Person_왕세자 rdf:type hist:Person .
+hist:Person_왕세자 rdfs:label "왕세자" .
+hist:Person_왕비 rdf:type hist:Person .
+hist:Person_왕비 rdfs:label "왕비" .
+hist:Person_모후 rdf:type hist:Person .
+hist:Person_모후 rdfs:label "모후" .
+hist:Person_혜경궁홍씨 rdf:type hist:Person .
+hist:Person_혜경궁홍씨 rdfs:label "혜경궁 홍씨" .
+hist:Person_정조 rdf:type hist:Person .
+hist:Person_정조 rdfs:label "정조" .
+hist:Nation_조선 rdf:type hist:Nation .
+hist:Nation_조선 rdfs:label "조선" .
+hist:Nation_고려 rdf:type hist:Nation .
+hist:Nation_고려 rdfs:label "고려" .
+hist:Place_수원현륭원 rdf:type hist:Place .
+hist:Place_수원현륭원 rdfs:label "수원 현륭원" .
+hist:Event_능행(왕의능행) rdf:type hist:Event .
+hist:Event_능행(왕의능행) rdfs:label "능행 (왕의 능행)" .
+hist:Event_현륭원행차(1795,정조19) rdf:type hist:Event .
+hist:Event_현륭원행차(1795,정조19) rdfs:label "현륭원 행차 (1795, 정조 19)" .
+hist:Event_열무참관 rdf:type hist:Event .
+hist:Event_열무참관 rdfs:label "열무 참관" .
+hist:Institution_하례(가교를잡는하인들) rdf:type hist:Institution .
+hist:Institution_하례(가교를잡는하인들) rdfs:label "하례 (가교를 잡는 하인들)" .
+hist:Institution_가교봉도 rdf:type hist:Institution .
+hist:Institution_가교봉도 rdfs:label "가교봉도" .
+hist:Institution_연 rdf:type hist:Institution .
+hist:Institution_연 rdfs:label "연" .
+hist:Institution_어가 rdf:type hist:Institution .
+hist:Institution_어가 rdfs:label "어가" .
+hist:Institution_공가교 rdf:type hist:Institution .
+hist:Institution_공가교 rdfs:label "공가교" .
+hist:Place_가교 hist:category "물품" .
+hist:Place_가교 hist:usedBy hist:Person_왕 .
+hist:Place_가교 hist:usedBy hist:Person_왕세자 .
+hist:Place_가교 hist:usedIn hist:Event_능행(왕의능행) .
+hist:Place_가교 hist:usedIn hist:Event_열무참관 .
+hist:Place_가교 hist:suspendedFrom "말의 멍에 (들채를 앞뒤 두 마리 말의 멍에에 매달아 운행)" .
+hist:Place_가교 hist:hasPart "들채" .
+hist:Place_가교 hist:hasPart "옥개" .
+hist:Place_가교 hist:hasPart "용두" .
+hist:Place_가교 hist:hasDecoration "옥개의 정상에 주석으로 연화모양 장식" .
+hist:Place_가교 hist:hasRoofColor "아청색" .
+hist:Place_가교 hist:appearanceFor "왕: 붉은색 바탕에 황금색 장식" .
+hist:Place_가교 hist:appearanceFor "왕세자: 들채와 창틀을 검정색" .
+hist:Place_가교 hist:hasVariant hist:Institution_어가 .
+hist:Place_가교 hist:hasVariant hist:Institution_공가교 .
+hist:Institution_어가 hist:aliasOf hist:Place_가교 .
+hist:Institution_공가교 hist:typeOf hist:Place_가교 .
+hist:Place_가교 hist:originatedFrom "고려 (상로·초요 계통)" .
+hist:Place_가교 hist:derivedFrom hist:Institution_연 .
+hist:Place_가교 hist:attendedBy "하례" .
+hist:하례 hist:wears "황색 복장" .
+hist:Institution_가교봉도 hist:directs "하례" .
+hist:Event_현륭원행차(1795,정조19) hist:involved hist:Place_가교 .
+hist:Event_현륭원행차(1795,정조19) hist:forPerson hist:Person_혜경궁홍씨 .
+hist:Event_현륭원행차(1795,정조19) hist:supervisedBy hist:Person_정조 .
+hist:Place_가교 hist:wellDocumentedIn "조선 후기 문헌 및 능행도 등 회화 자료" .
 
 # 가금법 (제도)
-hist:가금법1 rdf:type hist:Policy .
-hist:가금법1 rdfs:label "가금법"@ko .
-hist:가금법1 hist:hasAlias "가갈"@ko .
-hist:가금법1 hist:hasAlias "갈도"@ko .
-hist:가금법1 hist:hasAlias "가도"@ko .
-hist:가금법1 hist:hasAlias "창가"@ko .
-hist:가금법1 hist:hasAlias "가인"@ko .
-hist:가금법1 hist:hasAlias "벽제"@ko .
-hist:가금법1 hist:hasAlias "벽인"@ko .
-hist:가금법1 hist:hasAlias "정리"@ko .
-hist:가금법1 hist:summary "고관이나 특별한 관원이 행차할 때 위험을 제거하고 위엄을 세우기 위해 선두에서 인도하는 하인이 큰 소리로 앞길을 치우는 의장 제도"@ko .
-hist:가금법1 hist:origin "중국(한대)"@ko .
-hist:가금법1 hist:adoptedSince "삼국시대"@ko .
-hist:가금법1 hist:practicedDuring "고려시대"@ko .
-hist:가금법1 hist:practicedDuring "조선시대"@ko .
-hist:가금법1 hist:eligibility "대체로 4품 이상 관사 및 재판권·소추권 등 관련 직무나 왕명의 출납을 관장하는 특권 관원, 병조 예하 관원 등"@ko .
-hist:가금법1 hist:attendantTitles "조례(나장, 사령)"@ko .
-hist:가금법1 hist:attendantTitles "사헌부(갈도/소유)"@ko .
-hist:가금법1 hist:attendantTitles "사간원(정리→갈도)"@ko .
-hist:가금법1 hist:attendantTitles "승정원(인배사령)"@ko .
-hist:가금법1 hist:attendantTitles "종친부(인배)"@ko .
-hist:가금법1 hist:purpose "위험 제거"@ko .
-hist:가금법1 hist:purpose "위엄 유지"@ko .
-hist:가금법1 hist:notes "조선시대에는 허용 대상과 범위가 법으로 제한되었으나 사적·개인적 용무에서는 전도(하인이 길 인도)를 사용하는 사례도 존재"@ko .
-hist:중국1 rdf:type hist:Nation .
-hist:중국1 rdfs:label "중국"@ko .
-hist:한대1 rdf:type hist:Event .
-hist:한대1 rdfs:label "한대"@ko .
-hist:삼국시대1 rdf:type hist:Event .
-hist:삼국시대1 rdfs:label "삼국시대"@ko .
-hist:고려시대1 rdf:type hist:Event .
-hist:고려시대1 rdfs:label "고려시대"@ko .
-hist:조선시대1 rdf:type hist:Event .
-hist:조선시대1 rdfs:label "조선시대"@ko .
-hist:경조윤1 rdf:type hist:Institution .
-hist:경조윤1 rdfs:label "경조윤"@ko .
-hist:하남윤1 rdf:type hist:Institution .
-hist:하남윤1 rdfs:label "하남윤"@ko .
-hist:집금오1 rdf:type hist:Institution .
-hist:집금오1 rdfs:label "집금오"@ko .
-hist:사례교위1 rdf:type hist:Institution .
-hist:사례교위1 rdfs:label "사례교위"@ko .
-hist:사헌부1 rdf:type hist:Institution .
-hist:사헌부1 rdfs:label "사헌부"@ko .
-hist:사간원1 rdf:type hist:Institution .
-hist:사간원1 rdfs:label "사간원"@ko .
-hist:승정원3 rdf:type hist:Institution .
-hist:승정원3 rdfs:label "승정원"@ko .
-hist:종친부1 rdf:type hist:Institution .
-hist:종친부1 rdfs:label "종친부"@ko .
-hist:홍문관1 rdf:type hist:Institution .
-hist:홍문관1 rdfs:label "홍문관"@ko .
-hist:규장각1 rdf:type hist:Institution .
-hist:규장각1 rdfs:label "규장각"@ko .
-hist:의금부1 rdf:type hist:Institution .
-hist:의금부1 rdfs:label "의금부"@ko .
-hist:한성부3 rdf:type hist:Institution .
-hist:한성부3 rdfs:label "한성부"@ko .
-hist:병조1 rdf:type hist:Institution .
-hist:병조1 rdfs:label "병조"@ko .
-hist:형조3 rdf:type hist:Institution .
-hist:형조3 rdfs:label "형조"@ko .
-hist:도총부1 rdf:type hist:Institution .
-hist:도총부1 rdfs:label "도총부"@ko .
-hist:전옥서1 rdf:type hist:Institution .
-hist:전옥서1 rdfs:label "전옥서"@ko .
-hist:감영1 rdf:type hist:Institution .
-hist:감영1 rdfs:label "감영"@ko .
-hist:군현1 rdf:type hist:Institution .
-hist:군현1 rdfs:label "군현"@ko .
-hist:조례1 rdf:type hist:Institution .
-hist:조례1 rdfs:label "조례"@ko .
-hist:나장1 rdf:type hist:Institution .
-hist:나장1 rdfs:label "나장"@ko .
-hist:사령1 rdf:type hist:Institution .
-hist:사령1 rdfs:label "사령"@ko .
-hist:소유1 rdf:type hist:Institution .
-hist:소유1 rdfs:label "소유"@ko .
-hist:인배1 rdf:type hist:Institution .
-hist:인배1 rdfs:label "인배"@ko .
-hist:인배사령1 rdf:type hist:Institution .
-hist:인배사령1 rdfs:label "인배사령"@ko .
-hist:구종1 rdf:type hist:Institution .
-hist:구종1 rdfs:label "구종"@ko .
-hist:가금법 hist:hasAlias "갈도"@ko .
-hist:가금법 hist:originatedFrom hist:중국 .
-hist:가금법 hist:occuredDuring hist:한대 .
-hist:가금법 hist:adoptedSince hist:삼국시대 .
-hist:가금법 hist:practicedDuring hist:고려시대 .
-hist:가금법 hist:practicedDuring hist:조선시대 .
-hist:가금법 hist:allowedFor "4품 이상 관사"@ko .
-hist:가금법 hist:allowedFor "재판권·소추권 등 관련 직무 관원"@ko .
-hist:사간원 hist:hadRole "갈도 (정원 15)"@ko .
-hist:사헌부 hist:hadRole "소유 (정원 61)"@ko .
-hist:승정원2 hist:hadRole "인배사령 (정원 6)"@ko .
-hist:홍문관 hist:hadRole "인배 (정원 11)"@ko .
-hist:규장각 hist:hadRole "인배 (정원 4)"@ko .
-hist:의금부 hist:hadRole "나장 (정원 80)"@ko .
-hist:한성부2 hist:hadRole "구종 (정원 14)"@ko .
-hist:가금법 hist:usesUniform "오건; 엷은 붉은색 옷; 혁대"@ko .
-hist:사간원 hist:renamedRole "정리 → 갈도 (1417)"@ko .
-hist:사헌부 hist:renamedRole "갈도 → 소유"@ko .
-hist:가금법 hist:hasAttendantTitles "조례, 나장, 사령, 소유, 인배, 인배사령, 구종"@ko .
-hist:가금법 hist:hasPurpose "위험 제거"@ko .
-hist:가금법 hist:hasPurpose "위엄 유지"@ko .
-hist:경조윤 hist:wasAllowedForInHan "갈도 (한대)"@ko .
-hist:하남윤 hist:wasAllowedForInHan "갈도 (한대)"@ko .
-hist:집금오 hist:wasAllowedForInHan "갈도 (한대)"@ko .
-hist:사례교위 hist:wasAllowedForInHan "갈도 (한대)"@ko .
-hist:가금법 hist:couldBeReplacedBy "전도 (하인이 길 인도) in non-official/personal cases"@ko .
-
-# 가덕도해전 (사건)
-hist:가덕도해전1 rdf:type hist:Battle .
-hist:가덕도해전1 rdfs:label "가덕도해전"@ko .
-hist:가덕도해전1 hist:hasDate "1597-06-19"@ko .
-hist:가덕도해전1 hist:hasYear 1597 .
-hist:가덕도해전1 hist:occursAt "가덕도근해"@ko .
-hist:가덕도해전1 hist:hasLocationDetail "안골포"@ko .
-hist:가덕도해전1 hist:hasLocationDetail "한산도"@ko .
-hist:가덕도해전1 hist:hasLocationDetail "부산"@ko .
-hist:가덕도해전1 hist:hasLocationDetail "칠천량"@ko .
-hist:가덕도해전1 hist:hasParticipants "조선 수군"@ko .
-hist:가덕도해전1 hist:hasParticipants "일본 수군"@ko .
-hist:가덕도해전1 hist:hasCommanders "원균"@ko .
-hist:가덕도해전1 hist:hasCommanders "시마즈 요시히로"@ko .
-hist:가덕도해전1 hist:hasCommanders "다카하시 무네마스"@ko .
-hist:가덕도해전1 hist:hasOutcome "조선의 승리(일본 수군 격퇴 및 후퇴)"@ko .
-hist:정유재란1 rdf:type hist:Event .
-hist:정유재란1 rdfs:label "정유재란"@ko .
-hist:임진왜란1 rdf:type hist:Event .
-hist:임진왜란1 rdfs:label "임진왜란"@ko .
-hist:원균1 rdf:type hist:Person .
-hist:원균1 rdfs:label "원균"@ko .
-hist:원균1 hist:hasRank "수군통제사"@ko .
-hist:이원익1 rdf:type hist:Person .
-hist:이원익1 rdfs:label "이원익"@ko .
-hist:권율1 rdf:type hist:Person .
-hist:권율1 rdfs:label "권율"@ko .
-hist:남이공1 rdf:type hist:Person .
-hist:남이공1 rdfs:label "남이공"@ko .
-hist:시마즈요시히로1 rdf:type hist:Person .
-hist:시마즈요시히로1 rdfs:label "시마즈 요시히로"@ko .
-hist:다카하시무네마스1 rdf:type hist:Person .
-hist:다카하시무네마스1 rdfs:label "다카하시 무네마스"@ko .
-hist:김축1 rdf:type hist:Person .
-hist:김축1 rdfs:label "김축"@ko .
-hist:김축1 hist:hasRankOrOffice "평산포 만호"@ko .
-hist:안홍국1 rdf:type hist:Person .
-hist:안홍국1 rdfs:label "안홍국"@ko .
-hist:안홍국1 hist:hasOffice "보성군수"@ko .
-hist:조선수군1 rdf:type hist:Institution .
-hist:조선수군1 rdfs:label "조선 수군"@ko .
-hist:일본수군1 rdf:type hist:Institution .
-hist:일본수군1 rdfs:label "일본 수군"@ko .
-hist:가덕도근해1 rdf:type hist:Place .
-hist:가덕도근해1 rdfs:label "가덕도근해"@ko .
-hist:안골포1 rdf:type hist:Place .
-hist:안골포1 rdfs:label "안골포"@ko .
-hist:한산도1 rdf:type hist:Place .
-hist:한산도1 rdfs:label "한산도"@ko .
-hist:부산1 rdf:type hist:Place .
-hist:부산1 rdfs:label "부산"@ko .
-hist:칠천량1 rdf:type hist:Place .
-hist:칠천량1 rdfs:label "칠천량"@ko .
-hist:가덕도해전 hist:partOf hist:정유재란 .
-hist:정유재란 hist:partOf hist:임진왜란 .
-hist:가덕도해전 hist:occursAt hist:가덕도근해 .
-hist:가덕도해전 hist:hasDate "1597-06-19"@ko .
-hist:가덕도해전 hist:hasYear 1597 .
-hist:조선수군 hist:participatesIn hist:가덕도해전 .
-hist:일본수군 hist:participatesIn hist:가덕도해전 .
-hist:원균 hist:commands hist:가덕도해전 .
-hist:원균 hist:hasRank "수군통제사"@ko .
-hist:이원익 hist:advised hist:원균 .
-hist:권율 hist:advised hist:원균 .
-hist:남이공 hist:urged hist:원균 .
-hist:남이공 hist:participatesIn hist:가덕도해전 .
-hist:원균 hist:departedFrom hist:한산도 .
-hist:원균 hist:engagedAt hist:안골포 .
-hist:시마즈요시히로 hist:commands hist:일본수군 .
-hist:다카하시무네마스 hist:commands hist:일본수군 .
-hist:일본수군 hist:defeatedIn hist:가덕도해전 .
-hist:일본수군 hist:retreatedTo hist:칠천량 .
-hist:일본수군 hist:failedToAdvanceTo hist:부산 .
-hist:김축 hist:injuredIn hist:가덕도해전 .
-hist:안홍국 hist:killedIn hist:가덕도해전 .
-
-# 가덕대부 (제도)
-hist:가덕대부1 rdf:type hist:Institution .
-hist:가덕대부1 rdfs:label "가덕대부"@ko .
-hist:가덕대부1 hist:hasEra "조선시대"@ko .
-hist:가덕대부1 hist:establishedYear 1443 .
-hist:가덕대부1 hist:hasRankLevel "종1품 하계"@ko .
-hist:가덕대부1 hist:isPartOf "종친계"@ko .
-hist:가덕대부1 hist:conferredTo "대군을 계승할 적장자에게 처음으로 수여되는 벼슬"@ko .
-hist:가덕대부1 hist:officeHeldIn "종친부의 군"@ko .
-hist:가덕대부1 hist:notes "종친계 내 종1품 하계로 변동 없이 운영됨"@ko .
-hist:조선시대1 rdf:type hist:Nation .
-hist:조선시대1 rdfs:label "조선시대"@ko .
-hist:종친계1 rdf:type hist:Institution .
-hist:종친계1 rdfs:label "종친계"@ko .
-hist:문산계1 rdf:type hist:Institution .
-hist:문산계1 rdfs:label "문산계"@ko .
-hist:무산계1 rdf:type hist:Institution .
-hist:무산계1 rdfs:label "무산계"@ko .
-hist:잡직계1 rdf:type hist:Institution .
-hist:잡직계1 rdfs:label "잡직계"@ko .
-hist:토관계1 rdf:type hist:Institution .
-hist:토관계1 rdfs:label "토관계"@ko .
-hist:의빈계1 rdf:type hist:Institution .
-hist:의빈계1 rdfs:label "의빈계"@ko .
-hist:종친부3 rdf:type hist:Institution .
-hist:종친부3 rdfs:label "종친부"@ko .
-hist:세종대왕1 rdf:type hist:Person .
-hist:세종대왕1 rdfs:label "세종대왕"@ko .
-hist:1443년종친계설치(12월교지)1 rdf:type hist:Event .
-hist:1443년종친계설치(12월교지)1 rdfs:label "1443년 종친계 설치(12월 교지)"@ko .
-hist:대군1 rdf:type hist:Institution .
-hist:대군1 rdfs:label "대군"@ko .
-hist:왕자군주1 rdf:type hist:Institution .
-hist:왕자군주1 rdfs:label "왕자군주"@ko .
-hist:현록대부1 rdf:type hist:Institution .
-hist:현록대부1 rdfs:label "현록대부"@ko .
-hist:흥록대부1 rdf:type hist:Institution .
-hist:흥록대부1 rdfs:label "흥록대부"@ko .
-hist:소덕대부1 rdf:type hist:Institution .
-hist:소덕대부1 rdfs:label "소덕대부"@ko .
-hist:숭헌대부1 rdf:type hist:Institution .
-hist:숭헌대부1 rdfs:label "숭헌대부"@ko .
-hist:승헌대부1 rdf:type hist:Institution .
-hist:승헌대부1 rdfs:label "승헌대부"@ko .
-hist:중의대부1 rdf:type hist:Institution .
-hist:중의대부1 rdfs:label "중의대부"@ko .
-hist:정의대부1 rdf:type hist:Institution .
-hist:정의대부1 rdfs:label "정의대부"@ko .
-hist:명선대부1 rdf:type hist:Institution .
-hist:명선대부1 rdfs:label "명선대부"@ko .
-hist:창선대부1 rdf:type hist:Institution .
-hist:창선대부1 rdfs:label "창선대부"@ko .
-hist:보신대부1 rdf:type hist:Institution .
-hist:보신대부1 rdfs:label "보신대부"@ko .
-hist:자신대부1 rdf:type hist:Institution .
-hist:자신대부1 rdfs:label "자신대부"@ko .
-hist:선휘대부1 rdf:type hist:Institution .
-hist:선휘대부1 rdfs:label "선휘대부"@ko .
-hist:광휘대부1 rdf:type hist:Institution .
-hist:광휘대부1 rdfs:label "광휘대부"@ko .
-hist:봉성대부1 rdf:type hist:Institution .
-hist:봉성대부1 rdfs:label "봉성대부"@ko .
-hist:광성대부1 rdf:type hist:Institution .
-hist:광성대부1 rdfs:label "광성대부"@ko .
-hist:통직랑1 rdf:type hist:Institution .
-hist:통직랑1 rdfs:label "통직랑"@ko .
-hist:병직랑1 rdf:type hist:Institution .
-hist:병직랑1 rdfs:label "병직랑"@ko .
-hist:근절랑1 rdf:type hist:Institution .
-hist:근절랑1 rdfs:label "근절랑"@ko .
-hist:신절랑1 rdf:type hist:Institution .
-hist:신절랑1 rdfs:label "신절랑"@ko .
-hist:집순랑1 rdf:type hist:Institution .
-hist:집순랑1 rdfs:label "집순랑"@ko .
-hist:종순랑1 rdf:type hist:Institution .
-hist:종순랑1 rdfs:label "종순랑"@ko .
-hist:가덕대부 hist:isRankIn hist:종친계 .
-hist:가덕대부 hist:hasRankLevel "종1품 하계"@ko .
-hist:가덕대부 hist:establishedInYear 1443 .
-hist:가덕대부 hist:conferredTo "대군의 계승 적장자(처음 부여)"@ko .
-hist:가덕대부 hist:officeLocatedIn hist:종친부2 .
-hist:종친계 hist:separatedFrom hist:문산계 .
-hist:종친계 hist:establishedBy hist:세종대왕 .
-hist:종친계 hist:establishedInEvent hist:1443년종친계설치(12월교지) .
-hist:종친계 hist:purposeIncludes "종친 우대"@ko .
-hist:종친계 hist:purposeIncludes "종친의 정치 참여 제한"@ko .
-hist:문산계 hist:isCivilServiceBranchFor "문신"@ko .
-hist:무산계 hist:isMilitaryServiceBranchFor "무신"@ko .
-hist:잡직계 hist:isBranchFor "기술직 관원"@ko .
-hist:토관계 hist:isBranchFor "지방 실력자·향리"@ko .
-hist:의빈계 hist:isBranchWithin hist:문산계 .
-hist:종친계 hist:isBranchWithin hist:문산계 .
-hist:종친계 hist:usesTwoGradesPerRankSince 1443 .
-hist:명선대부 hist:hasSeniorStatus "당상관(종3품 상계 이상)"@ko .
-hist:종친계 hist:firstImplemented "1443년 12월 교지"@ko .
-
-# 가도사건 (사건)
-hist:가도사건1 rdf:type hist:Event .
-hist:가도사건1 rdfs:label "가도사건"@ko .
-hist:가도사건1 hist:hasSummary "1621년~1637년, 명나라 장수 모문룡이 가도에 들어와 동강진을 설치한 뒤로 조선 · 명 · 후금 사이에서 벌어진 일련의 사건."@ko .
-hist:가도사건1 hist:hasStartYear 1621 .
-hist:가도사건1 hist:hasEndYear 1637 .
-hist:가도사건1 hist:hasLocation "가도"@ko .
-hist:가도사건1 hist:hasInvolvedNations "조선"@ko .
-hist:가도사건1 hist:hasInvolvedNations "명나라"@ko .
-hist:가도사건1 hist:hasInvolvedNations "후금"@ko .
-hist:모문룡1 rdf:type hist:Person .
-hist:모문룡1 rdfs:label "모문룡"@ko .
-hist:동강진1 rdf:type hist:Place .
-hist:동강진1 rdfs:label "동강진"@ko .
-hist:가도1 rdf:type hist:Place .
-hist:가도1 rdfs:label "가도"@ko .
-hist:조선13 rdf:type hist:Nation .
-hist:조선13 rdfs:label "조선"@ko .
-hist:명나라1 rdf:type hist:Nation .
-hist:명나라1 rdfs:label "명나라"@ko .
-hist:후금1 rdf:type hist:Nation .
-hist:후금1 rdfs:label "후금"@ko .
-hist:누르하치1 rdf:type hist:Person .
-hist:누르하치1 rdfs:label "누르하치"@ko .
-hist:진대1 rdf:type hist:Person .
-hist:진대1 rdfs:label "진대"@ko .
-hist:진요도1 rdf:type hist:Person .
-hist:진요도1 rdfs:label "진요도"@ko .
-hist:한종공1 rdf:type hist:Person .
-hist:한종공1 rdfs:label "한종공"@ko .
-hist:이영방1 rdf:type hist:Person .
-hist:이영방1 rdfs:label "이영방"@ko .
-hist:우르구다이1 rdf:type hist:Person .
-hist:우르구다이1 rdfs:label "우르구다이"@ko .
-hist:의주부1 rdf:type hist:Place .
-hist:의주부1 rdfs:label "의주부"@ko .
-hist:옥강1 rdf:type hist:Place .
-hist:옥강1 rdfs:label "옥강"@ko .
-hist:수구1 rdf:type hist:Place .
-hist:수구1 rdfs:label "수구"@ko .
-hist:압록강1 rdf:type hist:Place .
-hist:압록강1 rdfs:label "압록강"@ko .
-hist:심양1 rdf:type hist:Place .
-hist:심양1 rdfs:label "심양"@ko .
-hist:요양1 rdf:type hist:Place .
-hist:요양1 rdfs:label "요양"@ko .
-hist:남사위1 rdf:type hist:Place .
-hist:남사위1 rdfs:label "남사위"@ko .
-hist:해주위1 rdf:type hist:Place .
-hist:해주위1 rdfs:label "해주위"@ko .
-hist:개주위1 rdf:type hist:Place .
-hist:개주위1 rdfs:label "개주위"@ko .
-hist:복주위1 rdf:type hist:Place .
-hist:복주위1 rdfs:label "복주위"@ko .
-hist:의주위1 rdf:type hist:Place .
-hist:의주위1 rdfs:label "의주위"@ko .
-hist:진강아문1 rdf:type hist:Institution .
-hist:진강아문1 rdfs:label "진강아문"@ko .
-hist:관전보1 rdf:type hist:Place .
-hist:관전보1 rdfs:label "관전보"@ko .
-hist:유홍훈1 rdf:type hist:Person .
-hist:유홍훈1 rdfs:label "유홍훈"@ko .
-hist:등주1 rdf:type hist:Place .
-hist:등주1 rdfs:label "등주"@ko .
-hist:안주1 rdf:type hist:Place .
-hist:안주1 rdfs:label "안주"@ko .
-hist:산동1 rdf:type hist:Place .
-hist:산동1 rdfs:label "산동"@ko .
-hist:요동1 rdf:type hist:Place .
-hist:요동1 rdfs:label "요동"@ko .
-hist:광녕1 rdf:type hist:Place .
-hist:광녕1 rdfs:label "광녕"@ko .
-hist:등래순무1 rdf:type hist:Institution .
-hist:등래순무1 rdfs:label "등래순무"@ko .
-hist:웅정필1 rdf:type hist:Person .
-hist:웅정필1 rdfs:label "웅정필"@ko .
-hist:가도사건 hist:hasStartYear 1621 .
-hist:가도사건 hist:hasEndYear 1637 .
-hist:모문룡 hist:entered hist:가도 .
-hist:모문룡 hist:established hist:동강진 .
-hist:가도사건 hist:involves hist:조선12 .
-hist:가도사건 hist:involves hist:명나라 .
-hist:가도사건 hist:involves hist:후금 .
-hist:후금 hist:captured hist:심양 .
-hist:후금 hist:captured hist:요양 .
-hist:후금 hist:causedCollapseOf hist:남사위 .
-hist:후금 hist:occupied hist:해주위 .
-hist:후금 hist:occupied hist:개주위 .
-hist:후금 hist:occupied hist:복주위 .
-hist:후금 hist:occupied hist:의주위 .
-hist:후금 hist:advancedTo hist:압록강 .
-hist:후금 hist:took hist:진강아문 .
-hist:진대 hist:killed hist:진요도 .
-hist:진대 hist:organized "3천명 한인의 자위 조직"@ko .
-hist:누르하치 hist:appointed hist:진요도 .
-hist:누르하치 hist:sent hist:이영방 .
-hist:누르하치 hist:sent hist:우르구다이 .
-hist:이영방 hist:entered hist:옥강 .
-hist:우르구다이 hist:entered hist:수구 .
-hist:이영방 hist:actedOn hist:의주부 .
-hist:우르구다이 hist:actedOn hist:의주부 .
-hist:이영방 hist:conducted "색출·도륙·압송"@ko .
-hist:우르구다이 hist:conducted "색출·도륙·압송"@ko .
-hist:남사위 hist:hadRefugeesFleeTo hist:조선12 .
-hist:명나라 hist:plannedToHostAndRepatriate "난민(한인 등)"@ko .
-hist:명나라 hist:established hist:등래순무 .
-hist:등래순무 hist:locatedIn hist:산동 .
-hist:유홍훈 hist:sailedFrom hist:안주 .
-hist:유홍훈 hist:sailedTo hist:등주 .
-hist:명나라 hist:intendedToSupportViaSeaThrough hist:등주 .
-hist:요동 hist:administrationMovedTo hist:광녕 .
-hist:웅정필 hist:argued "조선과의 연합 중요"@ko .
-hist:한종공 hist:wasAmong "난민(남사위 등)"@ko .
-hist:압록강 hist:separated "조선-후금 접경"@ko .
-hist:진강아문 hist:resisted "후금 점령"@ko .
-hist:관전보 hist:resisted "후금 점령"@ko .
-
-# 가례원류시말 (사건)
-hist:가례원류시말1 rdf:type hist:Event .
-hist:가례원류시말1 rdfs:label "가례원류시말"@ko .
-hist:가례원류시말1 hist:hasCategory "사건"@ko .
-hist:가례원류시말1 hist:hasYear 1715 .
-hist:가례원류시말1 hist:hasSummary "1715년 가례원류(간행)에 따른 소론과 노론 사이의 정쟁"@ko .
-hist:가례원류시말1 hist:hasRelatedBook "가례원류"@ko .
-hist:가례원류1 rdf:type hist:Book .
-hist:가례원류1 rdfs:label "가례원류"@ko .
-hist:유계1 rdf:type hist:Person .
-hist:유계1 rdfs:label "유계"@ko .
-hist:유상기1 rdf:type hist:Person .
-hist:유상기1 rdfs:label "유상기"@ko .
-hist:권상하1 rdf:type hist:Person .
-hist:권상하1 rdfs:label "권상하"@ko .
-hist:정호1 rdf:type hist:Person .
-hist:정호1 rdfs:label "정호"@ko .
-hist:윤증1 rdf:type hist:Person .
-hist:윤증1 rdfs:label "윤증"@ko .
-hist:송시열1 rdf:type hist:Person .
-hist:송시열1 rdfs:label "송시열"@ko .
-hist:윤선거1 rdf:type hist:Person .
-hist:윤선거1 rdfs:label "윤선거"@ko .
-hist:박세채1 rdf:type hist:Person .
-hist:박세채1 rdfs:label "박세채"@ko .
-hist:윤휴1 rdf:type hist:Person .
-hist:윤휴1 rdfs:label "윤휴"@ko .
-hist:이이명1 rdf:type hist:Person .
-hist:이이명1 rdfs:label "이이명"@ko .
-hist:윤행교1 rdf:type hist:Person .
-hist:윤행교1 rdfs:label "윤행교"@ko .
-hist:유규1 rdf:type hist:Person .
-hist:유규1 rdfs:label "유규"@ko .
-hist:이관명1 rdf:type hist:Person .
-hist:이관명1 rdfs:label "이관명"@ko .
-hist:어유구1 rdf:type hist:Person .
-hist:어유구1 rdfs:label "어유구"@ko .
-hist:숙종7 rdf:type hist:Person .
-hist:숙종7 rdfs:label "숙종"@ko .
-hist:서인1 rdf:type hist:Faction .
-hist:서인1 rdfs:label "서인"@ko .
-hist:소론1 rdf:type hist:Faction .
-hist:소론1 rdfs:label "소론"@ko .
-hist:노론1 rdf:type hist:Faction .
-hist:노론1 rdfs:label "노론"@ko .
-hist:남인1 rdf:type hist:Faction .
-hist:남인1 rdfs:label "남인"@ko .
-hist:좌의정1 rdf:type hist:Position .
-hist:좌의정1 rdfs:label "좌의정"@ko .
-hist:관찰사1 rdf:type hist:Position .
-hist:관찰사1 rdfs:label "관찰사"@ko .
-hist:용담현령1 rdf:type hist:Position .
-hist:용담현령1 rdfs:label "용담현령"@ko .
-hist:서인분당(소론·노론분당)1 rdf:type hist:Event .
-hist:서인분당(소론·노론분당)1 rdfs:label "서인 분당(소론·노론 분당)"@ko .
-hist:16731 rdf:type hist:Year .
-hist:16731 rdfs:label "1673"@ko .
-hist:16811 rdf:type hist:Year .
-hist:16811 rdfs:label "1681"@ko .
-hist:16831 rdf:type hist:Year .
-hist:16831 rdfs:label "1683"@ko .
-hist:17131 rdf:type hist:Year .
-hist:17131 rdfs:label "1713"@ko .
-hist:가례원류시말 hist:concerns hist:가례원류 .
-hist:가례원류시말 hist:hasYear 1715 .
-hist:가례원류 hist:publishedIn 1715 .
-hist:가례원류 hist:includesPrefaceBy hist:권상하 .
-hist:가례원류 hist:includesPostfaceBy hist:정호 .
-hist:가례원류 hist:postfaceContainsAccusationAgainst hist:윤증 .
-hist:가례원류 hist:publicationLedTo hist:가례원류시말 .
-hist:유계 hist:compiledWork hist:가례원류 .
-hist:유상기 hist:grandsonOf hist:유계 .
-hist:유상기 hist:heldPosition hist:용담현령 .
-hist:유상기 hist:attemptedToPublish hist:가례원류 .
-hist:유상기 hist:requestedSupportFrom hist:관찰사 .
-hist:숙종6 hist:approvedPublicationRequest hist:가례원류 .
-hist:이이명 hist:proposedPublication hist:가례원류 .
-hist:권상하 hist:wrotePrefaceFor hist:가례원류 .
-hist:정호 hist:wrotePostfaceFor hist:가례원류 .
-hist:정호 hist:accusedInPostface hist:윤증 .
-hist:윤증 hist:isSonOf hist:윤선거 .
-hist:윤선거 hist:hadCloseRelationWith hist:송시열 .
-hist:송시열 hist:wroteEpitaphFor hist:윤선거 .
-hist:송시열 hist:quotedWorkOf hist:박세채 .
-hist:송시열 hist:expressedDiscontentOver "윤선거's non-severance with 윤휴"@ko .
-hist:1673 hist:isYearOf "송시열 wrote epitaph incident"@ko .
-hist:1681 hist:isYearOf "송시열-related critical letter transmitted"@ko .
-hist:서인분당(소론·노론분당) hist:hasYear 1683 .
-hist:윤증 hist:ledFaction hist:소론 .
-hist:송시열 hist:ledFaction hist:노론 .
-hist:윤행교 hist:isSonOf hist:윤증 .
-hist:윤행교 hist:contestedAuthorshipOf hist:가례원류 .
-hist:윤행교 hist:claimedCoauthor hist:윤선거 .
-hist:소론 hist:opposed hist:노론 .
-hist:이관명 hist:filedPetition "inDefenseOf 정호"@ko .
-hist:어유구 hist:filedPetition "inDefenseOf 정호"@ko .
-hist:이관명 hist:opposed hist:유규 .
-hist:어유구 hist:opposed hist:유규 .
-hist:가례원류시말 hist:rootCauses "earlier 서인 내부 갈등 및 송시열-윤증 감정 격화 (1673~1683)"@ko .
-hist:남인 hist:wasOpposedGroupAffectedBy "1683 서인 분당/남인의 실각 이후 처벌 문제"@ko .
-
-# 가례도감 (제도)
-hist:가례도감1 rdf:type hist:Institution .
-hist:가례도감1 rdfs:label "가례도감"@ko .
-hist:가례도감1 hist:category "제도"@ko .
-hist:가례도감1 hist:description "조선시대 국왕·왕세자·왕세손 등의 가례(혼례) 사무를 관장하기 위하여 설치되었던 임시 관서"@ko .
-hist:가례도감1 hist:establishedYear 1397 .
-hist:가례도감1 hist:establishedMonth "10"@ko .
-hist:가례도감1 hist:firstEstablishedFor "왕세자 방석의 혼례"@ko .
-hist:가례도감1 hist:temporaryOffice True .
-hist:가례도감1 hist:typicalDurationMonths 2 .
-hist:가례도감1 hist:typicalDurationMonths 6 .
-hist:가례도감1 hist:primaryFunctions "왕실 가례(혼례) 주관"@ko .
-hist:가례도감1 hist:primaryFunctions "교명·옥죽책문·금보 제찬과 사자"@ko .
-hist:가례도감1 hist:primaryFunctions "의례 연습과 시행"@ko .
-hist:가례도감1 hist:primaryFunctions "필요 물자 조달"@ko .
-hist:가례도감1 hist:primaryFunctions "기록의 작성·보존"@ko .
-hist:가례도감1 hist:eventsHandled "간택"@ko .
-hist:가례도감1 hist:eventsHandled "납채"@ko .
-hist:가례도감1 hist:eventsHandled "납징"@ko .
-hist:가례도감1 hist:eventsHandled "고기"@ko .
-hist:가례도감1 hist:eventsHandled "책비"@ko .
-hist:가례도감1 hist:eventsHandled "친영"@ko .
-hist:가례도감1 hist:eventsHandled "동뢰연"@ko .
-hist:가례도감1 hist:eventsHandled "조현례"@ko .
-hist:가례도감1 hist:organizationDivisions "1방"@ko .
-hist:가례도감1 hist:organizationDivisions "2방"@ko .
-hist:가례도감1 hist:organizationDivisions "3방"@ko .
-hist:가례도감1 hist:organizationDivisions "별공작"@ko .
-hist:가례도감1 hist:organizationDivisions "수리소"@ko .
-hist:가례도감1 hist:organizationDivisions_for_세손가례 "2방"@ko .
-hist:가례도감1 hist:recordsForm "의궤"@ko .
-hist:가례도감1 hist:recordsStoredAt "궁중"@ko .
-hist:가례도감1 hist:recordsStoredAt "의정부"@ko .
-hist:가례도감1 hist:recordsStoredAt "예조"@ko .
-hist:가례도감1 hist:recordsStoredAt "사고"@ko .
-hist:가례도감1 hist:recordPreservationNote "임진왜란 이전의 의궤는 남아 있지 않음; 인조 이후의 가례도감 의궤는 대부분 보존됨"@ko .
-hist:왕세자방석1 rdf:type hist:Person .
-hist:왕세자방석1 rdfs:label "왕세자 방석"@ko .
-hist:인조3 rdf:type hist:Person .
-hist:인조3 rdfs:label "인조"@ko .
-hist:태조1 rdf:type hist:Person .
-hist:태조1 rdfs:label "태조"@ko .
-hist:도제조1 rdf:type hist:Institution .
-hist:도제조1 rdfs:label "도제조"@ko .
-hist:제조1 rdf:type hist:Institution .
-hist:제조1 rdfs:label "제조"@ko .
-hist:도청1 rdf:type hist:Institution .
-hist:도청1 rdfs:label "도청"@ko .
-hist:낭청1 rdf:type hist:Institution .
-hist:낭청1 rdfs:label "낭청"@ko .
-hist:감조관1 rdf:type hist:Institution .
-hist:감조관1 rdfs:label "감조관"@ko .
-hist:정사1 rdf:type hist:Institution .
-hist:정사1 rdfs:label "정사"@ko .
-hist:부사1 rdf:type hist:Institution .
-hist:부사1 rdfs:label "부사"@ko .
-hist:전교관1 rdf:type hist:Institution .
-hist:전교관1 rdfs:label "전교관"@ko .
-hist:장축자1 rdf:type hist:Institution .
-hist:장축자1 rdfs:label "장축자"@ko .
-hist:장차자1 rdf:type hist:Institution .
-hist:장차자1 rdfs:label "장차자"@ko .
-hist:산원1 rdf:type hist:Institution .
-hist:산원1 rdfs:label "산원"@ko .
-hist:녹사1 rdf:type hist:Institution .
-hist:녹사1 rdfs:label "녹사"@ko .
-hist:서리1 rdf:type hist:Institution .
-hist:서리1 rdfs:label "서리"@ko .
-hist:서사1 rdf:type hist:Institution .
-hist:서사1 rdfs:label "서사"@ko .
-hist:고직1 rdf:type hist:Institution .
-hist:고직1 rdfs:label "고직"@ko .
-hist:사령3 rdf:type hist:Institution .
-hist:사령3 rdfs:label "사령"@ko .
-hist:예조판서1 rdf:type hist:Institution .
-hist:예조판서1 rdfs:label "예조판서"@ko .
-hist:호조판서1 rdf:type hist:Institution .
-hist:호조판서1 rdfs:label "호조판서"@ko .
-hist:홍문관응교1 rdf:type hist:Institution .
-hist:홍문관응교1 rdfs:label "홍문관 응교"@ko .
-hist:홍문관교리1 rdf:type hist:Institution .
-hist:홍문관교리1 rdfs:label "홍문관 교리"@ko .
-hist:왕실가례(혼례)1 rdf:type hist:Event .
-hist:왕실가례(혼례)1 rdfs:label "왕실 가례(혼례)"@ko .
-hist:의궤1 rdf:type hist:Institution .
-hist:의궤1 rdfs:label "의궤"@ko .
-hist:궁중1 rdf:type hist:Institution .
-hist:궁중1 rdfs:label "궁중"@ko .
-hist:의정부1 rdf:type hist:Institution .
-hist:의정부1 rdfs:label "의정부"@ko .
-hist:예조1 rdf:type hist:Institution .
-hist:예조1 rdfs:label "예조"@ko .
-hist:사고1 rdf:type hist:Institution .
-hist:사고1 rdfs:label "사고"@ko .
-hist:임진왜란3 rdf:type hist:Event .
-hist:임진왜란3 rdfs:label "임진왜란"@ko .
-hist:가례도감 hist:establishedIn 1397 .
-hist:가례도감 hist:establishedMonth "10"@ko .
-hist:가례도감 hist:firstEstablishedFor hist:왕세자방석 .
-hist:가례도감 hist:administers hist:왕실가례(혼례) .
-hist:가례도감 hist:hasOfficer hist:도제조 .
-hist:가례도감 hist:hasOfficer hist:제조 .
-hist:가례도감 hist:hasOfficer hist:도청 .
-hist:가례도감 hist:hasOfficer hist:낭청 .
-hist:가례도감 hist:hasOfficer hist:감조관 .
-hist:가례도감 hist:hasOfficer hist:정사 .
-hist:가례도감 hist:hasOfficer hist:부사 .
-hist:가례도감 hist:hasOfficer hist:전교관 .
-hist:가례도감 hist:hasOfficer hist:장축자 .
-hist:가례도감 hist:hasOfficer hist:장차자 .
-hist:가례도감 hist:hasRoleGroup hist:산원 .
-hist:가례도감 hist:hasRoleGroup hist:녹사 .
-hist:가례도감 hist:hasRoleGroup hist:서리 .
-hist:가례도감 hist:hasRoleGroup hist:서사 .
-hist:가례도감 hist:hasRoleGroup hist:고직 .
-hist:가례도감 hist:hasRoleGroup hist:사령2 .
-hist:도제조 hist:appointedFrom "삼정승"@ko .
-hist:제조 hist:exOfficioUsually hist:예조판서 .
-hist:제조 hist:exOfficioUsually hist:호조판서 .
-hist:도청 hist:staffedBy hist:홍문관응교 .
-hist:도청 hist:staffedBy hist:홍문관교리 .
-hist:가례도감 hist:organizedInto "1방"@ko .
-hist:가례도감 hist:organizedInto "2방"@ko .
-hist:가례도감 hist:organizedInto "3방"@ko .
-hist:가례도감 hist:organizedInto "별공작"@ko .
-hist:가례도감 hist:organizedInto "수리소"@ko .
-hist:가례도감 hist:organizedInto_for_세손가례 "2방"@ko .
-hist:가례도감 hist:recordsProducedAs hist:의궤 .
-hist:의궤 hist:storedAt hist:궁중 .
-hist:의궤 hist:storedAt hist:의정부 .
-hist:의궤 hist:storedAt hist:예조 .
-hist:의궤 hist:storedAt hist:사고 .
-hist:의궤 hist:preservedAfter hist:인조2 .
-hist:의궤 hist:lostBefore hist:임진왜란2 .
-hist:가례도감 hist:typicalDurationMonthsRange "2-6"@ko .
-hist:가례도감 hist:responsibleFor "간택"@ko .
-hist:가례도감 hist:responsibleFor "납채"@ko .
-hist:가례도감 hist:responsibleFor "책비"@ko .
-hist:가례도감 hist:responsibleFor "친영"@ko .
-hist:가례도감 hist:responsibleFor "동뢰연"@ko .
-hist:가례도감 hist:responsibleFor "조현례"@ko .
-
-# 가리 (개념)
-hist:가리1 rdf:type hist:Institution .
-hist:가리1 rdfs:label "가리"@ko .
-hist:가리1 hist:hasAlias "가향리"@ko .
-hist:가리1 hist:hasDefinition "조선시대 각 군현에서 관아의 잡다한 공역을 임시로 수행하던 신분·직역층. 향리 가계에 속하지 아니하면서 향역을 대행하거나 향역을 계승하려고 한 자들을 지칭함."@ko .
-hist:가리1 hist:hasFirstAttestationYear 1451 .
-hist:가리1 hist:hasRecognitionYear 1677 .
-hist:가리1 hist:hasTypicalDuties "공생"@ko .
-hist:가리1 hist:hasTypicalDuties "율생"@ko .
-hist:가리1 hist:hasTypicalDuties "의생"@ko .
-hist:가리1 hist:hasTypicalDuties "서원 관련 업무"@ko .
-hist:가리1 hist:hasTypicalDuties "관아의 잡다한 공역 보조"@ko .
-hist:가리1 hist:hasTypicalDuties "향리의 실무 보조"@ko .
-hist:가리1 hist:hasOrigin "향리 수 부족 보완을 위해 문자 해독 능력이 있는 관노에게 향리 업무를 수행케 한 데서 기원"@ko .
-hist:가리1 hist:hasOrigin "지방 관아의 재정 문제 및 업무 다양화(임진왜란 이후)로 증가"@ko .
-hist:가리1 hist:hasOrigin "양정·사모속 등 제도의 시행으로 증가"@ko .
-hist:가리1 hist:hasSocialStatusChange "초기에는 임시직(가향리)로 운영되었으나 1677년 호패사목을 통해 국가로부터 하나의 직역층으로 인정받음"@ko .
-hist:향리1 rdf:type hist:Institution .
-hist:향리1 rdfs:label "향리"@ko .
-hist:가향리1 rdf:type hist:Institution .
-hist:가향리1 rdfs:label "가향리"@ko .
-hist:관아1 rdf:type hist:Institution .
-hist:관아1 rdfs:label "관아"@ko .
-hist:관노1 rdf:type hist:Person .
-hist:관노1 rdfs:label "관노"@ko .
-hist:향역1 rdf:type hist:Institution .
-hist:향역1 rdfs:label "향역"@ko .
-hist:사모속1 rdf:type hist:Institution .
-hist:사모속1 rdfs:label "사모속"@ko .
-hist:향교1 rdf:type hist:Institution .
-hist:향교1 rdfs:label "향교"@ko .
-hist:서원1 rdf:type hist:Institution .
-hist:서원1 rdfs:label "서원"@ko .
-hist:군관청1 rdf:type hist:Institution .
-hist:군관청1 rdfs:label "군관청"@ko .
-hist:향청1 rdf:type hist:Institution .
-hist:향청1 rdfs:label "향청"@ko .
-hist:작청1 rdf:type hist:Institution .
-hist:작청1 rdfs:label "작청"@ko .
-hist:임진왜란5 rdf:type hist:Event .
-hist:임진왜란5 rdfs:label "임진왜란"@ko .
-hist:호패사목1 rdf:type hist:Policy .
-hist:호패사목1 rdfs:label "호패사목"@ko .
-hist:문종1 rdf:type hist:Person .
-hist:문종1 rdfs:label "문종"@ko .
-hist:숙종9 rdf:type hist:Person .
-hist:숙종9 rdfs:label "숙종"@ko .
-hist:양정모집(양정)1 rdf:type hist:Policy .
-hist:양정모집(양정)1 rdfs:label "양정 모집(양정)"@ko .
-hist:공생1 rdf:type hist:Institution .
-hist:공생1 rdfs:label "공생"@ko .
-hist:율생1 rdf:type hist:Institution .
-hist:율생1 rdfs:label "율생"@ko .
-hist:의생1 rdf:type hist:Institution .
-hist:의생1 rdfs:label "의생"@ko .
-hist:가리 hist:aliasOf hist:가향리 .
-hist:가리 hist:performs hist:향역 .
-hist:가리 hist:performs hist:공생 .
-hist:가리 hist:performs hist:율생 .
-hist:가리 hist:performs hist:의생 .
-hist:가리 hist:assists hist:향리 .
-hist:가리 hist:firstMentionedInYear 1451 .
-hist:가리 hist:firstMentionedIn hist:문종 .
-hist:가리 hist:recognizedBy hist:호패사목 .
-hist:가리 hist:recognizedInYear 1677 .
-hist:가리 hist:originatedFrom hist:관노 .
-hist:가리 hist:increasedAfter hist:임진왜란4 .
-hist:가리 hist:membersRecruitedFrom hist:향교 .
-hist:가리 hist:membersRecruitedFrom hist:서원 .
-hist:가리 hist:membersRecruitedFrom hist:군관청 .
-hist:가리 hist:membersRecruitedFrom hist:향청 .
-hist:가리 hist:membersRecruitedFrom hist:작청 .
-hist:가리 hist:increasedByPolicy hist:양정모집(양정) .
-hist:향리 hist:opposes hist:가리 .
-hist:향리 hist:attemptsTo "prevent social degradation due to 가리 influx"@ko .
-hist:호패사목 hist:formalizes hist:가리 .
-
-# 가망 (제도)
-hist:가망1 rdf:type hist:Policy .
-hist:가망1 rdfs:label "가망"@ko .
-hist:가망1 hist:hasCategory "제도"@ko .
-hist:가망1 hist:hasDescription "조선시대 관리임용 때 왕명으로 추가 후보자를 선정하여 추천명단에 올리던 제도"@ko .
-hist:가망1 hist:hasPeriod "조선시대"@ko .
-hist:가망1 hist:triggerCondition "왕의 뜻에 맞는 후보자가 없을 경우"@ko .
-hist:이조1 rdf:type hist:Institution .
-hist:이조1 rdfs:label "이조"@ko .
-hist:왕3 rdf:type hist:Person .
-hist:왕3 rdfs:label "왕"@ko .
-hist:3인후보자명단1 rdf:type hist:Institution .
-hist:3인후보자명단1 rdfs:label "3인 후보자 명단"@ko .
-hist:추천명단1 rdf:type hist:Institution .
-hist:추천명단1 rdfs:label "추천명단"@ko .
-hist:추가후보자선정1 rdf:type hist:Event .
-hist:추가후보자선정1 rdfs:label "추가 후보자 선정"@ko .
-hist:품계1 rdf:type hist:Institution .
-hist:품계1 rdfs:label "품계"@ko .
-hist:하위품계의관원1 rdf:type hist:Institution .
-hist:하위품계의관원1 rdfs:label "하위 품계의 관원"@ko .
-hist:조선15 rdf:type hist:Nation .
-hist:조선15 rdfs:label "조선"@ko .
-hist:가망 hist:appliesIn hist:조선14 .
-hist:이조 hist:prepares hist:3인후보자명단 .
-hist:3인후보자명단 hist:presentsTo hist:왕2 .
-hist:왕2 hist:selectsFrom hist:3인후보자명단 .
-hist:가망 hist:enables hist:추가후보자선정 .
-hist:추가후보자선정 hist:orderedBy hist:왕2 .
-hist:추가후보자선정 hist:addsTo hist:추천명단 .
-hist:가망 hist:permitsSelectingFromLowerRank hist:하위품계의관원 .
-hist:하위품계의관원 hist:consideredWhen "품계에 적임자가 없을 경우"@ko .
-
-# 가림보초 (문헌)
-hist:가림보초1 rdf:type hist:Event .
-hist:가림보초1 rdfs:label "가림보초"@ko .
-hist:가림보초1 hist:hasCategory "문헌"@ko .
-hist:가림보초1 hist:hasDescription "임천군의 제반 사법·행정사무를 등사한 행정서"@ko .
-hist:가림보초1 hist:hasStartYear 1738 .
-hist:가림보초1 hist:hasEndYear 1740 .
-hist:가림보초1 hist:hasPeriod "영조 14–16년"@ko .
-hist:가림보초1 hist:hasLocation "임천군(현 충청남도)"@ko .
-hist:가림보초1 hist:hasForm "필사본 2책"@ko .
-hist:가림보초1 hist:hasCompiler "임천군수(편자 미상, 서리를 통해 등사)"@ko .
-hist:가림보초1 hist:hasPurpose "지방행정 기록 및 향후 업무 참고"@ko .
-hist:임천군1 rdf:type hist:Place .
-hist:임천군1 rdfs:label "임천군"@ko .
-hist:임천군1 hist:hasAlias "가림"@ko .
-hist:임천군1 hist:hasProvince "충청남도"@ko .
-hist:임천군1 hist:affiliatedWith "조선"@ko .
-hist:가림1 rdf:type hist:Place .
-hist:가림1 rdfs:label "가림"@ko .
-hist:가림1 hist:note "임천군의 옛 이름"@ko .
-hist:영조1 rdf:type hist:Person .
-hist:영조1 rdfs:label "영조"@ko .
-hist:영조1 hist:hasReignYears "1724–1776"@ko .
-hist:영조1 hist:hasRole "조선 국왕"@ko .
-hist:조선17 rdf:type hist:Nation .
-hist:조선17 rdfs:label "조선"@ko .
-hist:감영3 rdf:type hist:Institution .
-hist:감영3 rdfs:label "감영"@ko .
-hist:순영1 rdf:type hist:Institution .
-hist:순영1 rdfs:label "순영"@ko .
-hist:수영1 rdf:type hist:Institution .
-hist:수영1 rdfs:label "수영"@ko .
-hist:병영1 rdf:type hist:Institution .
-hist:병영1 rdfs:label "병영"@ko .
-hist:전영1 rdf:type hist:Institution .
-hist:전영1 rdfs:label "전영"@ko .
-hist:중영1 rdf:type hist:Institution .
-hist:중영1 rdfs:label "중영"@ko .
-hist:아영1 rdf:type hist:Institution .
-hist:아영1 rdfs:label "아영"@ko .
-hist:경각사1 rdf:type hist:Institution .
-hist:경각사1 rdfs:label "경각사"@ko .
-hist:훈련도감1 rdf:type hist:Institution .
-hist:훈련도감1 rdfs:label "훈련도감"@ko .
-hist:금위영1 rdf:type hist:Institution .
-hist:금위영1 rdfs:label "금위영"@ko .
-hist:병조3 rdf:type hist:Institution .
-hist:병조3 rdfs:label "병조"@ko .
-hist:선혜청1 rdf:type hist:Institution .
-hist:선혜청1 rdfs:label "선혜청"@ko .
-hist:충훈부1 rdf:type hist:Institution .
-hist:충훈부1 rdfs:label "충훈부"@ko .
-hist:전생서1 rdf:type hist:Institution .
-hist:전생서1 rdfs:label "전생서"@ko .
-hist:기로소1 rdf:type hist:Institution .
-hist:기로소1 rdfs:label "기로소"@ko .
-hist:한성부5 rdf:type hist:Institution .
-hist:한성부5 rdfs:label "한성부"@ko .
-hist:김천석난륜사건1 rdf:type hist:Event .
-hist:김천석난륜사건1 rdfs:label "김천석 난륜사건"@ko .
-hist:이매금상해사건1 rdf:type hist:Event .
-hist:이매금상해사건1 rdfs:label "이매금 상해사건"@ko .
-hist:홍계연살인사건1 rdf:type hist:Event .
-hist:홍계연살인사건1 rdfs:label "홍계연 살인사건"@ko .
-hist:수절과부겁략사건1 rdf:type hist:Event .
-hist:수절과부겁략사건1 rdfs:label "수절과부 겁략사건"@ko .
-hist:산송·토지경계쟁송1 rdf:type hist:Event .
-hist:산송·토지경계쟁송1 rdfs:label "산송·토지경계쟁송"@ko .
-hist:노비제도1 rdf:type hist:Policy .
-hist:노비제도1 rdfs:label "노비제도"@ko .
-hist:전답(농지)관리1 rdf:type hist:Policy .
-hist:전답(농지)관리1 rdfs:label "전답(농지) 관리"@ko .
-hist:호적관리1 rdf:type hist:Policy .
-hist:호적관리1 rdfs:label "호적 관리"@ko .
-hist:가림보초 hist:occursAt hist:임천군 .
-hist:가림보초 hist:hasPeriod "1738-1740"@ko .
-hist:가림보초 hist:createdDuring hist:영조 .
-hist:가림보초 hist:hasForm "필사본 2책"@ko .
-hist:가림보초 hist:hasPart "제1책"@ko .
-hist:가림보초 hist:hasPart "제2책"@ko .
-hist:가림보초 hist:recordsTopics hist:노비제도 .
-hist:가림보초 hist:recordsTopics hist:전답(농지)관리 .
-hist:가림보초 hist:recordsTopics hist:호적관리 .
-hist:가림보초 hist:documents hist:산송·토지경계쟁송 .
-hist:가림보초 hist:documents hist:김천석난륜사건 .
-hist:가림보초 hist:documents hist:이매금상해사건 .
-hist:가림보초 hist:documents hist:홍계연살인사건 .
-hist:가림보초 hist:documents hist:수절과부겁략사건 .
-hist:가림보초 hist:wasReportedTo hist:감영2 .
-hist:가림보초 hist:wasReportedTo hist:순영 .
-hist:가림보초 hist:wasReportedTo hist:수영 .
-hist:가림보초 hist:wasReportedTo hist:병영 .
-hist:가림보초 hist:wasReportedTo hist:전영 .
-hist:가림보초 hist:wasReportedTo hist:중영 .
-hist:가림보초 hist:wasReportedTo hist:아영 .
-hist:가림보초 hist:wasReportedTo hist:경각사 .
-hist:가림보초 hist:wasReportedTo hist:훈련도감 .
-hist:가림보초 hist:wasReportedTo hist:금위영 .
-hist:가림보초 hist:wasReportedTo hist:병조2 .
-hist:가림보초 hist:wasReportedTo hist:선혜청 .
-hist:가림보초 hist:wasReportedTo hist:충훈부 .
-hist:가림보초 hist:wasReportedTo hist:전생서 .
-hist:가림보초 hist:wasReportedTo hist:기로소 .
-hist:가림보초 hist:wasReportedTo hist:한성부4 .
-hist:가림 hist:aliasOf hist:임천군 .
-hist:임천군 hist:affiliatedWith "충청남도"@ko .
-hist:임천군 hist:affiliatedWith hist:조선16 .
-
-# 가별장 (제도)
-hist:가별장1 rdf:type hist:Institution .
-hist:가별장1 rdfs:label "가별장"@ko .
-hist:가별장1 hist:hasAlias "한강가별장"@ko .
-hist:가별장1 hist:hasAlias "삼전도가별장"@ko .
-hist:가별장1 hist:hasRank "종9품"@ko .
-hist:가별장1 hist:hasHighRankInstalledAt "용호영"@ko .
-hist:가별장1 hist:hasHighRankInstalledAt "훈련도감"@ko .
-hist:가별장1 hist:hasHighRankInstalledAt "금위영"@ko .
-hist:가별장1 hist:hasHighRankInstalledAt "어영청"@ko .
-hist:가별장1 hist:hasHighRankInstalledAt "수어청"@ko .
-hist:가별장1 hist:hasPurpose "산성과 나루터(한강·임진강 등) 수비"@ko .
-hist:가별장1 hist:hasPeriod "조선 후기"@ko .
-hist:가별장1 hist:isTemporary True .
-hist:가별장1 hist:note "진도별장에 초기의 도승이 후기에는 별장(가별장)으로 개칭되어 많이 임명됨"@ko .
-hist:산성별장1 rdf:type hist:Institution .
-hist:산성별장1 rdfs:label "산성별장"@ko .
-hist:진도별장1 rdf:type hist:Institution .
-hist:진도별장1 rdfs:label "진도별장"@ko .
-hist:한강가별장1 rdf:type hist:Institution .
-hist:한강가별장1 rdfs:label "한강가별장"@ko .
-hist:삼전도가별장1 rdf:type hist:Institution .
-hist:삼전도가별장1 rdfs:label "삼전도가별장"@ko .
-hist:용호영1 rdf:type hist:Institution .
-hist:용호영1 rdfs:label "용호영"@ko .
-hist:훈련도감3 rdf:type hist:Institution .
-hist:훈련도감3 rdfs:label "훈련도감"@ko .
-hist:금위영3 rdf:type hist:Institution .
-hist:금위영3 rdfs:label "금위영"@ko .
-hist:어영청1 rdf:type hist:Institution .
-hist:어영청1 rdfs:label "어영청"@ko .
-hist:수어청1 rdf:type hist:Institution .
-hist:수어청1 rdfs:label "수어청"@ko .
-hist:도승1 rdf:type hist:Institution .
-hist:도승1 rdfs:label "도승"@ko .
-hist:삼전도1 rdf:type hist:Place .
-hist:삼전도1 rdfs:label "삼전도"@ko .
-hist:한강1 rdf:type hist:Place .
-hist:한강1 rdfs:label "한강"@ko .
-hist:임진강1 rdf:type hist:Place .
-hist:임진강1 rdfs:label "임진강"@ko .
-hist:가별장 hist:alsoCalled hist:한강가별장 .
-hist:가별장 hist:alsoCalled hist:삼전도가별장 .
-hist:가별장 hist:protects hist:산성별장 .
-hist:가별장 hist:protects hist:한강 .
-hist:가별장 hist:protects hist:임진강 .
-hist:가별장 hist:installedAt hist:용호영 .
-hist:가별장 hist:installedAt hist:훈련도감2 .
-hist:가별장 hist:installedAt hist:금위영2 .
-hist:가별장 hist:installedAt hist:어영청 .
-hist:가별장 hist:installedAt hist:수어청 .
-hist:가별장 hist:occursAt hist:삼전도 .
-hist:도승 hist:renamedTo hist:가별장 .
-hist:진도별장 hist:hadManyAppointmentsOf hist:가별장 .
-
-# 가복 (제도)
-hist:가복1 rdf:type hist:Policy .
-hist:가복1 rdfs:label "가복"@ko .
-hist:가복1 hist:hasDescription "조선시대 정승 임용 때 복상(후보 추천) 중 적임자가 없을 경우 왕명이 내려 후보자를 다시 추가하도록 명하는 제도."@ko .
-hist:가복1 hist:hasEra "조선시대"@ko .
-hist:가복1 hist:appliesTo "복상"@ko .
-hist:가복1 hist:appliesTo "정승 임용"@ko .
-hist:가복1 hist:triggeredBy "복상에서 적임자 없음"@ko .
-hist:가복1 hist:enablesRoyalDiscretion True .
-hist:가복1 hist:exampleYears 1687 .
-hist:가복1 hist:exampleYears 1705 .
-hist:복상1 rdf:type hist:Policy .
-hist:복상1 rdfs:label "복상"@ko .
-hist:복상1 hist:description "정승의 후보자를 추천하는 제도. 현직 의정 중에서 3인을 추천하는 방식."@ko .
-hist:정승1 rdf:type hist:Institution .
-hist:정승1 rdfs:label "정승"@ko .
-hist:3의정1 rdf:type hist:Institution .
-hist:3의정1 rdfs:label "3의정"@ko .
-hist:우의정1 rdf:type hist:Institution .
-hist:우의정1 rdfs:label "우의정"@ko .
-hist:조선19 rdf:type hist:Nation .
-hist:조선19 rdfs:label "조선"@ko .
-hist:숙종11 rdf:type hist:Person .
-hist:숙종11 rdfs:label "숙종"@ko .
-hist:이단하1 rdf:type hist:Person .
-hist:이단하1 rdfs:label "이단하"@ko .
-hist:조사석1 rdf:type hist:Person .
-hist:조사석1 rdfs:label "조사석"@ko .
-hist:이유1 rdf:type hist:Person .
-hist:이유1 rdfs:label "이유"@ko .
-hist:서종태1 rdf:type hist:Person .
-hist:서종태1 rdfs:label "서종태"@ko .
-hist:1687가복사례1 rdf:type hist:Event .
-hist:1687가복사례1 rdfs:label "1687 가복 사례"@ko .
-hist:1687가복사례1 hist:hasYear 1687 .
-hist:1687가복사례1 hist:description "우의정 이단하로 하여금 후보자를 추천케 했으나 다섯 번 가복을 거듭하여 조사석이 지명된 사례."@ko .
-hist:1705가복사례1 rdf:type hist:Event .
-hist:1705가복사례1 rdfs:label "1705 가복 사례"@ko .
-hist:1705가복사례1 hist:hasYear 1705 .
-hist:1705가복사례1 hist:description "우의정 이유에게 복상을 명하였으나 세 번 가복한 뒤 숙종이 서종태를 특명으로 우의정에 임명하고 이유를 문책·면직한 사례."@ko .
-hist:가복 hist:relatedTo hist:복상 .
-hist:복상 hist:appliesTo hist:정승 .
-hist:복상 hist:performedBy hist:3의정 .
-hist:가복 hist:triggeredBy "복상에서 적임자 없음"@ko .
-hist:가복 hist:occursIn hist:조선18 .
-hist:1687가복사례 hist:hasYear 1687 .
-hist:1687가복사례 hist:orderedBy hist:숙종10 .
-hist:1687가복사례 hist:involved hist:이단하 .
-hist:1687가복사례 hist:resultedIn hist:조사석 .
-hist:1705가복사례 hist:hasYear 1705 .
-hist:1705가복사례 hist:orderedBy hist:숙종10 .
-hist:1705가복사례 hist:involved hist:이유 .
-hist:1705가복사례 hist:repeatedTimes 3 .
-hist:숙종10 hist:appointed hist:서종태 .
-hist:서종태 hist:appointedTo hist:우의정 .
-hist:숙종10 hist:disciplined hist:이유 .
-hist:이유 hist:wasDismissed True .
-hist:가복 hist:enables "왕이 자신의 뜻에 맞는 인물을 선택함"@ko .
+hist:Policy_가금법 rdf:type hist:Policy .
+hist:Policy_가금법 rdfs:label "가금법" .
+hist:Policy_가금법 hist:description "고관이나 특별한 관원이 행차할 때 위험을 제거하고 위엄을 세우기 위해 선두에서 인도하는 하인이 큰 소리로 앞길을 치우는 의장제도" .
+hist:Policy_가금법 hist:hasAlias "가갈" .
+hist:Policy_가금법 hist:hasAlias "갈도" .
+hist:Policy_가금법 hist:hasAlias "가도" .
+hist:Policy_가금법 hist:hasAlias "창가" .
+hist:Policy_가금법 hist:hasAlias "가인" .
+hist:Policy_가금법 hist:hasAlias "벽제" .
+hist:Policy_가금법 hist:hasAlias "벽인" .
+hist:Policy_가금법 hist:originatedFrom "한대(한나라, 중국)" .
+hist:Policy_가금법 hist:usedSince "삼국시대" .
+hist:Policy_가금법 hist:usedSince "고려시대" .
+hist:Policy_가금법 hist:usedSince "조선시대" .
+hist:Policy_가금법 hist:restrictedTo "4품 이상의 관사(재판권·소추권 등 관련 직무, 왕명의 출납을 관장하는 관원 및 병조 예하 관원 등)" .
+hist:Policy_가금법 hist:distinguishingUniform "오건 착용, 엷은 붉은색 옷에 혁대" .
+hist:Nation_한대(한나라) rdf:type hist:Nation .
+hist:Nation_한대(한나라) rdfs:label "한대(한나라)" .
+hist:Event_삼국시대 rdf:type hist:Event .
+hist:Event_삼국시대 rdfs:label "삼국시대" .
+hist:Event_고려시대 rdf:type hist:Event .
+hist:Event_고려시대 rdfs:label "고려시대" .
+hist:Event_조선시대 rdf:type hist:Event .
+hist:Event_조선시대 rdfs:label "조선시대" .
+hist:Person_충렬왕 rdf:type hist:Person .
+hist:Person_충렬왕 rdfs:label "충렬왕" .
+hist:Person_이조년 rdf:type hist:Person .
+hist:Person_이조년 rdfs:label "이조년" .
+hist:Institution_사헌부 rdf:type hist:Institution .
+hist:Institution_사헌부 rdfs:label "사헌부" .
+hist:Institution_사간원 rdf:type hist:Institution .
+hist:Institution_사간원 rdfs:label "사간원" .
+hist:Institution_승정원 rdf:type hist:Institution .
+hist:Institution_승정원 rdfs:label "승정원" .
+hist:Institution_종친부 rdf:type hist:Institution .
+hist:Institution_종친부 rdfs:label "종친부" .
+hist:Institution_병조 rdf:type hist:Institution .
+hist:Institution_병조 rdfs:label "병조" .
+hist:Institution_형조 rdf:type hist:Institution .
+hist:Institution_형조 rdfs:label "형조" .
+hist:Institution_도총부 rdf:type hist:Institution .
+hist:Institution_도총부 rdfs:label "도총부" .
+hist:Institution_전옥서 rdf:type hist:Institution .
+hist:Institution_전옥서 rdfs:label "전옥서" .
+hist:Institution_감영 rdf:type hist:Institution .
+hist:Institution_감영 rdfs:label "감영" .
+hist:Institution_군현 rdf:type hist:Institution .
+hist:Institution_군현 rdfs:label "군현" .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Institution_규장각 rdf:type hist:Institution .
+hist:Institution_규장각 rdfs:label "규장각" .
+hist:Institution_의금부 rdf:type hist:Institution .
+hist:Institution_의금부 rdfs:label "의금부" .
+hist:Institution_한성부 rdf:type hist:Institution .
+hist:Institution_한성부 rdfs:label "한성부" .
+hist:Institution_경조윤 rdf:type hist:Institution .
+hist:Institution_경조윤 rdfs:label "경조윤" .
+hist:Institution_하남윤 rdf:type hist:Institution .
+hist:Institution_하남윤 rdfs:label "하남윤" .
+hist:Institution_집금오 rdf:type hist:Institution .
+hist:Institution_집금오 rdfs:label "집금오" .
+hist:Institution_사례교위 rdf:type hist:Institution .
+hist:Institution_사례교위 rdfs:label "사례교위" .
+hist:Institution_조례 rdf:type hist:Institution .
+hist:Institution_조례 rdfs:label "조례" .
+hist:Institution_나장 rdf:type hist:Institution .
+hist:Institution_나장 rdfs:label "나장" .
+hist:Institution_사령 rdf:type hist:Institution .
+hist:Institution_사령 rdfs:label "사령" .
+hist:Institution_소유 rdf:type hist:Institution .
+hist:Institution_소유 rdfs:label "소유" .
+hist:Institution_인배 rdf:type hist:Institution .
+hist:Institution_인배 rdfs:label "인배" .
+hist:Institution_인배사령 rdf:type hist:Institution .
+hist:Institution_인배사령 rdfs:label "인배사령" .
+hist:Institution_구종 rdf:type hist:Institution .
+hist:Institution_구종 rdfs:label "구종" .
+hist:Institution_정리 rdf:type hist:Institution .
+hist:Institution_정리 rdfs:label "정리" .
+hist:Institution_전도 rdf:type hist:Institution .
+hist:Institution_전도 rdfs:label "전도" .
+hist:Institution_하인 rdf:type hist:Institution .
+hist:Institution_하인 rdfs:label "하인" .
+hist:Institution_오건 rdf:type hist:Institution .
+hist:Institution_오건 rdfs:label "오건" .
+hist:Institution_4품이상의관사 rdf:type hist:Institution .
+hist:Institution_4품이상의관사 rdfs:label "4품 이상의 관사" .
+hist:Policy_가금법 hist:hasAlias "갈도" .
+hist:Policy_가금법 hist:hasAlias "가갈" .
+hist:Policy_가금법 hist:hasAlias "가도" .
+hist:Policy_가금법 hist:hasAlias "창가" .
+hist:Policy_가금법 hist:hasAlias "가인" .
+hist:Policy_가금법 hist:hasAlias "벽제" .
+hist:Policy_가금법 hist:hasAlias "벽인" .
+hist:Policy_가금법 hist:originatedFrom hist:Nation_한대(한나라) .
+hist:Policy_가금법 hist:adoptedDuring hist:Event_삼국시대 .
+hist:Policy_가금법 hist:practicedDuring hist:Event_고려시대 .
+hist:Policy_가금법 hist:practicedDuring hist:Event_조선시대 .
+hist:Policy_가금법 hist:restrictedTo hist:Institution_4품이상의관사 .
+hist:Institution_4품이상의관사 hist:hasPrivileges "재판권·소추권·왕명 출납 등 관련 직무" .
+hist:Policy_가금법 hist:alternativeTo hist:Institution_전도 .
+hist:Institution_전도 hist:performedBy hist:Institution_하인 .
+hist:Institution_조례 hist:hasAlias hist:Institution_나장 .
+hist:Institution_조례 hist:hasAlias hist:Institution_사령 .
+hist:Institution_사간원 hist:hasStaffCountFor갈도 15 .
+hist:Institution_사헌부 hist:hasStaffCountFor소유 61 .
+hist:Institution_승정원 hist:hasStaffCountFor인배사령 6 .
+hist:Institution_홍문관 hist:hasStaffCountFor인배 11 .
+hist:Institution_규장각 hist:hasStaffCountFor인배 4 .
+hist:Institution_의금부 hist:hasStaffCountFor나장 80 .
+hist:Institution_한성부 hist:hasStaffCountFor구종 14 .
+hist:Institution_사헌부 hist:servantRoleName hist:Institution_소유 .
+hist:Institution_승정원 hist:servantRoleName hist:Institution_인배사령 .
+hist:Institution_종친부 hist:servantRoleName hist:Institution_인배 .
+hist:Institution_병조 hist:servantRoleName hist:Institution_사령 .
+hist:Institution_형조 hist:servantRoleName hist:Institution_사령 .
+hist:Institution_도총부 hist:servantRoleName hist:Institution_사령 .
+hist:Institution_전옥서 hist:servantRoleName hist:Institution_사령 .
+hist:Institution_감영 hist:servantRoleName hist:Institution_사령 .
+hist:Institution_군현 hist:servantRoleName hist:Institution_사령 .
+hist:Institution_정리 hist:usedIn hist:Event_고려시대 .
+hist:Institution_정리 hist:renamedTo "갈도" .
+hist:Institution_정리 hist:renamedInYear 1417 .
+hist:Institution_사헌부 hist:renamedTo hist:Institution_소유 .
+hist:Institution_나장 hist:distinguishedByUniform "오건 및 엷은 붉은색 옷과 혁대" .
+hist:Person_이조년 hist:observedProtocol "갈도" .
+hist:갈도 hist:documentedDuring hist:Person_충렬왕 .
+hist:Institution_경조윤 hist:permitted갈도InHanExample hist:Nation_한대(한나라) .
+hist:Institution_하남윤 hist:permitted갈도InHanExample hist:Nation_한대(한나라) .
+hist:Institution_집금오 hist:permitted갈도InHanExample hist:Nation_한대(한나라) .
+hist:Institution_사례교위 hist:permitted갈도InHanExample hist:Nation_한대(한나라) .

@@ -78,6 +78,30 @@
         <rdfs:comment>국가 제도 (집현전, 의금부 등)</rdfs:comment>
     </owl:Class>
 
+    <!-- Object (물품) -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Object">
+        <rdfs:label>Object</rdfs:label>
+        <rdfs:comment>역사적 물품 (형구, 의복, 무기 등)</rdfs:comment>
+    </owl:Class>
+
+    <!-- Role (역할) -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Role">
+        <rdfs:label>Role</rdfs:label>
+        <rdfs:comment>인물의 역할 (관직, 직책 등)</rdfs:comment>
+    </owl:Class>
+
+    <!-- SocialClass (사회계층) -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#SocialClass">
+        <rdfs:label>SocialClass</rdfs:label>
+        <rdfs:comment>사회 계층 (양반, 중인, 상민, 천민 등)</rdfs:comment>
+    </owl:Class>
+
+    <!-- Document (문헌) -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Document">
+        <rdfs:label>Document</rdfs:label>
+        <rdfs:comment>역사적 문헌 (실록, 의궤, 고서 등)</rdfs:comment>
+    </owl:Class>
+
 
 
     <!--

@@ -3,10 +3,6 @@ python-dotenv==1.2.1
 # rag
 pandas==2.3.3
 langchain-core==1.0.5
-<<<<<<< HEAD
-=======
-psycopg2==2.9.11
->>>>>>> d347f634db48409291cac70809627a5260333f80
 psycopg2-binary==2.9.11
 
 # langgraph
