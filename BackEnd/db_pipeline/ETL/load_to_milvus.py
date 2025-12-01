@@ -27,6 +27,18 @@ BATCH_SIZE = 100
 
 def load_csv_data(csv_path: Path) -> List[Dict]:
     """CSV 파일 로드"""
+    import sys
+    
+    # CSV 필드 크기 제한 증가 (기본값: 131072)
+    # 큰 contents 필드를 처리하기 위해 제한을 늘림
+    max_int = sys.maxsize
+    while True:
+        try:
+            csv.field_size_limit(max_int)
+            break
+        except OverflowError:
+            max_int = int(max_int / 10)
+    
     entities = []
     
     with open(csv_path, 'r', encoding='utf-8') as f:

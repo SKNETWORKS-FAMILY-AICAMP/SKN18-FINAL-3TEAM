@@ -365,9 +365,10 @@ def entity_extractor_node(state: GraphState) -> GraphState:
     """
     질문에서 핵심 엔티티 추출 (하이브리드 방식)
     
-    1단계: 키워드 추출 → TTL 정확 매칭 (빠름)
-    2단계: Milvus 유사도 검색 (fallback)
-    3단계: LLM 엔티티 추출 (최종 fallback)
+    키워드 추출 + Milvus 유사도 검색을 병렬로 수행
+    - 1단계: 키워드 추출
+    - 2단계: TTL 정확 매칭 + Milvus 유사도 검색 (동시)
+    - 3단계: LLM 엔티티 추출 (fallback - 결과 부족 시만)
     """
 
     query = state.get("query", "")
@@ -381,58 +382,70 @@ def entity_extractor_node(state: GraphState) -> GraphState:
     print(f"   📝 추출된 키워드: {query_keywords}")
     
     matched_entities = []
+    seen = set()
     
     # ========================================
-    # 1단계: TTL 정확 매칭 (키워드 기반)
+    # 하이브리드 검색: TTL 매칭 + Milvus 동시 수행
     # ========================================
-    print(f"\n   🎯 1단계: TTL 정확 매칭...")
+    
+    # --- TTL 정확 매칭 ---
+    print(f"\n   🎯 TTL 정확 매칭...")
+    ttl_matched = 0
     
     for keyword in query_keywords:
         # 정확한 라벨 매칭
         if keyword in ttl_data["label_to_uri"]:
             uri = ttl_data["label_to_uri"][keyword]
             entity_type = ttl_data["uri_to_type"].get(uri, "Event")
-            matched_entities.append({
-                "type": entity_type,
-                "name": keyword,
-                "uri": uri,
-                "matched": True,
-                "match_method": "exact"
-            })
-            continue
-        
-        # 부분 매칭 (키워드가 라벨에 포함된 경우)
-        for label, uri in ttl_data["label_to_uri"].items():
-            if keyword in label and len(keyword) >= 2:
-                entity_type = ttl_data["uri_to_type"].get(uri, "Event")
+            key = uri or keyword
+            if key not in seen:
+                seen.add(key)
                 matched_entities.append({
                     "type": entity_type,
-                    "name": label,
+                    "name": keyword,
                     "uri": uri,
                     "matched": True,
-                    "match_method": "partial",
-                    "matched_keyword": keyword
+                    "match_method": "exact"
                 })
-    
-    # 중복 제거
-    seen = set()
-    unique_entities = []
-    for e in matched_entities:
-        key = e.get("uri") or e.get("name")
-        if key not in seen:
-            seen.add(key)
-            unique_entities.append(e)
-    matched_entities = unique_entities
-    
-    print(f"      → TTL 매칭: {len(matched_entities)}개")
-    
-    # ========================================
-    # 2단계: Milvus 유사도 검색 (추가 엔티티 발굴)
-    # ========================================
-    if USE_MILVUS and len(matched_entities) < 10:
-        print(f"\n   🔮 2단계: Milvus 유사도 검색...")
+                ttl_matched += 1
         
-        milvus_entities = search_entities_with_milvus(query_keywords, ttl_data, top_k=5)
+        # 부분 매칭 (키워드가 라벨에 포함된 경우) - 최대 5개
+        partial_count = 0
+        for label, uri in ttl_data["label_to_uri"].items():
+            if keyword in label and len(keyword) >= 2:
+                key = uri or label
+                if key not in seen:
+                    seen.add(key)
+                    entity_type = ttl_data["uri_to_type"].get(uri, "Event")
+                    matched_entities.append({
+                        "type": entity_type,
+                        "name": label,
+                        "uri": uri,
+                        "matched": True,
+                        "match_method": "partial",
+                        "matched_keyword": keyword
+                    })
+                    ttl_matched += 1
+                    partial_count += 1
+                    if partial_count >= 5:  # 키워드당 최대 5개 부분 매칭
+                        break
+    
+    print(f"      → TTL 매칭: {ttl_matched}개")
+    
+    # --- Milvus 유사도 검색 (항상 실행) ---
+    milvus_added = 0
+    if USE_MILVUS:
+        print(f"\n   🔮 Milvus 유사도 검색...")
+        
+        # 동적 top_k: 키워드 수에 따라 조절
+        # 키워드가 적으면 각각 더 많이, 키워드가 많으면 각각 적게
+        dynamic_top_k = max(3, min(10, 15 // max(len(query_keywords), 1)))
+        
+        milvus_entities = search_entities_with_milvus(
+            query_keywords, 
+            ttl_data, 
+            top_k=dynamic_top_k
+        )
         
         # 기존에 없는 엔티티만 추가
         for e in milvus_entities:
@@ -441,8 +454,9 @@ def entity_extractor_node(state: GraphState) -> GraphState:
                 seen.add(key)
                 e["match_method"] = "milvus"
                 matched_entities.append(e)
+                milvus_added += 1
         
-        print(f"      → Milvus 추가: {len(milvus_entities)}개")
+        print(f"      → Milvus 추가: {milvus_added}개 (top_k={dynamic_top_k})")
     
     # ========================================
     # 3단계: LLM 엔티티 추출 (결과가 부족할 때만)

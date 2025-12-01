@@ -24,8 +24,56 @@ load_dotenv(env_path, override=True)
 from state import GraphState
 
 
+def clean_entity_name(name: str) -> str:
+    """정규화된 ID를 사람이 읽을 수 있는 이름으로 변환"""
+    import re
+    
+    # hist:Entity_해시코드 형태 제거
+    if "_" in name and len(name.split("_")[-1]) == 8:
+        # 해시코드가 있는 경우 (예: Institution_d4c9663e)
+        parts = name.split("_")
+        if len(parts) >= 2 and parts[-1].isalnum():
+            # 해시 제거하고 타입만 남김
+            return "_".join(parts[:-1])
+    
+    # hist: 접두사 제거
+    name = re.sub(r'^hist:', '', name)
+    
+    # 언더스코어를 공백으로
+    name = name.replace("_", " ")
+    
+    return name
+
+
+def format_evidence_for_prompt(evidences: list) -> tuple:
+    """근거를 프롬프트용으로 포맷팅 (본문용 + 각주용)"""
+    
+    formatted_list = []
+    footnotes = []
+    
+    for i, ev in enumerate(evidences, 1):
+        # 설명에서 정규화된 ID 정리
+        desc = ev.get('description', '')
+        desc = clean_entity_name(desc)
+        
+        # 출처 정리
+        source = ev.get('source', 'unknown')
+        source = clean_entity_name(source)
+        
+        # 신뢰도
+        weight = ev.get('weight', 0)
+        
+        # 프롬프트용 (상세)
+        formatted_list.append(f"[{i}] {desc}")
+        
+        # 각주용 (간략)
+        footnotes.append(f"[{i}] {desc[:50]}{'...' if len(desc) > 50 else ''} (신뢰도: {weight:.0%})")
+    
+    return "\n".join(formatted_list), "\n".join(footnotes)
+
+
 def story_generator_node(state: GraphState) -> GraphState:
-    """근거 기반 스토리 생성"""
+    """근거 기반 스토리 생성 (가독성 개선)"""
 
     query = state.get("query", "")
     query_type = state.get("query_type", "causal")
@@ -74,58 +122,65 @@ def story_generator_node(state: GraphState) -> GraphState:
             "executed_nodes": state.get("executed_nodes", []) + ["story_generator"]
         }
 
-    # 근거 정보 포맷팅 (명확한 번호 매핑)
-    evidence_text = "\n".join([
-        f"[근거 {i}] {ev['description']} (출처: {ev.get('source', 'unknown')}, 신뢰도: {ev['weight']:.0%})"
-        for i, ev in enumerate(evidences, 1)
-    ])
+    # 근거 정보 포맷팅 (정규화된 ID 정리)
+    evidence_text, footnotes = format_evidence_for_prompt(evidences)
 
     # 질문 유형별 프롬프트 조정
     if query_type == "what_if":
         instruction = """가상 시나리오에 기반한 대체 역사 스토리를 작성하세요.
-- "만약 ~했다면" 형식
-- 추론된 인과관계를 명확히 설명
-- 실제 역사와의 차이점 강조"""
+- "만약 ~했다면" 형식으로 시작
+- 추론된 인과관계를 자연스럽게 설명
+- 실제 역사와의 차이점을 명확히"""
 
     elif query_type == "deep_analysis":
-        instruction = """역사의 이면과 숨은 동기를 분석하는 스토리를 작성하세요.
-- "진짜 이유는..." 형식
-- 여러 근거를 종합하여 깊이 있는 분석
-- 당시 상황과 맥락 설명"""
+        instruction = """역사의 이면과 숨은 동기를 분석하세요.
+- 여러 근거를 종합하여 깊이 있는 해석 제시
+- 당시 정치적/사회적 맥락 설명
+- 다양한 관점에서 분석"""
 
     else:  # causal
-        instruction = """인과관계를 명확히 설명하는 스토리를 작성하세요.
-- "~때문에", "~로 인해" 같은 인과 표현 사용
-- 시간 순서대로 설명
-- 각 단계의 영향 설명"""
+        instruction = """인과관계를 명확히 설명하세요.
+- 원인과 결과를 논리적으로 연결
+- 시간 순서대로 전개
+- 각 사건의 영향 관계 설명"""
 
-    story_prompt = f"""당신은 조선시대 역사 스토리텔러입니다.
+    story_prompt = f"""당신은 조선시대 역사를 전문적으로 설명하는 역사가입니다.
 
-질문: {query}
-질문 유형: {query_type}
+## 질문
+{query}
 
-=== 제공된 근거 (총 {len(evidences)}개) ===
+## 참고 근거 ({len(evidences)}개)
 {evidence_text}
-=== 근거 끝 ===
 
+## 작성 지침
 {instruction}
 
-⚠️ 중요 규칙:
-1. 오직 위에 제공된 근거만 사용하세요
-2. 제공되지 않은 정보를 추가하거나 만들어내지 마세요
-3. 근거 번호는 위에 명시된 [근거 N] 형식을 정확히 사용하세요
-4. 근거가 {len(evidences)}개이므로, [근거 1]~[근거 {len(evidences)}]만 사용 가능합니다
-5. 추측이나 가정은 "~로 추정된다", "~했을 가능성이 있다"로 명확히 표시하세요
+## 필수 규칙
+1. **자연스러운 서술**: 근거를 본문에 자연스럽게 녹여서 서술하세요.
+   - 나쁜 예: "경신환국이 발생했다 [1]."
+   - 좋은 예: "1680년 경신환국이 발생하여 남인이 실각하고 서인이 집권하게 되었습니다."
 
-요구사항:
-1. 자연스러운 한국어 (2-3문단, 200-300자)
-2. 모든 주장에 해당 근거 번호 표시 (예: "이순신이 전략을 바꾼 것은 [근거 1]에서 확인됩니다")
-3. 제공된 근거에 기반한 사실만 서술
-4. 마지막에 핵심 요약 한 문장
+2. **각주 참조는 문단 끝에만**: 
+   - 문단 끝에 "(참고: 1, 3)" 형태로 간략히 표시
+   - 본문 중간에 [1][2][3] 형태로 나열하지 마세요
 
-출력 형식:
-[스토리 본문]
-"""
+3. **정규화된 ID 사용 금지**:
+   - "Institution_d4c9663e" 같은 코드 절대 사용 금지
+   - 실제 이름을 모르면 "관련 기관" 등으로 대체
+
+4. **추측 표시**: 확실하지 않은 내용은 "~로 추정된다", "~했을 것으로 보인다"로 표현
+
+## 출력 형식
+[본문]
+2-3문단으로 자연스럽게 서술 (200-400자)
+
+[요약]
+한 문장으로 핵심 정리
+
+[참고 근거]
+1. 근거1 요약
+2. 근거2 요약
+..."""
 
     try:
         response = llm.invoke(story_prompt)

@@ -26,6 +26,7 @@ sleep 5
 ```
 
 **스크립트가 자동으로 처리하는 작업:**
+
 1. ✅ TTL 파일 정규화 (`normalize_ttl.py`)
 2. ✅ 기존 Fuseki 데이터 삭제
 3. ✅ Jena Reasoner 추론 실행
@@ -33,13 +34,70 @@ sleep 5
 5. ✅ 트리플 수 확인
 
 **스크립트 설정:**
+
 - Java 메모리: 8GB (`-Xmx8g`)
 - 타임아웃: 240초 (4분)
 - 가상환경 자동 감지
 
 ---
 
-### 🔧 방법 2: 수동 단계별 실행
+### ⚡ 방법 2: 경량 모드 업로드 (Java Reasoner 없이)
+
+메모리가 부족하거나 Java Reasoner 실행이 어려운 환경에서 사용합니다.
+SWRL 규칙 기반 추론은 수행되지 않고, 기본 데이터만 업로드됩니다.
+
+```bash
+cd backend/ontology_langgraph_structure/ontology/scripts
+./upload_ttl_to_fuseki.sh
+```
+
+**스크립트가 처리하는 작업:**
+
+1. ✅ TTL 파일 정규화 (`normalize_ttl.py`)
+2. ✅ Fuseki 데이터셋 생성/확인 (`temp_inference`)
+3. ✅ 기존 데이터 삭제
+4. ✅ 정규화된 TTL 직접 업로드
+5. ✅ 트리플 수 확인
+
+**수동 업로드 (curl):**
+
+```bash
+# 1. TTL 정규화
+cd backend/ontology_langgraph_structure/ontology/scripts
+python normalize_ttl.py \
+  --input ../instances/korean_history_instances.ttl \
+  --output ../instances/korean_history_normalized.ttl
+
+# 2. Fuseki에 직접 업로드 (인증 필요)
+curl -X POST "http://localhost:3030/temp_inference/data" \
+  -u admin:fuseki1234 \
+  -H "Content-Type: text/turtle" \
+  --data-binary "@../instances/korean_history_normalized.ttl"
+
+# 3. 업로드 확인
+curl -s "http://localhost:3030/temp_inference/query" \
+  --data-urlencode "query=SELECT (COUNT(*) as ?count) WHERE { ?s ?p ?o }" \
+  -H "Accept: application/sparql-results+json"
+```
+
+**경량 모드 실행:**
+
+```bash
+# 환경변수 설정 후 실행
+export INFERENCE_MODE=light
+export QUERY_MODE=template
+python main.py
+```
+
+**참고:**
+
+- 추론(inference) 없이 기본 데이터만 쿼리
+- Java 8GB 메모리 불필요
+- 빠른 업로드 (몇 초 내)
+
+---
+
+### 🔧 방법 3: 수동 단계별 실행 (Full 모드)
 
 세부적인 제어가 필요한 경우 사용합니다.
 
@@ -58,6 +116,7 @@ python normalize_ttl.py \
 ```
 
 **정규화 작업:**
+
 - 한글 URI → 영숫자 해시 ID로 변환 (예: `Event_갑술환국` → `Event_abc123`)
 - 한글 프로퍼티 → 영문 변환
 - 특수문자 제거 (괄호, 하이픈 등)
