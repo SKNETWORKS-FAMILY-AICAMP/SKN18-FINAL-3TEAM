@@ -278,7 +278,7 @@ def main():
     
     parser = argparse.ArgumentParser(description='TTL 파일 정규화')
     parser.add_argument('--input', '-i', 
-                        default='../instances/korean_history_instances.ttl 01-42-57-943.ttl',
+                        default='../instances/korean_history_instances.ttl',
                         help='입력 TTL 파일 경로')
     parser.add_argument('--output', '-o',
                         default='../instances/korean_history_normalized.ttl',

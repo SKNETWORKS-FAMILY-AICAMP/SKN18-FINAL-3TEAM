@@ -5,6 +5,10 @@ Parallel Inference Executor Node (통합 버전)
 - ThreadPoolExecutor로 병렬 처리
 - 각 Thread마다: LLM 쿼리 생성 → Jena Reasoner API 호출
 - 추론 결과를 TTL 형식으로 저장
+
+경량 모드 (INFERENCE_MODE=light):
+- Java Reasoner 없이 Fuseki 직접 쿼리
+- 메모리 부족 환경에서 사용
 """
 
 import os
@@ -18,6 +22,9 @@ from state import GraphState
 
 
 API_URL = os.getenv("INFERENCE_API_URL", "http://localhost:8001")
+FUSEKI_URL = os.getenv("FUSEKI_URL", "http://localhost:3030/temp_inference")
+INFERENCE_MODE = os.getenv("INFERENCE_MODE", "light")  # "full" (Java Reasoner) or "light" (Fuseki 직접)
+QUERY_MODE = os.getenv("QUERY_MODE", "template")  # "llm" (LLM 쿼리 생성) or "template" (템플릿 쿼리, 빠름)
 SAVE_INFERENCE_TRIPLES = os.getenv("SAVE_INFERENCE_TRIPLES", "true").lower() == "true"
 INFERENCE_OUTPUT_DIR = os.getenv("INFERENCE_OUTPUT_DIR", "./inference_results")
 
@@ -110,16 +117,23 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
     # Thread 가중치 설정
     thread_weights = THREAD_WEIGHTS.get(query_type, THREAD_WEIGHTS["causal"])
     
-    print(f"\n⚡ 병렬 추론 시작 (쿼리생성+실행 통합, {len(INFERENCE_PROPERTIES_BY_STAGE)}개 Thread)")
+    mode_desc = "Fuseki 직접 쿼리" if INFERENCE_MODE == "light" else "Java Reasoner"
+    query_desc = "템플릿 (빠름)" if QUERY_MODE == "template" else "LLM 생성"
+    print(f"\n⚡ 병렬 지식 검색 시작 ({len(INFERENCE_PROPERTIES_BY_STAGE)}개 Thread)")
+    print(f"   - 검색 모드: {INFERENCE_MODE} ({mode_desc})")
+    print(f"   - 쿼리 모드: {QUERY_MODE} ({query_desc})")
     print(f"   - 질문 유형: {query_type}")
     print(f"   - 추출된 엔티티: {len(entities)}개")
     start_time = time.time()
     
-    # LLM 초기화 (Thread 간 공유)
-    llm = ChatOpenAI(
-        model=os.getenv("OPENAI_MODEL"),
-        temperature=0
-    )
+    # LLM 초기화 (QUERY_MODE=llm일 때만 필요)
+    if QUERY_MODE == "llm":
+        llm = ChatOpenAI(
+            model=os.getenv("OPENAI_MODEL"),
+            temperature=0
+        )
+    else:
+        llm = None  # 템플릿 모드에서는 LLM 불필요
     
     # ThreadPoolExecutor로 병렬 실행 (쿼리 생성 + 추론 통합)
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
@@ -160,11 +174,11 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
                 results[thread_type] = {"status": "error", "bindings": [], "error": str(e), "thread_type": thread_type}
     
     elapsed = time.time() - start_time
-    print(f"⚡ 병렬 추론 완료 ({elapsed:.1f}초)")
+    print(f"⚡ 병렬 지식 검색 완료 ({elapsed:.1f}초)")
     
     # 총 결과 통계
     total_bindings = sum(len(r.get("bindings", [])) for r in results.values())
-    print(f"   - 총 추론 결과: {total_bindings}개")
+    print(f"   - 총 검색 결과: {total_bindings}개")
     
     # 추론 결과를 TTL로 저장 (옵션)
     inference_ttl_path = None
@@ -203,10 +217,10 @@ def execute_unified_thread(
     description: str
 ) -> dict:
     """
-    개별 Thread에서 쿼리 생성 + 추론 실행을 순차적으로 수행
+    개별 Thread에서 쿼리 생성 + 지식 검색을 순차적으로 수행
     
     Args:
-        llm: ChatOpenAI 인스턴스 (Thread 간 공유)
+        llm: ChatOpenAI 인스턴스 (Thread 간 공유, QUERY_MODE=llm일 때만 사용)
         thread_type: Thread 타입 (causal/person/temporal/pattern/motive)
         query: 사용자 질문
         query_type: 질문 유형
@@ -216,25 +230,30 @@ def execute_unified_thread(
         description: Stage 설명
         
     Returns:
-        추론 결과 딕셔너리
+        검색 결과 딕셔너리
     """
     
-    # 1️⃣ SPARQL 쿼리 생성 (LLM)
-    try:
-        sparql = generate_sparql_with_llm(
-            llm=llm,
-            query=query,
-            query_type=query_type,
-            thread_type=thread_type,
-            entities=entities,
-            properties=properties,
-            description=description
-        )
-    except Exception as e:
-        # LLM 실패 시 fallback 쿼리 사용
+    # 1️⃣ SPARQL 쿼리 생성
+    if QUERY_MODE == "template":
+        # 템플릿 모드: LLM 없이 미리 정의된 쿼리 사용 (빠름!)
         sparql = generate_fallback_sparql(thread_type, entities)
+    else:
+        # LLM 모드: LLM으로 쿼리 생성 (느림, 더 정교함)
+        try:
+            sparql = generate_sparql_with_llm(
+                llm=llm,
+                query=query,
+                query_type=query_type,
+                thread_type=thread_type,
+                entities=entities,
+                properties=properties,
+                description=description
+            )
+        except Exception as e:
+            # LLM 실패 시 fallback 쿼리 사용
+            sparql = generate_fallback_sparql(thread_type, entities)
     
-    # 2️⃣ 추론 실행 (Jena Reasoner API)
+    # 2️⃣ 지식 검색 실행
     result = execute_inference_api(
         thread_type=thread_type,
         sparql=sparql,
@@ -395,8 +414,18 @@ SELECT ?s ?p ?o ?sLabel WHERE {{
 
 
 def execute_inference_api(thread_type: str, sparql: str, hypothetical: list, query_type: str) -> dict:
-    """Jena Reasoner API 호출"""
+    """
+    추론 실행 (모드에 따라 분기)
     
+    - INFERENCE_MODE=full: Java Reasoner API 호출 (8GB 메모리 필요)
+    - INFERENCE_MODE=light: Fuseki 직접 SPARQL 쿼리 (메모리 절약)
+    """
+    
+    if INFERENCE_MODE == "light":
+        # 경량 모드: Fuseki 직접 쿼리 (Java Reasoner 불필요)
+        return execute_fuseki_direct(thread_type, sparql)
+    
+    # 전체 모드: Java Reasoner API 호출
     use_hypothetical = (query_type == "what_if" and thread_type in ["causal", "person", "temporal"])
     rules_file = f"{thread_type}_inference.rules"
     
@@ -435,6 +464,49 @@ def execute_inference_api(thread_type: str, sparql: str, hypothetical: list, que
             "thread_type": thread_type
         }
         
+    except requests.exceptions.Timeout:
+        return {"status": "timeout", "bindings": [], "thread_type": thread_type}
+    except Exception as e:
+        return {"status": "error", "bindings": [], "error": str(e), "thread_type": thread_type}
+
+
+def execute_fuseki_direct(thread_type: str, sparql: str) -> dict:
+    """
+    Fuseki에 직접 SPARQL 쿼리 (경량 모드)
+    
+    Java Reasoner 없이 이미 Fuseki에 저장된 데이터에서 쿼리.
+    추론은 제한되지만 메모리 부족 환경에서 유용.
+    """
+    
+    endpoint = f"{FUSEKI_URL}/sparql"
+    
+    try:
+        response = requests.post(
+            endpoint,
+            data={"query": sparql},
+            headers={"Accept": "application/sparql-results+json"},
+            timeout=30
+        )
+        response.raise_for_status()
+        result = response.json()
+        
+        bindings = result.get("results", {}).get("bindings", [])
+        
+        return {
+            "status": "success",
+            "bindings": bindings,
+            "fuseki_endpoint": endpoint,
+            "thread_type": thread_type,
+            "mode": "light"
+        }
+        
+    except requests.exceptions.ConnectionError:
+        return {
+            "status": "error", 
+            "bindings": [], 
+            "error": f"Fuseki 서버 연결 실패 ({endpoint}). Docker 컨테이너가 실행 중인지 확인하세요.",
+            "thread_type": thread_type
+        }
     except requests.exceptions.Timeout:
         return {"status": "timeout", "bindings": [], "thread_type": thread_type}
     except Exception as e:
