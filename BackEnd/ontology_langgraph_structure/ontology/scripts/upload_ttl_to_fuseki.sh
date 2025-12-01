@@ -56,6 +56,7 @@ fi
 echo ""
 echo "3️⃣ 기존 데이터 삭제 중..."
 curl -X POST "${FUSEKI_URL}/${DATASET}/update" \
+  -u admin:fuseki1234 \
   --data-urlencode "update=CLEAR DEFAULT" \
   -H "Content-Type: application/x-www-form-urlencoded" 2>/dev/null
 echo "   ✅ 기존 데이터 삭제 완료"
@@ -74,6 +75,7 @@ FILE_SIZE=$(ls -lh "$TTL_FILE" | awk '{print $5}')
 echo "   📄 파일: korean_history_normalized.ttl (${FILE_SIZE})"
 
 curl -X POST "${FUSEKI_URL}/${DATASET}/data" \
+  -u admin:fuseki1234 \
   -H "Content-Type: text/turtle" \
   --data-binary "@${TTL_FILE}" \
   -w "\n   ⏱️ 업로드 시간: %{time_total}초\n"
