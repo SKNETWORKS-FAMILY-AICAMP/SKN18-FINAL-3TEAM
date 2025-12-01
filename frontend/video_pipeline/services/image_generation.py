@@ -108,10 +108,18 @@ def generate_image_with_gemini(prompt: str, output_path: str, apply_common_style
 - Same color palette and color temperature (cool blue/gray)
 - Same lighting approach (soft diffused atmospheric)
 - All backgrounds must look like they were painted by the SAME artist for the SAME series
+
+CHARACTER COMPOSITION RULE (IMPORTANT):
+- Background crowds, soldiers, armies in the distance = OK (small, not detailed)
+- NO prominent main character in foreground or center
+- NO close-up faces or detailed individual characters
+- Keep human figures small and as part of the background/environment
+- This is a BACKGROUND scene - main character will be composited separately
+
 NO TEXT, NO KOREAN CHARACTERS, NO CAPTIONS anywhere in the image."""
         
         full_prompt = f"{COMMON_STYLE} {prompt}. {style_consistency}"
-        print(f"[*] 🎨 고정 스타일 가이드 + 스타일 일관성 강화 + NO TEXT")
+        print(f"[*] 🎨 고정 스타일 가이드 + 배경 인물만 허용 + NO TEXT")
     else:
         full_prompt = prompt
 
