@@ -2,9 +2,10 @@
 Entity Extractor Node
 
 질문에서 핵심 엔티티 추출 및 TTL 데이터 매칭:
-1. LLM으로 엔티티 추출
-2. TTL 데이터에서 실제 엔티티 검색 (rdfs:label 매칭)
-3. 엔티티 URI 반환
+1. 키워드 추출 → TTL 정확 매칭 (빠름)
+2. Milvus 유사도 검색 (fallback)
+3. LLM 엔티티 추출 (최종 fallback)
+4. 엔티티 URI 반환
 
 + 추출된 엔티티 타입에 맞는 온톨로지 스키마 정보 제공
 """
@@ -19,6 +20,7 @@ from langchain_openai import ChatOpenAI
 
 # 상위 디렉토리를 경로에 추가
 sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # .env 파일 로드 (프로젝트 루트에서)
 env_path = Path(__file__).parent.parent.parent.parent / ".env"
@@ -26,6 +28,26 @@ load_dotenv(env_path, override=True)
 
 from state import GraphState
 from ontology_schema import get_schema_summary
+
+# Milvus 서비스 import (선택적)
+USE_MILVUS = os.getenv("USE_MILVUS", "true").lower() == "true"
+_milvus_service = None
+
+def get_milvus_service():
+    """Milvus 서비스 lazy loading"""
+    global _milvus_service
+    if _milvus_service is None and USE_MILVUS:
+        try:
+            from db_pipeline.services.milvus_service import get_milvus_service as _get_milvus
+            _milvus_service = _get_milvus()
+            if not _milvus_service.connect():
+                print("⚠️ Milvus 연결 실패 - TTL 매칭만 사용")
+                _milvus_service = None
+        except ImportError:
+            print("⚠️ Milvus 서비스 import 실패 - TTL 매칭만 사용")
+        except Exception as e:
+            print(f"⚠️ Milvus 초기화 실패: {e}")
+    return _milvus_service
 
 
 # TTL 파일 경로 (normalized 버전 사용 - Fuseki에 업로드된 데이터와 일치)
@@ -271,53 +293,192 @@ def get_ttl_labels_by_type(ttl_data: dict) -> dict:
     return labels_by_type
 
 
+def search_entities_with_milvus(keywords: list, ttl_data: dict, top_k: int = 5) -> list:
+    """
+    Milvus 유사도 검색으로 엔티티 찾기
+    
+    Args:
+        keywords: 검색할 키워드 리스트
+        ttl_data: TTL 데이터 (URI 매핑용)
+        top_k: 키워드당 최대 결과 수
+    
+    Returns:
+        매칭된 엔티티 리스트
+    """
+    milvus = get_milvus_service()
+    if milvus is None:
+        return []
+    
+    entities = []
+    seen_titles = set()
+    
+    try:
+        # 키워드별로 유사도 검색
+        for keyword in keywords:
+            results = milvus.search(keyword, top_k=top_k, threshold=0.5)
+            
+            for result in results:
+                title = result["title"]
+                if title in seen_titles:
+                    continue
+                seen_titles.add(title)
+                
+                # TTL에서 URI 찾기
+                uri = ttl_data["label_to_uri"].get(title)
+                entity_type = "Event"  # 기본값
+                
+                if uri:
+                    entity_type = ttl_data["uri_to_type"].get(uri, "Event")
+                else:
+                    # category로 타입 추정
+                    category = result.get("category", "")
+                    type_map = {
+                        "인물": "Person",
+                        "사건": "Event",
+                        "제도": "Institution",
+                        "문헌": "Document",
+                        "전투": "Battle",
+                        "장소": "Place",
+                        "물품": "Object"
+                    }
+                    entity_type = type_map.get(category, "Event")
+                
+                entities.append({
+                    "type": entity_type,
+                    "name": title,
+                    "uri": uri,
+                    "matched": uri is not None,
+                    "milvus_score": result["score"],
+                    "matched_keyword": keyword
+                })
+        
+        # 점수 순 정렬
+        entities.sort(key=lambda x: x.get("milvus_score", 0), reverse=True)
+        
+    except Exception as e:
+        print(f"⚠️ Milvus 검색 실패: {e}")
+    
+    return entities
+
+
 def entity_extractor_node(state: GraphState) -> GraphState:
-    """질문에서 핵심 엔티티 추출 및 TTL 매칭 (LLM에게 실제 TTL label 목록 제공)"""
+    """
+    질문에서 핵심 엔티티 추출 (하이브리드 방식)
+    
+    1단계: 키워드 추출 → TTL 정확 매칭 (빠름)
+    2단계: Milvus 유사도 검색 (fallback)
+    3단계: LLM 엔티티 추출 (최종 fallback)
+    """
 
     query = state.get("query", "")
+    print(f"\n🔍 엔티티 추출 중... (질문: {query[:50]}...)")
 
     # 1. TTL 데이터 로드
     ttl_data = load_ttl_entities()
     
-    # 2. TTL label 목록 준비 (타입별)
-    labels_by_type = get_ttl_labels_by_type(ttl_data)
-    
-    # 질문과 관련된 키워드 추출하여 관련 label만 필터링
+    # 2. 키워드 추출
     query_keywords = extract_keywords_from_query(query)
+    print(f"   📝 추출된 키워드: {query_keywords}")
     
-    # 관련 label 필터링 (너무 많으면 토큰 비용 증가)
-    relevant_labels = {}
-    for entity_type, labels in labels_by_type.items():
-        filtered = []
-        for label in labels:
-            # 키워드와 매칭되는 label만 포함
-            for kw in query_keywords:
-                if kw in label or any(c in label for c in kw if len(c) >= 2):
-                    filtered.append(label)
-                    break
-        # 필터링된 결과가 없으면 일부만 포함 (최대 20개)
-        if not filtered:
-            filtered = labels[:20]
-        else:
-            filtered = filtered[:30]  # 최대 30개
-        relevant_labels[entity_type] = filtered
+    matched_entities = []
     
-    # 3. TTL label 목록 문자열 생성
-    ttl_label_list = []
-    for entity_type in ["Event", "Person", "Institution", "Document", "Battle", "Place", "Nation"]:
-        labels = relevant_labels.get(entity_type, [])
-        if labels:
-            ttl_label_list.append(f"[{entity_type}] {', '.join(labels[:15])}")
+    # ========================================
+    # 1단계: TTL 정확 매칭 (키워드 기반)
+    # ========================================
+    print(f"\n   🎯 1단계: TTL 정확 매칭...")
     
-    ttl_labels_str = "\n".join(ttl_label_list)
+    for keyword in query_keywords:
+        # 정확한 라벨 매칭
+        if keyword in ttl_data["label_to_uri"]:
+            uri = ttl_data["label_to_uri"][keyword]
+            entity_type = ttl_data["uri_to_type"].get(uri, "Event")
+            matched_entities.append({
+                "type": entity_type,
+                "name": keyword,
+                "uri": uri,
+                "matched": True,
+                "match_method": "exact"
+            })
+            continue
+        
+        # 부분 매칭 (키워드가 라벨에 포함된 경우)
+        for label, uri in ttl_data["label_to_uri"].items():
+            if keyword in label and len(keyword) >= 2:
+                entity_type = ttl_data["uri_to_type"].get(uri, "Event")
+                matched_entities.append({
+                    "type": entity_type,
+                    "name": label,
+                    "uri": uri,
+                    "matched": True,
+                    "match_method": "partial",
+                    "matched_keyword": keyword
+                })
     
-    # 4. LLM으로 엔티티 추출 (TTL label 목록 제공)
-    llm = ChatOpenAI(
-        model=os.getenv("OPENAI_MODEL"),
-        temperature=0
-    )
+    # 중복 제거
+    seen = set()
+    unique_entities = []
+    for e in matched_entities:
+        key = e.get("uri") or e.get("name")
+        if key not in seen:
+            seen.add(key)
+            unique_entities.append(e)
+    matched_entities = unique_entities
+    
+    print(f"      → TTL 매칭: {len(matched_entities)}개")
+    
+    # ========================================
+    # 2단계: Milvus 유사도 검색 (추가 엔티티 발굴)
+    # ========================================
+    if USE_MILVUS and len(matched_entities) < 10:
+        print(f"\n   🔮 2단계: Milvus 유사도 검색...")
+        
+        milvus_entities = search_entities_with_milvus(query_keywords, ttl_data, top_k=5)
+        
+        # 기존에 없는 엔티티만 추가
+        for e in milvus_entities:
+            key = e.get("uri") or e.get("name")
+            if key not in seen:
+                seen.add(key)
+                e["match_method"] = "milvus"
+                matched_entities.append(e)
+        
+        print(f"      → Milvus 추가: {len(milvus_entities)}개")
+    
+    # ========================================
+    # 3단계: LLM 엔티티 추출 (결과가 부족할 때만)
+    # ========================================
+    if len(matched_entities) < 3:
+        print(f"\n   🤖 3단계: LLM 엔티티 추출...")
+        
+        # TTL label 목록 준비
+        labels_by_type = get_ttl_labels_by_type(ttl_data)
+        
+        # 키워드와 관련된 label만 필터링
+        relevant_labels = {}
+        for entity_type, labels in labels_by_type.items():
+            filtered = [label for label in labels 
+                       if any(kw in label for kw in query_keywords)]
+            if not filtered:
+                filtered = labels[:15]
+            else:
+                filtered = filtered[:20]
+            relevant_labels[entity_type] = filtered
+        
+        # TTL label 목록 문자열 생성
+        ttl_label_list = []
+        for entity_type in ["Event", "Person", "Institution", "Document", "Battle", "Place"]:
+            labels = relevant_labels.get(entity_type, [])
+            if labels:
+                ttl_label_list.append(f"[{entity_type}] {', '.join(labels[:10])}")
+        
+        ttl_labels_str = "\n".join(ttl_label_list)
+        
+        llm = ChatOpenAI(
+            model=os.getenv("OPENAI_MODEL"),
+            temperature=0
+        )
 
-    extraction_prompt = f"""당신은 조선시대 역사 데이터에서 엔티티를 추출하는 전문가입니다.
+        extraction_prompt = f"""당신은 조선시대 역사 데이터에서 엔티티를 추출하는 전문가입니다.
 
 ## 실제 데이터베이스에 존재하는 엔티티 목록:
 {ttl_labels_str}
@@ -328,105 +489,75 @@ def entity_extractor_node(state: GraphState) -> GraphState:
 ## 작업:
 1. 위 질문에서 언급된 역사적 엔티티를 추출하세요
 2. **반드시 위 "실제 데이터베이스" 목록에서 가장 유사한 엔티티명을 선택**하세요
-3. 예: 질문에 "민비복원"이 있고 목록에 "민비복위"가 있으면 → "민비복위" 선택
 
 ## 출력 형식 (JSON 배열만):
-[
-  {{"type": "Event", "name": "민비복위"}},
-  {{"type": "Person", "name": "숙종"}}
-]
+[{{"type": "Event", "name": "엔티티명"}}]
 
 ## 규칙:
-- name은 반드시 위 목록에 있는 정확한 이름 사용
-- 목록에 없으면 가장 유사한 것 선택
+- 목록에 있는 정확한 이름 사용
 - 관련 엔티티가 없으면 빈 배열 [] 반환
-- JSON만 출력 (설명 없이)"""
+- JSON만 출력"""
 
-    entities = []
+        try:
+            response = llm.invoke(extraction_prompt)
+            content = response.content.strip()
+            
+            # JSON 파싱
+            if "```" in content:
+                match = re.search(r'```(?:json)?\s*(.*?)\s*```', content, re.DOTALL)
+                if match:
+                    content = match.group(1).strip()
+            
+            json_match = re.search(r'\[.*\]', content, re.DOTALL)
+            if json_match:
+                content = json_match.group(0)
+            
+            llm_entities = json.loads(content)
+            
+            if isinstance(llm_entities, list):
+                for e in llm_entities:
+                    if isinstance(e, dict) and e.get("name"):
+                        name = e["name"]
+                        uri = ttl_data["label_to_uri"].get(name)
+                        entity_type = e.get("type", "Event")
+                        
+                        if uri:
+                            entity_type = ttl_data["uri_to_type"].get(uri, entity_type)
+                        
+                        key = uri or name
+                        if key not in seen:
+                            seen.add(key)
+                            matched_entities.append({
+                                "type": entity_type,
+                                "name": name,
+                                "uri": uri,
+                                "matched": uri is not None,
+                                "match_method": "llm"
+                            })
+            
+            print(f"      → LLM 추가: {len(llm_entities)}개")
+            
+        except Exception as e:
+            print(f"      ⚠️ LLM 추출 실패: {e}")
     
-    try:
-        print(f"\n🔍 엔티티 추출 중... (질문: {query[:50]}...)")
-        response = llm.invoke(extraction_prompt)
-        content = response.content.strip()
-        
-        # JSON 파싱
-        json_content = content
-        
-        # 마크다운 코드 블록 제거
-        if "```json" in json_content:
-            match = re.search(r'```json\s*(.*?)\s*```', json_content, re.DOTALL)
-            if match:
-                json_content = match.group(1).strip()
-        elif "```" in json_content:
-            match = re.search(r'```\s*(.*?)\s*```', json_content, re.DOTALL)
-            if match:
-                json_content = match.group(1).strip()
-        
-        # JSON 배열 추출
-        json_match = re.search(r'\[.*\]', json_content, re.DOTALL)
-        if json_match:
-            json_content = json_match.group(0)
-        
-        entities = json.loads(json_content)
-        
-        # 유효성 검사
-        if not isinstance(entities, list):
-            entities = []
-        
-        # 빈 엔티티 필터링
-        entities = [e for e in entities 
-                   if isinstance(e, dict) and e.get("type") and (e.get("name") or e.get("value"))]
-
-    except Exception as e:
-        print(f"⚠️ LLM 엔티티 추출 실패: {e}")
-        entities = []
-    
-    # 3. LLM 실패 시 키워드 기반 fallback
-    if not entities:
-        print("📝 키워드 기반 fallback 엔티티 추출...")
-        keywords = extract_keywords_from_query(query)
-        
-        # TTL에서 키워드와 매칭되는 엔티티 검색
-        for keyword in keywords:
-            for label, uri in ttl_data["label_to_uri"].items():
-                if keyword in label:
-                    entity_type = ttl_data["uri_to_type"].get(uri, "Event")
-                    entities.append({
-                        "type": entity_type,
-                        "name": label,
-                        "uri": uri,
-                        "matched": True
-                    })
-                    break  # 키워드당 하나만 매칭
-        
-        # 중복 제거
-        seen = set()
-        unique_entities = []
-        for e in entities:
-            key = (e.get("type"), e.get("name"))
-            if key not in seen:
-                seen.add(key)
-                unique_entities.append(e)
-        entities = unique_entities
-    
-    # 4. TTL 데이터와 매칭
-    if entities:
-        matched_entities = match_entities_with_ttl(entities, ttl_data)
-    else:
-        matched_entities = []
-    
-    # 5. 결과 출력
+    # ========================================
+    # 결과 정리
+    # ========================================
     print(f"\n🔍 추출된 엔티티: {len(matched_entities)}개")
     matched_count = sum(1 for e in matched_entities if e.get("matched"))
     unmatched_count = len(matched_entities) - matched_count
     
     if matched_entities:
-        for i, entity in enumerate(matched_entities, 1):
-            name = entity.get("name") or entity.get("value", "")
+        for i, entity in enumerate(matched_entities[:10], 1):  # 최대 10개만 출력
+            name = entity.get("name", "")
             entity_type = entity.get("type", "")
             uri = entity.get("uri", "")
+            method = entity.get("match_method", "")
+            score = entity.get("milvus_score", "")
             status = "✅" if entity.get("matched") else "⚠️"
-            print(f"   {i}. {status} [{entity_type}] {name}")
+            
+            score_str = f" (유사도: {score:.2f})" if score else ""
+            print(f"   {i}. {status} [{entity_type}] {name} [{method}]{score_str}")
             if uri:
                 print(f"      → URI: {uri}")
     else:
@@ -434,7 +565,7 @@ def entity_extractor_node(state: GraphState) -> GraphState:
     
     print(f"   📊 매칭 성공: {matched_count}개, 미매칭: {unmatched_count}개")
 
-    # 6. 온톨로지 스키마 정보 가져오기
+    # 온톨로지 스키마 정보 가져오기
     ontology_schema = get_schema_summary()
 
     print(f"\n📐 온톨로지 스키마:")
@@ -453,6 +584,6 @@ def entity_extractor_node(state: GraphState) -> GraphState:
         **state,
         "extracted_entities": matched_entities,
         "ontology_schema": ontology_schema,
-        "ttl_data": ttl_data,  # 이후 노드에서 사용
+        "ttl_data": ttl_data,
         "executed_nodes": state.get("executed_nodes", []) + ["entity_extractor"]
     }

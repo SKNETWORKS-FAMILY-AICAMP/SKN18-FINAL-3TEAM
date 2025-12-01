@@ -208,11 +208,11 @@ def infer(req: InferenceRequest):
             print(f"   - JAVA_HOME: {java_home}")
             
             result = subprocess.run(
-                [java_abs_path, "-jar", str(REASONER_JAR),
+                [java_abs_path, "-Xmx8g", "-Xms4g", "-jar", str(REASONER_JAR),
                  str(ontology), str(merged), str(rules), TEMP_FUSEKI_URL],
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=240,  # 4분으로 증가 (대용량 데이터 처리)
                 env=env
             )
             
@@ -254,7 +254,7 @@ def infer(req: InferenceRequest):
             
             return response
         except subprocess.TimeoutExpired:
-            raise HTTPException(500, "추론 시간 초과 (30초)")
+            raise HTTPException(500, "추론 시간 초과 (240초)")
         except HTTPException:
             raise
         except Exception as e:
@@ -304,11 +304,11 @@ def what_if(req: WhatIfRequest):
                 env['PATH'] = java_bin_dir
             
             result = subprocess.run(
-                [java_abs_path, "-jar", str(REASONER_JAR),
+                [java_abs_path, "-Xmx8g", "-Xms4g", "-jar", str(REASONER_JAR),
                  str(ontology), str(merged), str(rules), TEMP_FUSEKI_URL],
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=240,  # 4분으로 증가 (대용량 데이터 처리)
                 env=env
             )
             
@@ -327,7 +327,7 @@ def what_if(req: WhatIfRequest):
                 "results": query_results
             }
         except subprocess.TimeoutExpired:
-            raise HTTPException(500, "추론 시간 초과 (30초)")
+            raise HTTPException(500, "추론 시간 초과 (240초)")
 
 
 @app.get("/health")

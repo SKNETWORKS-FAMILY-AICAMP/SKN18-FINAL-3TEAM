@@ -545,45 +545,42 @@
 # ============================================================
 # Rule 8: 역사적 시대 분류 - 임진왜란 시기
 # ============================================================
-# DISABLED: greaterThanOrEqual/lessThanOrEqual not implemented in Jena
-# [classify_imjin_war_period:
-#     (?event hist:hasYear ?year)
-#     greaterThanOrEqual(?year, 1592)
-#     lessThanOrEqual(?year, 1598)
-#     noValue(?event hist:belongsToPeriod ?period)
-#     ->
-#     (?event hist:belongsToPeriod "imjin_war_period")
-# ]
+[classify_imjin_war_period:
+    (?event hist:hasYear ?year)
+    greaterThanOrEqual(?year, 1592)
+    lessThanOrEqual(?year, 1598)
+    noValue(?event hist:belongsToPeriod ?period)
+    ->
+    (?event hist:belongsToPeriod "imjin_war_period")
+]
 
 
 # ============================================================
 # Rule 9: 인물 생존 여부 추론
 # ============================================================
-# DISABLED: greaterThanOrEqual/lessThanOrEqual not implemented in Jena
-# [person_alive_during_event:
-#     (?person hist:participatesIn ?event)
-#     (?event hist:hasYear ?eventYear)
-#     (?person hist:hasBirthYear ?birth)
-#     (?person hist:hasDeathYear ?death)
-#     greaterThanOrEqual(?eventYear, ?birth)
-#     lessThanOrEqual(?eventYear, ?death)
-#     noValue(?person hist:aliveDuring ?event)
-#     ->
-#     (?person hist:aliveDuring ?event)
-# ]
+[person_alive_during_event:
+    (?person hist:participatesIn ?event)
+    (?event hist:hasYear ?eventYear)
+    (?person hist:hasBirthYear ?birth)
+    (?person hist:hasDeathYear ?death)
+    greaterThanOrEqual(?eventYear, ?birth)
+    lessThanOrEqual(?eventYear, ?death)
+    noValue(?person hist:aliveDuring ?event)
+    ->
+    (?person hist:aliveDuring ?event)
+]
 
 
 # ============================================================
 # Rule 10: 장기 전쟁 추론 (5년 이상)
 # ============================================================
-# DISABLED: greaterThanOrEqual not implemented in Jena
-# [long_war_classification:
-#     (?war hist:hasDuration ?duration)
-#     greaterThanOrEqual(?duration, 5)
-#     noValue(?war hist:warType ?type)
-#     ->
-#     (?war hist:warType "prolonged_war")
-# ]
+[long_war_classification:
+    (?war hist:hasDuration ?duration)
+    greaterThanOrEqual(?duration, 5)
+    noValue(?war hist:warType ?type)
+    ->
+    (?war hist:warType "prolonged_war")
+]
 
 
 # ============================================================
@@ -634,16 +631,15 @@
 # ============================================================
 # Rule 14: 제도 설립 시대 분류 - 세종대왕 시기
 # ============================================================
-# DISABLED: greaterThanOrEqual/lessThanOrEqual not implemented in Jena
-# [classify_sejong_period:
-#     (?institution rdf:type hist:Institution)
-#     (?institution hist:hasYear ?year)
-#     greaterThanOrEqual(?year, 1418)
-#     lessThanOrEqual(?year, 1450)
-#     noValue(?institution hist:belongsToPeriod ?period)
-#     ->
-#     (?institution hist:belongsToPeriod "sejong_period")
-# ]
+[classify_sejong_period:
+    (?institution rdf:type hist:Institution)
+    (?institution hist:hasYear ?year)
+    greaterThanOrEqual(?year, 1418)
+    lessThanOrEqual(?year, 1450)
+    noValue(?institution hist:belongsToPeriod ?period)
+    ->
+    (?institution hist:belongsToPeriod "sejong_period")
+]
 
 
 # ============================================================

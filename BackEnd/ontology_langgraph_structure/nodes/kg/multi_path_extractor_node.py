@@ -58,17 +58,51 @@ def extract_causal_paths(bindings: list, base_weight: float) -> list:
     """인과관계 체인 추출"""
     paths = []
 
-    # leadsTo 관계 수집
+    # leadsTo 관계 수집 (다양한 변수명 지원)
     for binding in bindings:
-        cause = binding.get("cause", {}).get("value", "").split("#")[-1]
-        effect = binding.get("effect", {}).get("value", "").split("#")[-1]
+        # 원인 추출 (cause, subject, s 등 다양한 변수명 지원)
+        cause_binding = (
+            binding.get("cause") or 
+            binding.get("subject") or 
+            binding.get("s") or 
+            binding.get("entity") or
+            {}
+        )
+        cause = cause_binding.get("value", "").split("#")[-1] if cause_binding else ""
+        
+        # 라벨이 있으면 사용
+        cause_label = (
+            binding.get("causeLabel") or 
+            binding.get("subjectLabel") or 
+            binding.get("sLabel") or
+            {}
+        )
+        cause_name = cause_label.get("value", cause) if cause_label else cause
+        
+        # 결과 추출 (effect, object, o 등 다양한 변수명 지원)
+        effect_binding = (
+            binding.get("effect") or 
+            binding.get("object") or 
+            binding.get("o") or
+            {}
+        )
+        effect = effect_binding.get("value", "").split("#")[-1] if effect_binding else ""
+        
+        # 라벨이 있으면 사용
+        effect_label = (
+            binding.get("effectLabel") or 
+            binding.get("objectLabel") or 
+            binding.get("oLabel") or
+            {}
+        )
+        effect_name = effect_label.get("value", effect) if effect_label else effect
 
         if cause and effect:
             paths.append({
                 "type": "causal",
-                "chain": [cause, effect],
+                "chain": [cause_name, effect_name],
                 "weight": base_weight,
-                "description": f"{cause} → {effect}"
+                "description": f"{cause_name} → {effect_name}"
             })
 
     return paths[:10]  # 상위 10개
@@ -79,18 +113,45 @@ def extract_person_paths(bindings: list, base_weight: float) -> list:
     paths = []
 
     for binding in bindings:
-        person = binding.get("person", {}).get("value", "").split("#")[-1]
-        event = binding.get("event", {}).get("value", "").split("#")[-1]
-        role = binding.get("role", {}).get("value", "")
+        # 인물 추출 (다양한 변수명 지원)
+        person_binding = (
+            binding.get("person") or 
+            binding.get("entity") or 
+            binding.get("s") or
+            {}
+        )
+        person = person_binding.get("value", "").split("#")[-1] if person_binding else ""
+        
+        # 라벨
+        person_label = (
+            binding.get("personLabel") or 
+            binding.get("entityLabel") or 
+            binding.get("sLabel") or
+            {}
+        )
+        person_name = person_label.get("value", person) if person_label else person
+        
+        # 이벤트/값 추출
+        event_binding = (
+            binding.get("event") or 
+            binding.get("value") or 
+            binding.get("o") or
+            {}
+        )
+        event = event_binding.get("value", "").split("#")[-1] if event_binding else ""
+        
+        # 역할
+        role_binding = binding.get("role") or binding.get("property") or {}
+        role = role_binding.get("value", "") if role_binding else ""
 
         if person and event:
             paths.append({
                 "type": "person",
-                "person": person,
+                "person": person_name,
                 "event": event,
                 "role": role,
                 "weight": base_weight,
-                "description": f"{person} - {event}" + (f" ({role})" if role else "")
+                "description": f"{person_name} - {event}" + (f" ({role})" if role else "")
             })
 
     return paths[:10]
@@ -101,18 +162,40 @@ def extract_temporal_paths(bindings: list, base_weight: float) -> list:
     paths = []
 
     for binding in bindings:
-        event = binding.get("event", {}).get("value", "").split("#")[-1]
-        year = binding.get("year", {}).get("value", "")
-        context = binding.get("context", {}).get("value", "")
+        # 이벤트/엔티티 추출 (다양한 변수명 지원)
+        event_binding = (
+            binding.get("event") or 
+            binding.get("entity") or 
+            binding.get("s") or
+            {}
+        )
+        event = event_binding.get("value", "").split("#")[-1] if event_binding else ""
+        
+        # 라벨
+        event_label = (
+            binding.get("eventLabel") or 
+            binding.get("entityLabel") or 
+            binding.get("sLabel") or
+            {}
+        )
+        event_name = event_label.get("value", event) if event_label else event
+        
+        # 연도
+        year_binding = binding.get("year") or binding.get("date") or {}
+        year = year_binding.get("value", "") if year_binding else ""
+        
+        # 컨텍스트
+        context_binding = binding.get("context") or binding.get("description") or {}
+        context = context_binding.get("value", "") if context_binding else ""
 
         if event and year:
             paths.append({
                 "type": "temporal",
-                "event": event,
+                "event": event_name,
                 "year": year,
                 "context": context,
                 "weight": base_weight,
-                "description": f"{year}년: {event}" + (f" ({context})" if context else "")
+                "description": f"{year}년: {event_name}" + (f" ({context})" if context else "")
             })
 
     return paths[:10]
@@ -123,17 +206,37 @@ def extract_pattern_paths(bindings: list, base_weight: float) -> list:
     paths = []
 
     for binding in bindings:
-        e1 = binding.get("e1", {}).get("value", "").split("#")[-1]
-        e2 = binding.get("e2", {}).get("value", "").split("#")[-1]
-        pattern = binding.get("pattern", {}).get("value", "")
+        # 엔티티 추출 (다양한 변수명 지원)
+        e1_binding = (
+            binding.get("e1") or 
+            binding.get("entity") or 
+            binding.get("s") or
+            {}
+        )
+        e1 = e1_binding.get("value", "").split("#")[-1] if e1_binding else ""
+        
+        e1_label = (
+            binding.get("e1Label") or 
+            binding.get("entityLabel") or 
+            binding.get("sLabel") or
+            {}
+        )
+        e1_name = e1_label.get("value", e1) if e1_label else e1
+        
+        e2_binding = binding.get("e2") or binding.get("o") or {}
+        e2 = e2_binding.get("value", "").split("#")[-1] if e2_binding else ""
+        
+        # 패턴
+        pattern_binding = binding.get("pattern") or binding.get("p") or {}
+        pattern = pattern_binding.get("value", "") if pattern_binding else ""
 
-        if e1 and e2:
+        if e1:
             paths.append({
                 "type": "pattern",
-                "events": [e1, e2],
+                "events": [e1_name, e2] if e2 else [e1_name],
                 "pattern": pattern,
                 "weight": base_weight,
-                "description": f"{e1} ↔ {e2}" + (f" ({pattern})" if pattern else "")
+                "description": f"{e1_name} ↔ {e2}" + (f" ({pattern})" if pattern else "") if e2 else e1_name
             })
 
     return paths[:10]
@@ -144,18 +247,44 @@ def extract_motive_paths(bindings: list, base_weight: float) -> list:
     paths = []
 
     for binding in bindings:
-        person = binding.get("person", {}).get("value", "").split("#")[-1]
-        motive = binding.get("motive", {}).get("value", "")
-        action = binding.get("action", {}).get("value", "").split("#")[-1]
+        # 인물/엔티티 추출
+        person_binding = (
+            binding.get("person") or 
+            binding.get("entity") or 
+            binding.get("s") or
+            {}
+        )
+        person = person_binding.get("value", "").split("#")[-1] if person_binding else ""
+        
+        person_label = (
+            binding.get("personLabel") or 
+            binding.get("entityLabel") or 
+            binding.get("sLabel") or
+            {}
+        )
+        person_name = person_label.get("value", person) if person_label else person
+        
+        # 동기
+        motive_binding = (
+            binding.get("motive") or 
+            binding.get("value") or 
+            binding.get("o") or
+            {}
+        )
+        motive = motive_binding.get("value", "") if motive_binding else ""
+        
+        # 행동
+        action_binding = binding.get("action") or {}
+        action = action_binding.get("value", "").split("#")[-1] if action_binding else ""
 
         if person and motive:
             paths.append({
                 "type": "motive",
-                "person": person,
+                "person": person_name,
                 "motive": motive,
                 "action": action,
                 "weight": base_weight,
-                "description": f"{person}: {motive}" + (f" → {action}" if action else "")
+                "description": f"{person_name}: {motive}" + (f" → {action}" if action else "")
             })
 
     return paths[:10]
