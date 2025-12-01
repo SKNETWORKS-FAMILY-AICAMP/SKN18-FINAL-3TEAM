@@ -23,3 +23,9 @@ rdflib==7.0.0
 # realtime inference api
 fastapi==0.115.6
 uvicorn==0.34.0
+
+# milvus vector database
+pymilvus==2.2.2
+sentence-transformers==2.2.2
+torch>=2.0.0  # sentence-transformers 의존성
+transformers>=4.30.0  # sentence-transformers 의존성
