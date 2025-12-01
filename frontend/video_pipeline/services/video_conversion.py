@@ -72,24 +72,33 @@ def create_video_from_image_fal(image_path: str, output_path: str, prompt: str =
         print(f"    모델: fal-ai/wan-25-preview/image-to-video")
         print(f"    모션 프롬프트: {prompt[:100]}...")
         
-        # 프롬프트에 액션/전투 키워드가 있을 때만 효과 생성 허용
-        action_keywords = ['battle', 'fight', 'attack', 'war', 'arrow', 'fire', 'explosion', 'cannon', 'combat', 'charge', 'shoot', 'strike', 'clash', 'siege', '전투', '공격', '화살', '포탄', '폭발', '발사']
+        # Unity 배경용: 자연스러운 움직임 + 전투 효과 허용
+        
+        # 전투/액션 효과 키워드 감지
+        action_keywords = ['battle', 'fight', 'attack', 'war', 'arrow', 'fire', 'explosion', 'cannon', 'combat', 'charge', 'shoot', 'strike', 'clash', 'siege', 'gun', 'blast', 'shell', '전투', '공격', '화살', '포탄', '폭발', '발사', '총', '사격']
         has_action = any(keyword in prompt.lower() for keyword in action_keywords)
         
-        # 기본: 사람 추가 금지, 원본 이미지 구도 유지
-        base_constraint = f"{prompt}, CAMERA MOVEMENT with natural motion, existing soldiers and people in the image can move naturally, BUT STRICTLY NO NEW PEOPLE APPEARING, NO new characters entering scene, NO hero emerging from nowhere, ONLY people already in the original image, maintain original composition of people and characters"
-        
-        # 액션 장면일 때만 전투 효과 허용 추가
+        # 액션 장면: 전투 효과 최우선! (맨 앞에 배치)
         if has_action:
-            effect_allowance = ", you CAN ADD battle effects like arrows flying, cannon fire, smoke, dust, explosions, fire effects, environmental destruction, debris, sparks, weapon effects if mentioned in the prompt"
-            enhanced_prompt = base_constraint + effect_allowance
-            print(f"    🎬 액션 장면 감지: 전투 효과 생성 허용")
+            # 전투 효과를 가장 먼저 명시 (AI가 최우선으로 처리)
+            battle_effects_priority = f"{prompt}, PRIORITY EFFECTS: dramatic battle scene with visible combat effects, MANY arrows flying through the air in multiple directions, large explosions with fire and smoke, cannon fire with dramatic smoke trails, gunfire smoke clouds, weapon sparks from clashing, debris flying from impacts, dust clouds from combat, fire effects from explosions"
+            
+            # 전투 동작
+            combat_actions = ", soldiers in dynamic combat: actively shooting arrows, swinging swords in battle, charging with spears, engaged in fighting, running in battle formation, all on ground"
+            
+            # 기본 제약 (맨 뒤로)
+            base_constraints = ", Joseon Dynasty 16th century Korea setting, static camera, people keep feet on ground, NO new people appearing, maintain composition"
+            
+            enhanced_prompt = battle_effects_priority + combat_actions + base_constraints
+            print(f"    💥 전투 장면: 전투 효과 최우선 (화살, 폭발, 연기 강조)")
         else:
-            enhanced_prompt = base_constraint
-            print(f"    🎬 일반 장면: 전투 효과 생성 없음, 자연스러운 움직임만")
+            # 일반 장면
+            base_settings = f"{prompt}, Joseon Dynasty 16th century Korea, static camera, peaceful background movements: soldiers walking, standing guard, talking, environmental motion (flags, smoke, wind), people on ground, NO new people, maintain composition"
+            enhanced_prompt = base_settings
+            print(f"    🎬 일반 장면: 평화로운 배경")
         
-        # 새 사람만 차단하는 네거티브 프롬프트
-        enhanced_negative_prompt = "NEW PERSON APPEARING, new character entering scene, additional people walking into frame, hero emerging, new warrior appearing, new soldier entering, person added to scene, prominent main character appearing from nowhere, new human figure, extra people, low resolution, error, worst quality, low quality, defects, distortion, blurry"
+        # 사람만 날아다니는 것 차단 (화살, 폭발 효과는 허용!)
+        enhanced_negative_prompt = "PEOPLE FLYING, PEOPLE FLOATING, SOLDIERS FLYING, SOLDIERS FLOATING, HUMAN LEVITATION, person in air, person in sky, person hovering, person jumping unrealistically high, human rising up, soldier not touching ground, camera movement, camera pan, camera zoom, modern soldiers, modern military, contemporary uniforms, modern equipment, 20th/21st century, NEW PERSON APPEARING, new character entering, hero emerging from nowhere, extra people, low resolution, error, worst quality, low quality, defects, distortion, blurry"
         
         arguments = {
             "prompt": enhanced_prompt,
@@ -99,7 +108,7 @@ def create_video_from_image_fal(image_path: str, output_path: str, prompt: str =
             "negative_prompt": enhanced_negative_prompt,
             "enable_prompt_expansion": False,  # 프롬프트 확장 비활성화
             "enable_safety_checker": False,  # 콘텐츠 필터 비활성화
-            "strength": 0.3  # 원본 이미지 구도 유지 최대 강화 (낮을수록 원본 유지)
+            "strength": 0.42  # 전투 효과 역동적 생성 허용 (58% 원본, 42% 변화)
         }
         
         try:
