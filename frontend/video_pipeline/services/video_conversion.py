@@ -72,17 +72,34 @@ def create_video_from_image_fal(image_path: str, output_path: str, prompt: str =
         print(f"    모델: fal-ai/wan-25-preview/image-to-video")
         print(f"    모션 프롬프트: {prompt[:100]}...")
         
-        # 카메라 움직임만, 인물은 최소 움직임
-        enhanced_prompt = f"{prompt}, CAMERA MOVEMENT ONLY, keep all people and soldiers relatively still, subtle environmental motion, no character animation or movement"
+        # 프롬프트에 액션/전투 키워드가 있을 때만 효과 생성 허용
+        action_keywords = ['battle', 'fight', 'attack', 'war', 'arrow', 'fire', 'explosion', 'cannon', 'combat', 'charge', 'shoot', 'strike', 'clash', 'siege', '전투', '공격', '화살', '포탄', '폭발', '발사']
+        has_action = any(keyword in prompt.lower() for keyword in action_keywords)
+        
+        # 기본: 사람 추가 금지, 원본 이미지 구도 유지
+        base_constraint = f"{prompt}, CAMERA MOVEMENT with natural motion, existing soldiers and people in the image can move naturally, BUT STRICTLY NO NEW PEOPLE APPEARING, NO new characters entering scene, NO hero emerging from nowhere, ONLY people already in the original image, maintain original composition of people and characters"
+        
+        # 액션 장면일 때만 전투 효과 허용 추가
+        if has_action:
+            effect_allowance = ", you CAN ADD battle effects like arrows flying, cannon fire, smoke, dust, explosions, fire effects, environmental destruction, debris, sparks, weapon effects if mentioned in the prompt"
+            enhanced_prompt = base_constraint + effect_allowance
+            print(f"    🎬 액션 장면 감지: 전투 효과 생성 허용")
+        else:
+            enhanced_prompt = base_constraint
+            print(f"    🎬 일반 장면: 전투 효과 생성 없음, 자연스러운 움직임만")
+        
+        # 새 사람만 차단하는 네거티브 프롬프트
+        enhanced_negative_prompt = "NEW PERSON APPEARING, new character entering scene, additional people walking into frame, hero emerging, new warrior appearing, new soldier entering, person added to scene, prominent main character appearing from nowhere, new human figure, extra people, low resolution, error, worst quality, low quality, defects, distortion, blurry"
         
         arguments = {
             "prompt": enhanced_prompt,
             "image_url": image_url,
             "resolution": resolution,
             "duration": str(duration),
-            "negative_prompt": "prominent main character, hero close-up, detailed face in foreground, single person focus, character appearing from nowhere, low resolution, error, worst quality, low quality, defects, distortion, blurry",
+            "negative_prompt": enhanced_negative_prompt,
             "enable_prompt_expansion": False,  # 프롬프트 확장 비활성화
-            "enable_safety_checker": False  # 콘텐츠 필터 비활성화
+            "enable_safety_checker": False,  # 콘텐츠 필터 비활성화
+            "strength": 0.3  # 원본 이미지 구도 유지 최대 강화 (낮을수록 원본 유지)
         }
         
         try:
