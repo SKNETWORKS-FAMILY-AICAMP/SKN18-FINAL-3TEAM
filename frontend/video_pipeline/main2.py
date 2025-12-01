@@ -11,6 +11,7 @@ from services import (
     generate_image_with_gemini,
     create_video_from_image_fal
 )
+from services.historical_prompt_enhancer import process_scene_prompt
 
 # Directory setup
 OUTPUT_DIR = Path(__file__).parent / "output"
@@ -206,8 +207,9 @@ def main():
         print(f"{'='*60}")
         
         try:
-            # 1. 장면 강화
-            enhanced_prompt = enhance_scene_with_era_details(scene["image_prompt"], use_gemini_analysis=False)
+            # 1. 장면 강화 - 시대 배경 명확화 + 한국어→영어 변환
+            print(f"    🔄 시대 배경 인식 강화 중...")
+            enhanced_prompt, _ = process_scene_prompt(scene["image_prompt"], is_image=True)
             
             # 3. 배경 이미지 생성
             bg_path = IMAGES_DIR / f"background_scene_{scene['scene_id']}.png"
@@ -255,6 +257,10 @@ def main():
         print(f"[*] 배경 이미지: {Path(img_path).name}")
         print(f"[*] 영상 프롬프트: {video_prompt[:80]}...")
         
+        # 영상 프롬프트도 시대 배경 강화
+        print(f"    🔄 영상 프롬프트 시대 배경 강화 중...")
+        enhanced_video_prompt, _ = process_scene_prompt(video_prompt, is_image=False)
+        
         video_path = VIDEO_DIR / f"background_scene_{scene_id}_video.mp4"
         
         try:
@@ -262,7 +268,7 @@ def main():
             result = create_video_from_image_fal(
                 img_path,
                 str(video_path),
-                video_prompt,
+                enhanced_video_prompt,
                 resolution="1080p",
                 duration=5
             )
