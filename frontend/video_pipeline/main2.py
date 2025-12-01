@@ -13,7 +13,7 @@ from services import (
 )
 
 # Directory setup
-OUTPUT_DIR = Path("output")
+OUTPUT_DIR = Path(__file__).parent / "output"
 VIDEO_DIR = OUTPUT_DIR / "videos"
 IMAGES_DIR = OUTPUT_DIR / "images"
 
@@ -87,7 +87,7 @@ def main():
     
     print("\n📌 JSON 프롬프트 입력 형식:")
     print("  {")
-    print('    "title": "임진왜란 - 1막",')
+    print('    "title": "타이틀"')
     print('    "scenes": [')
     print('      {')
     print('        "scene_id": 1,')
