@@ -52,22 +52,31 @@ def format_evidence_for_prompt(evidences: list) -> tuple:
     footnotes = []
     
     for i, ev in enumerate(evidences, 1):
+        # raw_data에서 실제 내용 추출
+        raw_data = ev.get('raw_data', {})
+        
+        # 실제 내용 (content > summary > description 순)
+        content = raw_data.get('content', '') or raw_data.get('summary', '') or ''
+        
         # 설명에서 정규화된 ID 정리
         desc = ev.get('description', '')
         desc = clean_entity_name(desc)
         
-        # 출처 정리
-        source = ev.get('source', 'unknown')
-        source = clean_entity_name(source)
+        # 엔티티명 추출 (desc에서 : 앞부분)
+        entity_name = desc.split(':')[0].strip() if ':' in desc else desc[:30]
+        entity_name = clean_entity_name(entity_name)
         
-        # 신뢰도
-        weight = ev.get('weight', 0)
+        # 실제 내용이 있으면 사용, 없으면 description 사용
+        if content:
+            display_text = f"{entity_name}: {content[:150]}"
+        else:
+            display_text = desc[:150] if desc else entity_name
         
         # 프롬프트용 (상세)
-        formatted_list.append(f"[{i}] {desc}")
+        formatted_list.append(f"[{i}] {display_text}")
         
         # 각주용 (간략)
-        footnotes.append(f"[{i}] {desc[:50]}{'...' if len(desc) > 50 else ''} (신뢰도: {weight:.0%})")
+        footnotes.append(f"{i}. {entity_name}: {content[:80] if content else '관련 정보'}{'...' if len(content) > 80 else ''}")
     
     return "\n".join(formatted_list), "\n".join(footnotes)
 
@@ -101,11 +110,11 @@ def story_generator_node(state: GraphState) -> GraphState:
 {entity_info}현재 온톨로지 데이터베이스에서 해당 질문에 답변할 수 있는 구체적인 관계 정보가 부족합니다.
 
 가능한 원인:
-1. 해당 주제에 대한 상세 데이터가 아직 구축되지 않음
-2. 질문의 범위가 현재 데이터로 커버하기 어려움
-3. 쿼리 처리 중 시간 초과 발생
+1. 해당 주제에 대한 상세 데이터가 아직 구축되지 않았습니다.
+2. 질문의 범위가 현재 데이터로 커버하기 어렵습니다.
+3. 쿼리 처리 중 시간 초과가 발생했습니다.
 
-더 구체적인 질문이나 특정 인물/사건에 대한 질문을 시도해 보세요."""
+더 구체적인 질문이나 특정 인물/사건에 대한 질문을 시도해 주세요."""
 
         answer_with_sources = {
             "story": final_answer,
@@ -127,22 +136,44 @@ def story_generator_node(state: GraphState) -> GraphState:
 
     # 질문 유형별 프롬프트 조정
     if query_type == "what_if":
-        instruction = """가상 시나리오에 기반한 대체 역사 스토리를 작성하세요.
-- "만약 ~했다면" 형식으로 시작
-- 추론된 인과관계를 자연스럽게 설명
-- 실제 역사와의 차이점을 명확히"""
+        instruction = """가상 시나리오에 기반한 대체 역사 스토리를 작성해 주세요.
+- "만약 ~했다면" 형식으로 시작합니다
+- 추론된 인과관계를 자연스럽게 설명합니다
+- 실제 역사와의 차이점을 명확히 합니다"""
 
     elif query_type == "deep_analysis":
-        instruction = """역사의 이면과 숨은 동기를 분석하세요.
-- 여러 근거를 종합하여 깊이 있는 해석 제시
-- 당시 정치적/사회적 맥락 설명
-- 다양한 관점에서 분석"""
+        instruction = """역사의 이면과 숨은 동기를 분석해 주세요.
+- 여러 근거를 종합하여 깊이 있는 해석을 제시합니다
+- 당시 정치적/사회적 맥락을 설명합니다
+- 다양한 관점에서 분석합니다"""
 
     else:  # causal
-        instruction = """인과관계를 명확히 설명하세요.
-- 원인과 결과를 논리적으로 연결
-- 시간 순서대로 전개
-- 각 사건의 영향 관계 설명"""
+        instruction = """인과관계를 명확히 설명해 주세요.
+- 원인과 결과를 논리적으로 연결합니다
+- 시간 순서대로 전개합니다
+- 각 사건의 영향 관계를 설명합니다"""
+
+    # 참고 근거 상세 정보 (출력용) - 실제 내용 포함
+    evidence_detail_list = []
+    for i, ev in enumerate(evidences[:10], 1):
+        raw_data = ev.get('raw_data', {})
+        
+        # 실제 내용 추출
+        content = raw_data.get('content', '') or raw_data.get('summary', '') or ''
+        
+        # 엔티티명 추출
+        desc = ev.get('description', '')
+        entity_name = desc.split(':')[0].strip() if ':' in desc else desc[:30]
+        entity_name = clean_entity_name(entity_name)
+        
+        # 상세 설명 생성
+        if content:
+            detail = f"{i}. {entity_name}: {content[:100]}{'...' if len(content) > 100 else ''}"
+        else:
+            detail = f"{i}. {entity_name}: 관련 역사 정보"
+        
+        evidence_detail_list.append(detail)
+    evidence_details = "\n".join(evidence_detail_list)
 
     story_prompt = f"""당신은 조선시대 역사를 전문적으로 설명하는 역사가입니다.
 
@@ -156,31 +187,43 @@ def story_generator_node(state: GraphState) -> GraphState:
 {instruction}
 
 ## 필수 규칙
-1. **자연스러운 서술**: 근거를 본문에 자연스럽게 녹여서 서술하세요.
-   - 나쁜 예: "경신환국이 발생했다 [1]."
+
+### 1. 말투: "-입니다" 체로 작성
+   - 반드시 존댓말 "-입니다", "-습니다", "-됩니다" 체로 작성하세요.
+   - 나쁜 예: "경신환국이 발생하여 서인이 집권하게 되었다."
+   - 좋은 예: "경신환국이 발생하여 서인이 집권하게 되었습니다."
+
+### 2. 되묻지 않기
+   - 추가 정보를 요청하거나 질문을 되묻지 마세요.
+   - 주어진 근거만으로 최선의 답변을 작성하세요.
+   - "어떤 사건을 말씀하시는 건가요?" 같은 표현 절대 금지
+
+### 3. 자연스러운 서술
+   - 근거를 본문에 자연스럽게 녹여서 서술하세요.
+   - 나쁜 예: "경신환국이 발생했습니다 [1]."
    - 좋은 예: "1680년 경신환국이 발생하여 남인이 실각하고 서인이 집권하게 되었습니다."
 
-2. **각주 참조는 문단 끝에만**: 
+### 4. 각주 참조는 문단 끝에만
    - 문단 끝에 "(참고: 1, 3)" 형태로 간략히 표시
    - 본문 중간에 [1][2][3] 형태로 나열하지 마세요
 
-3. **정규화된 ID 사용 금지**:
+### 5. 정규화된 ID 사용 금지
    - "Institution_d4c9663e" 같은 코드 절대 사용 금지
    - 실제 이름을 모르면 "관련 기관" 등으로 대체
 
-4. **추측 표시**: 확실하지 않은 내용은 "~로 추정된다", "~했을 것으로 보인다"로 표현
+### 6. 추측 표시
+   - 확실하지 않은 내용은 "~로 추정됩니다", "~했을 것으로 보입니다"로 표현
 
-## 출력 형식
+## 출력 형식 (반드시 이 형식 준수)
+
 [본문]
-2-3문단으로 자연스럽게 서술 (200-400자)
+2-3문단으로 자연스럽게 서술 (200-400자, "-입니다" 체)
 
 [요약]
-한 문장으로 핵심 정리
+한 문장으로 핵심 정리 ("-입니다" 체)
 
 [참고 근거]
-1. 근거1 요약
-2. 근거2 요약
-..."""
+{evidence_details}"""
 
     try:
         response = llm.invoke(story_prompt)
@@ -198,7 +241,7 @@ def story_generator_node(state: GraphState) -> GraphState:
 
     except Exception as e:
         print(f"❌ 스토리 생성 실패: {e}")
-        final_answer = f"죄송합니다. 질문 '{query}'에 대한 답변을 생성하지 못했습니다."
+        final_answer = f"죄송합니다. 질문 '{query}'에 대한 답변을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요."
         answer_with_sources = {"story": final_answer, "sources": [], "error": str(e)}
 
     return {

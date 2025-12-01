@@ -8,7 +8,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTANCES_DIR="${SCRIPT_DIR}/../instances"
 FUSEKI_URL="${FUSEKI_URL:-http://localhost:3030}"
-DATASET="${DATASET:-temp_inference}"
+DATASET="${DATASET:-korean-history}"
 
 # Python 명령어 설정
 if [ -n "$VIRTUAL_ENV" ]; then
