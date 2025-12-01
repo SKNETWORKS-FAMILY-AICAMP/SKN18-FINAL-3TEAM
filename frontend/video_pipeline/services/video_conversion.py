@@ -72,12 +72,15 @@ def create_video_from_image_fal(image_path: str, output_path: str, prompt: str =
         print(f"    모델: fal-ai/wan-25-preview/image-to-video")
         print(f"    모션 프롬프트: {prompt[:100]}...")
         
+        # 카메라 움직임만, 인물은 최소 움직임
+        enhanced_prompt = f"{prompt}, CAMERA MOVEMENT ONLY, keep all people and soldiers relatively still, subtle environmental motion, no character animation or movement"
+        
         arguments = {
-            "prompt": prompt,
+            "prompt": enhanced_prompt,
             "image_url": image_url,
             "resolution": resolution,
             "duration": str(duration),
-            "negative_prompt": "low resolution, error, worst quality, low quality, defects, distortion, blurry",
+            "negative_prompt": "prominent main character, hero close-up, detailed face in foreground, single person focus, character appearing from nowhere, low resolution, error, worst quality, low quality, defects, distortion, blurry",
             "enable_prompt_expansion": False,  # 프롬프트 확장 비활성화
             "enable_safety_checker": False  # 콘텐츠 필터 비활성화
         }
