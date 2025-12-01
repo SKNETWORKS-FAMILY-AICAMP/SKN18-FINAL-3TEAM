@@ -25,7 +25,7 @@ fastapi==0.115.6
 uvicorn==0.34.0
 
 # milvus vector database
-pymilvus==2.2.2
-sentence-transformers==2.2.2
-torch>=2.0.0  # sentence-transformers 의존성
-transformers>=4.30.0  # sentence-transformers 의존성
+pymilvus==2.6.4
+sentence-transformers==5.1.2
+torch==2.9.1  # sentence-transformers 의존성
+transformers==4.57.3  # sentence-transformers 의존성

@@ -1,0 +1,31 @@
+# 추론 결과 Triples
+# Generated at: 2025-12-01T17:10:17.667383
+# Session ID: 20251201_171017
+
+@prefix hist: <http://www.example.org/korean-history#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# TEMPORAL 추론 결과 (1개)
+
+
+# 총 0개 Triple 생성
+
+# 추론 메타데이터
+
+hist:InferenceSession_20251201_171017 a hist:InferenceSession ;
+    hist:sessionId "20251201_171017" ;
+    hist:query "조선시대 (정치변동)턴은 어떠한가요?" ;
+    hist:timestamp "2025-12-01T17:10:17.667761"^^xsd:dateTime ;
+    hist:executionTime "0.15"^^xsd:float ;
+    hist:thread_temporal_status "success" ;
+    hist:thread_temporal_results "1"^^xsd:integer ;
+    hist:thread_motive_status "success" ;
+    hist:thread_motive_results "0"^^xsd:integer ;
+    hist:thread_person_status "success" ;
+    hist:thread_person_results "0"^^xsd:integer ;
+    hist:thread_pattern_status "success" ;
+    hist:thread_pattern_results "0"^^xsd:integer ;
+    hist:thread_causal_status "success" ;
+    hist:thread_causal_results "0"^^xsd:integer .
