@@ -1,0 +1,40 @@
+# 추론 결과 Triples
+# Generated at: 2025-12-01T21:25:26.886896
+# Session ID: 20251201_212526
+
+@prefix hist: <http://www.example.org/korean-history#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# BACKGROUND 추론 결과 (5개)
+
+
+# EVENT_CONTEXT 추론 결과 (5개)
+
+
+# TIMELINE 추론 결과 (5개)
+
+
+# SIMILAR_EVENTS 추론 결과 (10개)
+
+
+# 총 0개 Triple 생성
+
+# 추론 메타데이터
+
+hist:InferenceSession_20251201_212526 a hist:InferenceSession ;
+    hist:sessionId "20251201_212526" ;
+    hist:query "명성황후 시해사건에 대해서 알려줘" ;
+    hist:timestamp "2025-12-01T21:25:26.887086"^^xsd:dateTime ;
+    hist:executionTime "0.44"^^xsd:float ;
+    hist:thread_actor_network_status "error" ;
+    hist:thread_actor_network_results "0"^^xsd:integer ;
+    hist:thread_background_status "success" ;
+    hist:thread_background_results "5"^^xsd:integer ;
+    hist:thread_event_context_status "success" ;
+    hist:thread_event_context_results "5"^^xsd:integer ;
+    hist:thread_timeline_status "success" ;
+    hist:thread_timeline_results "5"^^xsd:integer ;
+    hist:thread_similar_events_status "success" ;
+    hist:thread_similar_events_results "10"^^xsd:integer .

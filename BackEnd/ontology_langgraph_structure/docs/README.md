@@ -4,609 +4,585 @@
 
 ```mermaid
 graph TD
-    Start([사용자 질문]) --> QueryClassifier[Query Classifier<br/>LLM 기반 질문 분류]
+    Start([사용자 질문]) --> QueryClassifier[Query Classifier<br/>질문 유형 분류]
 
-    QueryClassifier --> EntityExtractor[Entity Extractor<br/>Milvus pgvector 기반]
+    QueryClassifier --> EntityExtractor[Entity Extractor<br/>LLM 키워드 추출 + 하이브리드 검색]
 
-    EntityExtractor --> MultiQueryGen[Multi-Query Generator<br/>5가지 관점 쿼리 생성]
+    %% 하이브리드 엔티티 추출
+    EntityExtractor --> LLMKeyword[LLM 역사 키워드 추출<br/>조사/동사 제외]
+    LLMKeyword --> TTLMatch[TTL 정확 매칭<br/>키워드 기반]
+    LLMKeyword --> MilvusSearch[Milvus 유사도 검색<br/>벡터 기반]
 
-    MultiQueryGen --> WhatIfCheck{What-if?}
+    TTLMatch --> EntityMerge[엔티티 병합<br/>중복 제거]
+    MilvusSearch --> EntityMerge
 
-    WhatIfCheck -->|Yes| HypoTriple[Hypothetical Triple<br/>가상 시나리오 Triple 생성]
-    WhatIfCheck -->|No| ParallelInference
+    EntityMerge --> ParallelKnowledge[Parallel Knowledge Retrieval<br/>5개 Thread 병렬 실행]
 
-    HypoTriple --> ParallelInference
+    ParallelKnowledge --> Thread1[Thread 1: event_context<br/>1-hop 관계 확장]
+    ParallelKnowledge --> Thread2[Thread 2: actor_network<br/>2-hop 인물 네트워크]
+    ParallelKnowledge --> Thread3[Thread 3: timeline<br/>인과관계 체인]
+    ParallelKnowledge --> Thread4[Thread 4: similar_events<br/>유사 사건 검색]
+    ParallelKnowledge --> Thread5[Thread 5: background<br/>정책/제도 확장]
 
-    ParallelInference[Parallel Inference Executor<br/>LangGraph Agent 오케스트레이션] --> Thread1[Thread 1<br/>인과관계 추론]
-    ParallelInference --> Thread2[Thread 2<br/>인물관계 추론]
-    ParallelInference --> Thread3[Thread 3<br/>시대배경 추론]
-    ParallelInference --> Thread4[Thread 4<br/>패턴 추론]
-    ParallelInference --> Thread5[Thread 5<br/>동기분석 추론]
+    Thread1 --> Fuseki1[(Fuseki<br/>관계 확장)]
+    Thread2 --> Fuseki2[(Fuseki<br/>2-hop)]
+    Thread3 --> Fuseki3[(Fuseki<br/>인과체인)]
+    Thread4 --> Milvus4[(Milvus)]
+    Thread5 --> Fuseki5[(Fuseki<br/>정책 확장)]
 
-    Thread1 --> Jena1[Jena Reasoner API]
-    Thread2 --> Jena2[Jena Reasoner API]
-    Thread3 --> Jena3[Jena Reasoner API]
-    Thread4 --> Jena4[Jena Reasoner API]
-    Thread5 --> Jena5[Jena Reasoner API]
+    Fuseki1 --> PathExtractor[Multi-Path Extractor<br/>관계 경로 추출]
+    Fuseki2 --> PathExtractor
+    Fuseki3 --> PathExtractor
+    Milvus4 --> PathExtractor
+    Fuseki5 --> PathExtractor
 
-    Jena1 --> Fuseki1[(Fuseki<br/>temp_inference)]
-    Jena2 --> Fuseki2[(Fuseki<br/>temp_inference)]
-    Jena3 --> Fuseki3[(Fuseki<br/>temp_inference)]
-    Jena4 --> Fuseki4[(Fuseki<br/>temp_inference)]
-    Jena5 --> Fuseki5[(Fuseki<br/>temp_inference)]
+    PathExtractor --> EvidenceAgg[Evidence Aggregator<br/>근거 통합 + 가중치 정렬]
 
-    Fuseki1 --> SPARQL1[SPARQL 쿼리 1<br/>인과관계]
-    Fuseki2 --> SPARQL2[SPARQL 쿼리 2<br/>인물관계]
-    Fuseki3 --> SPARQL3[SPARQL 쿼리 3<br/>시대배경]
-    Fuseki4 --> SPARQL4[SPARQL 쿼리 4<br/>패턴]
-    Fuseki5 --> SPARQL5[SPARQL 쿼리 5<br/>동기]
+    EvidenceAgg --> StoryGen[Story Generator<br/>LLM 스토리 생성<br/>-입니다 체]
 
-    SPARQL1 --> PathExtractor1[Path Extractor 1<br/>인과 체인]
-    SPARQL2 --> PathExtractor2[Path Extractor 2<br/>인물 관계]
-    SPARQL3 --> PathExtractor3[Path Extractor 3<br/>시대 맥락]
-    SPARQL4 --> PathExtractor4[Path Extractor 4<br/>패턴]
-    SPARQL5 --> PathExtractor5[Path Extractor 5<br/>동기]
+    StoryGen --> StoryModeCheck{이야기 모드?}
 
-    PathExtractor1 --> EvidenceAgg[Multi-Evidence Aggregator<br/>5가지 근거 통합 + 우선순위 정렬]
-    PathExtractor2 --> EvidenceAgg
-    PathExtractor3 --> EvidenceAgg
-    PathExtractor4 --> EvidenceAgg
-    PathExtractor5 --> EvidenceAgg
+    StoryModeCheck -->|No| Output([최종 답변])
+    StoryModeCheck -->|Yes| KeywordExtract[LLM 키워드 추출<br/>스토리에서 핵심어]
 
-    EvidenceAgg --> StoryGen[Rich Story Generator<br/>LLM 기반 스토리 생성]
+    %% 설화 검색 상세 흐름
+    KeywordExtract --> FolktaleSearch[Milvus 설화 컬렉션<br/>유사도 검색]
+    FolktaleSearch --> FolktaleDB[(Milvus<br/>설화 DB)]
+    FolktaleDB --> ContentFetch[설화 내용 조회<br/>title + content + summary]
+    ContentFetch --> StoryMerge[LLM 스토리 결합<br/>역사 + 설화]
+    StoryMerge --> EnhancedOutput([풍성한 스토리 답변<br/>사실/이야기 구분])
 
-    StoryGen --> Output([최종 답변<br/>다중 근거 + 풍부한 스토리])
-
-    %% Milvus pgvector 연결 (3가지 역할)
-    Milvus[(Milvus pgvector<br/>엔티티 임베딩 DB)] -.->|1. 엔티티 매핑| EntityExtractor
-    Milvus -.->|2. 유사 엔티티 검색| EntityExtractor
-    Milvus -.->|3. 온톨로지 스키마 검색| MultiQueryGen
+    %% Milvus 연결
+    MilvusDB[(Milvus<br/>엔티티 DB)] -.->|title 유사도| MilvusSearch
+    MilvusDB -.->|유사 사건| Milvus4
 
     %% 스타일
     classDef llmNode fill:#e1f5ff,stroke:#01579b,stroke-width:2px
     classDef dbNode fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef jenaNode fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef parallelNode fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
     classDef vectorNode fill:#fce4ec,stroke:#880e4f,stroke-width:3px
+    classDef hybridNode fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef storyNode fill:#e0f7fa,stroke:#006064,stroke-width:2px
+    classDef folktaleNode fill:#fff8e1,stroke:#ff6f00,stroke-width:2px
 
-    class QueryClassifier,EntityExtractor,StoryGen llmNode
-    class Fuseki1,Fuseki2,Fuseki3,Fuseki4,Fuseki5 dbNode
-    class Jena1,Jena2,Jena3,Jena4,Jena5 jenaNode
-    class Thread1,Thread2,Thread3,Thread4,Thread5,ParallelInference parallelNode
-    class Milvus vectorNode
+    class QueryClassifier,StoryGen,LLMKeyword,KeywordExtract llmNode
+    class Fuseki1,Fuseki2,Fuseki3,Fuseki5 dbNode
+    class Thread1,Thread2,Thread3,Thread4,Thread5,ParallelKnowledge parallelNode
+    class MilvusDB,Milvus4,FolktaleDB vectorNode
+    class TTLMatch,MilvusSearch,EntityMerge hybridNode
+    class StoryModeCheck,StoryMerge,EnhancedOutput storyNode
+    class FolktaleSearch,ContentFetch folktaleNode
 ```
 
 ---
 
 ## 🔧 핵심 컴포넌트
 
-### **1. Query Classifier (LLM 기반)**
+### **1. Query Classifier (질문 분류)**
 
-**역할:** 사용자 질문을 3가지 유형으로 분류
+**역할:** 사용자 질문을 유형별로 분류
 
 **분류 유형:**
 
-- **`causal`: 인과관계 질문 ("왜 ~했을까?", "어떤 영향을 미쳤나?")**
-- **`what_if`: 가상 시나리오 ("만약 ~했다면?", "~가 없었다면?")**
-- **`deep_analysis`: 심화 분석 ("진짜 이유는?", "숨은 의도는?")**
-
-**구현 방법:**
-
-```python
-# LLM 프롬프트 기반 분류
-llm.invoke(f"질문을 causal/what_if/deep_analysis 중 하나로 분류: {query}")
-```
+- **`causal`**: 인과관계 질문 ("왜 ~했을까?", "어떤 영향을 미쳤나?")
+- **`deep_analysis`**: 심화 분석 ("진짜 이유는?", "숨은 의도는?")
+- **`factual`**: 사실 확인 ("~은 언제 일어났나?")
+- **`comparative`**: 비교 분석 ("A와 B의 차이는?")
 
 ---
 
-### **2. Entity Extractor (Milvus pgvector 기반)**
+### **2. Entity Extractor (하이브리드 엔티티 추출)**
 
-**역할:** 질문에서 역사적 엔티티 추출 및 URI 매핑
+**역할:** LLM 키워드 추출 + TTL 매칭 + Milvus 유사도 검색
 
-#### **2-1. 엔티티 매핑 (Entity Linking)**
-
-**기능:** 자연어 엔티티 → 온톨로지 URI 변환
-
-**예시:**
-
-```
-입력: "이순신"
-↓ Milvus 벡터 검색
-출력: {
-  "name": "이순신",
-  "type": "Person",
-  "uri": "hist:YiSunSin",
-  "similarity": 0.98
-}
-```
-
-**Milvus 컬렉션 구조:**
+#### **2-1. LLM 역사 키워드 추출 (NEW)**
 
 ```python
-collection_schema = {
-    "entity_name": "이순신",           # 한글 이름
-    "entity_type": "Person",          # 엔티티 타입
-    "uri": "hist:YiSunSin",          # 온톨로지 URI
-    "aliases": ["충무공", "李舜臣"],  # 별칭
-    "embedding": [0.123, 0.456, ...], # 벡터 임베딩
-    "description": "조선 수군 통제사" # 설명
-}
+# 조사/동사/일반 단어 제외, 역사적 키워드만 추출
+def extract_historical_keywords_with_llm(query: str) -> list:
+    """
+    입력: "명성황후에 대해서 알려줘"
+    출력: ["명성황후"]  # "대해서", "알려줘" 제외
+    """
 ```
 
-**검색 코드:**
+#### **2-2. TTL 정확 매칭**
 
 ```python
-from pymilvus import Collection, connections
+# 키워드로 TTL 라벨 매칭
+for keyword in historical_keywords:
+    if keyword in ttl_data["label_to_uri"]:
+        # 정확 매칭
+    else:
+        # 부분 매칭 (키워드가 라벨에 포함된 경우)
+```
 
-# Milvus 연결
-connections.connect(host="localhost", port="19530")
-collection = Collection("historical_entities")
+#### **2-3. Milvus 유사도 검색**
 
-# 질문 임베딩
-query_vector = embeddings.embed_query("이순신")
-
-# 유사도 검색 (Top 5)
-results = collection.search(
-    data=[query_vector],
-    anns_field="embedding",
-    param={"metric_type": "COSINE", "params": {"nprobe": 10}},
-    limit=5
+```python
+# LLM 추출 키워드로만 검색 (일반 단어 제외)
+milvus_entities = search_entities_with_milvus(
+    historical_keywords,  # "명성황후"만, "대해서" 제외
+    ttl_data,
+    top_k=dynamic_top_k
 )
-
-# 결과: [
-#   {"name": "이순신", "uri": "hist:YiSunSin", "score": 0.98},
-#   {"name": "원균", "uri": "hist:Wongyun", "score": 0.72},
-#   ...
-# ]
 ```
 
 ---
 
-#### **2-2. 유사 엔티티 검색**
+### **3. Parallel Knowledge Retrieval (5개 Thread 관계 확장)**
 
-**기능:** 질문과 관련된 확장 엔티티 발굴
+**역할:** 5가지 관점에서 **관계 확장** 지식 검색
 
-**예시:**
+#### **5개 Thread 관계 확장 방식**
 
+| Thread       | 이름             | 역할            | 관계 확장                               |
+| ------------ | ---------------- | --------------- | --------------------------------------- |
+| **Thread 1** | `event_context`  | 사건 맥락       | **1-hop**: 엔티티 → 참여자/장소/결과    |
+| **Thread 2** | `actor_network`  | 인물 네트워크   | **2-hop**: 인물 → 참여 사건 → 다른 인물 |
+| **Thread 3** | `timeline`       | 시간순/인과관계 | **인과 체인**: 원인 → 사건 → 결과       |
+| **Thread 4** | `similar_events` | 유사 사건       | Milvus 벡터 검색                        |
+| **Thread 5** | `background`     | 배경 정보       | **정책 확장**: 사건 → 관련 정책         |
+
+#### **관계 확장 SPARQL 예시**
+
+```sparql
+# Thread 1: event_context - 1-hop 관계 확장
+SELECT ?entity ?label ?summary ?related ?relatedLabel ?relationType WHERE {
+    VALUES ?entity { hist:Person_명성황후 }
+    ?entity rdfs:label ?label .
+
+    # 1-hop 관계 확장: 엔티티와 연결된 모든 것
+    OPTIONAL {
+        ?entity ?relationType ?related .
+        ?related rdfs:label ?relatedLabel .
+        FILTER(?relationType IN (
+            hist:hasParticipant, hist:participatesIn,
+            hist:leadsTo, hist:causedBy
+        ))
+    }
+}
+
+# 결과 예시:
+# 명성황후 → [참여] → 을미사변
+# 명성황후 → [결과] → 민씨 척족 몰락
 ```
-입력: "명량해전"
-↓ Milvus 검색
-출력: [
-  {"name": "명량해전", "uri": "hist:Myeongnyang", "score": 1.0},
-  {"name": "한산도대첩", "uri": "hist:Hansando", "score": 0.85},  # 유사 전투
-  {"name": "이순신", "uri": "hist:YiSunSin", "score": 0.82},      # 관련 인물
-  {"name": "정유재란", "uri": "hist:JeongYu", "score": 0.78}      # 관련 사건
-]
+
+```sparql
+# Thread 2: actor_network - 2-hop 인물 네트워크
+SELECT ?person ?label ?hop1 ?hop1Label ?hop2 ?hop2Label WHERE {
+    VALUES ?entity { hist:Person_명성황후 }
+    ?entity rdfs:label ?label .
+    BIND(?entity AS ?person)
+
+    # 1-hop: 인물과 직접 연결된 것 (사건, 기관)
+    OPTIONAL {
+        ?entity ?rel1 ?hop1 .
+        ?hop1 rdfs:label ?hop1Label .
+
+        # 2-hop: 관련 사건의 다른 참여자
+        OPTIONAL {
+            ?hop1 hist:hasParticipant ?hop2 .
+            ?hop2 rdfs:label ?hop2Label .
+            FILTER(?hop2 != ?entity)
+        }
+    }
+}
+
+# 결과 예시:
+# 명성황후 → [참여] → 을미사변 → [참여자] → 일본 낭인
 ```
 
-**활용:** 질문에 명시되지 않은 관련 엔티티까지 추론에 포함
+```sparql
+# Thread 3: timeline - 인과관계 체인
+SELECT ?event ?label ?year ?causedBy ?causedByLabel ?leadsTo ?leadsToLabel WHERE {
+    VALUES ?entity { hist:Event_을미사변 }
+    ?entity rdfs:label ?label .
+
+    # 인과관계 체인
+    OPTIONAL { ?entity hist:causedBy ?causedBy . ?causedBy rdfs:label ?causedByLabel }
+    OPTIONAL { ?entity hist:leadsTo ?leadsTo . ?leadsTo rdfs:label ?leadsToLabel }
+}
+
+# 결과 예시:
+# 삼국간섭 → [원인] → 을미사변 → [결과] → 아관파천
+```
 
 ---
 
-#### **2-3. 온톨로지 스키마 검색**
+### **4. Multi-Path Extractor (관계 경로 추출)**
 
-**기능:** 관련 클래스/프로퍼티 검색하여 SPARQL 생성 지원
-
-**예시:**
-
-```
-입력: "전투"
-↓ Milvus 스키마 검색
-출력: [
-  {"type": "Class", "uri": "hist:Battle", "score": 0.95},
-  {"type": "Class", "uri": "hist:NavalBattle", "score": 0.92},
-  {"type": "Property", "uri": "hist:wonBattle", "score": 0.88},
-  {"type": "Property", "uri": "hist:participatedIn", "score": 0.85}
-]
-```
-
-**Milvus 스키마 컬렉션 구조:**
+**역할:** 관계 확장 결과에서 경로 추출 및 가중치 부여
 
 ```python
-schema_collection = {
-    "name": "NavalBattle",               # 클래스/프로퍼티 이름
-    "type": "Class",                     # Class or Property
-    "uri": "hist:NavalBattle",          # URI
-    "description": "해상 전투",          # 설명
-    "embedding": [0.234, 0.567, ...],   # 임베딩
-    "parent_class": "hist:Battle",      # 상위 클래스
-    "properties": ["hist:wonBattle", "hist:location"]
+# 관계 정보에 높은 가중치 부여
+def extract_event_context_paths(bindings, base_weight):
+    for binding in bindings:
+        # 기본 엔티티 정보
+        paths.append({
+            "type": "event_context",
+            "weight": base_weight,
+            "description": f"{label}: {summary}"
+        })
+
+        # 관계 확장 결과 (1.2배 가중치)
+        if related_label:
+            paths.append({
+                "type": "event_context",
+                "weight": base_weight * 1.2,
+                "description": f"{label} → [{relation}] → {related_label}"
+            })
+```
+
+---
+
+### **5. Story Generator (스토리 생성)**
+
+**역할:** 근거 기반 자연스러운 스토리 생성
+
+#### **프롬프트 규칙**
+
+1. **말투**: `-입니다` 체로 작성
+2. **되묻기 금지**: 추가 정보 요청하지 않음
+3. **자연스러운 서술**: 근거를 본문에 녹여서 서술
+4. **각주 참조**: 문단 끝에 `(참고: 1, 3)` 형태로 표시
+
+#### **출력 형식**
+
+```
+[본문]
+2-3문단으로 자연스럽게 서술 (200-400자, "-입니다" 체)
+
+[요약]
+한 문장으로 핵심 정리 ("-입니다" 체)
+
+[참고 근거]
+1. 을미사변: 1895년 일본 낭인들에 의해 명성황후가 시해된 사건입니다.
+2. 아관파천: 을미사변 이후 고종이 러시아 공사관으로 피신한 사건입니다.
+```
+
+---
+
+### **6. Story Enhancer (설화/이야기 추가) - 선택적**
+
+**역할:** 기존 스토리에 설화/이야기를 추가하여 풍성한 콘텐츠 생성
+
+#### **Milvus 설화 컬렉션 검색**
+
+```python
+# 설화 컬렉션 스키마
+FOLKTALE_COLLECTION = {
+    "id": "auto",
+    "title": "설화 제목",           # 예: "숙종과 장희빈"
+    "content": "설화 내용",         # 전체 이야기 텍스트
+    "summary": "줄거리 요약",       # 임베딩 대상
+    "related_entity": "관련 엔티티", # 예: ["숙종", "장희빈", "인현왕후"]
+    "era": "시대",                  # 예: "조선 중기"
+    "embedding": "벡터"             # title + summary 임베딩
 }
 ```
 
-**활용:** Multi-Query Generator에서 적절한 SPARQL 프로퍼티 선택
+#### **검색 흐름**
 
----
+```
+[기존 스토리 생성 완료]
+        ↓
+[이야기 모드 활성화?]
+        ↓ Yes
+[스토리에서 키워드 추출] (LLM)
+  - "경신환국" → ["환국", "숙종", "서인", "남인"]
+        ↓
+[Milvus 설화 컬렉션 검색]
+  - 키워드 벡터 유사도 검색
+  - summary + title 기반 검색
+  - 관련 설화/야사 3개 추출
+        ↓
+[설화 내용(content) 조회]
+  - 전체 이야기 텍스트 가져오기
+        ↓
+[LLM 스토리 결합]
+  - 역사적 사실 + 설화/이야기
+  - 사실과 이야기 구분 표시
+        ↓
+[풍성한 스토리 출력]
+```
 
-### **3. LangGraph Agent 오케스트레이션 (병렬 실행)**
-
-**역할:** 5개의 추론 스레드를 병렬로 실행하고 결과 수집
-
-#### **병렬 실행 구조**
+#### **Story Enhancer 노드**
 
 ```python
-from langgraph.graph import StateGraph
-import asyncio
-import concurrent.futures
+def story_enhancer_node(state: GraphState) -> GraphState:
+    """기존 스토리에 설화/이야기 추가"""
 
-def parallel_inference_executor(state: GraphState) -> GraphState:
-    """5가지 관점의 추론을 병렬 실행"""
+    if not state.get("story_mode", False):
+        return state  # 이야기 모드 비활성화
 
-    # 5가지 SPARQL 쿼리
-    queries = state.get("multi_queries", {})
+    # 1. 기존 스토리에서 키워드 추출
+    keywords = extract_keywords_with_llm(state["final_answer"])
 
-    # ThreadPoolExecutor로 병렬 실행
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        # 5개 Thread 동시 실행
-        futures = {
-            executor.submit(
-                execute_inference_thread,
-                query_type=qtype,
-                sparql=query,
-                hypothetical=state.get("hypothetical_triples", [])
-            ): qtype
-            for qtype, query in queries.items()
-        }
+    # 2. Milvus 설화 컬렉션에서 유사도 검색
+    folktales = milvus.search(
+        collection="folktale_collection",
+        query=keywords,
+        top_k=3,
+        threshold=0.6,
+        output_fields=["title", "content", "summary", "era"]  # 내용까지 조회
+    )
 
-        # 결과 수집
-        results = {}
-        for future in concurrent.futures.as_completed(futures):
-            qtype = futures[future]
-            try:
-                results[qtype] = future.result(timeout=30)
-            except Exception as e:
-                print(f"⚠️ {qtype} 추론 실패: {e}")
-                results[qtype] = {"status": "error", "bindings": []}
+    # 3. LLM으로 스토리 결합
+    enhanced = llm.invoke(f"""
+    [역사적 사실]
+    {state["final_answer"]}
+
+    [관련 설화/이야기]
+    {format_folktales(folktales)}
+
+    위 내용을 결합하여 풍성한 역사 스토리를 작성하세요.
+    - 역사적 사실을 기반으로 합니다
+    - 설화/이야기로 흥미 요소를 추가합니다
+    - [사실]과 [이야기] 부분을 명확히 구분합니다
+    - "-입니다" 체로 작성합니다
+    """)
 
     return {
         **state,
-        "parallel_inference_results": results
+        "enhanced_story": enhanced,
+        "folktales_used": folktales
     }
+```
 
+#### **출력 예시**
 
-def execute_inference_thread(query_type, sparql, hypothetical):
-    """개별 추론 스레드 실행"""
+```
+[역사적 사실]
+경신환국(1680년)은 숙종이 남인을 몰아내고 서인을 등용한 사건입니다.
+허적의 서자 허견이 역모를 도모한다는 고변으로 시작되었습니다.
 
-    # Jena Reasoner API 호출
-    payload = {
-        "base_ontology": "korean_history.owl",
-        "base_instances": ["joseon_era.ttl"],
-        "rules": f"{query_type}_inference.rules",
-        "hypothetical_triples": hypothetical if query_type == "causal" else [],
-        "query": sparql
-    }
+[관련 이야기]
+당시 궁중에서는 장희빈과 인현왕후의 갈등이 심화되고 있었습니다.
+민간에서는 숙종이 밤마다 궁 밖을 거닐며 민심을 살폈다는 이야기가 전해집니다.
+이 시기 숙종이 미행 중 만난 노인과의 대화가 환국의 결심에 영향을 주었다는
+야사도 있습니다.
 
-    response = requests.post(
-        "http://localhost:8001/what-if",
-        json=payload,
-        timeout=30
-    )
-
-    return response.json()
+※ [이야기] 부분은 민간 전승으로, 역사적 사실과 다를 수 있습니다.
 ```
 
 ---
 
-#### **5가지 병렬 추론 타입 (5-Stage Analysis Plan 기반)**
-
-| Thread       | 추론 타입         | Rules 파일                | Stage | 주요 추론 프로퍼티                                                                 |
-| ------------ | ----------------- | ------------------------- | ----- | ---------------------------------------------------------------------------------- |
-| **Thread 1** | 인과관계          | `causal_inference.rules`  | 2     | `hist:leadsTo`, `hist:indirectlyCausedBy`, `hist:hasStrategicAdvantage`           |
-| **Thread 2** | 인물 분석         | `person_inference.rules`  | 1, 3  | `hist:hasRelationshipWith`, `hist:hasEnemyRelationship`, `hist:hasInfluence`      |
-| **Thread 3** | 시대적 배경       | `temporal_inference.rules`| 4     | `hist:occursBefore`, `hist:contemporaryWith`, `hist:hasLifespan`                   |
-| **Thread 4** | 패턴 분석         | `pattern_inference.rules` | 5     | `hist:hasStrategyPattern`, `hist:hasWinningStreak`, `hist:hasComebackPattern`     |
-| **Thread 5** | 동기 분석         | `motive_inference.rules`  | 1     | `hist:hasMotive` (revenge, national_defense, invasion, survival 등)                |
-
-**📌 5-Stage Analysis Plan 매핑:**
-- **Stage 1** (비하인드 스토리): Thread 2 (인물 관계) + Thread 5 (동기 분석)
-- **Stage 2** (역사 시뮬레이터): Thread 1 (인과관계)
-- **Stage 3** (인물 분석): Thread 2 (인물 분석)
-- **Stage 4** (시대적 배경): Thread 3 (시대적 배경)
-- **Stage 5** (심화 분석): Thread 4 (패턴 분석)
-
-**Note:** Stage 1과 3은 `person_inference.rules`와 `motive_inference.rules`로 통합 처리됩니다.
-
----
-
-#### **병렬 실행 타임라인**
+## 📊 데이터 플로우 예시
 
 ```
-시작 (t=0)
-  ↓
-  ├─ Thread 1: 인과관계 추론 ━━━━━━━━━━━━━━ (5초)
-  ├─ Thread 2: 인물관계 추론 ━━━━━━━━━ (4초)
-  ├─ Thread 3: 시대배경 추론 ━━━━━━━ (3.5초)
-  ├─ Thread 4: 패턴 추론 ━━━━━━━━━━ (4.5초)
-  └─ Thread 5: 동기분석 추론 ━━━━━━━━━━━ (5초)
-  ↓
-종료 (t=5초) ← 순차 실행 시 21.5초 → **76% 시간 단축**
+1. 사용자 질문: "명성황후에 대해 알려줘"
+   ↓
+2. Query Classifier: "deep_analysis"
+   ↓
+3. LLM 키워드 추출: ["명성황후"]  # "대해", "알려줘" 제외
+   ↓
+4. Entity Extractor (하이브리드):
+   - TTL 매칭: 명성황후
+   - Milvus 검색: 을미사변, 민비복위
+   ↓
+5. Parallel Knowledge Retrieval (5 Thread 관계 확장):
+   - event_context: 명성황후 → [참여] → 을미사변
+   - actor_network: 명성황후 ↔ [을미사변] ↔ 일본 낭인
+   - timeline: 삼국간섭 → 을미사변 → 아관파천
+   - similar_events: 민비복위, 갑신정변
+   - background: 명성황후 → 민씨 척족 정치
+   ↓
+6. Evidence Aggregator:
+   - 근거 1: 명성황후 → 을미사변 (가중치 0.36)
+   - 근거 2: 을미사변 → 아관파천 (0.30)
+   - 근거 3: 민씨 척족 정치 (0.25)
+   ↓
+7. Story Generator (LLM):
+   → "명성황후는 조선 말기 고종의 왕비로..."
+   ↓
+8. (선택) Story Enhancer:
+   - Milvus 설화 컬렉션 검색 → 관련 설화 3개
+   - 설화 내용(content) 조회
+   - LLM으로 역사 + 설화 결합
+   → "관련 이야기에 따르면..."
 ```
-
----
-
-## 🎯 전체 데이터 플로우
-
-```
-1. 사용자 질문: "명량해전이 왜 중요했을까?"
-   ↓
-2. Query Classifier (LLM): "causal"
-   ↓
-3. Entity Extractor (Milvus):
-   - 엔티티 매핑: "명량해전" → hist:Myeongnyang
-   - 유사 검색: [한산도대첩, 이순신, 정유재란]
-   ↓
-4. Multi-Query Generator (Milvus 스키마 활용):
-   - 인과: SELECT ?cause ?effect WHERE {?cause hist:leadsTo ?effect}
-   - 인물: SELECT ?person WHERE {?person hist:participatedIn hist:Myeongnyang}
-   - 시대: SELECT ?event WHERE {?event hist:year 1597}
-   - 패턴: SELECT ?similar WHERE {hist:Myeongnyang hist:similarPattern ?similar}
-   - 동기: SELECT ?motivation WHERE {?person hist:motivation ?motivation}
-   ↓
-5. Parallel Inference (5 Threads 동시 실행):
-   - Thread 1-5 → Jena Reasoner → Fuseki → SPARQL 결과
-   ↓
-6. Path Extractors (병렬):
-   - 인과 체인: [명량해전 → 수군보존 → 해상권 → 왜란종료]
-   - 인물: [이순신, 조선수군]
-   - 시대: [1597년, 정유재란, 가덕도해전]
-   - 패턴: [한산도대첩 vs 명량해전]
-   - 동기: [이순신 리더십]
-   ↓
-7. Evidence Aggregator:
-   - 근거 1: 인과 체인 (가중치 90%)
-   - 근거 2: 이순신 리더십 (85%)
-   - 근거 3: 1597년 배경 (70%)
-   - 근거 4: 전술 패턴 (60%)
-   ↓
-8. Story Generator (LLM):
-   → "명량해전은 조선 역사의 결정적 전환점이었습니다..."
-```
-
----
-
-## 🆕 주요 개선사항
-
-### **1. LLM 기반 SPARQL 쿼리 생성**
-
-기존 템플릿 방식에서 **LLM 동적 생성**으로 변경:
-
-```python
-# multi_query_generator_node.py
-def generate_sparql_with_llm(llm, query, thread_type, entities, properties):
-    """
-    LLM이 질문과 엔티티를 분석하여 최적의 SPARQL 생성
-
-    Input: "이순신이 명량해전에서 왜 승리했을까?"
-    Stage: person (인물 분석)
-    Available Properties: hist:commands, hist:hasRelationshipWith, hist:hasInfluence
-
-    Output (LLM 생성):
-    PREFIX hist: <http://www.example.org/korean-history#>
-    SELECT ?person ?battle ?influence WHERE {
-        ?person hist:commands ?battle .
-        OPTIONAL { ?person hist:hasInfluence ?influence }
-        FILTER (?person = hist:YiSunSin && ?battle = hist:Myeongnyang)
-    } LIMIT 100
-    """
-```
-
-**장점:**
-- 질문 의도에 맞는 정확한 쿼리 생성
-- 추론 프로퍼티만 사용하도록 제한
-- 엔티티 자동 URI 변환
-
-### **2. 추론 결과 → TTL Triple 자동 저장**
-
-병렬 추론 실행 후 결과를 TTL 파일로 자동 저장:
-
-```python
-# parallel_inference_executor_node.py
-generator = InferenceTripleGenerator()
-generator.save_triples_to_file(
-    inference_results=results,
-    output_path="./inference_results/inference_20251127_140532.ttl"
-)
-```
-
-**생성 예시 (inference_20251127_140532.ttl):**
-```turtle
-@prefix hist: <http://www.example.org/korean-history#> .
-
-# CAUSAL 추론 결과 (2개)
-hist:Myeongnyang hist:leadsTo hist:JapanRetreat .
-hist:JapanRetreat hist:indirectlyCausedBy hist:YiSunSinLeadership .
-
-# PERSON 추론 결과 (3개)
-hist:YiSunSin hist:hasRelationshipWith hist:JoseonNavy .
-hist:YiSunSin hist:hasEnemyRelationship hist:ToyotomiHideyoshi .
-hist:YiSunSin hist:hasInfluence "high" .
-
-# 추론 메타데이터
-hist:InferenceSession_20251127_140532 a hist:InferenceSession ;
-    hist:sessionId "20251127_140532" ;
-    hist:query "이순신이 명량해전에서 왜 승리했을까?" ;
-    hist:executionTime "5.2"^^xsd:float .
-```
-
-**활용:**
-- Fuseki에 재업로드하여 영구 저장
-- 추론 결과 추적 및 분석
-- 다른 시스템과의 데이터 공유
 
 ---
 
 ## 📚 기술 스택
 
-| 컴포넌트                | 기술                            | 역할                         |
-| ----------------------- | ------------------------------- | ---------------------------- |
-| **Query Classifier**    | LLM (GPT-4o-mini)               | 질문 유형 분류               |
-| **Entity Extractor**    | LLM (GPT-4o-mini)               | 엔티티 추출                  |
-| **Multi-Query Gen**     | **LLM + ontology_schema.py**    | **동적 SPARQL 생성**         |
-| **Agent Orchestration** | **LangGraph**                   | 병렬 실행 관리               |
-| **Inference Engine**    | Apache Jena + Jena Rules        | 추론 규칙 실행               |
-| **Triple Store**        | Apache Jena Fuseki              | RDF 데이터 저장/SPARQL       |
-| **Triple Generator**    | **InferenceTripleGenerator**    | **추론 결과 → TTL 변환**     |
-| **Story Generator**     | LLM (GPT-4o)                    | 최종 스토리 생성             |
+| 컴포넌트                | 기술                           | 역할                      |
+| ----------------------- | ------------------------------ | ------------------------- |
+| **Query Classifier**    | LLM (GPT-4o-mini)              | 질문 유형 분류            |
+| **Keyword Extractor**   | LLM                            | 역사적 키워드 추출        |
+| **Entity Extractor**    | TTL + Milvus                   | 하이브리드 엔티티 추출    |
+| **Knowledge Retrieval** | Fuseki SPARQL                  | **관계 확장** 검색        |
+| **Vector Search**       | Milvus                         | 유사도 검색               |
+| **Agent Orchestration** | LangGraph + ThreadPoolExecutor | 5개 Thread 병렬 실행      |
+| **Triple Store**        | Apache Jena Fuseki             | RDF 저장/SPARQL           |
+| **Story Generator**     | LLM (GPT-4o)                   | 스토리 생성               |
+| **Story Enhancer**      | LLM + **Milvus 설화 검색**     | 설화/이야기 추가 (선택적) |
 
 ---
 
 ## 🚀 실행 방법
 
 ```bash
-# 1. Milvus 실행
-docker-compose up -d milvus
+# 1. Docker 컨테이너 시작
+cd Infra
+docker-compose up -d
 
-# 2. Fuseki 실행
-docker-compose up -d fuseki
+# 2. Fuseki 데이터 업로드
+cd backend/ontology_langgraph_structure/ontology/scripts
+./upload_ttl_to_fuseki.sh
 
-# 3. Jena Reasoner API 실행
-cd knowledge_engineering/scripts
-python realtime_inference_api.py
+# 3. Milvus 데이터 적재
+cd backend
+python -m db_pipeline.ETL.load_to_milvus
 
-# 4. 메인 실행
+# 4. 환경변수 설정
+export USE_MILVUS=true
+export INFERENCE_MODE=light
+export QUERY_MODE=template
+
+# 5. 메인 실행
+cd backend/ontology_langgraph_structure
 python main.py
 ```
 
 ---
 
-## 📊 성능 최적화
+## 📊 성능 비교
 
-| 항목            | 순차 실행 | 병렬 실행   | 개선율 |
-| --------------- | --------- | ----------- | ------ |
-| **추론 시간**   | 21.5초    | 5초         | 76% ↓  |
-| **근거 다양성** | 1가지     | 5가지       | 400% ↑ |
-| **답변 품질**   | 단편적    | 다각도 분석 | -      |
+| 항목            | 이전 (Rules 기반)  | 현재 (관계 확장)           |
+| --------------- | ------------------ | -------------------------- |
+| **엔티티 추출** | TTL만              | LLM 키워드 + TTL + Milvus  |
+| **Thread 방식** | 추론 프로퍼티 기반 | **1-hop, 2-hop 관계 확장** |
+| **검색 결과**   | 엔티티 정보만      | 엔티티 + 관련 사건/인물    |
+| **인과관계**    | 추론 필요          | **SPARQL로 직접 검색**     |
+| **실행 시간**   | ~30초              | ~10초                      |
+| **Java 의존성** | 필요 (8GB)         | 불필요                     |
 
 ---
 
-## 🔥 LLM 버전 아키텍처 (최신)
+## 🆕 주요 변경사항 (v2.0)
 
-### ontology_schema.py 기반 스키마 검색
+### 1. LLM 키워드 추출 추가
+
+```
+이전: 모든 단어로 Milvus 검색 → "대해서"로 "와서" 찾음 ❌
+현재: LLM으로 역사 키워드만 추출 → "명성황후"로 관련 사건 찾음 ✅
+```
+
+### 2. 관계 확장 SPARQL
+
+```
+이전: VALUES ?entity { ... } → 엔티티 정보만
+현재: ?entity ?relation ?related → 1-hop, 2-hop 관계 확장
+```
+
+### 3. 인과관계 체인 검색
+
+```
+이전: LLM 추론에 의존
+현재: causedBy, leadsTo 프로퍼티로 직접 검색
+```
+
+### 4. 프롬프트 개선
+
+```
+이전: "~이다" 체, 되묻기 발생
+현재: "-입니다" 체, 되묻기 금지, 실제 근거 내용 포함
+```
+
+---
+
+## 🔥 아키텍처 상세
+
+### 관계 확장 검색 흐름
+
+```mermaid
+graph LR
+    Entity([추출된 엔티티]) --> OneHop[1-hop 관계]
+    OneHop --> Related1[관련 사건/인물]
+    Related1 --> TwoHop[2-hop 관계]
+    TwoHop --> Related2[더 관련된 것들]
+
+    Entity --> CausalChain[인과관계 체인]
+    CausalChain --> Cause[원인 사건]
+    CausalChain --> Effect[결과 사건]
+
+    style Entity fill:#e1f5ff,stroke:#01579b
+    style OneHop fill:#e8f5e9,stroke:#1b5e20
+    style TwoHop fill:#fff3e0,stroke:#e65100
+    style CausalChain fill:#fce4ec,stroke:#880e4f
+```
+
+### LLM 키워드 추출
+
+```mermaid
+graph LR
+    Query([사용자 질문]) --> LLM[LLM 키워드 추출]
+    LLM --> Historical[역사적 키워드만]
+    LLM -.->|제외| Stopwords[조사/동사/일반 단어]
+
+    Historical --> TTL[TTL 매칭]
+    Historical --> Milvus[Milvus 검색]
+
+    style LLM fill:#e1f5ff,stroke:#01579b
+    style Historical fill:#e8f5e9,stroke:#1b5e20
+    style Stopwords fill:#ffcdd2,stroke:#b71c1c
+```
+
+### 설화/이야기 모드 (Milvus 설화 검색)
 
 ```mermaid
 graph TD
-    Start([사용자 질문]) --> QueryClassifier[Query Classifier<br/>LLM 기반 질문 분류]
+    Story[기존 스토리 생성 완료] --> Check{이야기 모드?}
 
-    QueryClassifier --> EntityExtractor[Entity Extractor<br/>LLM 기반 엔티티 추출]
+    Check -->|No| Output1([일반 답변])
+    Check -->|Yes| Extract[LLM 키워드 추출<br/>스토리에서 핵심어]
 
-    EntityExtractor --> MultiQueryGen[Multi-Query Generator<br/>LLM + ontology_schema.py]
+    Extract --> Search[Milvus 설화 컬렉션<br/>유사도 검색]
+    Search --> FolktaleDB[(설화 DB<br/>title + summary 벡터)]
 
-    %% ontology_schema.py 제공
-    OntologySchema[(ontology_schema.py<br/>INFERENCE_PROPERTIES_BY_STAGE)] -.->|Stage별 추론 프로퍼티 제공| MultiQueryGen
+    FolktaleDB --> Fetch[설화 내용 조회<br/>content 전체 텍스트]
+    Fetch --> Folktales[관련 설화 3개]
 
-    MultiQueryGen --> WhatIfCheck{What-if?}
+    Story --> Merge[LLM 스토리 결합]
+    Folktales --> Merge
 
-    WhatIfCheck -->|Yes| HypoTriple[Hypothetical Triple Generator<br/>가상 시나리오 TTL 생성]
-    WhatIfCheck -->|No| ParallelInference
+    Merge --> Separate[사실/이야기 구분]
+    Separate --> Output2([풍성한 스토리])
 
-    HypoTriple --> ParallelInference
-
-    ParallelInference[Parallel Inference Executor<br/>ThreadPoolExecutor 병렬 실행] --> Thread1[Thread 1: CAUSAL<br/>causal_inference.rules<br/>Stage 2: 역사 시뮬레이터]
-    ParallelInference --> Thread2[Thread 2: PERSON<br/>person_inference.rules<br/>Stage 1,3: 인물 분석]
-    ParallelInference --> Thread3[Thread 3: TEMPORAL<br/>temporal_inference.rules<br/>Stage 4: 시대적 배경]
-    ParallelInference --> Thread4[Thread 4: PATTERN<br/>pattern_inference.rules<br/>Stage 5: 심화 분석]
-    ParallelInference --> Thread5[Thread 5: MOTIVE<br/>motive_inference.rules<br/>Stage 1: 동기 분석]
-
-    Thread1 --> Jena1[Jena Reasoner API<br/>POST /what-if or /infer]
-    Thread2 --> Jena2[Jena Reasoner API<br/>POST /what-if or /infer]
-    Thread3 --> Jena3[Jena Reasoner API<br/>POST /what-if or /infer]
-    Thread4 --> Jena4[Jena Reasoner API<br/>POST /what-if or /infer]
-    Thread5 --> Jena5[Jena Reasoner API<br/>POST /what-if or /infer]
-
-    Jena1 --> Fuseki1[(Fuseki Triple Store<br/>temp_inference_*)]
-    Jena2 --> Fuseki2[(Fuseki Triple Store<br/>temp_inference_*)]
-    Jena3 --> Fuseki3[(Fuseki Triple Store<br/>temp_inference_*)]
-    Jena4 --> Fuseki4[(Fuseki Triple Store<br/>temp_inference_*)]
-    Jena5 --> Fuseki5[(Fuseki Triple Store<br/>temp_inference_*)]
-
-    Fuseki1 --> Results1[SPARQL 결과<br/>인과관계 Bindings]
-    Fuseki2 --> Results2[SPARQL 결과<br/>인물관계 Bindings]
-    Fuseki3 --> Results3[SPARQL 결과<br/>시대배경 Bindings]
-    Fuseki4 --> Results4[SPARQL 결과<br/>패턴 Bindings]
-    Fuseki5 --> Results5[SPARQL 결과<br/>동기 Bindings]
-
-    Results1 --> TTLGenerator[InferenceTripleGenerator<br/>SPARQL Bindings → TTL 변환]
-    Results2 --> TTLGenerator
-    Results3 --> TTLGenerator
-    Results4 --> TTLGenerator
-    Results5 --> TTLGenerator
-
-    TTLGenerator --> TTLFile[TTL 파일 저장<br/>inference_YYYYMMDD_HHMMSS.ttl]
-
-    Results1 --> EvidenceAgg[Evidence Aggregator<br/>5가지 근거 통합 + 가중치 정렬]
-    Results2 --> EvidenceAgg
-    Results3 --> EvidenceAgg
-    Results4 --> EvidenceAgg
-    Results5 --> EvidenceAgg
-
-    EvidenceAgg --> StoryGen[Story Generator<br/>LLM 기반 스토리 생성]
-
-    StoryGen --> Output([최종 답변<br/>다중 근거 + 풍부한 스토리])
-
-    %% 스타일
-    classDef llmNode fill:#e1f5ff,stroke:#01579b,stroke-width:2px
-    classDef dbNode fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef jenaNode fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef parallelNode fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
-    classDef schemaNode fill:#ffebee,stroke:#b71c1c,stroke-width:3px
-    classDef ttlNode fill:#e0f2f1,stroke:#004d40,stroke-width:2px
-
-    class QueryClassifier,EntityExtractor,StoryGen llmNode
-    class Fuseki1,Fuseki2,Fuseki3,Fuseki4,Fuseki5 dbNode
-    class Jena1,Jena2,Jena3,Jena4,Jena5 jenaNode
-    class Thread1,Thread2,Thread3,Thread4,Thread5,ParallelInference parallelNode
-    class OntologySchema schemaNode
-    class TTLGenerator,TTLFile ttlNode
+    style Search fill:#fce4ec,stroke:#880e4f
+    style FolktaleDB fill:#fff8e1,stroke:#ff6f00
+    style Fetch fill:#fff8e1,stroke:#ff6f00
+    style Merge fill:#e1f5ff,stroke:#01579b
+    style Extract fill:#e1f5ff,stroke:#01579b
 ```
 
-### 주요 변경사항 (Milvus → LLM 버전)
+---
 
-| 컴포넌트              | Milvus 버전                          | LLM 버전                                      |
-| --------------------- | ------------------------------------ | --------------------------------------------- |
-| **Entity Extractor**  | Milvus pgvector 유사도 검색          | **LLM 기반 엔티티 추출**                      |
-| **Schema 검색**       | Milvus 스키마 컬렉션 벡터 검색       | **ontology_schema.py INFERENCE_PROPERTIES**   |
-| **Multi-Query Gen**   | Milvus 유사 프로퍼티 검색 → 템플릿   | **LLM + ontology_schema.py 동적 SPARQL 생성** |
-| **추론 결과 저장**    | -                                    | **InferenceTripleGenerator → TTL 파일**       |
+## 🗂️ 파일 구조
 
-### ontology_schema.py의 역할
-
-```python
-# ontology_schema.py에서 제공하는 Stage별 추론 프로퍼티
-INFERENCE_PROPERTIES_BY_STAGE = {
-    "causal": {
-        "description": "Stage 2: 역사 시뮬레이터 (인과관계 추론)",
-        "properties": [
-            "hist:leadsTo",
-            "hist:indirectlyCausedBy",
-            "hist:hasStatus",
-            "hist:hasStrategicAdvantage",
-            "hist:strategicImportance"
-        ]
-    },
-    "person": {
-        "description": "Stage 1, 3: 비하인드 스토리 + 인물 분석",
-        "properties": [
-            "hist:commands",
-            "hist:participatesIn",
-            "hist:hasRelationshipWith",
-            "hist:hasEnemyRelationship",
-            "hist:hasInfluence",
-            "hist:hasLoyalty"
-        ]
-    },
-    # ... temporal, pattern, motive
-}
 ```
-
-**사용 흐름:**
-1. Multi-Query Generator Node가 `ontology_schema.py`에서 Stage별 프로퍼티 로드
-2. LLM에게 프로퍼티 목록과 함께 SPARQL 생성 요청
-3. LLM이 질문에 맞는 프로퍼티만 선택하여 정확한 SPARQL 생성
-
-**장점:**
-- ✅ Milvus 의존성 제거 (벡터 검색 불필요)
-- ✅ 빠른 실행 (파일 import만으로 스키마 로드)
-- ✅ 정확한 스키마 정의 (Python 코드로 명시)
-- ✅ LLM이 추론 프로퍼티만 사용하도록 강제
+backend/ontology_langgraph_structure/
+├── main.py                    # 메인 실행
+├── graph.py                   # LangGraph 정의
+├── state.py                   # GraphState 정의
+├── nodes/
+│   ├── classify_node.py       # 질문 분류
+│   ├── entity_extractor_node.py  # 하이브리드 엔티티 추출
+│   ├── generate_node.py       # 스토리 생성
+│   ├── evidence_aggregator_node.py  # 근거 통합
+│   └── kg/
+│       ├── parallel_inference_executor_node.py  # 5개 Thread 관계 확장
+│       └── multi_path_extractor_node.py  # 관계 경로 추출
+├── ontology/
+│   ├── korean_history.owl     # 온톨로지 스키마
+│   ├── instances/
+│   │   └── korean_history_normalized.ttl  # 정규화된 데이터
+│   └── scripts/
+│       └── upload_ttl_to_fuseki.sh  # Fuseki 업로드
+└── docs/
+    └── README.md              # 이 문서
+```
 
 ---

@@ -27,8 +27,19 @@ def multi_path_extractor_node(state: GraphState) -> GraphState:
             inference_paths[thread_type] = []
             continue
 
-        # Thread별 경로 추출
-        if thread_type == "causal":
+        # Thread별 경로 추출 (새로운 데이터 기반 Thread 타입)
+        if thread_type == "event_context":
+            paths = extract_event_context_paths(bindings, thread_weights.get(thread_type, 0.2))
+        elif thread_type == "actor_network":
+            paths = extract_actor_network_paths(bindings, thread_weights.get(thread_type, 0.2))
+        elif thread_type == "timeline":
+            paths = extract_timeline_paths(bindings, thread_weights.get(thread_type, 0.2))
+        elif thread_type == "similar_events":
+            paths = extract_similar_events_paths(bindings, thread_weights.get(thread_type, 0.2))
+        elif thread_type == "background":
+            paths = extract_background_paths(bindings, thread_weights.get(thread_type, 0.2))
+        # 이전 버전 호환성 (레거시 Thread 타입)
+        elif thread_type == "causal":
             paths = extract_causal_paths(bindings, thread_weights.get(thread_type, 0.2))
         elif thread_type == "person":
             paths = extract_person_paths(bindings, thread_weights.get(thread_type, 0.2))
@@ -310,3 +321,305 @@ def extract_comparison_paths(bindings: list, base_weight: float) -> list:
             })
 
     return paths[:10]
+
+
+def extract_event_context_paths(bindings: list, base_weight: float) -> list:
+    """사건 맥락 경로 추출 + 1-hop 관계 확장"""
+    paths = []
+    seen_relations = set()  # 중복 관계 제거용
+    
+    for binding in bindings:
+        entity_binding = binding.get("entity") or binding.get("event") or {}
+        entity = entity_binding.get("value", "").split("#")[-1] if entity_binding else ""
+        
+        label_binding = binding.get("label") or {}
+        label = label_binding.get("value", "") if label_binding else entity
+        
+        # 요약 추출
+        summary_binding = binding.get("summary") or {}
+        summary = summary_binding.get("value", "")[:150] if summary_binding.get("value") else ""
+        
+        # 1-hop 관계 확장 결과
+        related_binding = binding.get("related") or {}
+        related = related_binding.get("value", "").split("#")[-1] if related_binding else ""
+        related_label_binding = binding.get("relatedLabel") or {}
+        related_label = related_label_binding.get("value", "") if related_label_binding else related
+        
+        relation_type_binding = binding.get("relationType") or {}
+        relation_type = relation_type_binding.get("value", "").split("#")[-1] if relation_type_binding else ""
+        
+        if entity:
+            # 기본 엔티티 정보
+            if label and (label, "") not in seen_relations:
+                seen_relations.add((label, ""))
+                display_desc = f"{label}: {summary}" if summary else label
+                paths.append({
+                    "type": "event_context",
+                    "event": label,
+                    "content": summary,
+                    "weight": base_weight,
+                    "description": display_desc
+                })
+            
+            # 관계 확장 결과 추가
+            if related_label and (label, related_label) not in seen_relations:
+                seen_relations.add((label, related_label))
+                
+                # 관계 타입을 한글로 변환
+                relation_map = {
+                    "hasParticipant": "참여자",
+                    "participatesIn": "참여",
+                    "occursAt": "장소",
+                    "leadsTo": "결과",
+                    "causedBy": "원인",
+                    "hasCommander": "지휘관",
+                    "hasVictor": "승자",
+                    "hasDefeated": "패자"
+                }
+                relation_kr = relation_map.get(relation_type, relation_type)
+                
+                display_desc = f"{label} → [{relation_kr}] → {related_label}"
+                paths.append({
+                    "type": "event_context",
+                    "event": label,
+                    "related": related_label,
+                    "relation": relation_kr,
+                    "content": f"{label}의 {relation_kr}: {related_label}",
+                    "weight": base_weight * 1.2,  # 관계 정보는 가중치 높임
+                    "description": display_desc
+                })
+    
+    return paths[:15]  # 관계 확장으로 결과 많아짐
+
+
+def extract_actor_network_paths(bindings: list, base_weight: float) -> list:
+    """인물 네트워크 경로 추출 + 2-hop 관계 확장"""
+    paths = []
+    seen_relations = set()
+    
+    for binding in bindings:
+        person_binding = binding.get("person") or {}
+        person = person_binding.get("value", "").split("#")[-1] if person_binding else ""
+        
+        label_binding = binding.get("label") or {}
+        label = label_binding.get("value", "") if label_binding else person
+        
+        # 1-hop: 인물과 직접 연결된 것
+        hop1_binding = binding.get("hop1") or {}
+        hop1 = hop1_binding.get("value", "").split("#")[-1] if hop1_binding else ""
+        hop1_label_binding = binding.get("hop1Label") or {}
+        hop1_label = hop1_label_binding.get("value", "") if hop1_label_binding else hop1
+        hop1_type_binding = binding.get("hop1Type") or {}
+        hop1_type = hop1_type_binding.get("value", "").split("#")[-1] if hop1_type_binding else ""
+        
+        # 2-hop: 관련 사건의 다른 참여자
+        hop2_binding = binding.get("hop2") or {}
+        hop2 = hop2_binding.get("value", "").split("#")[-1] if hop2_binding else ""
+        hop2_label_binding = binding.get("hop2Label") or {}
+        hop2_label = hop2_label_binding.get("value", "") if hop2_label_binding else hop2
+        
+        if person and label:
+            # 1-hop 관계
+            if hop1_label and (label, hop1_label) not in seen_relations:
+                seen_relations.add((label, hop1_label))
+                
+                # 타입에 따라 관계 설명
+                type_map = {"Event": "참여 사건", "Institution": "소속 기관", "Role": "역할", "Battle": "참여 전투"}
+                relation_desc = type_map.get(hop1_type, "관련")
+                
+                display_desc = f"{label} → [{relation_desc}] → {hop1_label}"
+                paths.append({
+                    "type": "actor_network",
+                    "person": label,
+                    "related": hop1_label,
+                    "related_type": hop1_type,
+                    "content": f"{label}의 {relation_desc}: {hop1_label}",
+                    "weight": base_weight * 1.2,
+                    "description": display_desc
+                })
+                
+                # 2-hop 관계: 같은 사건의 다른 인물
+                if hop2_label and (label, hop2_label) not in seen_relations:
+                    seen_relations.add((label, hop2_label))
+                    display_desc = f"{label} ↔ [{hop1_label}] ↔ {hop2_label}"
+                    paths.append({
+                        "type": "actor_network",
+                        "person": label,
+                        "via_event": hop1_label,
+                        "related_person": hop2_label,
+                        "content": f"{label}와(과) {hop2_label}은(는) {hop1_label}에 함께 관여",
+                        "weight": base_weight * 1.5,  # 2-hop은 더 높은 가중치
+                        "description": display_desc
+                    })
+    
+    return paths[:15]
+
+
+def extract_timeline_paths(bindings: list, base_weight: float) -> list:
+    """시간순 사건 경로 추출 + 인과관계 체인"""
+    paths = []
+    seen_events = set()
+    
+    for binding in bindings:
+        event_binding = binding.get("event") or binding.get("entity") or {}
+        event = event_binding.get("value", "").split("#")[-1] if event_binding else ""
+        
+        label_binding = binding.get("label") or {}
+        label = label_binding.get("value", "") if label_binding else event
+        
+        year_binding = binding.get("year") or {}
+        year = year_binding.get("value", "") if year_binding else ""
+        
+        summary_binding = binding.get("summary") or {}
+        summary = summary_binding.get("value", "")[:100] if summary_binding.get("value") else ""
+        
+        # 인과관계 체인
+        caused_by_binding = binding.get("causedBy") or {}
+        caused_by_label_binding = binding.get("causedByLabel") or {}
+        caused_by = caused_by_label_binding.get("value", "") if caused_by_label_binding else ""
+        
+        leads_to_binding = binding.get("leadsTo") or {}
+        leads_to_label_binding = binding.get("leadsToLabel") or {}
+        leads_to = leads_to_label_binding.get("value", "") if leads_to_label_binding else ""
+        
+        if event and label and label not in seen_events:
+            seen_events.add(label)
+            
+            # 기본 시간 정보
+            year_str = f"{year}년" if year else ""
+            
+            # 인과관계 체인 구성
+            chain_parts = []
+            if caused_by:
+                chain_parts.append(f"원인: {caused_by}")
+            if leads_to:
+                chain_parts.append(f"결과: {leads_to}")
+            
+            if chain_parts:
+                # 인과관계가 있으면 체인으로 표시
+                chain_desc = " → ".join([caused_by, label, leads_to]) if caused_by and leads_to else ""
+                if not chain_desc:
+                    chain_desc = f"{caused_by} → {label}" if caused_by else f"{label} → {leads_to}"
+                
+                content = f"{year_str} {chain_desc}" if year_str else chain_desc
+                display_desc = f"[인과] {content}"
+            else:
+                content = f"{year_str} {label}: {summary}" if summary else f"{year_str} {label}"
+                display_desc = content
+            
+            paths.append({
+                "type": "timeline",
+                "event": label,
+                "year": year,
+                "caused_by": caused_by,
+                "leads_to": leads_to,
+                "content": summary or f"{label} ({year_str})",
+                "weight": base_weight * (1.3 if (caused_by or leads_to) else 1.0),  # 인과관계 있으면 가중치 높임
+                "description": display_desc
+            })
+    
+    return paths[:15]
+
+
+def extract_similar_events_paths(bindings: list, base_weight: float) -> list:
+    """유사 사건 경로 추출 (Milvus 벡터 검색 결과)"""
+    paths = []
+    
+    for binding in bindings:
+        entity_binding = binding.get("entity") or {}
+        entity = entity_binding.get("value", "").split("#")[-1] if entity_binding else ""
+        
+        label_binding = binding.get("label") or {}
+        label = label_binding.get("value", "") if label_binding else entity
+        
+        category_binding = binding.get("category") or {}
+        category = category_binding.get("value", "") if category_binding else ""
+        
+        summary_binding = binding.get("summary") or {}
+        summary = summary_binding.get("value", "")[:150] if summary_binding else ""
+        
+        score_binding = binding.get("score") or {}
+        score = float(score_binding.get("value", 0)) if score_binding else 0.0
+        
+        if entity or label:
+            # 설명에 summary 포함 (유사도는 내부용)
+            display_name = label or entity
+            display_desc = f"{display_name}: {summary}" if summary else display_name
+            
+            paths.append({
+                "type": "similar_events",
+                "event": display_name,
+                "category": category,
+                "content": summary,  # 원본 요약
+                "similarity_score": score,
+                "weight": base_weight * (1.0 + score),  # 유사도 점수 반영
+                "description": display_desc  # 표시용 (유사도 숫자 제외)
+            })
+    
+    return paths[:10]
+
+
+def extract_background_paths(bindings: list, base_weight: float) -> list:
+    """배경 정보 경로 추출 + 관련 정책/제도 확장"""
+    paths = []
+    seen_entities = set()
+    
+    for binding in bindings:
+        entity_binding = binding.get("entity") or {}
+        entity = entity_binding.get("value", "").split("#")[-1] if entity_binding else ""
+        
+        label_binding = binding.get("label") or {}
+        label = label_binding.get("value", "") if label_binding else entity
+        
+        summary_binding = binding.get("summary") or {}
+        summary = summary_binding.get("value", "")[:200] if summary_binding.get("value") else ""
+        
+        category_binding = binding.get("category") or {}
+        category = category_binding.get("value", "") if category_binding else ""
+        
+        # 관련 정책/제도 확장
+        policy_label_binding = binding.get("policyLabel") or {}
+        policy_label = policy_label_binding.get("value", "") if policy_label_binding else ""
+        policy_summary_binding = binding.get("policySummary") or {}
+        policy_summary = policy_summary_binding.get("value", "")[:100] if policy_summary_binding.get("value") else ""
+        
+        if entity and label:
+            display_name = label
+            
+            # 기본 엔티티 정보
+            if display_name not in seen_entities:
+                seen_entities.add(display_name)
+                
+                if summary:
+                    display_desc = f"{display_name}: {summary}"
+                    content = summary
+                else:
+                    display_desc = display_name
+                    content = f"{display_name} 관련 배경 정보"
+                
+                paths.append({
+                    "type": "background",
+                    "entity": display_name,
+                    "content": content,
+                    "category": category,
+                    "weight": base_weight,
+                    "description": display_desc
+                })
+            
+            # 관련 정책/제도 확장 결과 추가
+            if policy_label and policy_label not in seen_entities:
+                seen_entities.add(policy_label)
+                
+                policy_content = policy_summary or f"{label}과(와) 관련된 정책"
+                display_desc = f"[관련 정책] {policy_label}: {policy_content}"
+                
+                paths.append({
+                    "type": "background",
+                    "entity": policy_label,
+                    "related_to": display_name,
+                    "content": policy_content,
+                    "weight": base_weight * 1.2,  # 관련 정책은 가중치 높임
+                    "description": display_desc
+                })
+    
+    return paths[:15]

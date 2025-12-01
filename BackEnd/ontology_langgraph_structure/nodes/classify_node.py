@@ -2,9 +2,8 @@
 Query Classifier Node
 
 사용자 질문을 분석하여 유형 분류:
-- causal: 인과관계 질문 ("왜 ~했을까?", "어떻게 ~했나?")
-- what_if: 가상 시나리오 ("만약 ~했다면?", "~가 없었다면?")
-- deep_analysis: 심화 질문 ("진짜 이유는?", "숨은 의도는?")
+- causal: 인과관계 질문 ("왜 ~했을까?", "어떻게 ~했나?", "패턴은?")
+- deep_analysis: 심화 분석 ("진짜 이유는?", "숨은 의도는?", "비하인드는?")
 """
 
 import os
@@ -21,7 +20,7 @@ from state import GraphState
 
 
 def query_classifier_node(state: GraphState) -> GraphState:
-    """질문 유형 분류"""
+    """질문 유형 분류 (causal / deep_analysis)"""
 
     query = state.get("query", "")
 
@@ -33,23 +32,29 @@ def query_classifier_node(state: GraphState) -> GraphState:
 
     classification_prompt = f"""당신은 역사 질문을 분류하는 전문가입니다.
 
-다음 질문을 3가지 유형 중 하나로 분류하세요:
+다음 질문을 2가지 유형 중 하나로 분류하세요:
 
-1. causal (인과관계): "왜 ~했을까?", "어떤 영향을 미쳤나?", "~의 결과는?"
-2. what_if (가상 시나리오): "만약 ~했다면?", "~가 없었다면?", "~가 성공했다면?"
-3. deep_analysis (심화 분석): "진짜 이유는?", "숨은 의도는?", "이면에는?"
+1. causal (인과관계/패턴): 
+   - "왜 ~했을까?", "어떤 영향을 미쳤나?", "~의 결과는?"
+   - "~의 패턴은?", "어떤 식으로 진행되었나?"
+   
+2. deep_analysis (심화 분석): 
+   - "진짜 이유는?", "숨은 의도는?", "이면에는?"
+   - "비하인드 스토리는?", "~의 진실은?"
 
 질문: {query}
 
-답변은 반드시 다음 중 하나만 출력하세요: causal, what_if, deep_analysis
+답변은 반드시 다음 중 하나만 출력하세요: causal, deep_analysis
 """
 
     try:
         response = llm.invoke(classification_prompt)
         query_type = response.content.strip().lower()
 
-        # 검증
-        if query_type not in ["causal", "what_if", "deep_analysis"]:
+        # 검증 (what_if는 causal로 매핑)
+        if query_type == "what_if":
+            query_type = "causal"
+        elif query_type not in ["causal", "deep_analysis"]:
             query_type = "causal"  # 기본값
 
     except Exception as e:

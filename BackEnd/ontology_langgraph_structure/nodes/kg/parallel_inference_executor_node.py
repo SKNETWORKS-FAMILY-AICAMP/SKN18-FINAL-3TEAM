@@ -22,82 +22,129 @@ from state import GraphState
 
 
 API_URL = os.getenv("INFERENCE_API_URL", "http://localhost:8001")
-FUSEKI_URL = os.getenv("FUSEKI_URL", "http://localhost:3030/temp_inference")
+FUSEKI_URL = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
 INFERENCE_MODE = os.getenv("INFERENCE_MODE", "light")  # "full" (Java Reasoner) or "light" (Fuseki 직접)
 QUERY_MODE = os.getenv("QUERY_MODE", "template")  # "llm" (LLM 쿼리 생성) or "template" (템플릿 쿼리, 빠름)
 SAVE_INFERENCE_TRIPLES = os.getenv("SAVE_INFERENCE_TRIPLES", "true").lower() == "true"
 INFERENCE_OUTPUT_DIR = os.getenv("INFERENCE_OUTPUT_DIR", "./inference_results")
 
 
-# 질문 유형별 Thread 가중치 (5-stage plan 기반)
+# 질문 유형별 Thread 가중치 (데이터 기반)
 THREAD_WEIGHTS = {
     "causal": {
-        "causal": 0.35,      # Stage 2: 역사 시뮬레이터
-        "person": 0.25,      # Stage 1, 3: 인물 분석
-        "temporal": 0.20,    # Stage 4: 시대적 배경
-        "pattern": 0.10,     # Stage 5: 심화 분석
-        "motive": 0.10       # Stage 1: 동기 분석
-    },
-    "what_if": {
-        "causal": 0.45,      # Stage 2: 가상 인과 중요
-        "person": 0.20,      # Stage 1, 3: 인물 영향
-        "temporal": 0.15,    # Stage 4: 시대 맥락
-        "pattern": 0.10,     # Stage 5: 전략 패턴
-        "motive": 0.10       # Stage 1: 동기
+        "event_context": 0.30,    # 사건 맥락 중요
+        "actor_network": 0.25,    # 인물 네트워크
+        "timeline": 0.20,         # 시간순 정리
+        "similar_events": 0.15,   # 유사 사건
+        "background": 0.10        # 배경 정보
     },
     "deep_analysis": {
-        "motive": 0.30,      # Stage 1: 동기 분석 중요
-        "person": 0.25,      # Stage 1, 3: 인물 관계
-        "causal": 0.20,      # Stage 2: 인과관계
-        "pattern": 0.15,     # Stage 5: 패턴 분석
-        "temporal": 0.10     # Stage 4: 시대 배경
+        "background": 0.30,       # 배경 정보 중요
+        "actor_network": 0.25,    # 인물 네트워크
+        "event_context": 0.20,    # 사건 맥락
+        "similar_events": 0.15,   # 유사 사건
+        "timeline": 0.10          # 시간순 정리
+    },
+    "factual": {
+        "event_context": 0.35,    # 사실 기반 질문
+        "background": 0.25,       # 배경 정보
+        "timeline": 0.20,         # 시간순 정리
+        "actor_network": 0.10,    # 인물 네트워크
+        "similar_events": 0.10    # 유사 사건
+    },
+    "comparative": {
+        "similar_events": 0.35,   # 비교 분석 - 유사 사건 중요
+        "event_context": 0.25,    # 사건 맥락
+        "actor_network": 0.20,    # 인물 네트워크
+        "timeline": 0.10,         # 시간순 정리
+        "background": 0.10        # 배경 정보
+    },
+    "what_if": {
+        "event_context": 0.30,    # 가상 시나리오
+        "similar_events": 0.25,   # 유사 사건
+        "timeline": 0.20,         # 시간순 정리
+        "actor_network": 0.15,    # 인물 네트워크
+        "background": 0.10        # 배경 정보
     }
 }
 
-# Stage별 추론 프로퍼티 매핑
-INFERENCE_PROPERTIES_BY_STAGE = {
-    "causal": {
-        "description": "Stage 2: 역사 시뮬레이터 (인과관계 추론)",
-        "properties": [
-            "hist:leadsTo", "hist:causedBy", "hist:hasImpact", "hist:hasOutcome",
-            "hist:indirectlyCausedBy", "hist:hasStatus", "hist:hasStrategicAdvantage",
-            "hist:strategicImportance", "hist:relatedToPolicy"
-        ]
+# 데이터 기반 Thread 설정 (SPARQL 템플릿)
+DATA_THREADS = {
+    "event_context": {
+        "description": "사건 맥락 검색 (설명, 참여자, 장소)",
+        "sparql_template": """
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            
+            SELECT ?entity ?label ?description ?participant ?location WHERE {{
+                ?entity rdfs:label ?label .
+                OPTIONAL {{ ?entity hist:hasDescription ?description }}
+                OPTIONAL {{ ?entity hist:hasParticipant ?participant }}
+                OPTIONAL {{ ?entity hist:occursAt ?location }}
+                FILTER (?entity IN ({entity_uris}))
+            }} LIMIT 50
+        """,
+        "use_milvus": False
     },
-    "person": {
-        "description": "Stage 1, 3: 비하인드 스토리 + 인물 분석",
-        "properties": [
-            "hist:commands", "hist:participatesIn", "hist:affiliatedWith", "hist:hasRole",
-            "hist:hasAchievement", "hist:initiatedBy", "hist:establishedBy",
-            "hist:hasRelationshipWith", "hist:hasEnemyRelationship", "hist:hasLocalTies",
-            "hist:hasInfluence", "hist:hasLoyalty"
-        ]
+    "actor_network": {
+        "description": "인물 네트워크 검색 (관계, 소속, 역할)",
+        "sparql_template": """
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            
+            SELECT ?person ?label ?affiliation ?role ?relationship WHERE {{
+                ?person rdf:type hist:Person ;
+                        rdfs:label ?label .
+                OPTIONAL {{ ?person hist:affiliatedWith ?affiliation }}
+                OPTIONAL {{ ?person hist:hasRole ?role }}
+                OPTIONAL {{ ?person hist:hasRelationshipWith ?relationship }}
+                FILTER (?person IN ({entity_uris}))
+            }} LIMIT 50
+        """,
+        "use_milvus": False
     },
-    "temporal": {
-        "description": "Stage 4: 시대적 배경 분석",
-        "properties": [
-            "hist:hasYear", "hist:hasDate", "hist:hasBirthYear", "hist:hasDeathYear",
-            "hist:occursBefore", "hist:occursAfter", "hist:contemporaryWith",
-            "hist:simultaneousWith", "hist:hasLifespan", "hist:hasDuration", "hist:belongsToPeriod"
-        ]
+    "timeline": {
+        "description": "시간순 사건 검색 (연도, 순서)",
+        "sparql_template": """
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            
+            SELECT ?event ?label ?year ?before ?after WHERE {{
+                ?event rdfs:label ?label .
+                OPTIONAL {{ ?event hist:hasYear ?year }}
+                OPTIONAL {{ ?event hist:occursBefore ?before }}
+                OPTIONAL {{ ?event hist:occursAfter ?after }}
+                FILTER (?event IN ({entity_uris}))
+            }} 
+            ORDER BY ?year
+            LIMIT 50
+        """,
+        "use_milvus": False
     },
-    "pattern": {
-        "description": "Stage 5: 심화 분석 (전략 패턴)",
-        "properties": [
-            "hist:occursAt", "hist:hasVictor", "hist:hasDefeated", "hist:hasStrategyPattern",
-            "hist:hasWinningStreak", "hist:hasComebackPattern", "hist:hasContestedStatus",
-            "hist:hasCommandPattern"
-        ]
+    "similar_events": {
+        "description": "유사 사건 검색 (Milvus 벡터)",
+        "sparql_template": None,  # Milvus 사용
+        "use_milvus": True
     },
-    "motive": {
-        "description": "Stage 1: 비하인드 스토리 (동기 분석)",
-        "properties": [
-            "hist:commands", "hist:bornIn", "hist:affiliatedWith", "hist:initiatedBy",
-            "hist:establishedBy", "hist:hasObjective", "hist:hasPurpose", "hist:hasMotive",
-            "hist:hasLocalTies"
-        ]
+    "background": {
+        "description": "배경 정보 검색 (summary, category)",
+        "sparql_template": """
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            
+            SELECT ?entity ?label ?summary ?category WHERE {{
+                ?entity rdfs:label ?label .
+                OPTIONAL {{ ?entity hist:hasSummary ?summary }}
+                OPTIONAL {{ ?entity hist:hasCategory ?category }}
+                FILTER (?entity IN ({entity_uris}))
+            }} LIMIT 50
+        """,
+        "use_milvus": False
     }
 }
+
+# 이전 버전 호환을 위해 INFERENCE_PROPERTIES_BY_STAGE도 유지
+INFERENCE_PROPERTIES_BY_STAGE = DATA_THREADS
 
 
 def parallel_inference_executor_node(state: GraphState) -> GraphState:
@@ -119,7 +166,7 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
     
     mode_desc = "Fuseki 직접 쿼리" if INFERENCE_MODE == "light" else "Java Reasoner"
     query_desc = "템플릿 (빠름)" if QUERY_MODE == "template" else "LLM 생성"
-    print(f"\n⚡ 병렬 지식 검색 시작 ({len(INFERENCE_PROPERTIES_BY_STAGE)}개 Thread)")
+    print(f"\n⚡ 병렬 지식 검색 시작 ({len(DATA_THREADS)}개 Thread)")
     print(f"   - 검색 모드: {INFERENCE_MODE} ({mode_desc})")
     print(f"   - 쿼리 모드: {QUERY_MODE} ({query_desc})")
     print(f"   - 질문 유형: {query_type}")
@@ -146,10 +193,9 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
                 query_type=query_type,
                 entities=entities,
                 hypothetical=hypothetical_triples,
-                properties=INFERENCE_PROPERTIES_BY_STAGE[thread_type]["properties"],
-                description=INFERENCE_PROPERTIES_BY_STAGE[thread_type]["description"]
+                thread_config=DATA_THREADS[thread_type]
             ): thread_type
-            for thread_type in INFERENCE_PROPERTIES_BY_STAGE.keys()
+            for thread_type in DATA_THREADS.keys()
         }
         
         # 결과 수집
@@ -213,45 +259,39 @@ def execute_unified_thread(
     query_type: str,
     entities: list,
     hypothetical: list,
-    properties: list,
-    description: str
+    thread_config: dict
 ) -> dict:
     """
     개별 Thread에서 쿼리 생성 + 지식 검색을 순차적으로 수행
     
     Args:
         llm: ChatOpenAI 인스턴스 (Thread 간 공유, QUERY_MODE=llm일 때만 사용)
-        thread_type: Thread 타입 (causal/person/temporal/pattern/motive)
+        thread_type: Thread 타입 (event_context/actor_network/timeline/similar_events/background)
         query: 사용자 질문
         query_type: 질문 유형
         entities: 추출된 엔티티 목록
-        hypothetical: 가상 트리플 목록 (what-if용)
-        properties: 사용 가능한 프로퍼티 목록
-        description: Stage 설명
+        hypothetical: 가상 트리플 목록 (미사용)
+        thread_config: Thread 설정 (sparql_template, use_milvus, description)
         
     Returns:
         검색 결과 딕셔너리
     """
     
+    description = thread_config.get("description", "")
+    use_milvus = thread_config.get("use_milvus", False)
+    sparql_template = thread_config.get("sparql_template", "")
+    
+    # similar_events는 Milvus 검색 사용
+    if use_milvus:
+        return execute_milvus_search(thread_type, entities, description)
+    
     # 1️⃣ SPARQL 쿼리 생성
-    if QUERY_MODE == "template":
-        # 템플릿 모드: LLM 없이 미리 정의된 쿼리 사용 (빠름!)
-        sparql = generate_fallback_sparql(thread_type, entities)
+    if sparql_template and QUERY_MODE == "template":
+        # 템플릿 모드: 미리 정의된 SPARQL 템플릿 사용
+        sparql = generate_template_sparql(thread_type, entities, sparql_template)
     else:
-        # LLM 모드: LLM으로 쿼리 생성 (느림, 더 정교함)
-        try:
-            sparql = generate_sparql_with_llm(
-                llm=llm,
-                query=query,
-                query_type=query_type,
-                thread_type=thread_type,
-                entities=entities,
-                properties=properties,
-                description=description
-            )
-        except Exception as e:
-            # LLM 실패 시 fallback 쿼리 사용
-            sparql = generate_fallback_sparql(thread_type, entities)
+        # Fallback 쿼리 사용
+        sparql = generate_fallback_sparql(thread_type, entities)
     
     # 2️⃣ 지식 검색 실행
     result = execute_inference_api(
@@ -265,6 +305,93 @@ def execute_unified_thread(
     result["sparql"] = sparql
     
     return result
+
+
+def execute_milvus_search(thread_type: str, entities: list, description: str) -> dict:
+    """Milvus를 사용한 유사 사건 검색"""
+    try:
+        # Milvus 서비스 import
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+        
+        from db_pipeline.services.milvus_service import get_milvus_service
+        
+        milvus = get_milvus_service()
+        if not milvus or not milvus.connect():
+            return {"status": "error", "bindings": [], "thread_type": thread_type, "error": "Milvus 연결 실패"}
+        
+        # 엔티티 이름으로 유사 사건 검색
+        all_results = []
+        for entity in entities[:5]:  # 상위 5개 엔티티만
+            name = entity.get("name", "")
+            if name:
+                results = milvus.search(name, top_k=3, threshold=0.5)
+                all_results.extend(results)
+        
+        # 중복 제거
+        seen = set()
+        unique_results = []
+        for r in all_results:
+            if r["title"] not in seen:
+                seen.add(r["title"])
+                unique_results.append(r)
+        
+        # Fuseki 형식으로 변환
+        bindings = [
+            {
+                "entity": {"value": r.get("title", "")},
+                "label": {"value": r.get("title", "")},
+                "category": {"value": r.get("category", "")},
+                "summary": {"value": r.get("summary", "")[:200] if r.get("summary") else ""},
+                "score": {"value": str(r.get("score", 0))}
+            }
+            for r in unique_results[:10]
+        ]
+        
+        return {
+            "status": "success",
+            "bindings": bindings,
+            "thread_type": thread_type,
+            "source": "milvus"
+        }
+        
+    except Exception as e:
+        return {"status": "error", "bindings": [], "thread_type": thread_type, "error": str(e)}
+
+
+def generate_template_sparql(thread_type: str, entities: list, template: str) -> str:
+    """템플릿 기반 SPARQL 생성"""
+    
+    # 엔티티 URI 목록 생성
+    entity_uris = []
+    for e in entities:
+        uri = e.get("uri")
+        if uri:
+            entity_uris.append(uri)
+    
+    if not entity_uris:
+        # URI가 없으면 라벨로 검색
+        labels = [e.get("name", "") for e in entities if e.get("name")]
+        if labels:
+            label_filter = " || ".join([f'CONTAINS(LCASE(?label), "{label.lower()}")' for label in labels[:5]])
+            return f"""
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            
+            SELECT ?entity ?label WHERE {{
+                ?entity rdfs:label ?label .
+                FILTER ({label_filter})
+            }} LIMIT 30
+            """
+    
+    # URI 목록 포맷팅
+    uri_list = ", ".join(entity_uris)
+    
+    # 템플릿에 URI 삽입
+    sparql = template.format(entity_uris=uri_list)
+    
+    return sparql
 
 
 def generate_sparql_with_llm(
@@ -353,53 +480,132 @@ def generate_fallback_sparql(thread_type: str, entities: list) -> str:
     else:
         values_clause = ""
     
+    # 새로운 데이터 기반 Thread 템플릿 (관계 확장 포함)
     fallback_templates = {
-        "causal": f"""PREFIX hist: <http://www.example.org/korean-history#>
+        # ============================================================
+        # event_context: 사건 맥락 + 1-hop 관계 확장
+        # 엔티티 → 관련 사건/인물 (hasParticipant, occursAt, leadsTo 등)
+        # ============================================================
+        "event_context": f"""PREFIX hist: <http://www.example.org/korean-history#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?subject ?subjectLabel ?predicate ?object ?objectLabel WHERE {{
+SELECT DISTINCT ?entity ?label ?summary ?related ?relatedLabel ?relationType WHERE {{
     {values_clause}
-    {{ ?entity hist:leadsTo ?object . ?subject hist:leadsTo ?object . FILTER(?subject = ?entity) }}
-    UNION
-    {{ ?subject hist:leadsTo ?entity . BIND(?entity AS ?object) }}
-    OPTIONAL {{ ?subject rdfs:label ?subjectLabel }}
-    OPTIONAL {{ ?object rdfs:label ?objectLabel }}
-    BIND(hist:leadsTo AS ?predicate)
+    ?entity rdfs:label ?label .
+    OPTIONAL {{ ?entity hist:hasSummary ?summary }}
+    
+    # 1-hop 관계 확장: 엔티티와 연결된 모든 것
+    OPTIONAL {{
+        ?entity ?relationType ?related .
+        ?related rdfs:label ?relatedLabel .
+        FILTER(?relationType IN (
+            hist:hasParticipant, hist:participatesIn,
+            hist:occursAt, hist:isLocationOf,
+            hist:leadsTo, hist:causedBy,
+            hist:hasCommander, hist:commands,
+            hist:hasVictor, hist:hasDefeated
+        ))
+    }}
 }} LIMIT 100""",
         
-        "person": f"""PREFIX hist: <http://www.example.org/korean-history#>
+        # ============================================================
+        # actor_network: 인물 중심 2-hop 관계 확장
+        # 인물 → 관련 사건 → 다른 인물/사건
+        # ============================================================
+        "actor_network": f"""PREFIX hist: <http://www.example.org/korean-history#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?person ?personLabel ?property ?value WHERE {{
+SELECT DISTINCT ?person ?label ?hop1 ?hop1Label ?hop1Type ?hop2 ?hop2Label WHERE {{
     {values_clause}
-    ?entity ?property ?value .
+    ?entity rdfs:label ?label .
     BIND(?entity AS ?person)
-    OPTIONAL {{ ?entity rdfs:label ?personLabel }}
-    FILTER(?property IN (hist:participatesIn, hist:commands, hist:affiliatedWith, hist:hasRole, hist:hasAchievement))
+    
+    # 1-hop: 인물과 직접 연결된 것 (사건, 기관, 역할)
+    OPTIONAL {{
+        ?entity ?rel1 ?hop1 .
+        ?hop1 rdfs:label ?hop1Label .
+        ?hop1 a ?hop1Type .
+        FILTER(?rel1 IN (
+            hist:participatesIn, hist:commands, hist:affiliatedWith,
+            hist:hasRole, hist:authored, hist:teacherOf, hist:studentOf,
+            hist:servedUnder, hist:allyOf, hist:enemyOf
+        ))
+        
+        # 2-hop: 관련 사건에 참여한 다른 인물
+        OPTIONAL {{
+            ?hop1 hist:hasParticipant ?hop2 .
+            ?hop2 rdfs:label ?hop2Label .
+            FILTER(?hop2 != ?entity)
+        }}
+    }}
 }} LIMIT 100""",
         
-        "temporal": f"""PREFIX hist: <http://www.example.org/korean-history#>
+        # ============================================================
+        # timeline: 시간순 + 인과관계 체인
+        # 사건 → 선행 사건 → 후행 사건
+        # ============================================================
+        "timeline": f"""PREFIX hist: <http://www.example.org/korean-history#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?entity ?entityLabel ?year WHERE {{
+SELECT DISTINCT ?event ?label ?year ?summary ?causedBy ?causedByLabel ?leadsTo ?leadsToLabel WHERE {{
     {values_clause}
-    ?entity hist:hasYear ?year .
-    OPTIONAL {{ ?entity rdfs:label ?entityLabel }}
-}} LIMIT 100""",
+    ?entity rdfs:label ?label .
+    BIND(?entity AS ?event)
+    OPTIONAL {{ ?entity hist:hasYear ?year }}
+    OPTIONAL {{ ?entity hist:hasSummary ?summary }}
+    
+    # 인과관계 체인: 원인 → 사건 → 결과
+    OPTIONAL {{ 
+        ?entity hist:causedBy ?causedBy . 
+        ?causedBy rdfs:label ?causedByLabel 
+    }}
+    OPTIONAL {{ 
+        ?entity hist:leadsTo ?leadsTo . 
+        ?leadsTo rdfs:label ?leadsToLabel 
+    }}
+    
+    # 시간순 관계
+    OPTIONAL {{ ?entity hist:precedes ?after . ?after rdfs:label ?afterLabel }}
+    OPTIONAL {{ ?before hist:precedes ?entity . ?before rdfs:label ?beforeLabel }}
+}} ORDER BY ?year LIMIT 100""",
         
-        "pattern": f"""PREFIX hist: <http://www.example.org/korean-history#>
+        # ============================================================
+        # similar_events: Milvus로 처리됨 (fallback용)
+        # ============================================================
+        "similar_events": f"""PREFIX hist: <http://www.example.org/korean-history#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?entity ?entityLabel ?pattern WHERE {{
+SELECT DISTINCT ?entity ?label ?type ?summary WHERE {{
     {values_clause}
-    ?entity ?prop ?pattern .
-    OPTIONAL {{ ?entity rdfs:label ?entityLabel }}
-    FILTER(?prop IN (hist:hasStrategyPattern, hist:occursAt, hist:hasVictor, hist:hasDefeated))
-}} LIMIT 100""",
+    ?entity rdfs:label ?label .
+    ?entity a ?type .
+    OPTIONAL {{ ?entity hist:hasSummary ?summary }}
+}} LIMIT 30""",
         
-        "motive": f"""PREFIX hist: <http://www.example.org/korean-history#>
+        # ============================================================
+        # background: 배경 정보 + 관련 정책/제도 확장
+        # 사건 → 관련 정책 → 영향받은 것들
+        # ============================================================
+        "background": f"""PREFIX hist: <http://www.example.org/korean-history#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?entity ?entityLabel ?motive WHERE {{
+SELECT DISTINCT ?entity ?label ?summary ?category ?relatedPolicy ?policyLabel ?policySummary WHERE {{
     {values_clause}
-    ?entity ?prop ?motive .
-    OPTIONAL {{ ?entity rdfs:label ?entityLabel }}
-    FILTER(?prop IN (hist:hasMotive, hist:hasObjective, hist:hasPurpose, hist:initiatedBy))
+    ?entity rdfs:label ?label .
+    OPTIONAL {{ ?entity hist:hasSummary ?summary }}
+    OPTIONAL {{ ?entity hist:hasCategory ?category }}
+    
+    # 관련 정책/제도 확장
+    OPTIONAL {{
+        ?entity hist:relatedToPolicy ?relatedPolicy .
+        ?relatedPolicy rdfs:label ?policyLabel .
+        OPTIONAL {{ ?relatedPolicy hist:hasSummary ?policySummary }}
+    }}
+    
+    # 원인/결과 관계
+    OPTIONAL {{ 
+        ?entity hist:hasCause ?cause . 
+        ?cause rdfs:label ?causeLabel 
+    }}
+    OPTIONAL {{ 
+        ?entity hist:hasResult ?result . 
+        ?result rdfs:label ?resultLabel 
+    }}
 }} LIMIT 100"""
     }
     
