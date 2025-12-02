@@ -53,10 +53,14 @@ def get_milvus_service():
 # TTL 파일 경로 (normalized 버전 사용 - Fuseki에 업로드된 데이터와 일치)
 TTL_PATH = Path(__file__).parent.parent / "ontology/instances/korean_history_normalized.ttl"
 
+# TTL 데이터 캐시 (매번 파일 읽지 않도록)
+_ttl_cache = None
+_ttl_cache_mtime = None
+
 
 def load_ttl_entities() -> dict:
     """
-    TTL 파일에서 모든 엔티티와 label 로드
+    TTL 파일에서 모든 엔티티와 label 로드 (캐싱 적용)
     
     Returns:
         {
@@ -64,6 +68,14 @@ def load_ttl_entities() -> dict:
             "uri_to_type": {"hist:Event_심기원역모사건": "Event", ...}
         }
     """
+    global _ttl_cache, _ttl_cache_mtime
+    
+    # 캐시 유효성 검사 (파일 수정 시간 비교)
+    if TTL_PATH.exists():
+        current_mtime = TTL_PATH.stat().st_mtime
+        if _ttl_cache is not None and _ttl_cache_mtime == current_mtime:
+            return _ttl_cache  # 캐시 반환 (파일 I/O 생략)
+    
     label_to_uri = {}
     uri_to_type = {}
     
@@ -105,7 +117,12 @@ def load_ttl_entities() -> dict:
     except Exception as e:
         print(f"⚠️ TTL 파일 로드 실패: {e}")
     
-    return {"label_to_uri": label_to_uri, "uri_to_type": uri_to_type}
+    # 캐시 저장
+    result = {"label_to_uri": label_to_uri, "uri_to_type": uri_to_type}
+    _ttl_cache = result
+    _ttl_cache_mtime = TTL_PATH.stat().st_mtime if TTL_PATH.exists() else None
+    
+    return result
 
 
 def match_entities_with_ttl(entities: list, ttl_data: dict) -> list:
@@ -247,31 +264,40 @@ def match_entities_with_ttl(entities: list, ttl_data: dict) -> list:
     return matched_entities
 
 
-def extract_keywords_from_query(query: str) -> list:
+def extract_keywords_from_query(query: str, for_vector_search: bool = False) -> list:
     """
-    질문에서 키워드 직접 추출 (기본 불용어 제거 - TTL 매칭용)
+    질문에서 키워드 직접 추출 (규칙 기반 - LLM 없이)
     
     Args:
         query: 사용자 질문
+        for_vector_search: True면 벡터 검색용 (조선시대/조선 제외)
     
     Returns:
         키워드 리스트
     """
-    # 불용어 제거 (조사, 동사, 일반 단어)
+    # 불용어 (조사, 동사, 일반 단어)
     stopwords = {
         # 조사
         '이', '가', '은', '는', '을', '를', '에', '의', '와', '과', '로', '으로', 
         '에서', '까지', '부터', '에게', '한테', '께', '보다', '처럼', '만큼',
         # 의문사
         '어떤', '무엇', '왜', '어떻게', '언제', '누구', '어디', '무슨', '뭐',
-        # 일반 동사/형용사
+        '누구인지', '무엇인지', '어디인지',
+        # 일반 동사/형용사 어간
         '있다', '없다', '하다', '되다', '이다', '아니다', '알다', '모르다',
         '있어', '없어', '해서', '되어', '알려', '알려줘', '알려주세요',
+        '있는', '없는', '하는', '되는',
         # 일반 부사/대명사
         '그', '저', '이', '것', '수', '등', '때', '중', '후', '전', '더', '또',
         # 일반 명사 (역사와 무관)
         '대해서', '대해', '관해서', '관해', '관련', '관련된', '사실', '이유',
-        '진짜', '정말', '실제', '어떠', '어떻게', '무엇', '왜', '어디'
+        '진짜', '정말', '실제', '어떠', '어떻게', '무엇', '왜', '어디',
+        '시대', '시기', '당시', '역사', '내용', '설명', '정보'
+    }
+    
+    # 벡터 검색용 추가 필터 (모든 데이터가 조선시대라서 유사도가 다 높게 나옴)
+    vector_search_exclude = {
+        '조선', '조선시대', '조선왕조', '조선시대의', '조선의'
     }
     
     # 한글 단어 추출 (2글자 이상)
@@ -280,20 +306,26 @@ def extract_keywords_from_query(query: str) -> list:
     # 불용어 제거
     keywords = [w for w in words if w not in stopwords]
     
+    # 벡터 검색용이면 "조선/조선시대" 추가 필터링
+    if for_vector_search:
+        keywords = [w for w in keywords if w not in vector_search_exclude]
+    
     return keywords
 
 
-def extract_historical_keywords_with_llm(query: str) -> list:
+def extract_historical_keywords_with_llm(query: str, include_query_type: bool = False) -> dict:
     """
-    LLM으로 역사적 키워드만 추출 (Milvus 검색용)
+    LLM으로 역사적 키워드 + 질문 유형을 한 번에 추출 (LLM 호출 최적화)
     
     조사, 동사, 일반 단어를 제외하고 역사적 인물/사건/제도/장소만 추출
     
     Args:
         query: 사용자 질문
+        include_query_type: True면 질문 유형도 함께 분류 (query_classifier 통합)
     
     Returns:
-        역사적 키워드 리스트
+        {"keywords": [...], "query_type": "causal"} (include_query_type=True 시)
+        또는 [...] (include_query_type=False 시)
     """
     try:
         llm = ChatOpenAI(
@@ -301,7 +333,27 @@ def extract_historical_keywords_with_llm(query: str) -> list:
             temperature=0
         )
         
-        prompt = f"""다음 질문에서 **역사적 키워드만** 추출하세요.
+        # 질문 유형 분류 포함 여부에 따라 프롬프트 분기
+        if include_query_type:
+            prompt = f"""다음 질문을 분석하세요.
+
+## 질문
+{query}
+
+## 작업 1: 역사적 키워드 추출
+- 역사적 인물명, 사건명, 제도/기관명, 장소명, 시대명만 추출
+- 조사/동사/의문사/일반 단어 제외
+
+## 작업 2: 질문 유형 분류
+- causal: 인과관계/패턴 ("왜?", "영향은?", "결과는?", "패턴은?")
+- deep_analysis: 심화 분석 ("진짜 이유?", "숨은 의도?", "이면에는?")
+
+## 출력 형식 (JSON만, 다른 설명 없이)
+{{"keywords": ["키워드1", "키워드2"], "query_type": "causal"}}
+
+키워드가 없으면 빈 배열로 출력"""
+        else:
+            prompt = f"""다음 질문에서 **역사적 키워드만** 추출하세요.
 
 ## 질문
 {query}
@@ -329,22 +381,47 @@ def extract_historical_keywords_with_llm(query: str) -> list:
         content = response.content.strip()
         
         # 파싱
-        if not content or content == "없음" or content == "없습니다":
-            return []
-        
-        keywords = [kw.strip() for kw in content.split(',') if kw.strip()]
-        
-        # 추가 필터링 (혹시 모를 일반 단어 제거)
-        stopwords = {'대해서', '대해', '관해서', '관해', '관련', '사실', '이유', 
-                     '진짜', '정말', '어떻게', '무엇', '왜', '있어', '없어', 
-                     '알려줘', '알려주세요', '알려', '하다', '되다'}
-        keywords = [kw for kw in keywords if kw not in stopwords and len(kw) >= 2]
-        
-        return keywords
+        if include_query_type:
+            # JSON 파싱
+            import json
+            try:
+                # JSON 추출 (코드블록 제거)
+                if "```" in content:
+                    content = content.split("```")[1]
+                    if content.startswith("json"):
+                        content = content[4:]
+                
+                result = json.loads(content)
+                keywords = result.get("keywords", [])
+                query_type = result.get("query_type", "causal")
+                
+                # 검증
+                if query_type not in ["causal", "deep_analysis"]:
+                    query_type = "causal"
+                
+                return {"keywords": keywords, "query_type": query_type}
+            except json.JSONDecodeError:
+                # JSON 파싱 실패 시 기본값
+                return {"keywords": extract_keywords_from_query(query), "query_type": "causal"}
+        else:
+            if not content or content == "없음" or content == "없습니다":
+                return []
+            
+            keywords = [kw.strip() for kw in content.split(',') if kw.strip()]
+            
+            # 추가 필터링 (혹시 모를 일반 단어 제거)
+            stopwords = {'대해서', '대해', '관해서', '관해', '관련', '사실', '이유', 
+                         '진짜', '정말', '어떻게', '무엇', '왜', '있어', '없어', 
+                         '알려줘', '알려주세요', '알려', '하다', '되다'}
+            keywords = [kw for kw in keywords if kw not in stopwords and len(kw) >= 2]
+            
+            return keywords
         
     except Exception as e:
         print(f"⚠️ LLM 키워드 추출 실패: {e}")
         # 실패 시 기본 키워드 추출 사용
+        if include_query_type:
+            return {"keywords": extract_keywords_from_query(query), "query_type": "causal"}
         return extract_keywords_from_query(query)
 
 
@@ -449,24 +526,26 @@ def entity_extractor_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
     print(f"\n🔍 엔티티 추출 중... (질문: {query[:50]}...)")
 
-    # 1. TTL 데이터 로드
+    # 1. TTL 데이터 로드 (캐싱됨)
     ttl_data = load_ttl_entities()
     
-    # 2. 키워드 추출
-    # 2-1. 기본 키워드 추출 (TTL 매칭용 - 빠름)
-    basic_keywords = extract_keywords_from_query(query)
-    print(f"   📝 기본 키워드: {basic_keywords}")
+    # 2. 키워드 추출 (규칙 기반 - LLM 없이)
+    # ========================================
+    # ⚡ 리팩토링: LLM 키워드 추출 제거
+    # - LLM이 "답"을 해석해서 의도와 다른 결과 발생 방지
+    # - 규칙 기반으로 조사/동사만 제거하고 원본 단어 유지
+    # ========================================
     
-    # 2-2. LLM 역사 키워드 추출 (Milvus 검색용 - 정확함)
-    try:
-        historical_keywords = extract_historical_keywords_with_llm(query)
-        print(f"   🎯 역사 키워드 (LLM): {historical_keywords}")
-    except Exception as e:
-        print(f"   ⚠️ LLM 키워드 추출 실패: {e}")
-        historical_keywords = []
+    # TTL 매칭용 키워드 (전체)
+    query_keywords = extract_keywords_from_query(query, for_vector_search=False)
+    print(f"   📝 TTL 매칭용 키워드: {query_keywords}")
     
-    # TTL 매칭용 키워드 (기본 + 역사)
-    query_keywords = list(set(basic_keywords + historical_keywords))
+    # 벡터 검색용 키워드 (조선시대/조선 제외)
+    vector_keywords = extract_keywords_from_query(query, for_vector_search=True)
+    print(f"   🔮 벡터 검색용 키워드: {vector_keywords}")
+    
+    # query_type은 query_classifier_node에서 이미 설정됨
+    current_query_type = state.get("query_type", "causal")
     
     matched_entities = []
     seen = set()
@@ -519,19 +598,20 @@ def entity_extractor_node(state: GraphState) -> GraphState:
     
     print(f"      → TTL 매칭: {ttl_matched}개")
     
-    # --- Milvus 유사도 검색 (LLM 역사 키워드로만 검색) ---
+    # --- Milvus 유사도 검색 (규칙 기반 키워드 사용) ---
+    # ⚡ 리팩토링: LLM 대신 규칙 기반 키워드로 벡터 검색
+    # - "조선시대/조선" 제외 (모든 데이터가 조선시대라서)
+    # - 조사/동사 제거된 명확한 단어만 사용
     milvus_added = 0
-    if USE_MILVUS and historical_keywords:
-        print(f"\n   🔮 Milvus 유사도 검색 (역사 키워드만 사용)...")
+    if USE_MILVUS and vector_keywords:
+        print(f"\n   🔮 Milvus 유사도 검색 (조선시대/조선 제외)...")
         
         # 동적 top_k: 키워드 수에 따라 조절
-        # 키워드가 적으면 각각 더 많이, 키워드가 많으면 각각 적게
-        dynamic_top_k = max(3, min(10, 15 // max(len(historical_keywords), 1)))
+        dynamic_top_k = max(3, min(10, 15 // max(len(vector_keywords), 1)))
         
-        # ⚠️ 중요: LLM이 추출한 역사 키워드로만 Milvus 검색
-        # "대해서", "알려줘" 같은 일반 단어는 제외됨
+        # 규칙 기반으로 추출된 키워드로 Milvus 검색
         milvus_entities = search_entities_with_milvus(
-            historical_keywords,  # 역사 키워드만 사용!
+            vector_keywords,  # 조선시대/조선 제외된 키워드
             ttl_data, 
             top_k=dynamic_top_k
         )
@@ -545,9 +625,9 @@ def entity_extractor_node(state: GraphState) -> GraphState:
                 matched_entities.append(e)
                 milvus_added += 1
         
-        print(f"      → Milvus 추가: {milvus_added}개 (top_k={dynamic_top_k}, 키워드: {historical_keywords})")
-    elif USE_MILVUS and not historical_keywords:
-        print(f"\n   ⚠️ 역사 키워드가 없어 Milvus 검색 건너뜀")
+        print(f"      → Milvus 추가: {milvus_added}개 (top_k={dynamic_top_k}, 키워드: {vector_keywords})")
+    elif USE_MILVUS and not vector_keywords:
+        print(f"\n   ⚠️ 벡터 검색용 키워드가 없어 Milvus 검색 건너뜀")
     
     # ========================================
     # 3단계: LLM 엔티티 추출 (결과가 부족할 때만)
@@ -685,6 +765,7 @@ def entity_extractor_node(state: GraphState) -> GraphState:
             if props:
                 print(f"     • {entity_type}: {len(props)}개 ({', '.join(props[:3])}...)")
 
+    # 결과 반환 (query_type은 query_classifier_node에서 설정됨)
     return {
         **state,
         "extracted_entities": matched_entities,

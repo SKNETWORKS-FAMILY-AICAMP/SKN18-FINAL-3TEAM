@@ -27,32 +27,37 @@ def multi_path_extractor_node(state: GraphState) -> GraphState:
             inference_paths[thread_type] = []
             continue
 
-        # Thread별 경로 추출 (새로운 데이터 기반 Thread 타입)
-        if thread_type == "event_context":
-            paths = extract_event_context_paths(bindings, thread_weights.get(thread_type, 0.2))
-        elif thread_type == "actor_network":
-            paths = extract_actor_network_paths(bindings, thread_weights.get(thread_type, 0.2))
-        elif thread_type == "timeline":
-            paths = extract_timeline_paths(bindings, thread_weights.get(thread_type, 0.2))
-        elif thread_type == "similar_events":
-            paths = extract_similar_events_paths(bindings, thread_weights.get(thread_type, 0.2))
-        elif thread_type == "background":
-            paths = extract_background_paths(bindings, thread_weights.get(thread_type, 0.2))
+        # Thread별 경로 추출 (범용 관계 검색 기반)
+        base_weight = thread_weights.get(thread_type, 0.2)
+        
+        if thread_type == "outgoing_relations":
+            paths = extract_outgoing_relations(bindings, base_weight)
+        elif thread_type == "incoming_relations":
+            paths = extract_incoming_relations(bindings, base_weight)
+        elif thread_type == "entity_properties":
+            paths = extract_entity_properties(bindings, base_weight)
+        elif thread_type == "connected_entities":
+            paths = extract_connected_entities(bindings, base_weight)
+        elif thread_type == "type_and_summary":
+            paths = extract_type_and_summary(bindings, base_weight)
         # 이전 버전 호환성 (레거시 Thread 타입)
+        elif thread_type in ["event_context", "actor_network", "timeline", "similar_events", "background"]:
+            paths = extract_generic_paths(bindings, base_weight, thread_type)
         elif thread_type == "causal":
-            paths = extract_causal_paths(bindings, thread_weights.get(thread_type, 0.2))
+            paths = extract_causal_paths(bindings, base_weight)
         elif thread_type == "person":
-            paths = extract_person_paths(bindings, thread_weights.get(thread_type, 0.2))
+            paths = extract_person_paths(bindings, base_weight)
         elif thread_type == "temporal":
-            paths = extract_temporal_paths(bindings, thread_weights.get(thread_type, 0.2))
+            paths = extract_temporal_paths(bindings, base_weight)
         elif thread_type == "pattern":
-            paths = extract_pattern_paths(bindings, thread_weights.get(thread_type, 0.2))
+            paths = extract_pattern_paths(bindings, base_weight)
         elif thread_type == "motive":
-            paths = extract_motive_paths(bindings, thread_weights.get(thread_type, 0.2))
+            paths = extract_motive_paths(bindings, base_weight)
         elif thread_type == "comparison":
-            paths = extract_comparison_paths(bindings, thread_weights.get(thread_type, 0.2))
+            paths = extract_comparison_paths(bindings, base_weight)
         else:
-            paths = []
+            # 알 수 없는 Thread는 범용 추출
+            paths = extract_generic_paths(bindings, base_weight, thread_type)
 
         inference_paths[thread_type] = paths
 
@@ -623,3 +628,219 @@ def extract_background_paths(bindings: list, base_weight: float) -> list:
                 })
     
     return paths[:15]
+
+
+# ========================================
+# 범용 관계 검색 경로 추출 함수들
+# ========================================
+
+def extract_outgoing_relations(bindings: list, base_weight: float) -> list:
+    """엔티티에서 나가는 모든 관계 추출 (엔티티 → ?)"""
+    paths = []
+    seen = set()
+    
+    for binding in bindings:
+        entity_label = binding.get("entityLabel", {}).get("value", "")
+        predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
+        obj = binding.get("object", {}).get("value", "")
+        obj_label = binding.get("objectLabel", {}).get("value", "") or obj.split("#")[-1]
+        
+        # 중복 제거
+        key = f"{entity_label}-{predicate}-{obj_label}"
+        if key in seen or not predicate:
+            continue
+        seen.add(key)
+        
+        # 프로퍼티 이름을 읽기 좋게 변환
+        predicate_display = predicate.replace("has", "").replace("_", " ")
+        
+        description = f"{entity_label} → [{predicate_display}] → {obj_label}"
+        
+        paths.append({
+            "type": "outgoing_relation",
+            "subject": entity_label,
+            "predicate": predicate,
+            "predicate_display": predicate_display,
+            "object": obj_label,
+            "weight": base_weight,
+            "description": description
+        })
+    
+    return paths[:30]
+
+
+def extract_incoming_relations(bindings: list, base_weight: float) -> list:
+    """엔티티로 들어오는 모든 관계 추출 (? → 엔티티)"""
+    paths = []
+    seen = set()
+    
+    for binding in bindings:
+        subject = binding.get("subject", {}).get("value", "")
+        subject_label = binding.get("subjectLabel", {}).get("value", "") or subject.split("#")[-1]
+        predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
+        entity_label = binding.get("entityLabel", {}).get("value", "")
+        
+        # 중복 제거
+        key = f"{subject_label}-{predicate}-{entity_label}"
+        if key in seen or not predicate:
+            continue
+        seen.add(key)
+        
+        # 프로퍼티 이름을 읽기 좋게 변환
+        predicate_display = predicate.replace("has", "").replace("_", " ")
+        
+        description = f"{subject_label} → [{predicate_display}] → {entity_label}"
+        
+        paths.append({
+            "type": "incoming_relation",
+            "subject": subject_label,
+            "predicate": predicate,
+            "predicate_display": predicate_display,
+            "object": entity_label,
+            "weight": base_weight * 1.2,  # 들어오는 관계는 더 중요
+            "description": description
+        })
+    
+    return paths[:30]
+
+
+def extract_entity_properties(bindings: list, base_weight: float) -> list:
+    """엔티티의 모든 속성 추출 (리터럴 값)"""
+    paths = []
+    seen = set()
+    
+    for binding in bindings:
+        entity_label = binding.get("entityLabel", {}).get("value", "")
+        predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
+        value = binding.get("value", {}).get("value", "")
+        
+        # 중복 제거
+        key = f"{entity_label}-{predicate}"
+        if key in seen or not predicate or not value:
+            continue
+        seen.add(key)
+        
+        # 값 정리 (너무 길면 자르기)
+        value_display = value[:100] + "..." if len(value) > 100 else value
+        
+        # 프로퍼티 이름을 읽기 좋게 변환
+        predicate_display = predicate.replace("has", "").replace("_", " ")
+        
+        description = f"{entity_label}의 {predicate_display}: {value_display}"
+        
+        paths.append({
+            "type": "property",
+            "entity": entity_label,
+            "predicate": predicate,
+            "predicate_display": predicate_display,
+            "value": value_display,
+            "weight": base_weight,
+            "description": description
+        })
+    
+    return paths[:30]
+
+
+def extract_connected_entities(bindings: list, base_weight: float) -> list:
+    """연결된 엔티티들 간의 관계 추출 (2-hop)"""
+    paths = []
+    seen = set()
+    
+    for binding in bindings:
+        entity1 = binding.get("label1", {}).get("value", "")
+        predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
+        entity2 = binding.get("label2", {}).get("value", "")
+        
+        # 중복 제거
+        key = f"{entity1}-{predicate}-{entity2}"
+        if key in seen or not predicate:
+            continue
+        seen.add(key)
+        
+        # 프로퍼티 이름을 읽기 좋게 변환
+        predicate_display = predicate.replace("has", "").replace("_", " ")
+        
+        description = f"{entity1} ↔ [{predicate_display}] ↔ {entity2}"
+        
+        paths.append({
+            "type": "connection",
+            "entity1": entity1,
+            "predicate": predicate,
+            "predicate_display": predicate_display,
+            "entity2": entity2,
+            "weight": base_weight * 1.5,  # 연결 관계는 매우 중요
+            "description": description
+        })
+    
+    return paths[:20]
+
+
+def extract_type_and_summary(bindings: list, base_weight: float) -> list:
+    """엔티티 타입과 요약 정보 추출"""
+    paths = []
+    seen = set()
+    
+    for binding in bindings:
+        entity_label = binding.get("entityLabel", {}).get("value", "")
+        entity_type = binding.get("type", {}).get("value", "").split("#")[-1] if binding.get("type") else ""
+        summary = binding.get("summary", {}).get("value", "") if binding.get("summary") else ""
+        category = binding.get("category", {}).get("value", "") if binding.get("category") else ""
+        year = binding.get("year", {}).get("value", "") if binding.get("year") else ""
+        
+        if entity_label in seen:
+            continue
+        seen.add(entity_label)
+        
+        # 설명 생성
+        parts = []
+        if entity_type:
+            parts.append(f"[{entity_type}]")
+        if year:
+            parts.append(f"({year}년)")
+        if category:
+            parts.append(f"분류: {category}")
+        if summary:
+            parts.append(summary[:100])
+        
+        description = f"{entity_label} " + " ".join(parts) if parts else entity_label
+        
+        paths.append({
+            "type": "summary",
+            "entity": entity_label,
+            "entity_type": entity_type,
+            "summary": summary,
+            "category": category,
+            "year": year,
+            "weight": base_weight,
+            "description": description
+        })
+    
+    return paths[:20]
+
+
+def extract_generic_paths(bindings: list, base_weight: float, thread_type: str) -> list:
+    """범용 경로 추출 (알 수 없는 Thread 타입용)"""
+    paths = []
+    
+    for i, binding in enumerate(bindings[:20]):
+        # 바인딩에서 모든 값 추출
+        parts = []
+        for key, value in binding.items():
+            if isinstance(value, dict) and "value" in value:
+                val = value["value"]
+                # URI면 마지막 부분만
+                if val.startswith("http"):
+                    val = val.split("#")[-1].split("/")[-1]
+                parts.append(f"{key}: {val[:50]}")
+        
+        if parts:
+            description = " | ".join(parts)
+            paths.append({
+                "type": thread_type,
+                "index": i,
+                "weight": base_weight,
+                "description": description,
+                "raw_binding": {k: v.get("value", "") if isinstance(v, dict) else v for k, v in binding.items()}
+            })
+    
+    return paths

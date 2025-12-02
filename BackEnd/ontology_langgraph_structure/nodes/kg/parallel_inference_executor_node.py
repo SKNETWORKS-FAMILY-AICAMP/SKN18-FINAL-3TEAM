@@ -69,74 +69,89 @@ THREAD_WEIGHTS = {
 }
 
 # 데이터 기반 Thread 설정 (SPARQL 템플릿)
+# ⚡ 범용 관계 검색: 특정 프로퍼티 하드코딩 대신 모든 관계 검색
 DATA_THREADS = {
-    "event_context": {
-        "description": "사건 맥락 검색 (설명, 참여자, 장소)",
+    "outgoing_relations": {
+        "description": "엔티티에서 나가는 모든 관계 (엔티티 → ?)",
         "sparql_template": """
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
             
-            SELECT ?entity ?label ?description ?participant ?location WHERE {{
-                ?entity rdfs:label ?label .
-                OPTIONAL {{ ?entity hist:hasDescription ?description }}
-                OPTIONAL {{ ?entity hist:hasParticipant ?participant }}
-                OPTIONAL {{ ?entity hist:occursAt ?location }}
-                FILTER (?entity IN ({entity_uris}))
+            SELECT ?entity ?entityLabel ?predicate ?object ?objectLabel WHERE {{
+                VALUES ?entity {{ {entity_uris} }}
+                ?entity rdfs:label ?entityLabel .
+                ?entity ?predicate ?object .
+                OPTIONAL {{ ?object rdfs:label ?objectLabel }}
+                FILTER(?predicate != rdf:type)
+                FILTER(?predicate != rdfs:label)
+            }} LIMIT 100
+        """,
+        "use_milvus": False
+    },
+    "incoming_relations": {
+        "description": "엔티티로 들어오는 모든 관계 (? → 엔티티)",
+        "sparql_template": """
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            
+            SELECT ?subject ?subjectLabel ?predicate ?entity ?entityLabel WHERE {{
+                VALUES ?entity {{ {entity_uris} }}
+                ?entity rdfs:label ?entityLabel .
+                ?subject ?predicate ?entity .
+                OPTIONAL {{ ?subject rdfs:label ?subjectLabel }}
+                FILTER(?predicate != rdf:type)
+                FILTER(?predicate != rdfs:label)
+            }} LIMIT 100
+        """,
+        "use_milvus": False
+    },
+    "entity_properties": {
+        "description": "엔티티의 모든 속성 (리터럴 값)",
+        "sparql_template": """
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            
+            SELECT ?entity ?entityLabel ?predicate ?value WHERE {{
+                VALUES ?entity {{ {entity_uris} }}
+                ?entity rdfs:label ?entityLabel .
+                ?entity ?predicate ?value .
+                FILTER(isLiteral(?value))
+                FILTER(?predicate != rdfs:label)
+            }} LIMIT 100
+        """,
+        "use_milvus": False
+    },
+    "connected_entities": {
+        "description": "연결된 엔티티들 간의 관계 (2-hop)",
+        "sparql_template": """
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            
+            SELECT DISTINCT ?entity1 ?label1 ?predicate ?entity2 ?label2 WHERE {{
+                VALUES ?entity1 {{ {entity_uris} }}
+                VALUES ?entity2 {{ {entity_uris} }}
+                ?entity1 rdfs:label ?label1 .
+                ?entity2 rdfs:label ?label2 .
+                ?entity1 ?predicate ?entity2 .
+                FILTER(?entity1 != ?entity2)
             }} LIMIT 50
         """,
         "use_milvus": False
     },
-    "actor_network": {
-        "description": "인물 네트워크 검색 (관계, 소속, 역할)",
+    "type_and_summary": {
+        "description": "엔티티 타입과 요약 정보",
         "sparql_template": """
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
             
-            SELECT ?person ?label ?affiliation ?role ?relationship WHERE {{
-                ?person rdf:type hist:Person ;
-                        rdfs:label ?label .
-                OPTIONAL {{ ?person hist:affiliatedWith ?affiliation }}
-                OPTIONAL {{ ?person hist:hasRole ?role }}
-                OPTIONAL {{ ?person hist:hasRelationshipWith ?relationship }}
-                FILTER (?person IN ({entity_uris}))
-            }} LIMIT 50
-        """,
-        "use_milvus": False
-    },
-    "timeline": {
-        "description": "시간순 사건 검색 (연도, 순서)",
-        "sparql_template": """
-            PREFIX hist: <http://www.example.org/korean-history#>
-            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            
-            SELECT ?event ?label ?year ?before ?after WHERE {{
-                ?event rdfs:label ?label .
-                OPTIONAL {{ ?event hist:hasYear ?year }}
-                OPTIONAL {{ ?event hist:occursBefore ?before }}
-                OPTIONAL {{ ?event hist:occursAfter ?after }}
-                FILTER (?event IN ({entity_uris}))
-            }} 
-            ORDER BY ?year
-            LIMIT 50
-        """,
-        "use_milvus": False
-    },
-    "similar_events": {
-        "description": "유사 사건 검색 (Milvus 벡터)",
-        "sparql_template": None,  # Milvus 사용
-        "use_milvus": True
-    },
-    "background": {
-        "description": "배경 정보 검색 (summary, category)",
-        "sparql_template": """
-            PREFIX hist: <http://www.example.org/korean-history#>
-            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            
-            SELECT ?entity ?label ?summary ?category WHERE {{
-                ?entity rdfs:label ?label .
+            SELECT ?entity ?entityLabel ?type ?summary ?category ?year WHERE {{
+                VALUES ?entity {{ {entity_uris} }}
+                ?entity rdfs:label ?entityLabel .
+                OPTIONAL {{ ?entity rdf:type ?type }}
                 OPTIONAL {{ ?entity hist:hasSummary ?summary }}
                 OPTIONAL {{ ?entity hist:hasCategory ?category }}
-                FILTER (?entity IN ({entity_uris}))
+                OPTIONAL {{ ?entity hist:hasYear ?year }}
             }} LIMIT 50
         """,
         "use_milvus": False
@@ -154,12 +169,20 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
     기존 multi_query_generator_node를 통합하여 효율성 향상:
     - 기존: 쿼리 5개 순차 생성(~10초) → 추론 5개 병렬 실행(~3초) = ~13초
     - 개선: 쿼리생성+추론을 Thread별로 동시 실행 = ~3-5초
+    
+    프로퍼티 필터링:
+    - classify_node에서 선택된 프로퍼티 그룹으로 SPARQL FILTER 적용
+    - 관련 프로퍼티만 검색하여 정확도 향상
     """
     
     query = state.get("query", "")
     query_type = state.get("query_type", "causal")
     entities = state.get("extracted_entities", [])
     hypothetical_triples = state.get("hypothetical_triples", [])
+    
+    # 선택된 프로퍼티 (classify_node에서 전달)
+    selected_properties = state.get("selected_properties", [])
+    selected_groups = state.get("selected_property_groups", [])
     
     # Thread 가중치 설정
     thread_weights = THREAD_WEIGHTS.get(query_type, THREAD_WEIGHTS["causal"])
@@ -171,6 +194,10 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
     print(f"   - 쿼리 모드: {QUERY_MODE} ({query_desc})")
     print(f"   - 질문 유형: {query_type}")
     print(f"   - 추출된 엔티티: {len(entities)}개")
+    if selected_groups:
+        print(f"   - 프로퍼티 그룹: {selected_groups}")
+    if selected_properties:
+        print(f"   - 필터 프로퍼티: {len(selected_properties)}개 ({selected_properties[:5]}...)")
     start_time = time.time()
     
     # LLM 초기화 (QUERY_MODE=llm일 때만 필요)
@@ -193,7 +220,8 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
                 query_type=query_type,
                 entities=entities,
                 hypothetical=hypothetical_triples,
-                thread_config=DATA_THREADS[thread_type]
+                thread_config=DATA_THREADS[thread_type],
+                selected_properties=selected_properties  # 프로퍼티 필터 전달
             ): thread_type
             for thread_type in DATA_THREADS.keys()
         }
@@ -259,19 +287,21 @@ def execute_unified_thread(
     query_type: str,
     entities: list,
     hypothetical: list,
-    thread_config: dict
+    thread_config: dict,
+    selected_properties: list = None
 ) -> dict:
     """
     개별 Thread에서 쿼리 생성 + 지식 검색을 순차적으로 수행
     
     Args:
         llm: ChatOpenAI 인스턴스 (Thread 간 공유, QUERY_MODE=llm일 때만 사용)
-        thread_type: Thread 타입 (event_context/actor_network/timeline/similar_events/background)
+        thread_type: Thread 타입 (outgoing_relations/incoming_relations/entity_properties/connected_entities/type_and_summary)
         query: 사용자 질문
         query_type: 질문 유형
         entities: 추출된 엔티티 목록
         hypothetical: 가상 트리플 목록 (미사용)
         thread_config: Thread 설정 (sparql_template, use_milvus, description)
+        selected_properties: 필터링할 프로퍼티 목록 (classify_node에서 선택)
         
     Returns:
         검색 결과 딕셔너리
@@ -280,6 +310,7 @@ def execute_unified_thread(
     description = thread_config.get("description", "")
     use_milvus = thread_config.get("use_milvus", False)
     sparql_template = thread_config.get("sparql_template", "")
+    selected_properties = selected_properties or []
     
     # similar_events는 Milvus 검색 사용
     if use_milvus:
@@ -288,7 +319,8 @@ def execute_unified_thread(
     # 1️⃣ SPARQL 쿼리 생성
     if sparql_template and QUERY_MODE == "template":
         # 템플릿 모드: 미리 정의된 SPARQL 템플릿 사용
-        sparql = generate_template_sparql(thread_type, entities, sparql_template)
+        # 선택된 프로퍼티로 FILTER 적용
+        sparql = generate_template_sparql(thread_type, entities, sparql_template, selected_properties)
     else:
         # Fallback 쿼리 사용
         sparql = generate_fallback_sparql(thread_type, entities)
@@ -360,8 +392,18 @@ def execute_milvus_search(thread_type: str, entities: list, description: str) ->
         return {"status": "error", "bindings": [], "thread_type": thread_type, "error": str(e)}
 
 
-def generate_template_sparql(thread_type: str, entities: list, template: str) -> str:
-    """템플릿 기반 SPARQL 생성"""
+def generate_template_sparql(thread_type: str, entities: list, template: str, selected_properties: list = None) -> str:
+    """
+    템플릿 기반 SPARQL 생성
+    
+    Args:
+        thread_type: Thread 타입
+        entities: 엔티티 목록
+        template: SPARQL 템플릿
+        selected_properties: 필터링할 프로퍼티 목록 (선택된 경우 FILTER 추가)
+    """
+    
+    selected_properties = selected_properties or []
     
     # 엔티티 URI 목록 생성
     entity_uris = []
@@ -390,6 +432,19 @@ def generate_template_sparql(thread_type: str, entities: list, template: str) ->
     
     # 템플릿에 URI 삽입
     sparql = template.format(entity_uris=uri_list)
+    
+    # 선택된 프로퍼티가 있으면 FILTER 추가 (outgoing/incoming 관계 검색에만)
+    if selected_properties and thread_type in ["outgoing_relations", "incoming_relations"]:
+        # 프로퍼티 FILTER 생성
+        prop_uris = [f"hist:{prop}" for prop in selected_properties[:20]]  # 최대 20개
+        prop_filter = ", ".join(prop_uris)
+        
+        # 기존 FILTER 앞에 프로퍼티 FILTER 추가
+        # 두 가지 방식 시도: 프로퍼티 필터가 있을 때와 없을 때
+        if prop_filter:
+            # LIMIT 앞에 프로퍼티 FILTER 추가
+            filter_clause = f"FILTER(?predicate IN ({prop_filter}))"
+            sparql = sparql.replace("}} LIMIT", f"{filter_clause}\n            }} LIMIT")
     
     return sparql
 
