@@ -1,0 +1,176 @@
+# ============================================================
+# Causal Inference Rules (인과관계 추론)
+# ============================================================
+#
+# 목적: What-if 시뮬레이터 (Stage 2)
+# CSV 추출: leadsTo, causedBy (LLM이 "이로 인해", "계기로" 키워드로 추출)
+# 추론 결과: indirectlyCausedBy (2-3단계 인과관계 체인)
+#
+
+@prefix hist: <http://www.example.org/korean-history#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+
+# ============================================================
+# Rule 1: 간접 인과관계 추론 (2단계)
+# ============================================================
+[causal_chain_2hop:
+    (?event1 hist:leadsTo ?event2)
+    (?event2 hist:leadsTo ?event3)
+    noValue(?event1 hist:indirectlyCausedBy ?event3)
+    ->
+    (?event1 hist:indirectlyCausedBy ?event3)
+]
+
+
+# ============================================================
+# Rule 2: 간접 인과관계 추론 (3단계)
+# ============================================================
+[causal_chain_3hop:
+    (?event1 hist:leadsTo ?event2)
+    (?event2 hist:leadsTo ?event3)
+    (?event3 hist:leadsTo ?event4)
+    noValue(?event1 hist:indirectlyCausedBy ?event4)
+    ->
+    (?event1 hist:indirectlyCausedBy ?event4)
+]
+
+
+# ============================================================
+# Rule 3: 전투 승리 → 전쟁 승리
+# ============================================================
+[battle_victory_to_war:
+    (?battle1 rdf:type hist:Battle)
+    (?battle2 rdf:type hist:Battle)
+    (?battle1 hist:partOf ?war)
+    (?battle2 hist:partOf ?war)
+    (?battle1 hist:hasVictor ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    notEqual(?battle1, ?battle2)
+    noValue(?war hist:hasVictor ?nation)
+    ->
+    (?war hist:hasVictor ?nation)
+]
+
+
+# ============================================================
+# Rule 4: 전투 패배 → 국가 약화
+# ============================================================
+[multiple_defeats_weakens_nation:
+    (?battle1 hist:hasDefeated ?nation)
+    (?battle2 hist:hasDefeated ?nation)
+    notEqual(?battle1, ?battle2)
+    noValue(?nation hist:hasStatus "weakened")
+    ->
+    (?nation hist:hasStatus "weakened")
+]
+
+
+# ============================================================
+# Rule 5: 연속 승리 → 전략적 우위
+# ============================================================
+[consecutive_victories_strategic_advantage:
+    (?person hist:commands ?battle1)
+    (?person hist:commands ?battle2)
+    (?battle1 hist:hasVictor ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    (?person hist:affiliatedWith ?nation)
+    notEqual(?battle1, ?battle2)
+    noValue(?person hist:hasStrategicAdvantage "high")
+    ->
+    (?person hist:hasStrategicAdvantage "high")
+]
+
+
+# ============================================================
+# Rule 6: 여러 전투 발생 → 전략적 요충지
+# ============================================================
+[strategic_location_inference:
+    (?battle1 hist:occursAt ?place)
+    (?battle2 hist:occursAt ?place)
+    (?battle3 hist:occursAt ?place)
+    notEqual(?battle1, ?battle2)
+    notEqual(?battle2, ?battle3)
+    notEqual(?battle1, ?battle3)
+    noValue(?place hist:strategicImportance "high")
+    ->
+    (?place hist:strategicImportance "high")
+]
+
+
+# ============================================================
+# Rule 7: 전쟁 참여 → 국가 간 적대 관계
+# ============================================================
+[war_creates_hostility:
+    (?battle hist:hasVictor ?nation1)
+    (?battle hist:hasDefeated ?nation2)
+    notEqual(?nation1, ?nation2)
+    noValue(?nation1 hist:atWarWith ?nation2)
+    ->
+    (?nation1 hist:atWarWith ?nation2)
+    (?nation2 hist:atWarWith ?nation1)
+]
+
+
+# ============================================================
+# Rule 8: 전투 승리 → 영토 통제
+# ============================================================
+[battle_victory_controls_territory:
+    (?battle hist:occursAt ?place)
+    (?battle hist:hasVictor ?nation)
+    noValue(?place hist:controlledBy ?nation)
+    ->
+    (?place hist:controlledBy ?nation)
+]
+
+
+# ============================================================
+# Rule 9: 인과관계 역방향 추론
+# ============================================================
+[inverse_causality:
+    (?event1 hist:leadsTo ?event2)
+    noValue(?event2 hist:causedBy ?event1)
+    ->
+    (?event2 hist:causedBy ?event1)
+]
+
+
+# ============================================================
+# Rule 10: 정책 → 사건 인과관계
+# ============================================================
+[policy_leads_to_event:
+    (?policy rdf:type hist:Policy)
+    (?policy hist:leadsTo ?event)
+    (?event rdf:type hist:Event)
+    noValue(?event hist:causedBy ?policy)
+    ->
+    (?event hist:causedBy ?policy)
+]
+
+
+# ============================================================
+# Rule 11: 제도 설립 → 정책 연계
+# ============================================================
+[institution_policy_connection:
+    (?institution rdf:type hist:Institution)
+    (?policy rdf:type hist:Policy)
+    (?institution hist:establishedBy ?person)
+    (?policy hist:initiatedBy ?person)
+    noValue(?institution hist:relatedToPolicy ?policy)
+    ->
+    (?institution hist:relatedToPolicy ?policy)
+]
+
+
+# ============================================================
+# Rule 12: 정책 시행 → 국가 관계
+# ============================================================
+[policy_affects_nation_relations:
+    (?policy rdf:type hist:Policy)
+    (?policy hist:involves ?nation)
+    (?policy hist:hasImpact ?impact)
+    noValue(?nation hist:hasStatus ?impact)
+    ->
+    (?nation hist:hasStatus ?impact)
+]

@@ -3,7 +3,6 @@ python-dotenv==1.2.1
 # rag
 pandas==2.3.3
 langchain-core==1.0.5
-psycopg2==2.9.11
 psycopg2-binary==2.9.11
 
 # langgraph
@@ -16,6 +15,20 @@ langsmith==0.4.46
 
 # api requests
 requests==2.32.5
+
+# fuseki / sparql
+SPARQLWrapper==2.0.0
+rdflib==7.0.0
+
+# realtime inference api
+fastapi==0.115.6
+uvicorn==0.34.0
+
+# milvus vector database
+pymilvus==2.6.4
+sentence-transformers==5.1.2
+torch==2.9.1  # sentence-transformers 의존성
+transformers==4.57.3  # sentence-transformers 의존성
 
 # video_pipeline
 google-genai==1.52.0          # Gemini Image API 클라이언트
