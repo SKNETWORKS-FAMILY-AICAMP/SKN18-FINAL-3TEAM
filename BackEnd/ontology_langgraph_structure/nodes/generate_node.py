@@ -86,6 +86,8 @@ def story_generator_node(state: GraphState) -> GraphState:
 
     query = state.get("query", "")
     query_type = state.get("query_type", "causal")
+    query_intent = state.get("query_intent", "")  # 핵심 의도 (예: "건축/창건 관계")
+    relation_keywords = state.get("relation_keywords", [])  # 관계 키워드
     evidences = state.get("evidences", [])
     causal_chains = state.get("causal_chains", [])
     extracted_entities = state.get("extracted_entities", [])
@@ -158,28 +160,45 @@ def story_generator_node(state: GraphState) -> GraphState:
     for i, ev in enumerate(evidences[:10], 1):
         raw_data = ev.get('raw_data', {})
         
-        # 실제 내용 추출
+        # 실제 내용 추출 (content > summary > description 순서)
         content = raw_data.get('content', '') or raw_data.get('summary', '') or ''
+        
+        # 연도 정보 추출
+        year = raw_data.get('year', '') or raw_data.get('hasYear', '')
+        year_str = f"({year}년) " if year else ""
         
         # 엔티티명 추출
         desc = ev.get('description', '')
         entity_name = desc.split(':')[0].strip() if ':' in desc else desc[:30]
         entity_name = clean_entity_name(entity_name)
         
-        # 상세 설명 생성
+        # 상세 설명 생성 - 실제 내용 포함 (관련 역사 정보 제거)
         if content:
-            detail = f"{i}. {entity_name}: {content[:100]}{'...' if len(content) > 100 else ''}"
+            detail = f"[{i}] {year_str}{entity_name}: {content[:120]}{'...' if len(content) > 120 else ''}"
         else:
-            detail = f"{i}. {entity_name}: 관련 역사 정보"
+            # 내용이 없으면 description 사용
+            desc_content = desc.replace(entity_name + ':', '').strip()[:100] if desc else ''
+            if desc_content:
+                detail = f"[{i}] {year_str}{entity_name}: {desc_content}"
+            else:
+                detail = f"[{i}] {year_str}{entity_name}"
         
         evidence_detail_list.append(detail)
     evidence_details = "\n".join(evidence_detail_list)
+
+    # 의도 정보 추가
+    intent_info = ""
+    if query_intent:
+        intent_info = f"\n## 질문의 핵심 의도\n{query_intent}"
+        if relation_keywords:
+            intent_info += f"\n관련 키워드: {', '.join(relation_keywords)}"
+        intent_info += "\n→ 근거에서 이 의도와 관련된 정보를 우선적으로 사용하세요.\n"
 
     story_prompt = f"""당신은 조선시대 역사를 전문적으로 설명하는 역사가입니다.
 
 ## 질문
 {query}
-
+{intent_info}
 ## 참고 근거 ({len(evidences)}개)
 {evidence_text}
 
@@ -190,22 +209,22 @@ def story_generator_node(state: GraphState) -> GraphState:
 
 ### 1. 말투: "-입니다" 체로 작성
    - 반드시 존댓말 "-입니다", "-습니다", "-됩니다" 체로 작성하세요.
-   - 나쁜 예: "경신환국이 발생하여 서인이 집권하게 되었다."
-   - 좋은 예: "경신환국이 발생하여 서인이 집권하게 되었습니다."
 
 ### 2. 되묻지 않기
    - 추가 정보를 요청하거나 질문을 되묻지 마세요.
    - 주어진 근거만으로 최선의 답변을 작성하세요.
-   - "어떤 사건을 말씀하시는 건가요?" 같은 표현 절대 금지
 
-### 3. 자연스러운 서술
-   - 근거를 본문에 자연스럽게 녹여서 서술하세요.
-   - 나쁜 예: "경신환국이 발생했습니다 [1]."
-   - 좋은 예: "1680년 경신환국이 발생하여 남인이 실각하고 서인이 집권하게 되었습니다."
+### 3. 명확한 근거 제시 (중요!)
+   - 반드시 **연도, 사건명, 인물명, 문헌명**을 명시하세요.
+   - 나쁜 예: "궁궐이 지어졌습니다."
+   - 좋은 예: "1395년 태조 이성계가 경복궁을 창건하였습니다."
+   - 나쁜 예: "왕이 정책을 시행했습니다."
+   - 좋은 예: "세종대왕이 1446년 훈민정음을 반포하였습니다."
 
-### 4. 각주 참조는 문단 끝에만
-   - 문단 끝에 "(참고: 1, 3)" 형태로 간략히 표시
-   - 본문 중간에 [1][2][3] 형태로 나열하지 마세요
+### 4. 각주 형식: [1][2][3]
+   - 문장 끝에 **[1][2][3]** 형태로 근거 번호를 표시하세요.
+   - 나쁜 예: "(참고: 1, 2)"
+   - 좋은 예: "경복궁은 1395년에 창건되었습니다.[1][3]"
 
 ### 5. 정규화된 ID 사용 금지
    - "Institution_d4c9663e" 같은 코드 절대 사용 금지
@@ -218,6 +237,8 @@ def story_generator_node(state: GraphState) -> GraphState:
 
 [본문]
 2-3문단으로 자연스럽게 서술 (200-400자, "-입니다" 체)
+- 연도, 사건명, 인물명을 명확히 언급
+- 문장 끝에 [1][2] 형태로 근거 표시
 
 [요약]
 한 문장으로 핵심 정리 ("-입니다" 체)

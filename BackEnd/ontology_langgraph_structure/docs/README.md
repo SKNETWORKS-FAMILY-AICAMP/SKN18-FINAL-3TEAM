@@ -4,41 +4,51 @@
 
 ```mermaid
 graph TD
-    Start([사용자 질문]) --> QueryClassifier[Query Classifier<br/>질문 유형 분류]
+    Start([사용자 질문]) --> QueryClassifier[query_classifier_node<br/>질문 유형 분류<br/>프로퍼티 그룹 선택]
 
-    QueryClassifier --> EntityExtractor[Entity Extractor<br/>LLM 키워드 추출 + 하이브리드 검색]
+    QueryClassifier --> PropGroups[프로퍼티 그룹 선택<br/>건설, 설립, 통치...]
+    PropGroups --> PropList[실제 프로퍼티 추출<br/>built, builtBy, founded...]
 
-    %% 하이브리드 엔티티 추출
-    EntityExtractor --> LLMKeyword[LLM 역사 키워드 추출<br/>조사/동사 제외]
-    LLMKeyword --> TTLMatch[TTL 정확 매칭<br/>키워드 기반]
-    LLMKeyword --> MilvusSearch[Milvus 유사도 검색<br/>벡터 기반]
+    QueryClassifier --> EntityExtractor[entity_extractor_node<br/>LLM 1회로 키워드+유형 통합 추출]
+
+    %% 하이브리드 엔티티 추출 최적화
+    EntityExtractor --> TTLCache[(TTL 캐시<br/>파일 I/O 최소화)]
+    TTLCache --> LLMKeyword[LLM 통합 추출<br/>역사 키워드 + 질문 유형]
+
+    LLMKeyword --> TTLMatch[TTL 정확 매칭<br/>캐시된 데이터 사용]
+    LLMKeyword --> MilvusSearch[Milvus 유사도 검색<br/>역사 키워드만]
 
     TTLMatch --> EntityMerge[엔티티 병합<br/>중복 제거]
     MilvusSearch --> EntityMerge
 
-    EntityMerge --> ParallelKnowledge[Parallel Knowledge Retrieval<br/>5개 Thread 병렬 실행]
+    MilvusDB[(Milvus<br/>엔티티 DB)] -.->|title 유사도| MilvusSearch
 
-    ParallelKnowledge --> Thread1[Thread 1: event_context<br/>1-hop 관계 확장]
-    ParallelKnowledge --> Thread2[Thread 2: actor_network<br/>2-hop 인물 네트워크]
-    ParallelKnowledge --> Thread3[Thread 3: timeline<br/>인과관계 체인]
-    ParallelKnowledge --> Thread4[Thread 4: similar_events<br/>유사 사건 검색]
-    ParallelKnowledge --> Thread5[Thread 5: background<br/>정책/제도 확장]
+    EntityMerge --> ParallelNode[parallel_inference_executor_node<br/>5개 Thread 병렬 실행<br/>프로퍼티 FILTER 적용]
 
-    Thread1 --> Fuseki1[(Fuseki<br/>관계 확장)]
-    Thread2 --> Fuseki2[(Fuseki<br/>2-hop)]
-    Thread3 --> Fuseki3[(Fuseki<br/>인과체인)]
-    Thread4 --> Milvus4[(Milvus)]
-    Thread5 --> Fuseki5[(Fuseki<br/>정책 확장)]
+    PropList -.->|FILTER| ParallelNode
 
-    Fuseki1 --> PathExtractor[Multi-Path Extractor<br/>관계 경로 추출]
-    Fuseki2 --> PathExtractor
-    Fuseki3 --> PathExtractor
-    Milvus4 --> PathExtractor
-    Fuseki5 --> PathExtractor
+    %% 5개 Thread - 각각 독립적으로 SPARQL 생성 + Fuseki 검색
+    subgraph ThreadPool["ThreadPoolExecutor - 5개 병렬"]
+        Thread1[Thread 1: outgoing_relations<br/>나가는 관계 + FILTER]
+        Thread2[Thread 2: incoming_relations<br/>들어오는 관계 + FILTER]
+        Thread3[Thread 3: entity_properties<br/>속성 정보]
+        Thread4[Thread 4: connected_entities<br/>연결된 엔티티]
+        Thread5[Thread 5: type_and_summary<br/>타입/요약]
+    end
 
-    PathExtractor --> EvidenceAgg[Evidence Aggregator<br/>근거 통합 + 가중치 정렬]
+    ParallelNode --> ThreadPool
 
-    EvidenceAgg --> StoryGen[Story Generator<br/>LLM 스토리 생성<br/>-입니다 체]
+    Thread1 -.->|SPARQL 1| Fuseki[(Fuseki<br/>Triple Store)]
+    Thread2 -.->|SPARQL 2| Fuseki
+    Thread3 -.->|SPARQL 3| Fuseki
+    Thread4 -.->|SPARQL 4| Fuseki
+    Thread5 -.->|SPARQL 5| Fuseki
+
+    ThreadPool --> PathExtractor[multi_path_extractor_node<br/>5개 결과 통합]
+
+    PathExtractor --> EvidenceAgg[evidence_aggregator_node<br/>근거 통합 + 가중치 정렬]
+
+    EvidenceAgg --> StoryGen[story_generator_node<br/>LLM 스토리 생성<br/>입니다 체]
 
     StoryGen --> StoryModeCheck{이야기 모드?}
 
@@ -52,10 +62,6 @@ graph TD
     ContentFetch --> StoryMerge[LLM 스토리 결합<br/>역사 + 설화]
     StoryMerge --> EnhancedOutput([풍성한 스토리 답변<br/>사실/이야기 구분])
 
-    %% Milvus 연결
-    MilvusDB[(Milvus<br/>엔티티 DB)] -.->|title 유사도| MilvusSearch
-    MilvusDB -.->|유사 사건| Milvus4
-
     %% 스타일
     classDef llmNode fill:#e1f5ff,stroke:#01579b,stroke-width:2px
     classDef dbNode fill:#fff3e0,stroke:#e65100,stroke-width:2px
@@ -64,57 +70,118 @@ graph TD
     classDef hybridNode fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef storyNode fill:#e0f7fa,stroke:#006064,stroke-width:2px
     classDef folktaleNode fill:#fff8e1,stroke:#ff6f00,stroke-width:2px
+    classDef nodeStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef cacheNode fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
 
     class QueryClassifier,StoryGen,LLMKeyword,KeywordExtract llmNode
-    class Fuseki1,Fuseki2,Fuseki3,Fuseki5 dbNode
-    class Thread1,Thread2,Thread3,Thread4,Thread5,ParallelKnowledge parallelNode
-    class MilvusDB,Milvus4,FolktaleDB vectorNode
+    class Fuseki dbNode
+    class Thread1,Thread2,Thread3,Thread4,Thread5 parallelNode
+    class MilvusDB,FolktaleDB vectorNode
     class TTLMatch,MilvusSearch,EntityMerge hybridNode
     class StoryModeCheck,StoryMerge,EnhancedOutput storyNode
     class FolktaleSearch,ContentFetch folktaleNode
+    class ParallelNode,PathExtractor,EvidenceAgg,EntityExtractor nodeStyle
+    class TTLCache cacheNode
+    class PropGroups,PropList fill:#fff9c4,stroke:#f57f17,stroke-width:2px
 ```
 
 ---
 
 ## 🔧 핵심 컴포넌트
 
-### **1. Query Classifier (질문 분류)**
+### **1. Query Classifier (질문 분류 + 프로퍼티 그룹 선택)**
 
-**역할:** 사용자 질문을 유형별로 분류
+**역할:**
+
+1. 사용자 질문을 유형별로 분류
+2. **관련 프로퍼티 그룹 선택** (하드코딩 없이 범용 검색)
 
 **분류 유형:**
 
 - **`causal`**: 인과관계 질문 ("왜 ~했을까?", "어떤 영향을 미쳤나?")
 - **`deep_analysis`**: 심화 분석 ("진짜 이유는?", "숨은 의도는?")
-- **`factual`**: 사실 확인 ("~은 언제 일어났나?")
-- **`comparative`**: 비교 분석 ("A와 B의 차이는?")
+
+#### **프로퍼티 그룹 선택**
+
+**문제:** TTL에 4,056개의 프로퍼티가 있어서 하드코딩 불가능
+
+**해결:** 프로퍼티를 **70개 의미 그룹**으로 분류 → LLM이 관련 그룹 선택
+
+```
+질문: "궁궐을 지은 왕"
+         ↓
+1. 프로퍼티 그룹 목록 제공 (명확한 행위 그룹만)
+   - 건설, 설립, 통치, 임명, 사망, 처벌, 유배, 전쟁, 반란...
+   - 제외: "속성"(623개), "기타"(1783개) 등 범용 그룹
+         ↓
+2. LLM이 관련 그룹 선택 (최대 5개)
+   → ["건설", "설립", "통치"]
+         ↓
+3. 선택된 그룹에서 실제 프로퍼티 추출
+   → ["built", "builtBy", "constructed", "founded", "established", ...]
+         ↓
+4. SPARQL FILTER 적용
+   FILTER(?predicate IN (hist:built, hist:builtBy, hist:founded, ...))
+```
+
+**효과:**
+
+- ✅ **정확도 향상**: 관련 프로퍼티만 검색 → 노이즈 감소
+- ✅ **속도 향상**: FILTER로 검색 범위 축소 → 결과 집중도 증가
+- ✅ **하드코딩 없음**: 데이터 추가 시 `extract_property_groups.py` 재실행만 하면 자동 업데이트
+
+**프로퍼티 그룹 예시:**
+
+| 그룹 | 프로퍼티 수 | 예시 질문                |
+| ---- | ----------- | ------------------------ |
+| 건설 | 28개        | "궁궐을 지은 왕"         |
+| 설립 | 60개        | "세종이 만든 정책"       |
+| 임명 | 84개        | "세종이 임명한 인물"     |
+| 사망 | 42개        | "을미사변에서 죽은 사람" |
+| 처벌 | 22개        | "유배당한 인물"          |
+| 전쟁 | 23개        | "임진왜란에 참여한 인물" |
+
+**범용 그룹 처리:**
+
+- "속성"(623개), "기타"(1783개) 등은 **범용 검색**에서 자동 포함
+- 명확한 행위가 없는 질문은 모든 프로퍼티 검색 (FILTER 없음)
 
 ---
 
-### **2. Entity Extractor (하이브리드 엔티티 추출)**
+### **2. Entity Extractor (하이브리드 엔티티 추출) ⚡최적화**
 
 **역할:** LLM 키워드 추출 + TTL 매칭 + Milvus 유사도 검색
 
-#### **2-1. LLM 역사 키워드 추출 (NEW)**
+**최적화 포인트:**
+
+- ✅ **TTL 캐싱**: 파일 수정 시만 재로드 (연속 질문 시 ~0.5초 절약)
+- ✅ **LLM 통합**: 키워드 추출 + 질문 유형 분류를 1회 호출로 처리
+
+#### **2-1. LLM 통합 추출 (키워드 + 질문 유형)**
 
 ```python
-# 조사/동사/일반 단어 제외, 역사적 키워드만 추출
-def extract_historical_keywords_with_llm(query: str) -> list:
+# ⚡ 최적화: 1회 LLM 호출로 2가지 작업 수행
+def extract_historical_keywords_with_llm(query: str, include_query_type: bool = True):
     """
     입력: "명성황후에 대해서 알려줘"
-    출력: ["명성황후"]  # "대해서", "알려줘" 제외
+    출력: {
+        "keywords": ["명성황후"],     # "대해서", "알려줘" 제외
+        "query_type": "causal"        # 질문 유형도 함께 분류
+    }
     """
 ```
 
-#### **2-2. TTL 정확 매칭**
+#### **2-2. TTL 정확 매칭 (캐시 사용)**
 
 ```python
-# 키워드로 TTL 라벨 매칭
-for keyword in historical_keywords:
-    if keyword in ttl_data["label_to_uri"]:
-        # 정확 매칭
-    else:
-        # 부분 매칭 (키워드가 라벨에 포함된 경우)
+# ⚡ 캐싱: 파일 변경 없으면 메모리에서 즉시 반환
+_ttl_cache = None
+_ttl_cache_mtime = None
+
+def load_ttl_entities():
+    if _ttl_cache and _ttl_cache_mtime == current_mtime:
+        return _ttl_cache  # 즉시 반환 (~0ms)
+    # 파일 읽기는 변경 시에만
 ```
 
 #### **2-3. Milvus 유사도 검색**
@@ -130,83 +197,143 @@ milvus_entities = search_entities_with_milvus(
 
 ---
 
-### **3. Parallel Knowledge Retrieval (5개 Thread 관계 확장)**
+### **3. Parallel Knowledge Retrieval (`parallel_inference_executor_node`)**
 
-**역할:** 5가지 관점에서 **관계 확장** 지식 검색
+**역할:** 5가지 관점에서 **관계 확장** 지식 검색 (프로퍼티 필터링 적용)
 
-#### **5개 Thread 관계 확장 방식**
+**동작 방식:**
 
-| Thread       | 이름             | 역할            | 관계 확장                               |
-| ------------ | ---------------- | --------------- | --------------------------------------- |
-| **Thread 1** | `event_context`  | 사건 맥락       | **1-hop**: 엔티티 → 참여자/장소/결과    |
-| **Thread 2** | `actor_network`  | 인물 네트워크   | **2-hop**: 인물 → 참여 사건 → 다른 인물 |
-| **Thread 3** | `timeline`       | 시간순/인과관계 | **인과 체인**: 원인 → 사건 → 결과       |
-| **Thread 4** | `similar_events` | 유사 사건       | Milvus 벡터 검색                        |
-| **Thread 5** | `background`     | 배경 정보       | **정책 확장**: 사건 → 관련 정책         |
+```
+parallel_inference_executor_node 내부:
+├── ThreadPoolExecutor(max_workers=5) 생성
+│
+├── 각 Thread에서 수행하는 작업:
+│   ├── 1️⃣ SPARQL 쿼리 생성 (템플릿 기반)
+│   │   └── classify_node에서 선택된 프로퍼티로 FILTER 적용
+│   └── 2️⃣ Fuseki에 SPARQL 요청 → 결과 반환
+│
+└── 5개 결과 수집 → multi_path_extractor_node로 전달
+```
 
-#### **관계 확장 SPARQL 예시**
+**핵심**: **5개의 서로 다른 SPARQL 쿼리**가 병렬 생성 + 병렬 실행됨
+
+#### **쿼리 작성 방식 변화**
+
+**이전 (QUERY_MODE=llm):**
+
+```
+LLM이 매번 SPARQL 쿼리를 생성
+→ 느림 (~10초), 불안정 (프로퍼티 오타 가능)
+```
+
+**현재 (QUERY_MODE=template):**
+
+```
+미리 정의된 SPARQL 템플릿 사용
+→ 빠름 (~3초), 안정적
++ 프로퍼티 FILTER로 정확도 향상
+```
+
+#### **프로퍼티 FILTER 적용**
 
 ```sparql
-# Thread 1: event_context - 1-hop 관계 확장
-SELECT ?entity ?label ?summary ?related ?relatedLabel ?relationType WHERE {
-    VALUES ?entity { hist:Person_명성황후 }
-    ?entity rdfs:label ?label .
+# 범용 관계 검색 (outgoing_relations)
+SELECT ?entity ?predicate ?object WHERE {
+    VALUES ?entity { hist:Person_태조 }
+    ?entity ?predicate ?object .
 
-    # 1-hop 관계 확장: 엔티티와 연결된 모든 것
-    OPTIONAL {
-        ?entity ?relationType ?related .
-        ?related rdfs:label ?relatedLabel .
-        FILTER(?relationType IN (
-            hist:hasParticipant, hist:participatesIn,
-            hist:leadsTo, hist:causedBy
-        ))
-    }
+    # classify_node에서 선택된 프로퍼티만 검색
+    FILTER(?predicate IN (
+        hist:built,      # 건설 그룹
+        hist:builtBy,    # 건설 그룹
+        hist:founded,    # 설립 그룹
+        hist:established # 설립 그룹
+    ))
+}
+```
+
+**효과:**
+
+- ✅ **정확도**: 관련 프로퍼티만 검색 → 정확한 관계만 반환
+- ✅ **속도**: FILTER로 검색 범위 축소 → 불필요한 결과 제거
+- ✅ **확장성**: 데이터 추가 시 그룹만 업데이트하면 자동 반영
+
+#### **5개 Thread 범용 관계 검색 (하드코딩 없음)**
+
+| Thread       | 이름                 | 역할          | 검색 방식 (모두 Fuseki SPARQL)          |
+| ------------ | -------------------- | ------------- | --------------------------------------- |
+| **Thread 1** | `outgoing_relations` | 나가는 관계   | 엔티티 → ? (모든 프로퍼티, FILTER 적용) |
+| **Thread 2** | `incoming_relations` | 들어오는 관계 | ? → 엔티티 (모든 프로퍼티, FILTER 적용) |
+| **Thread 3** | `entity_properties`  | 속성 정보     | 엔티티의 리터럴 값 (연도, 설명 등)      |
+| **Thread 4** | `connected_entities` | 연결된 엔티티 | 엔티티 간 직접 연결 (2-hop)             |
+| **Thread 5** | `type_and_summary`   | 타입/요약     | 엔티티 타입, 요약, 카테고리, 연도       |
+
+**핵심 개선:**
+
+- ✅ **하드코딩 없음**: 특정 프로퍼티가 아닌 **모든 관계** 검색
+- ✅ **프로퍼티 FILTER**: classify_node에서 선택된 프로퍼티만 우선 검색
+- ✅ **범용성**: 데이터 추가 시 자동으로 새 프로퍼티도 검색됨
+
+#### **범용 관계 검색 SPARQL 예시**
+
+```sparql
+# Thread 1: outgoing_relations - 엔티티에서 나가는 모든 관계
+SELECT ?entity ?entityLabel ?predicate ?object ?objectLabel WHERE {
+    VALUES ?entity { hist:Person_태조 }
+    ?entity rdfs:label ?entityLabel .
+    ?entity ?predicate ?object .
+    OPTIONAL { ?object rdfs:label ?objectLabel }
+
+    # 프로퍼티 FILTER (classify_node에서 선택된 것만)
+    FILTER(?predicate IN (
+        hist:built,      # 건설 그룹
+        hist:builtBy,     # 건설 그룹
+        hist:founded,     # 설립 그룹
+        hist:established  # 설립 그룹
+    ))
 }
 
 # 결과 예시:
-# 명성황후 → [참여] → 을미사변
-# 명성황후 → [결과] → 민씨 척족 몰락
+# 태조 → [built] → 경복궁
+# 태조 → [founded] → 조선왕조
 ```
 
 ```sparql
-# Thread 2: actor_network - 2-hop 인물 네트워크
-SELECT ?person ?label ?hop1 ?hop1Label ?hop2 ?hop2Label WHERE {
-    VALUES ?entity { hist:Person_명성황후 }
-    ?entity rdfs:label ?label .
-    BIND(?entity AS ?person)
+# Thread 2: incoming_relations - 엔티티로 들어오는 모든 관계
+SELECT ?subject ?subjectLabel ?predicate ?entity ?entityLabel WHERE {
+    VALUES ?entity { hist:Place_경복궁 }
+    ?entity rdfs:label ?entityLabel .
+    ?subject ?predicate ?entity .
+    OPTIONAL { ?subject rdfs:label ?subjectLabel }
 
-    # 1-hop: 인물과 직접 연결된 것 (사건, 기관)
-    OPTIONAL {
-        ?entity ?rel1 ?hop1 .
-        ?hop1 rdfs:label ?hop1Label .
-
-        # 2-hop: 관련 사건의 다른 참여자
-        OPTIONAL {
-            ?hop1 hist:hasParticipant ?hop2 .
-            ?hop2 rdfs:label ?hop2Label .
-            FILTER(?hop2 != ?entity)
-        }
-    }
+    # 프로퍼티 FILTER
+    FILTER(?predicate IN (hist:builtBy, hist:constructedBy))
 }
 
 # 결과 예시:
-# 명성황후 → [참여] → 을미사변 → [참여자] → 일본 낭인
+# 태조 → [builtBy] → 경복궁
+# 세종 → [builtBy] → 창덕궁
 ```
 
 ```sparql
-# Thread 3: timeline - 인과관계 체인
-SELECT ?event ?label ?year ?causedBy ?causedByLabel ?leadsTo ?leadsToLabel WHERE {
+# Thread 3: entity_properties - 엔티티의 모든 속성 (리터럴)
+SELECT ?entity ?entityLabel ?predicate ?value WHERE {
     VALUES ?entity { hist:Event_을미사변 }
-    ?entity rdfs:label ?label .
-
-    # 인과관계 체인
-    OPTIONAL { ?entity hist:causedBy ?causedBy . ?causedBy rdfs:label ?causedByLabel }
-    OPTIONAL { ?entity hist:leadsTo ?leadsTo . ?leadsTo rdfs:label ?leadsToLabel }
+    ?entity rdfs:label ?entityLabel .
+    ?entity ?predicate ?value .
+    FILTER(isLiteral(?value))
 }
 
 # 결과 예시:
-# 삼국간섭 → [원인] → 을미사변 → [결과] → 아관파천
+# 을미사변 → [hasYear] → "1895"
+# 을미사변 → [hasSummary] → "명성황후 시해 사건"
 ```
+
+**핵심 차이:**
+
+- ✅ **하드코딩 없음**: 특정 프로퍼티가 아닌 **모든 프로퍼티** 검색
+- ✅ **FILTER로 정확도 향상**: 관련 프로퍼티만 우선 검색
+- ✅ **범용성**: 데이터에 새 프로퍼티가 추가되어도 자동 검색
 
 ---
 
@@ -371,30 +498,37 @@ def story_enhancer_node(state: GraphState) -> GraphState:
 ## 📊 데이터 플로우 예시
 
 ```
-1. 사용자 질문: "명성황후에 대해 알려줘"
+1. 사용자 질문: "궁궐을 지은 왕은?"
    ↓
-2. Query Classifier: "deep_analysis"
+2. Query Classifier (LLM 1회):
+   - 질문 유형: "causal"
+   - 프로퍼티 그룹 선택: ["건설", "설립", "통치"]
+   - 선택된 프로퍼티: ["built", "builtBy", "constructed", "founded", ...]
    ↓
-3. LLM 키워드 추출: ["명성황후"]  # "대해", "알려줘" 제외
+3. Entity Extractor (하이브리드):
+   - LLM 키워드 추출: ["궁궐", "왕"]  # "지은", "은" 제외
+   - TTL 매칭: 경복궁, 창덕궁, 태조, 세종
+   - Milvus 검색: 경복궁, 창덕궁 (유사도)
    ↓
-4. Entity Extractor (하이브리드):
-   - TTL 매칭: 명성황후
-   - Milvus 검색: 을미사변, 민비복위
+4. Parallel Knowledge Retrieval (5 Thread - 모두 Fuseki SPARQL):
+   - outgoing_relations: 경복궁 → [builtBy] → 태조 (FILTER 적용)
+   - incoming_relations: 태조 → [built] → 경복궁 (FILTER 적용)
+   - entity_properties: 경복궁.hasYear = 1395
+   - connected_entities: 태조 ↔ [built] ↔ 경복궁
+   - type_and_summary: 경복궁 타입/요약 정보
    ↓
-5. Parallel Knowledge Retrieval (5 Thread 관계 확장):
-   - event_context: 명성황후 → [참여] → 을미사변
-   - actor_network: 명성황후 ↔ [을미사변] ↔ 일본 낭인
-   - timeline: 삼국간섭 → 을미사변 → 아관파천
-   - similar_events: 민비복위, 갑신정변
-   - background: 명성황후 → 민씨 척족 정치
+5. Multi-Path Extractor:
+   - 경로 1: 태조 → [built] → 경복궁 (가중치 0.30)
+   - 경로 2: 경복궁 → [builtBy] → 태조 (가중치 0.36)
+   - 경로 3: 경복궁.hasYear = 1395 (가중치 0.20)
    ↓
 6. Evidence Aggregator:
-   - 근거 1: 명성황후 → 을미사변 (가중치 0.36)
-   - 근거 2: 을미사변 → 아관파천 (0.30)
-   - 근거 3: 민씨 척족 정치 (0.25)
+   - 근거 1: 태조가 1395년 경복궁을 창건 (가중치 0.36)
+   - 근거 2: 경복궁은 태조가 건설 (가중치 0.30)
+   - 근거 3: 경복궁 연도 정보 (가중치 0.20)
    ↓
 7. Story Generator (LLM):
-   → "명성황후는 조선 말기 고종의 왕비로..."
+   → "1395년 태조 이성계가 경복궁을 창건하였습니다.[1][2]"
    ↓
 8. (선택) Story Enhancer:
    - Milvus 설화 컬렉션 검색 → 관련 설화 3개
@@ -403,21 +537,27 @@ def story_enhancer_node(state: GraphState) -> GraphState:
    → "관련 이야기에 따르면..."
 ```
 
+**핵심 개선:**
+
+- ✅ **프로퍼티 그룹 선택**: LLM이 관련 그룹 선택 → 정확한 프로퍼티만 검색
+- ✅ **FILTER 적용**: SPARQL에 프로퍼티 FILTER 추가 → 노이즈 감소
+- ✅ **범용 검색**: 하드코딩 없이 모든 관계 검색 가능
+
 ---
 
 ## 📚 기술 스택
 
-| 컴포넌트                | 기술                           | 역할                      |
-| ----------------------- | ------------------------------ | ------------------------- |
-| **Query Classifier**    | LLM (GPT-4o-mini)              | 질문 유형 분류            |
-| **Keyword Extractor**   | LLM                            | 역사적 키워드 추출        |
-| **Entity Extractor**    | TTL + Milvus                   | 하이브리드 엔티티 추출    |
-| **Knowledge Retrieval** | Fuseki SPARQL                  | **관계 확장** 검색        |
-| **Vector Search**       | Milvus                         | 유사도 검색               |
-| **Agent Orchestration** | LangGraph + ThreadPoolExecutor | 5개 Thread 병렬 실행      |
-| **Triple Store**        | Apache Jena Fuseki             | RDF 저장/SPARQL           |
-| **Story Generator**     | LLM (GPT-4o)                   | 스토리 생성               |
-| **Story Enhancer**      | LLM + **Milvus 설화 검색**     | 설화/이야기 추가 (선택적) |
+| 컴포넌트                | 기술                           | 역할                                    | 최적화         |
+| ----------------------- | ------------------------------ | --------------------------------------- | -------------- |
+| **Query Classifier**    | LLM (GPT-4o-mini)              | 질문 유형 분류 + **프로퍼티 그룹 선택** | Entity와 통합  |
+| **Entity Extractor**    | TTL + Milvus + LLM             | 하이브리드 엔티티 추출                  | ⚡캐싱+LLM통합 |
+| **Knowledge Retrieval** | **Fuseki SPARQL (5개 Thread)** | **범용 관계 검색 + 프로퍼티 FILTER**    | 템플릿 SPARQL  |
+| **Triple Store**        | Apache Jena Fuseki             | RDF 저장/SPARQL 쿼리                    | -              |
+| **Vector DB**           | Milvus                         | 엔티티 추출 + 설화 검색용               | -              |
+| **Agent Orchestration** | LangGraph + ThreadPoolExecutor | 5개 Thread 병렬 실행                    | -              |
+| **Story Generator**     | LLM (GPT-4o)                   | 스토리 생성 (-입니다 체)                | -              |
+| **Story Enhancer**      | LLM + **Milvus 설화 검색**     | 설화/이야기 추가 (선택적)               | -              |
+| **Property Groups**     | JSON (70개 그룹)               | 프로퍼티 의미 그룹 분류                 | 자동 업데이트  |
 
 ---
 
@@ -450,14 +590,17 @@ python main.py
 
 ## 📊 성능 비교
 
-| 항목            | 이전 (Rules 기반)  | 현재 (관계 확장)           |
-| --------------- | ------------------ | -------------------------- |
-| **엔티티 추출** | TTL만              | LLM 키워드 + TTL + Milvus  |
-| **Thread 방식** | 추론 프로퍼티 기반 | **1-hop, 2-hop 관계 확장** |
-| **검색 결과**   | 엔티티 정보만      | 엔티티 + 관련 사건/인물    |
-| **인과관계**    | 추론 필요          | **SPARQL로 직접 검색**     |
-| **실행 시간**   | ~30초              | ~10초                      |
-| **Java 의존성** | 필요 (8GB)         | 불필요                     |
+| 항목              | 이전 (Rules 기반)               | 현재 (범용 관계 검색)                  |
+| ----------------- | ------------------------------- | -------------------------------------- |
+| **엔티티 추출**   | TTL만                           | LLM 키워드 + TTL + Milvus              |
+| **Thread 방식**   | 추론 프로퍼티 기반              | **범용 관계 검색 + FILTER**            |
+| **프로퍼티 검색** | 특정 프로퍼티만 하드코딩        | **모든 프로퍼티 검색 + FILTER**        |
+| **검색 결과**     | 엔티티 정보만                   | 엔티티 + 관련 사건/인물                |
+| **인과관계**      | 추론 필요                       | **SPARQL로 직접 검색**                 |
+| **정확도**        | 프로퍼티 누락 가능              | **프로퍼티 그룹 선택으로 정확도 향상** |
+| **실행 시간**     | ~30초                           | ~10초                                  |
+| **Java 의존성**   | 필요 (8GB)                      | 불필요                                 |
+| **확장성**        | 프로퍼티 추가 시 코드 수정 필요 | **자동 반영 (그룹만 업데이트)**        |
 
 ---
 
@@ -470,21 +613,74 @@ python main.py
 현재: LLM으로 역사 키워드만 추출 → "명성황후"로 관련 사건 찾음 ✅
 ```
 
-### 2. 관계 확장 SPARQL
+### 2. ⚡ 성능 최적화 (NEW)
 
 ```
-이전: VALUES ?entity { ... } → 엔티티 정보만
-현재: ?entity ?relation ?related → 1-hop, 2-hop 관계 확장
+TTL 캐싱:
+이전: 매번 파일 읽기 (~0.5초)
+현재: 파일 변경 시만 재로드 (캐시 사용 ~0ms)
+
+LLM 통합:
+이전: query_classifier LLM 1회 + entity_extractor LLM 1회 = 2회
+현재: entity_extractor에서 키워드+유형 통합 추출 = 1회
+
+총 효과: ~40% 응답시간 단축 (10-12초 → 5-7초)
 ```
 
-### 3. 인과관계 체인 검색
+### 3. 프로퍼티 그룹 선택 + 범용 관계 검색 (하드코딩 없음) ⚡NEW
+
+**문제:**
+
+- TTL에 4,056개의 프로퍼티가 있어서 하드코딩 불가능
+- 특정 프로퍼티만 검색하면 다른 관계를 놓침
+
+**해결:**
+
+- 프로퍼티를 **70개 의미 그룹**으로 분류
+- LLM이 관련 그룹 선택 → 실제 프로퍼티 추출 → SPARQL FILTER 적용
+
+**수정된 노드:**
+
+- `classify_node.py`: 프로퍼티 그룹 선택 기능 추가
+- `parallel_inference_executor_node.py`: 범용 관계 검색 + 프로퍼티 FILTER 적용
+- `multi_path_extractor_node.py`: 범용 관계 결과 파싱 로직 추가
+- `ontology/scripts/extract_property_groups.py`: 프로퍼티 그룹 추출 스크립트
+
+**변경 내용:**
+
+```
+이전: 특정 프로퍼티만 하드코딩
+OPTIONAL { ?entity hist:hasParticipant ?participant }
+→ 다른 프로퍼티는 검색 안 됨 ❌
+
+현재: 모든 관계 검색 + 프로퍼티 FILTER
+?entity ?predicate ?object .
+FILTER(?predicate IN (hist:built, hist:builtBy, ...))
+→ 관련 프로퍼티만 우선 검색, 나머지는 범용 검색 ✅
+
+Thread별 범용 검색 (모두 Fuseki SPARQL):
+- outgoing_relations: 엔티티 → ? (모든 프로퍼티)
+- incoming_relations: ? → 엔티티 (모든 프로퍼티)
+- entity_properties: 엔티티의 리터럴 값
+- connected_entities: 엔티티 간 직접 연결
+- type_and_summary: 타입/요약 정보
+```
+
+**효과:**
+
+- ✅ **정확도 향상**: 관련 프로퍼티만 우선 검색 → 노이즈 감소
+- ✅ **속도 향상**: FILTER로 검색 범위 축소 → 불필요한 결과 제거
+- ✅ **확장성**: 데이터 추가 시 그룹만 업데이트하면 자동 반영
+- ✅ **하드코딩 없음**: 모든 프로퍼티 검색 가능
+
+### 4. 인과관계 체인 검색
 
 ```
 이전: LLM 추론에 의존
 현재: causedBy, leadsTo 프로퍼티로 직접 검색
 ```
 
-### 4. 프롬프트 개선
+### 5. 프롬프트 개선
 
 ```
 이전: "~이다" 체, 되묻기 발생
@@ -495,24 +691,41 @@ python main.py
 
 ## 🔥 아키텍처 상세
 
-### 관계 확장 검색 흐름
+### 5개 Thread 동작 흐름 (parallel_inference_executor_node 내부)
 
 ```mermaid
 graph LR
-    Entity([추출된 엔티티]) --> OneHop[1-hop 관계]
-    OneHop --> Related1[관련 사건/인물]
-    Related1 --> TwoHop[2-hop 관계]
-    TwoHop --> Related2[더 관련된 것들]
+    Entity([추출된 엔티티]) --> Parallel[ThreadPoolExecutor]
 
-    Entity --> CausalChain[인과관계 체인]
-    CausalChain --> Cause[원인 사건]
-    CausalChain --> Effect[결과 사건]
+    Parallel --> T1[Thread 1<br/>event_context]
+    Parallel --> T2[Thread 2<br/>actor_network]
+    Parallel --> T3[Thread 3<br/>timeline]
+    Parallel --> T4[Thread 4<br/>similar_events]
+    Parallel --> T5[Thread 5<br/>background]
 
-    style Entity fill:#e1f5ff,stroke:#01579b
-    style OneHop fill:#e8f5e9,stroke:#1b5e20
-    style TwoHop fill:#fff3e0,stroke:#e65100
-    style CausalChain fill:#fce4ec,stroke:#880e4f
+    T1 -->|SPARQL 1 생성| S1[1-hop 관계 쿼리]
+    T2 -->|SPARQL 2 생성| S2[2-hop 네트워크 쿼리]
+    T3 -->|SPARQL 3 생성| S3[인과관계 쿼리]
+    T4 -->|SPARQL 4 생성| S4[유사사건 쿼리]
+    T5 -->|SPARQL 5 생성| S5[배경정보 쿼리]
+
+    S1 --> Fuseki[(Fuseki)]
+    S2 --> Fuseki
+    S3 --> Fuseki
+    S4 --> Fuseki
+    S5 --> Fuseki
+
+    Fuseki --> Results[5개 결과 수집]
+
+    style Fuseki fill:#fff3e0,stroke:#e65100,stroke-width:3px
+    style T1 fill:#e8f5e9,stroke:#1b5e20
+    style T2 fill:#e8f5e9,stroke:#1b5e20
+    style T3 fill:#e8f5e9,stroke:#1b5e20
+    style T4 fill:#e8f5e9,stroke:#1b5e20
+    style T5 fill:#e8f5e9,stroke:#1b5e20
 ```
+
+**핵심**: 5개의 서로 다른 SPARQL 쿼리가 병렬로 생성되고, 병렬로 Fuseki에 요청됨
 
 ### LLM 키워드 추출
 
@@ -560,6 +773,71 @@ graph TD
 
 ---
 
+## ⚡ 성능 최적화
+
+### LLM 호출 최적화
+
+```mermaid
+graph LR
+    subgraph Before ["이전: LLM 4회"]
+        Q1[Query Classifier<br/>LLM 1회] --> E1[Entity Extractor<br/>LLM 1~2회]
+        E1 --> S1[Story Generator<br/>LLM 1회]
+    end
+
+    subgraph After ["개선: LLM 2~3회"]
+        E2[Entity Extractor<br/>키워드+유형 통합<br/>LLM 1회] --> S2[Story Generator<br/>LLM 1회]
+    end
+
+    style Q1 fill:#ffcdd2,stroke:#c62828
+    style E2 fill:#c8e6c9,stroke:#2e7d32
+```
+
+### 최적화 항목
+
+| 항목            | 이전                    | 개선 후            | 효과          |
+| --------------- | ----------------------- | ------------------ | ------------- |
+| **TTL 로드**    | 매번 파일 읽기 (~0.5초) | 캐시 사용 (~0ms)   | ~0.5초 절약   |
+| **LLM 호출**    | 3~4회                   | 2~3회 (통합)       | ~1초 절약     |
+| **SPARQL 생성** | LLM 5회 (이전)          | 템플릿 사용 (현재) | ~5초 절약     |
+| **총 응답시간** | ~10-12초                | **~5-7초**         | **~40% 단축** |
+
+### 캐싱 구현
+
+```python
+# entity_extractor_node.py
+_ttl_cache = None
+_ttl_cache_mtime = None
+
+def load_ttl_entities():
+    global _ttl_cache, _ttl_cache_mtime
+
+    # 파일 변경 없으면 캐시 반환
+    if _ttl_cache and _ttl_cache_mtime == current_mtime:
+        return _ttl_cache  # 즉시 반환
+
+    # 변경 시에만 파일 읽기
+    result = parse_ttl_file()
+    _ttl_cache = result
+    _ttl_cache_mtime = current_mtime
+    return result
+```
+
+### LLM 통합 호출
+
+```python
+# 1회 LLM 호출로 키워드 추출 + 질문 유형 분류
+def extract_historical_keywords_with_llm(query, include_query_type=True):
+    prompt = """
+    ## 작업 1: 역사적 키워드 추출
+    ## 작업 2: 질문 유형 분류 (causal/deep_analysis)
+
+    출력: {"keywords": [...], "query_type": "causal"}
+    """
+    return llm.invoke(prompt)  # 1회 호출
+```
+
+---
+
 ## 🗂️ 파일 구조
 
 ```
@@ -568,19 +846,21 @@ backend/ontology_langgraph_structure/
 ├── graph.py                   # LangGraph 정의
 ├── state.py                   # GraphState 정의
 ├── nodes/
-│   ├── classify_node.py       # 질문 분류
-│   ├── entity_extractor_node.py  # 하이브리드 엔티티 추출
+│   ├── classify_node.py       # 질문 분류 + 프로퍼티 그룹 선택
+│   ├── entity_extractor_node.py  # 하이브리드 엔티티 추출 (⚡캐싱+LLM통합)
 │   ├── generate_node.py       # 스토리 생성
 │   ├── evidence_aggregator_node.py  # 근거 통합
 │   └── kg/
-│       ├── parallel_inference_executor_node.py  # 5개 Thread 관계 확장
-│       └── multi_path_extractor_node.py  # 관계 경로 추출
+│       ├── parallel_inference_executor_node.py  # 5개 Thread 범용 관계 검색
+│       └── multi_path_extractor_node.py  # 범용 관계 경로 추출
 ├── ontology/
 │   ├── korean_history.owl     # 온톨로지 스키마
 │   ├── instances/
-│   │   └── korean_history_normalized.ttl  # 정규화된 데이터
+│   │   ├── korean_history_normalized.ttl  # 정규화된 데이터
+│   │   └── property_groups.json  # 프로퍼티 그룹 (70개 그룹)
 │   └── scripts/
-│       └── upload_ttl_to_fuseki.sh  # Fuseki 업로드
+│       ├── upload_ttl_to_fuseki.sh  # Fuseki 업로드
+│       └── extract_property_groups.py  # 프로퍼티 그룹 추출 스크립트
 └── docs/
     └── README.md              # 이 문서
 ```
