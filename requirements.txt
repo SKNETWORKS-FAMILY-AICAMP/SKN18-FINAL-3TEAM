@@ -3,7 +3,6 @@ python-dotenv==1.2.1
 # rag
 pandas==2.3.3
 langchain-core==1.0.5
-psycopg2==2.9.11
 psycopg2-binary==2.9.11
 
 # langgraph
@@ -16,3 +15,29 @@ langsmith==0.4.46
 
 # api requests
 requests==2.32.5
+
+# fuseki / sparql
+SPARQLWrapper==2.0.0
+rdflib==7.0.0
+
+# realtime inference api
+fastapi==0.115.6
+uvicorn==0.34.0
+
+# milvus vector database
+pymilvus==2.6.4
+sentence-transformers==5.1.2
+torch==2.9.1  # sentence-transformers 의존성
+transformers==4.57.3  # sentence-transformers 의존성
+
+# video_pipeline
+google-genai==1.52.0          # Gemini Image API 클라이언트
+google-generativeai==0.8.5    # Gemini 텍스트/분석 모델
+pillow==12.0.0                # 이미지 생성/저장 유틸
+fal-client==0.9.1             # fal.ai Wan 2.5 API 호출
+requests==2.32.5              # 비디오 다운로드 HTTP 요청
+
+# django
+django==5.2.8
+mysqlclient==2.2.7
+django-allauth==65.13.1
