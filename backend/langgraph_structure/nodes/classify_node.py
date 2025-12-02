@@ -15,9 +15,7 @@
 """
 from langgraph_structure.state import GraphState
 from langgraph.graph import END
-from typing import Literal, TypedDict, List
-import json
-from langgraph_structure.utils import create_model, _extract_json
+from langgraph_structure.utils import create_model
 
 def classify_node(state: GraphState) -> GraphState:
 
@@ -37,7 +35,7 @@ def classify_node(state: GraphState) -> GraphState:
     - GraphDB(Neo4j) 기반 질의(Graph)로 처리할지
     - 둘 다 사용하는 하이브리드(Hybrid)로 처리할지를 결정해야 합니다.
 
-    1) VECTOR_ONLY (use_vector=true, use_graph=false)
+    1) vector_only
     - 예/아니오 질문
     - 단순 사실/정의/설명/요약
     - 자연어로 쉽게 설명해달라는 요청
@@ -48,7 +46,7 @@ def classify_node(state: GraphState) -> GraphState:
     - "임진왜란이 1592년에 시작했나요?"
     - "초등학생도 이해할 수 있게 세종대왕 업적 설명해줘."
 
-    2) GRAPH_ONLY (use_vector=false, use_graph=true)
+    2) graph_only
     - 관계/연결/네트워크/사이/영향을 묻는 질문
     - '~한 사람들', '~에 참여한 인물들' 같은 리스트/집합
     - 타임라인/순서/연대기를 묻는 질문
@@ -60,7 +58,7 @@ def classify_node(state: GraphState) -> GraphState:
     - "조선 건국부터 임진왜란까지 중요한 사건들을 시간 순서대로 정리해줘."
     - "위화도 회군에서 조선 건국까지 사건 흐름을 알려줘."
 
-    3) HYBRID (use_vector=true, use_graph=true)
+    3) hybrid
     - "설명 + 관계/리스트/타임라인"을 동시에 요구하는 질문
     - 스토리 설명과 함께 관련 인물/사건 목록을 요구하는 질문
     - 애매하지만 그래프형 단어(연결, 관계, 관련, 네트워크, 타임라인, 순서 등)가 섞인 경우
@@ -70,15 +68,27 @@ def classify_node(state: GraphState) -> GraphState:
     - "세종대왕의 업적을 설명하고, 그와 관련된 제도들을 정리해줘."
     - "조선 초기 중요한 인물들 사이의 관계를 간단히 설명해주고, 인물 리스트도 알려줘."
 
-    질문이 애매하면 HYBRID 로 분류하십시오.
+    4) no_related
+    - 질문 내용이 조선시대와 전혀 관련 없는 경우
+    - '물품', '문헌', '제도', '사건', '개념', '인물', '지명', '작품', '유적', '의례·행사','단체', '의복'과 무관한 주제인 경우
+    - 역사 관련 단어가 포함 되어있더라도 문장 전체의 맥락이 조선시대 또는 역사와 무관한 경우
+
+    예시:
+    - "오늘 날씨 어때?"
+    - "현대 기업의 조선사업 전망이 어때?"
+    - "이순신은 어떤 신이야?"  (이순신 장군이 아니라 '신' 또는 캐릭터로 말하는 경우)
+    - "학익진의 다리 개수가 몇 개인지 맞춰봐."  (조선 수군 전술 구조가 아니라 농담인 경우)
+    - "신라면이랑 진라면 중 뭐가 더 맛있어?"
+
+    질문이 애매하거나 조선시대와 관련이 없다면 no_related로 분류하십시오.
 
     ### 출력 형식 (중요)
 
-    아래 스펙을 만족하는 **문자열**을 출력하십시오.
-    - 앞뒤에 어떤 설명 문장도 붙이지 마십시오.
-
-    필드 스펙:
-    - query_type: "VECTOR_ONLY", "GRAPH_ONLY", "HYBRID" 중 하나
+    아래 중 하나만 정확히 출력하십시오. 다른 문장이나 설명은 절대 쓰지 마십시오.
+    - vector_only
+    - graph_only
+    - hybrid
+    - no_related
     """
 
     client = create_model()
@@ -93,7 +103,8 @@ def classify_node(state: GraphState) -> GraphState:
         ],
     )
 
-    query_type = response.choices[0].message["content"].strip()
+    query_type = query_type = response.choices[0].message.content.strip()
+
     print(query_type)
 
     return {
@@ -106,13 +117,17 @@ def route_classify(state: GraphState) -> str:
     node 결과에 따라 다른 node로 분기
     """
     query_type = state.get("query_type")
-    if query_type=="VECTOR_ONLY":
+    if query_type=="vector_only":
         return "retrieval_node"
-    elif query_type=="GRAPH_ONLY":
+    elif query_type=="graph_only":
         return "generate_cypher_node"
-    elif query_type=="HYBRID":
+    elif query_type=="hybrid":
         # 둘 다 동시에 사용
-        pass
+        return "hybrid_node"
+    elif query_type=="no_related":
+        return END
+    else:
+        raise ValueError(f"지원하지 않는 query_type={query_type}")
 
 
 if __name__ == "__main__":
@@ -130,7 +145,7 @@ if __name__ == "__main__":
         nodes = route_classify(result)
 
         print("\n--- Classify Result ---")
-        print("  질문        :", result["query"])
-        print("  query_type  :", )
+        print("  질문        :", q)
+        print("  query_type  :", result.get("query_type"))
         print("  다음 노드    :",nodes)
         print("-" * 80)
