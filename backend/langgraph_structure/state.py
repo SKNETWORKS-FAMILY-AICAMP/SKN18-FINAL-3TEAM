@@ -5,7 +5,7 @@ class GraphState(TypedDict):
     query : str
 
     # 분류 결과
-    is_history_related : str
+    query_type : str
 
     # retrieval results
     search_chunks: List[Dict[str, Any]]

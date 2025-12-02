@@ -20,6 +20,14 @@ import json
 from langgraph_structure.utils import create_model, _extract_json
 
 def classify_node(state: GraphState) -> GraphState:
+
+    query = state.get("query")
+
+    if not query:
+        raise ValueError("classify_node: 'query' 값이 state에 없습니다.")
+
+    query = query.lower()
+
     CLASSIFY_SYSTEM_PROMPT = """
     당신의 역할은 "질문 라우터(Query Router)"입니다.
 
@@ -66,94 +74,46 @@ def classify_node(state: GraphState) -> GraphState:
 
     ### 출력 형식 (중요)
 
-    아래 스펙을 만족하는 **JSON 객체 하나만** 출력하십시오.
-
+    아래 스펙을 만족하는 **문자열**을 출력하십시오.
     - 앞뒤에 어떤 설명 문장도 붙이지 마십시오.
-    - 코드 블록 표시(예: ```json 같은 것)를 절대 넣지 마십시오.
-    - 반드시 `{` 로 시작해서 `}` 로 끝나는 한 개의 JSON 객체만 출력하십시오.
 
     필드 스펙:
     - query_type: "VECTOR_ONLY", "GRAPH_ONLY", "HYBRID" 중 하나
-    - use_vector: true/false
-    - use_graph: true/false
-    - reason: 왜 이렇게 분류했는지 한국어로 1~3문장
-    - detected_intents: ["explanation", "timeline", "relation", "list"] 중에서 관련되는 것들만 배열로 나열
-    - important_keywords: 질문에서 중요한 고유명사나 키워드를 뽑아서 배열로 나열
     """
 
-
-
-class ClassifyResult(TypedDict):
-    query: str
-    query_type: Literal["VECTOR_ONLY", "GRAPH_ONLY", "HYBRID"]
-    use_vector: bool
-    use_graph: bool
-    reason: str
-    detected_intents: List[str]
-    important_keywords: List[str]
-
-
-
-
-
-def classify_query(query: str) -> ClassifyResult:
-    """LLM에게 질의를 보내서 분류 결과(JSON)를 받는다."""
     client = create_model()
     MODEL_NAME = "gpt-5-mini"
-    resp = client.chat.completions.create(
+
+    response = client.chat.completions.create(
         model=MODEL_NAME,
-        response_format={"type": "json_object"},
+        response_format={"type": "text"},
         messages=[
             {"role": "system", "content": CLASSIFY_SYSTEM_PROMPT},
             {"role": "user", "content": f"사용자 질문: {query}"},
         ],
     )
 
-    raw = resp.choices[0].message.content or ""
-    json_str = _extract_json(raw)
+    query_type = response.choices[0].message["content"].strip()
+    print(query_type)
 
-    try:
-        data = json.loads(json_str)
-    except json.JSONDecodeError:
-        # 실패 시 기본값 + 디버그용 reason
-        data = {
-            "query_type": "VECTOR_ONLY",
-            "use_vector": True,
-            "use_graph": False,
-            "reason": f"JSON 파싱 실패. 원본: {raw}",
-            "detected_intents": ["explanation"],
-            "important_keywords": [],
-        }
-
-    data["query"] = query
-    return data  # type: ignore[return-value]
-
-
-def decide_nodes(result: ClassifyResult) -> List[str]:
-    """
-    use_vector / use_graph 플래그를 기반으로
-    실제 파이프라인 상 어떤 노드를 타는지 간단히 시뮬레이션.
-    """
-    nodes: List[str] = ["Query", "Classify"]
-
-    if result["use_vector"]:
-        nodes += ["Retrival", "Evaluate_Chunk", "Generate_Answer"]
-
-    if result["use_graph"]:
-        if result["use_vector"]:
-            nodes.append("|| (parallel) ||")
-        nodes += ["Cyper", "Neo4j", "Generate_Answer"]
-
-    if not result["use_vector"] and not result["use_graph"]:
-        nodes += ["Generate_Answer"]
-
-    nodes.append("End")
-    return nodes
+    return {
+        **state,
+        "query_type": query_type,
+    }
 
 def route_classify(state: GraphState) -> str:
-    if state.get("is_history_related") == "irrelevant":
-        return END
-    return "retrieval_node"
+    """
+    node 결과에 따라 다른 node로 분기
+    """
+    query_type = state.get("query_type")
+    if query_type=="VECTOR_ONLY":
+        return "retrieval_node"
+    elif query_type=="GRAPH_ONLY":
+        return "generate_cypher_node"
+    elif query_type=="HYBRID":
+        # 둘 다 동시에 사용
+        pass
+
 
 if __name__ == "__main__":
     print("=== 질의 분류 인터랙티브 테스트 ===")
@@ -166,16 +126,11 @@ if __name__ == "__main__":
         if q.lower() == "q":
             break
 
-        result = classify_query(q)
-        nodes = decide_nodes(result)
+        result = classify_node({"query": q})
+        nodes = route_classify(result)
 
         print("\n--- Classify Result ---")
         print("  질문        :", result["query"])
-        print("  query_type  :", result["query_type"])
-        print("  use_vector  :", result["use_vector"])
-        print("  use_graph   :", result["use_graph"])
-        print("  reason      :", result["reason"])
-        print("  intents     :", ", ".join(result["detected_intents"]))
-        print("  keywords    :", ", ".join(result["important_keywords"]))
-        print("  node flow   :", " -> ".join(nodes))
+        print("  query_type  :", )
+        print("  다음 노드    :",nodes)
         print("-" * 80)
