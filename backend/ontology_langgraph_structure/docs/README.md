@@ -9,14 +9,14 @@ graph TD
     QueryClassifier --> PropGroups[프로퍼티 그룹 선택<br/>건설, 설립, 통치...]
     PropGroups --> PropList[실제 프로퍼티 추출<br/>built, builtBy, founded...]
 
-    QueryClassifier --> EntityExtractor[entity_extractor_node<br/>LLM 1회로 키워드+유형 통합 추출]
+    QueryClassifier --> EntityExtractor[entity_extractor_node<br/>kiwipiepy 형태소 분석]
 
     %% 하이브리드 엔티티 추출 최적화
     EntityExtractor --> TTLCache[(TTL 캐시<br/>파일 I/O 최소화)]
-    TTLCache --> LLMKeyword[LLM 통합 추출<br/>역사 키워드 + 질문 유형]
+    TTLCache --> KiwiExtract[kiwipiepy 명사 추출<br/>조사/어미 자동 제거]
 
-    LLMKeyword --> TTLMatch[TTL 정확 매칭<br/>캐시된 데이터 사용]
-    LLMKeyword --> MilvusSearch[Milvus 유사도 검색<br/>역사 키워드만]
+    KiwiExtract --> TTLMatch[TTL 정확 매칭<br/>캐시된 데이터 사용]
+    KiwiExtract --> MilvusSearch[Milvus 유사도 검색<br/>역사 키워드만]
 
     TTLMatch --> EntityMerge[엔티티 병합<br/>중복 제거]
     MilvusSearch --> EntityMerge
@@ -73,7 +73,8 @@ graph TD
     classDef nodeStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
     classDef cacheNode fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
 
-    class QueryClassifier,StoryGen,LLMKeyword,KeywordExtract llmNode
+    class QueryClassifier,StoryGen,KeywordExtract llmNode
+    class KiwiExtract fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px
     class Fuseki dbNode
     class Thread1,Thread2,Thread3,Thread4,Thread5 parallelNode
     class MilvusDB,FolktaleDB vectorNode
@@ -150,17 +151,34 @@ graph TD
 
 ### **2. Entity Extractor (하이브리드 엔티티 추출) ⚡최적화**
 
-**역할:** LLM 키워드 추출 + TTL 매칭 + Milvus 유사도 검색
+**역할:** 형태소 분석 키워드 추출 + TTL 매칭 + Milvus 유사도 검색
 
 **최적화 포인트:**
 
+- ✅ **kiwipiepy 형태소 분석**: 조사/어미 자동 제거 (빠름, 정확)
 - ✅ **TTL 캐싱**: 파일 수정 시만 재로드 (연속 질문 시 ~0.5초 절약)
-- ✅ **LLM 통합**: 키워드 추출 + 질문 유형 분류를 1회 호출로 처리
+- ✅ **LLM fallback**: 결과 부족 시에만 LLM 호출
 
-#### **2-1. LLM 통합 추출 (키워드 + 질문 유형)**
+#### **2-1. kiwipiepy 형태소 분석 (1차 - 빠름, 무료)**
 
 ```python
-# ⚡ 최적화: 1회 LLM 호출로 2가지 작업 수행
+from kiwipiepy import Kiwi
+kiwi = Kiwi()
+
+def extract_nouns_with_kiwi(query: str) -> list:
+    """
+    입력: "궁궐을 건축한 왕들은 누가 있는지?"
+    토큰: [('궁궐', 'NNG'), ('을', 'JKO'), ('건축', 'NNG'), ('한', 'ETM'), ...]
+    출력: ['궁궐', '건축', '왕']  # 명사만 추출 (조사/어미 자동 제거!)
+    """
+    tokens = kiwi.tokenize(query)
+    return [t.form for t in tokens if t.tag in ('NNG', 'NNP')]  # 일반명사 + 고유명사
+```
+
+#### **2-2. LLM 키워드 추출 (fallback - 결과 부족 시)**
+
+```python
+# ⚡ 최적화: kiwipiepy 실패 시에만 LLM 호출
 def extract_historical_keywords_with_llm(query: str, include_query_type: bool = True):
     """
     입력: "명성황후에 대해서 알려줘"

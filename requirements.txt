@@ -30,6 +30,9 @@ sentence-transformers==5.1.2
 torch==2.9.1  # sentence-transformers 의존성
 transformers==4.57.3  # sentence-transformers 의존성
 
+# 한국어 형태소 분석기 (조사/어미 제거)
+kiwipiepy==0.18.0
+
 # video_pipeline
 google-genai==1.52.0          # Gemini Image API 클라이언트
 google-generativeai==0.8.5    # Gemini 텍스트/분석 모델
