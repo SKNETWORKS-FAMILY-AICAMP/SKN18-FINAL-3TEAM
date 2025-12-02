@@ -69,17 +69,18 @@ THREAD_WEIGHTS = {
 }
 
 # 데이터 기반 Thread 설정 (SPARQL 템플릿)
-# ⚡ 범용 관계 검색: 특정 프로퍼티 하드코딩 대신 모든 관계 검색
+# ⚡ 라벨 기반 검색: URI 대신 라벨로 검색하여 데이터 불일치 문제 해결
 DATA_THREADS = {
     "outgoing_relations": {
         "description": "엔티티에서 나가는 모든 관계 (엔티티 → ?)",
         "sparql_template": """
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
             
             SELECT ?entity ?entityLabel ?predicate ?object ?objectLabel WHERE {{
-                VALUES ?entity {{ {entity_uris} }}
                 ?entity rdfs:label ?entityLabel .
+                FILTER ({label_filter})
                 ?entity ?predicate ?object .
                 OPTIONAL {{ ?object rdfs:label ?objectLabel }}
                 FILTER(?predicate != rdf:type)
@@ -93,10 +94,11 @@ DATA_THREADS = {
         "sparql_template": """
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
             
             SELECT ?subject ?subjectLabel ?predicate ?entity ?entityLabel WHERE {{
-                VALUES ?entity {{ {entity_uris} }}
                 ?entity rdfs:label ?entityLabel .
+                FILTER ({label_filter})
                 ?subject ?predicate ?entity .
                 OPTIONAL {{ ?subject rdfs:label ?subjectLabel }}
                 FILTER(?predicate != rdf:type)
@@ -110,10 +112,11 @@ DATA_THREADS = {
         "sparql_template": """
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
             
             SELECT ?entity ?entityLabel ?predicate ?value WHERE {{
-                VALUES ?entity {{ {entity_uris} }}
                 ?entity rdfs:label ?entityLabel .
+                FILTER ({label_filter})
                 ?entity ?predicate ?value .
                 FILTER(isLiteral(?value))
                 FILTER(?predicate != rdfs:label)
@@ -122,18 +125,20 @@ DATA_THREADS = {
         "use_milvus": False
     },
     "connected_entities": {
-        "description": "연결된 엔티티들 간의 관계 (2-hop)",
+        "description": "두 엔티티 사이의 관계",
         "sparql_template": """
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
             
             SELECT DISTINCT ?entity1 ?label1 ?predicate ?entity2 ?label2 WHERE {{
-                VALUES ?entity1 {{ {entity_uris} }}
-                VALUES ?entity2 {{ {entity_uris} }}
                 ?entity1 rdfs:label ?label1 .
                 ?entity2 rdfs:label ?label2 .
+                FILTER ({label_filter1})
                 ?entity1 ?predicate ?entity2 .
                 FILTER(?entity1 != ?entity2)
+                FILTER(?predicate != rdf:type)
+                FILTER(?predicate != rdfs:label)
             }} LIMIT 50
         """,
         "use_milvus": False
@@ -146,8 +151,8 @@ DATA_THREADS = {
             PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
             
             SELECT ?entity ?entityLabel ?type ?summary ?category ?year WHERE {{
-                VALUES ?entity {{ {entity_uris} }}
                 ?entity rdfs:label ?entityLabel .
+                FILTER ({label_filter})
                 OPTIONAL {{ ?entity rdf:type ?type }}
                 OPTIONAL {{ ?entity hist:hasSummary ?summary }}
                 OPTIONAL {{ ?entity hist:hasCategory ?category }}
@@ -394,7 +399,7 @@ def execute_milvus_search(thread_type: str, entities: list, description: str) ->
 
 def generate_template_sparql(thread_type: str, entities: list, template: str, selected_properties: list = None) -> str:
     """
-    템플릿 기반 SPARQL 생성
+    템플릿 기반 SPARQL 생성 (라벨 기반 검색)
     
     Args:
         thread_type: Thread 타입
@@ -405,33 +410,43 @@ def generate_template_sparql(thread_type: str, entities: list, template: str, se
     
     selected_properties = selected_properties or []
     
-    # 엔티티 URI 목록 생성
-    entity_uris = []
-    for e in entities:
-        uri = e.get("uri")
-        if uri:
-            entity_uris.append(uri)
+    # 엔티티에서 라벨(이름) 추출
+    labels = [e.get("name", "") for e in entities if e.get("name")]
     
-    if not entity_uris:
-        # URI가 없으면 라벨로 검색
-        labels = [e.get("name", "") for e in entities if e.get("name")]
-        if labels:
-            label_filter = " || ".join([f'CONTAINS(LCASE(?label), "{label.lower()}")' for label in labels[:5]])
-            return f"""
-            PREFIX hist: <http://www.example.org/korean-history#>
-            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            
-            SELECT ?entity ?label WHERE {{
-                ?entity rdfs:label ?label .
-                FILTER ({label_filter})
-            }} LIMIT 30
-            """
+    if not labels:
+        # 라벨이 없으면 URI에서 추출 시도
+        for e in entities:
+            uri = e.get("uri", "")
+            if uri:
+                # hist:Person_xxx → 라벨 추출 불가, 이름 필요
+                name = e.get("label", "") or e.get("name", "")
+                if name and name not in labels:
+                    labels.append(name)
     
-    # URI 목록 포맷팅
-    uri_list = ", ".join(entity_uris)
+    if not labels:
+        return ""  # 검색할 라벨 없음
     
-    # 템플릿에 URI 삽입
-    sparql = template.format(entity_uris=uri_list)
+    # 라벨 FILTER 생성 (정확 매칭 또는 포함 검색)
+    label_conditions = []
+    for label in labels[:10]:  # 최대 10개 라벨
+        # 정확 매칭 우선, 2글자 이상만
+        if len(label) >= 2:
+            # 정확 매칭: ?entityLabel = "경복궁"
+            label_conditions.append(f'?entityLabel = "{label}"')
+            # 포함 검색: CONTAINS(?entityLabel, "경복궁")
+            # label_conditions.append(f'CONTAINS(?entityLabel, "{label}")')
+    
+    if not label_conditions:
+        return ""
+    
+    label_filter = " || ".join(label_conditions)
+    
+    # connected_entities는 두 개의 라벨 필터 필요
+    if thread_type == "connected_entities":
+        label_filter1 = " || ".join([f'?label1 = "{l}"' for l in labels[:5]])
+        sparql = template.format(label_filter1=label_filter1)
+    else:
+        sparql = template.format(label_filter=label_filter)
     
     # 선택된 프로퍼티가 있으면 FILTER 추가 (outgoing/incoming 관계 검색에만)
     if selected_properties and thread_type in ["outgoing_relations", "incoming_relations"]:
@@ -439,8 +454,6 @@ def generate_template_sparql(thread_type: str, entities: list, template: str, se
         prop_uris = [f"hist:{prop}" for prop in selected_properties[:20]]  # 최대 20개
         prop_filter = ", ".join(prop_uris)
         
-        # 기존 FILTER 앞에 프로퍼티 FILTER 추가
-        # 두 가지 방식 시도: 프로퍼티 필터가 있을 때와 없을 때
         if prop_filter:
             # LIMIT 앞에 프로퍼티 FILTER 추가
             filter_clause = f"FILTER(?predicate IN ({prop_filter}))"
@@ -731,7 +744,7 @@ def execute_inference_api(thread_type: str, sparql: str, hypothetical: list, que
         return {"status": "error", "bindings": [], "error": str(e), "thread_type": thread_type}
 
 
-def execute_fuseki_direct(thread_type: str, sparql: str) -> dict:
+def execute_fuseki_direct(thread_type: str, sparql: str, debug: bool = False) -> dict:
     """
     Fuseki에 직접 SPARQL 쿼리 (경량 모드)
     
@@ -741,6 +754,11 @@ def execute_fuseki_direct(thread_type: str, sparql: str) -> dict:
     
     endpoint = f"{FUSEKI_URL}/sparql"
     
+    # 디버그 모드: SPARQL 쿼리 출력
+    if debug:
+        print(f"\n[DEBUG] {thread_type} SPARQL:")
+        print(sparql[:500])
+    
     try:
         response = requests.post(
             endpoint,
@@ -748,9 +766,20 @@ def execute_fuseki_direct(thread_type: str, sparql: str) -> dict:
             headers={"Accept": "application/sparql-results+json"},
             timeout=30
         )
-        response.raise_for_status()
-        result = response.json()
         
+        # 에러 응답 상세 로그
+        if response.status_code != 200:
+            error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
+            if debug:
+                print(f"[DEBUG] {thread_type} 에러: {error_msg}")
+            return {
+                "status": "error",
+                "bindings": [],
+                "error": error_msg,
+                "thread_type": thread_type
+            }
+        
+        result = response.json()
         bindings = result.get("results", {}).get("bindings", [])
         
         return {

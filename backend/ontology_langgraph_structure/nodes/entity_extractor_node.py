@@ -2,7 +2,7 @@
 Entity Extractor Node
 
 질문에서 핵심 엔티티 추출 및 TTL 데이터 매칭:
-1. 키워드 추출 → TTL 정확 매칭 (빠름)
+1. 형태소 분석기(kiwipiepy)로 명사 추출 → TTL 정확 매칭 (빠름)
 2. Milvus 유사도 검색 (fallback)
 3. LLM 엔티티 추출 (최종 fallback)
 4. 엔티티 URI 반환
@@ -17,6 +17,17 @@ import json
 from pathlib import Path
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
+
+# 한국어 형태소 분석기 (조사/어미 자동 제거)
+try:
+    from kiwipiepy import Kiwi
+    _kiwi = Kiwi()
+    USE_KIWI = True
+    print("✅ kiwipiepy 형태소 분석기 로드 완료")
+except ImportError:
+    _kiwi = None
+    USE_KIWI = False
+    print("⚠️ kiwipiepy 미설치 - 규칙 기반 조사 제거 사용")
 
 # 상위 디렉토리를 경로에 추가
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -264,9 +275,68 @@ def match_entities_with_ttl(entities: list, ttl_data: dict) -> list:
     return matched_entities
 
 
+# ⚠️ DEPRECATED: kiwipiepy 형태소 분석기 사용으로 더 이상 필요 없음
+# kiwipiepy가 없을 때만 fallback으로 사용 (현재는 사용 안 함)
+def remove_particles(word: str) -> str:
+    """
+    [DEPRECATED] 한국어 조사/어미 제거 (하드코딩 규칙)
+    
+    ⚠️ kiwipiepy 형태소 분석기를 사용하므로 이 함수는 더 이상 사용되지 않습니다.
+    kiwipiepy가 없을 때만 fallback으로 사용됩니다.
+    """
+    # 간단한 fallback (kiwipiepy 없을 때만)
+    if USE_KIWI:
+        return word  # kiwipiepy 있으면 그대로 반환 (이미 처리됨)
+    
+    # 기본 조사만 제거 (최소한의 fallback)
+    particles = ['을', '를', '이', '가', '은', '는', '에', '의', '와', '과', '로', '도', '만', '들']
+    for p in particles:
+        if word.endswith(p) and len(word) > len(p):
+            return word[:-len(p)]
+    return word
+
+
+def extract_nouns_with_kiwi(query: str) -> list:
+    """
+    kiwipiepy 형태소 분석기로 명사만 추출
+    
+    품사 태그:
+    - NNG: 일반명사
+    - NNP: 고유명사 (인물, 지명 등)
+    - NNB: 의존명사 (것, 수, 등)
+    
+    Args:
+        query: 사용자 질문
+        
+    Returns:
+        명사 리스트 (고유명사 우선)
+    """
+    if not USE_KIWI or _kiwi is None:
+        return []
+    
+    try:
+        tokens = _kiwi.tokenize(query)
+        
+        # 명사만 추출 (NNG: 일반명사, NNP: 고유명사)
+        # 의존명사(NNB)는 제외 (것, 수, 등)
+        nouns = []
+        for token in tokens:
+            if token.tag in ('NNG', 'NNP') and len(token.form) >= 2:
+                nouns.append(token.form)
+        
+        return nouns
+    except Exception as e:
+        print(f"⚠️ kiwipiepy 분석 실패: {e}")
+        return []
+
+
 def extract_keywords_from_query(query: str, for_vector_search: bool = False) -> list:
     """
-    질문에서 키워드 직접 추출 (규칙 기반 - LLM 없이)
+    질문에서 키워드 추출 (kiwipiepy 형태소 분석기 사용)
+    
+    1. kiwipiepy 형태소 분석기로 명사 추출 (조사/어미 자동 제거)
+    2. 불용어 제거
+    3. 중복 제거
     
     Args:
         query: 사용자 질문
@@ -275,42 +345,74 @@ def extract_keywords_from_query(query: str, for_vector_search: bool = False) -> 
     Returns:
         키워드 리스트
     """
-    # 불용어 (조사, 동사, 일반 단어)
+    # 불용어 (동사성 명사, 일반 명사)
     stopwords = {
-        # 조사
-        '이', '가', '은', '는', '을', '를', '에', '의', '와', '과', '로', '으로', 
-        '에서', '까지', '부터', '에게', '한테', '께', '보다', '처럼', '만큼',
-        # 의문사
-        '어떤', '무엇', '왜', '어떻게', '언제', '누구', '어디', '무슨', '뭐',
-        '누구인지', '무엇인지', '어디인지',
-        # 일반 동사/형용사 어간
-        '있다', '없다', '하다', '되다', '이다', '아니다', '알다', '모르다',
-        '있어', '없어', '해서', '되어', '알려', '알려줘', '알려주세요',
-        '있는', '없는', '하는', '되는',
-        # 일반 부사/대명사
-        '그', '저', '이', '것', '수', '등', '때', '중', '후', '전', '더', '또',
-        # 일반 명사 (역사와 무관)
-        '대해서', '대해', '관해서', '관해', '관련', '관련된', '사실', '이유',
-        '진짜', '정말', '실제', '어떠', '어떻게', '무엇', '왜', '어디',
-        '시대', '시기', '당시', '역사', '내용', '설명', '정보'
+        # 의문사/대명사
+        '무엇', '누구', '어디', '언제', '무슨', '어떤',
+        # 동사성 명사 (검색 노이즈)
+        '건축', '건설', '설립', '창건', '조성', '설치', '시행', '실시',
+        # 의존명사/일반명사
+        '것', '수', '등', '때', '중', '후', '전', '이', '그', '저',
+        '사실', '이유', '내용', '설명', '정보', '관련', '대해',
+        # 시간 관련 (너무 일반적)
+        '시대', '시기', '당시', '역사', '년', '월', '일'
     }
     
     # 벡터 검색용 추가 필터 (모든 데이터가 조선시대라서 유사도가 다 높게 나옴)
     vector_search_exclude = {
-        '조선', '조선시대', '조선왕조', '조선시대의', '조선의'
+        '조선', '조선시대', '조선왕조'
     }
     
+    # ========================================
+    # kiwipiepy 형태소 분석기로 명사 추출
+    # ========================================
+    if USE_KIWI:
+        nouns = extract_nouns_with_kiwi(query)
+        if nouns:
+            # 불용어 제거
+            keywords = [n for n in nouns if n not in stopwords]
+            
+            # 중복 제거 (순서 유지)
+            seen = set()
+            unique_keywords = []
+            for kw in keywords:
+                if kw not in seen:
+                    seen.add(kw)
+                    unique_keywords.append(kw)
+            
+            # 벡터 검색용 필터링
+            if for_vector_search:
+                unique_keywords = [w for w in unique_keywords if w not in vector_search_exclude]
+            
+            return unique_keywords
+    
+    # ========================================
+    # Fallback: kiwipiepy 없을 때만 (최소한의 처리)
+    # ========================================
+    print("⚠️ kiwipiepy 미설치 - 기본 키워드 추출 사용 (정확도 낮음)")
+    
     # 한글 단어 추출 (2글자 이상)
-    words = re.findall(r'[가-힣]{2,}', query)
+    raw_words = re.findall(r'[가-힣]{2,}', query)
     
-    # 불용어 제거
-    keywords = [w for w in words if w not in stopwords]
+    # 간단한 조사 제거 (최소한)
+    words_cleaned = [remove_particles(w) for w in raw_words]
     
-    # 벡터 검색용이면 "조선/조선시대" 추가 필터링
+    # 불용어 제거 + 1글자 제거
+    keywords = [w for w in words_cleaned if w not in stopwords and len(w) >= 2]
+    
+    # 중복 제거
+    seen = set()
+    unique_keywords = []
+    for kw in keywords:
+        if kw not in seen:
+            seen.add(kw)
+            unique_keywords.append(kw)
+    
+    # 벡터 검색용 필터링
     if for_vector_search:
-        keywords = [w for w in keywords if w not in vector_search_exclude]
+        unique_keywords = [w for w in unique_keywords if w not in vector_search_exclude]
     
-    return keywords
+    return unique_keywords
 
 
 def extract_historical_keywords_with_llm(query: str, include_query_type: bool = False) -> dict:
