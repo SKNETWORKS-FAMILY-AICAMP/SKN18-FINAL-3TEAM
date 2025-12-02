@@ -1,10 +1,13 @@
-# create_nodes.py
 import csv
 import re
 from neo4j import GraphDatabase
+from pathlib import Path   # ✅ 추가
 
 import sys
 csv.field_size_limit(2_147_483_647)
+
+# 프로젝트 루트 기준 경로 계산 (backend/langgraph_structure/graphdb/ 기준 3단계 위)
+BASE_DIR = Path(__file__).resolve().parents[3]
 
 # --- Neo4j 접속 정보 ---
 URI = "neo4j://localhost:7687"
@@ -12,7 +15,8 @@ USER = "neo4j"
 PASSWORD = "skn183final"
 
 # --- CSV 경로 ---
-CSV_PATH = "neo4j/import/encykorea_cleaned6.csv"
+CSV_PATH = BASE_DIR / "infra" / "neo4j" / "import" / "encykorea_cleaned6.csv"
+
 
 # --- 카테고리 → 라벨 매핑 ---
 CATEGORY_LABEL_MAP = {
