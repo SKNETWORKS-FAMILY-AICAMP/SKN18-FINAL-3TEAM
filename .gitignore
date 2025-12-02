@@ -3354,4 +3354,4 @@ GitHub에 push할 때는 과거 커밋까지 통째로 업로드되니까 또 �
 .gitignore 안에 최소 이 정도는 있어야 함 (이미 넣었으면 건너뛰어도 됨):
 
 # neo4j
-backend/langgraph_structure/graphdb/neo4j/
+infra/neo4j/
