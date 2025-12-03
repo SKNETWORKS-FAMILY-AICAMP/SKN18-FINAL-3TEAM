@@ -65,8 +65,28 @@ def create_graph_flow():
     # 1. 시작: 질문 분류
     workflow.set_entry_point("query_classifier")
 
-    # 2. 엔티티 추출 (하이브리드: TTL + Milvus)
-    workflow.add_edge("query_classifier", "entity_extractor")
+    # 2. 조건부 분기: 역사 관련 질문 여부에 따라 분기
+    def route_after_classify(state: GraphState) -> str:
+        """classify_node 이후 라우팅"""
+        is_historical = state.get("is_historical", True)
+        
+        if not is_historical:
+            # 역사 관련이 아니면 바로 스토리 생성으로 (조기 종료 메시지 출력)
+            return "story_generator"
+        else:
+            # 역사 관련이면 정상 플로우 진행
+            return "entity_extractor"
+    
+    workflow.add_conditional_edges(
+        "query_classifier",
+        route_after_classify,
+        {
+            "entity_extractor": "entity_extractor",
+            "story_generator": "story_generator"
+        }
+    )
+
+    # 3. 엔티티 추출 (하이브리드: TTL + Milvus) - 역사 관련 질문만
 
     # 3. 병렬 지식 검색 (5개 Thread)
     workflow.add_edge("entity_extractor", "parallel_knowledge_retrieval")

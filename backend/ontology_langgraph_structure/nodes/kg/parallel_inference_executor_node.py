@@ -170,20 +170,50 @@ INFERENCE_PROPERTIES_BY_STAGE = DATA_THREADS
 def parallel_inference_executor_node(state: GraphState) -> GraphState:
     """
     5개 Thread에서 쿼리 생성 + 추론 실행을 병렬로 수행
-    
+
     기존 multi_query_generator_node를 통합하여 효율성 향상:
     - 기존: 쿼리 5개 순차 생성(~10초) → 추론 5개 병렬 실행(~3초) = ~13초
     - 개선: 쿼리생성+추론을 Thread별로 동시 실행 = ~3-5초
-    
+
     프로퍼티 필터링:
     - classify_node에서 선택된 프로퍼티 그룹으로 SPARQL FILTER 적용
     - 관련 프로퍼티만 검색하여 정확도 향상
     """
-    
+
+    import time
+    node_start = time.time()
+
     query = state.get("query", "")
     query_type = state.get("query_type", "causal")
     entities = state.get("extracted_entities", [])
     hypothetical_triples = state.get("hypothetical_triples", [])
+    
+    # 질문에서 핵심 키워드 추출 (kiwipiepy 사용)
+    try:
+        from kiwipiepy import Kiwi
+        kiwi = Kiwi()
+        tokens = kiwi.tokenize(query)
+        # 명사만 추출 (핵심 키워드)
+        core_keywords = [t.form for t in tokens if t.tag in ('NNG', 'NNP') and len(t.form) >= 2]
+    except:
+        # kiwipiepy 없으면 기본 키워드 추출
+        import re
+        core_keywords = re.findall(r'[가-힣]{2,}', query)
+    
+    # 엔티티를 핵심 키워드와의 관련도로 정렬
+    # 핵심 키워드가 엔티티 이름에 포함되면 우선순위 높임
+    def entity_priority(entity):
+        name = entity.get("name", "").lower()
+        score = 0
+        for kw in core_keywords:
+            if kw.lower() in name:
+                score += 10  # 핵심 키워드 매칭 시 높은 점수
+        # URI가 있으면 추가 점수
+        if entity.get("uri"):
+            score += 1
+        return score
+    
+    entities_sorted = sorted(entities, key=entity_priority, reverse=True)
     
     # 선택된 프로퍼티 (classify_node에서 전달)
     selected_properties = state.get("selected_properties", [])
@@ -192,17 +222,13 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
     # Thread 가중치 설정
     thread_weights = THREAD_WEIGHTS.get(query_type, THREAD_WEIGHTS["causal"])
     
-    mode_desc = "Fuseki 직접 쿼리" if INFERENCE_MODE == "light" else "Java Reasoner"
-    query_desc = "템플릿 (빠름)" if QUERY_MODE == "template" else "LLM 생성"
-    print(f"\n⚡ 병렬 지식 검색 시작 ({len(DATA_THREADS)}개 Thread)")
-    print(f"   - 검색 모드: {INFERENCE_MODE} ({mode_desc})")
-    print(f"   - 쿼리 모드: {QUERY_MODE} ({query_desc})")
-    print(f"   - 질문 유형: {query_type}")
-    print(f"   - 추출된 엔티티: {len(entities)}개")
+    print(f"\n{'='*70}")
+    print(f"[3/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
+    print(f"{'='*70}")
+    print(f"  ├─ Thread 수: {len(DATA_THREADS)}개")
+    print(f"  ├─ 엔티티: {len(entities)}개")
     if selected_groups:
-        print(f"   - 프로퍼티 그룹: {selected_groups}")
-    if selected_properties:
-        print(f"   - 필터 프로퍼티: {len(selected_properties)}개 ({selected_properties[:5]}...)")
+        print(f"  └─ 프로퍼티 필터: {', '.join(selected_groups[:3])}{'...' if len(selected_groups) > 3 else ''} ({len(selected_groups)}개)")
     start_time = time.time()
     
     # LLM 초기화 (QUERY_MODE=llm일 때만 필요)
@@ -223,7 +249,7 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
                 thread_type=thread_type,
                 query=query,
                 query_type=query_type,
-                entities=entities,
+                entities=entities_sorted,  # 정렬된 엔티티 사용 (핵심 키워드 우선)
                 hypothetical=hypothetical_triples,
                 thread_config=DATA_THREADS[thread_type],
                 selected_properties=selected_properties  # 프로퍼티 필터 전달
@@ -242,23 +268,71 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
                 results[thread_type] = result
                 multi_queries[thread_type] = result.get("sparql", "")
                 
-                status_icon = "✅" if result["status"] == "success" else "⚠️"
-                print(f"   {status_icon} {thread_type}: {result['status']} ({len(result.get('bindings', []))}개 결과)")
-                
+                # 성공적으로 완료 (로그 최소화)
+                pass
+
             except concurrent.futures.TimeoutError:
-                print(f"   ⏱️ {thread_type}: 시간 초과 (45초)")
                 results[thread_type] = {"status": "timeout", "bindings": [], "thread_type": thread_type}
             except Exception as e:
-                print(f"   ❌ {thread_type}: 실패 - {e}")
                 results[thread_type] = {"status": "error", "bindings": [], "error": str(e), "thread_type": thread_type}
-    
+
     elapsed = time.time() - start_time
-    print(f"⚡ 병렬 지식 검색 완료 ({elapsed:.1f}초)")
-    
-    # 총 결과 통계
     total_bindings = sum(len(r.get("bindings", [])) for r in results.values())
-    print(f"   - 총 검색 결과: {total_bindings}개")
-    
+
+    # Thread별 검색 결과 상세
+    print(f"\n      [Thread별 검색 결과]")
+    for thread_type, result in results.items():
+        bindings = result.get("bindings", [])
+        status = result.get("status", "unknown")
+
+        # 상태 아이콘
+        status_icon = "✓" if status == "success" else "✗"
+
+        # Thread 이름 정규화 (가독성)
+        thread_name_map = {
+            "outgoing_relations": "나가는 관계",
+            "incoming_relations": "들어오는 관계",
+            "entity_properties": "엔티티 속성",
+            "connected_entities": "연결 엔티티",
+            "type_and_summary": "타입/요약"
+        }
+        thread_display = thread_name_map.get(thread_type, thread_type)
+
+        print(f"      {status_icon} {thread_display:15s}: {len(bindings):3d}개")
+
+        # 상위 3개 결과 샘플 표시 (라벨만)
+        if bindings and len(bindings) > 0:
+            for i, binding in enumerate(bindings[:3], 1):
+                # 라벨 추출 (정규화된 라벨 우선)
+                label = (
+                    binding.get("entityLabel", {}).get("value") or
+                    binding.get("label", {}).get("value") or
+                    binding.get("label1", {}).get("value") or
+                    binding.get("subjectLabel", {}).get("value") or
+                    binding.get("entity", {}).get("value", "")
+                )
+
+                # URI에서 라벨 추출 (라벨이 없는 경우)
+                if not label or label.startswith("http"):
+                    for key in ["entity", "subject", "event"]:
+                        if key in binding:
+                            uri = binding[key].get("value", "")
+                            if "#" in uri:
+                                label = uri.split("#")[-1]
+                                break
+                            elif "/" in uri:
+                                label = uri.split("/")[-1]
+                                break
+
+                if label and len(label) > 0:
+                    # 라벨 길이 제한
+                    label_display = label[:40] + "..." if len(label) > 40 else label
+                    print(f"         {i}. {label_display}")
+
+    node_elapsed = time.time() - node_start
+    print(f"  └─ 완료: {total_bindings}개 결과 ({node_elapsed:.2f}초)")
+    print()
+
     # 추론 결과를 TTL로 저장 (옵션)
     inference_ttl_path = None
     if SAVE_INFERENCE_TRIPLES and total_bindings > 0:
@@ -270,10 +344,14 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
                 session_id=session_id,
                 execution_time=elapsed
             )
-            print(f"   💾 추론 결과 저장: {inference_ttl_path}")
+            # 추론 결과 저장 완료 (로그 간소화)
         except Exception as e:
-            print(f"   ⚠️ 추론 결과 저장 실패: {e}")
-    
+            print(f"   경고: 추론 결과 저장 실패: {e}")
+
+    # 노드 실행 시간 기록
+    node_times = state.get("node_execution_times", {})
+    node_times["parallel_knowledge_retrieval"] = node_elapsed
+
     return {
         **state,
         "multi_queries": multi_queries,  # 생성된 쿼리도 state에 저장
@@ -281,7 +359,8 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
         "parallel_inference_results": results,
         "execution_time": elapsed,
         "inference_ttl_path": inference_ttl_path,
-        "executed_nodes": state.get("executed_nodes", []) + ["parallel_inference_executor"]
+        "executed_nodes": state.get("executed_nodes", []) + ["parallel_inference_executor"],
+        "node_execution_times": node_times
     }
 
 
@@ -448,12 +527,12 @@ def generate_template_sparql(thread_type: str, entities: list, template: str, se
     else:
         sparql = template.format(label_filter=label_filter)
     
-    # 선택된 프로퍼티가 있으면 FILTER 추가 (outgoing/incoming 관계 검색에만)
-    if selected_properties and thread_type in ["outgoing_relations", "incoming_relations"]:
+    # 선택된 프로퍼티가 있으면 FILTER 추가 (outgoing/incoming/connected 관계 검색에)
+    if selected_properties and thread_type in ["outgoing_relations", "incoming_relations", "connected_entities"]:
         # 프로퍼티 FILTER 생성
         prop_uris = [f"hist:{prop}" for prop in selected_properties[:20]]  # 최대 20개
         prop_filter = ", ".join(prop_uris)
-        
+
         if prop_filter:
             # LIMIT 앞에 프로퍼티 FILTER 추가
             filter_clause = f"FILTER(?predicate IN ({prop_filter}))"
