@@ -69,13 +69,13 @@ python normalize_ttl.py \
   --output ../instances/korean_history_normalized.ttl
 
 # 2. Fuseki에 직접 업로드 (인증 필요)
-curl -X POST "http://localhost:3030/temp_inference/data" \
+curl -X POST "http://localhost:3030/korean-history/data" \
   -u admin:fuseki1234 \
   -H "Content-Type: text/turtle" \
   --data-binary "@../instances/korean_history_normalized.ttl"
 
 # 3. 업로드 확인
-curl -s "http://localhost:3030/temp_inference/query" \
+curl -s "http://localhost:3030/korean-history/query" \
   --data-urlencode "query=SELECT (COUNT(*) as ?count) WHERE { ?s ?p ?o }" \
   -H "Accept: application/sparql-results+json"
 ```

@@ -4,9 +4,13 @@
 
 ```mermaid
 graph TD
-    Start([사용자 질문]) --> QueryClassifier[query_classifier_node<br/>질문 유형 분류<br/>프로퍼티 그룹 선택]
+    Start([사용자 질문]) --> QueryClassifier[query_classifier_node<br/>LLM 1회 통합 분석<br/>질문 유형/의도/프로퍼티 분석]
 
-    QueryClassifier --> PropGroups[프로퍼티 그룹 선택<br/>건설, 설립, 통치...]
+    QueryClassifier --> HistoryCheck{역사 관련?}
+
+    HistoryCheck -->|No| EarlyExit[조기 종료<br/>답변 불가 안내]
+    HistoryCheck -->|Yes| PropGroups[프로퍼티 그룹 선택<br/>건설, 설립, 통치...]
+
     PropGroups --> PropList[실제 프로퍼티 추출<br/>built, builtBy, founded...]
 
     QueryClassifier --> EntityExtractor[entity_extractor_node<br/>kiwipiepy 형태소 분석]
@@ -15,8 +19,10 @@ graph TD
     EntityExtractor --> TTLCache[(TTL 캐시<br/>파일 I/O 최소화)]
     TTLCache --> KiwiExtract[kiwipiepy 명사 추출<br/>조사/어미 자동 제거]
 
-    KiwiExtract --> TTLMatch[TTL 정확 매칭<br/>캐시된 데이터 사용]
-    KiwiExtract --> MilvusSearch[Milvus 유사도 검색<br/>역사 키워드만]
+    KiwiExtract --> KeywordExpand[키워드 확장<br/>일반명사 → 구체적 인스턴스<br/>궁궐 → 경복궁, 창덕궁...]
+
+    KeywordExpand --> TTLMatch[TTL 정확 매칭<br/>확장된 키워드 + 원본 키워드<br/>캐시된 데이터 사용]
+    KeywordExpand --> MilvusSearch[Milvus 유사도 검색<br/>역사 키워드만<br/>fallback]
 
     TTLMatch --> EntityMerge[엔티티 병합<br/>중복 제거]
     MilvusSearch --> EntityMerge
@@ -73,12 +79,15 @@ graph TD
     classDef nodeStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
     classDef cacheNode fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
 
-    class QueryClassifier,StoryGen,KeywordExtract llmNode
+    class QueryClassifier,StoryGen,KeywordExtract,KeywordExpand llmNode
     class KiwiExtract fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px
     class Fuseki dbNode
+    class HistoryCheck fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    class EarlyExit fill:#ffebee,stroke:#d32f2f,stroke-width:2px
     class Thread1,Thread2,Thread3,Thread4,Thread5 parallelNode
     class MilvusDB,FolktaleDB vectorNode
     class TTLMatch,MilvusSearch,EntityMerge hybridNode
+    class TTLMatch fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
     class StoryModeCheck,StoryMerge,EnhancedOutput storyNode
     class FolktaleSearch,ContentFetch folktaleNode
     class ParallelNode,PathExtractor,EvidenceAgg,EntityExtractor nodeStyle
@@ -90,17 +99,47 @@ graph TD
 
 ## 🔧 핵심 컴포넌트
 
-### **1. Query Classifier (질문 분류 + 프로퍼티 그룹 선택)**
+### **1. Query Classifier (통합 분석 노드) ⚡LLM 1회 호출**
 
-**역할:**
+**역할:** LLM 1회 호출로 다음을 모두 수행
 
-1. 사용자 질문을 유형별로 분류
-2. **관련 프로퍼티 그룹 선택** (하드코딩 없이 범용 검색)
+1. **역사 관련 여부 판단** (`is_historical`)
+2. 질문 유형 분류 (`causal`/`deep_analysis`)
+3. 핵심 의도 파악 (`intent`)
+4. 프로퍼티 그룹 선택 (`property_groups`)
+5. 키워드 확장 (`expanded_keywords`: 일반명사 → 구체적 인스턴스)
 
 **분류 유형:**
 
 - **`causal`**: 인과관계 질문 ("왜 ~했을까?", "어떤 영향을 미쳤나?")
 - **`deep_analysis`**: 심화 분석 ("진짜 이유는?", "숨은 의도는?")
+
+**역사 관련 필터링:**
+
+- `is_historical=false`: 조선시대 한국 역사와 무관한 질문
+  - 예: "파이썬 프로그래밍 방법", "2024년 대선 결과"
+  - → 조기 종료: "답변을 생성할 수 없습니다" 메시지 반환
+- `is_historical=true`: 정상 플로우 진행
+
+#### **키워드 확장 (일반명사 → 구체적 인스턴스)**
+
+**문제:** "궁궐", "환국", "왕" 같은 일반명사로는 구체적인 엔티티를 찾을 수 없음
+
+**해결:** LLM으로 일반명사를 구체적 인스턴스로 확장
+
+```
+질문: "궁궐을 건축한 왕들은 누가 있는지?"
+         ↓
+1. 키워드 추출 (kiwipiepy)
+   → ["궁궐", "건축", "왕"]
+         ↓
+2. 키워드 확장 (LLM)
+   → {"궁궐": ["경복궁", "창덕궁", "경덕궁", "창경궁"],
+       "왕": ["태조", "세종", "숙종"]}
+         ↓
+3. 확장된 키워드 + 원본 키워드로 TTL 정확 매칭
+   → 경복궁, 창덕궁, 태조, 세종 등 엔티티 발견
+```
 
 #### **프로퍼티 그룹 선택**
 
@@ -151,15 +190,58 @@ graph TD
 
 ### **2. Entity Extractor (하이브리드 엔티티 추출) ⚡최적화**
 
-**역할:** 형태소 분석 키워드 추출 + TTL 매칭 + Milvus 유사도 검색
+**역할:** 확장된 키워드 + TTL 정확 매칭 + Milvus 유사도 검색 (Fuseki 검색 제거됨)
 
 **최적화 포인트:**
 
+- ✅ **키워드 확장 활용**: classify_node에서 확장된 키워드 사용 (LLM 호출 없음)
+- ✅ **TTL 정확 매칭**: 확장된 키워드 + 원본 키워드 모두 사용하여 TTL 파일에서 직접 매칭
 - ✅ **kiwipiepy 형태소 분석**: 조사/어미 자동 제거 (빠름, 정확)
 - ✅ **TTL 캐싱**: 파일 수정 시만 재로드 (연속 질문 시 ~0.5초 절약)
-- ✅ **LLM fallback**: 결과 부족 시에만 LLM 호출
+- ✅ **엔티티 우선순위 정렬**: 질문의 핵심 키워드와 관련된 엔티티 우선 검색
+- ✅ **의도 파악**: classify_node에서 이미 처리됨 (query_intent)
 
-#### **2-1. kiwipiepy 형태소 분석 (1차 - 빠름, 무료)**
+#### **2-1. 키워드 확장 활용 (classify_node에서 처리)**
+
+```python
+# classify_node에서 이미 확장된 키워드 사용
+expanded_keywords = state.get("expanded_keywords", [])
+# 예: ["경복궁", "창덕궁", "태조", "세종"]
+
+# 원본 키워드와 확장된 키워드 병합
+all_keywords = list(set(query_keywords + expanded_keywords))
+
+# TTL 파일에서 직접 매칭
+for keyword in all_keywords:
+    if keyword in ttl_data["label_to_uri"]:
+        # 엔티티 발견
+```
+
+#### **2-2. TTL 정확 매칭 (Fuseki 검색 제거됨)**
+
+**변경사항:** Fuseki 검색을 제거하고 TTL 파일에서 직접 매칭합니다.
+
+```python
+# 확장된 키워드 + 원본 키워드 모두 사용하여 TTL 매칭
+for keyword in all_keywords:  # 확장된 키워드 + 원본 키워드
+    # 정확한 라벨 매칭
+    if keyword in ttl_data["label_to_uri"]:
+        uri = ttl_data["label_to_uri"][keyword]
+        # 엔티티 추가
+
+    # 부분 매칭 (키워드가 라벨에 포함된 경우)
+    for label, uri in ttl_data["label_to_uri"].items():
+        if keyword in label:
+            # 엔티티 추가
+```
+
+**장점:**
+
+- ✅ 네트워크 통신 없음 (매우 빠름)
+- ✅ TTL 파일과 직접 동기화 (업로드 불필요)
+- ✅ 캐싱으로 파일 I/O 최소화
+
+#### **2-3. kiwipiepy 형태소 분석 (키워드 추출용)**
 
 ```python
 from kiwipiepy import Kiwi
@@ -175,21 +257,22 @@ def extract_nouns_with_kiwi(query: str) -> list:
     return [t.form for t in tokens if t.tag in ('NNG', 'NNP')]  # 일반명사 + 고유명사
 ```
 
-#### **2-2. LLM 키워드 추출 (fallback - 결과 부족 시)**
+#### **2-4. 엔티티 우선순위 정렬**
 
 ```python
-# ⚡ 최적화: kiwipiepy 실패 시에만 LLM 호출
-def extract_historical_keywords_with_llm(query: str, include_query_type: bool = True):
-    """
-    입력: "명성황후에 대해서 알려줘"
-    출력: {
-        "keywords": ["명성황후"],     # "대해서", "알려줘" 제외
-        "query_type": "causal"        # 질문 유형도 함께 분류
-    }
-    """
+# 질문의 핵심 키워드와 관련된 엔티티 우선 검색
+def entity_priority(entity):
+    name = entity.get("name", "").lower()
+    score = 0
+    for kw in core_keywords:  # "환국", "궁궐" 등
+        if kw.lower() in name:
+            score += 10  # 핵심 키워드 매칭 시 높은 점수
+    return score
+
+entities_sorted = sorted(entities, key=entity_priority, reverse=True)
 ```
 
-#### **2-2. TTL 정확 매칭 (캐시 사용)**
+#### **2-5. TTL 정확 매칭 (캐시 사용)**
 
 ```python
 # ⚡ 캐싱: 파일 변경 없으면 메모리에서 즉시 반환
@@ -202,16 +285,127 @@ def load_ttl_entities():
     # 파일 읽기는 변경 시에만
 ```
 
-#### **2-3. Milvus 유사도 검색**
+#### **2-6. Milvus 유사도 검색 (fallback)**
 
 ```python
-# LLM 추출 키워드로만 검색 (일반 단어 제외)
+# 확장된 키워드로만 검색 (일반 단어 제외)
 milvus_entities = search_entities_with_milvus(
-    historical_keywords,  # "명성황후"만, "대해서" 제외
+    expanded_keywords,  # "경복궁", "태조" 등
     ttl_data,
     top_k=dynamic_top_k
 )
 ```
+
+---
+
+### **Fuseki 검색 vs TTL 정확 매칭 비교**
+
+#### **1. Fuseki 검색 (`search_fuseki_with_keywords`)**
+
+**방식:**
+
+- SPARQL 쿼리를 통해 Fuseki 서버에 HTTP 요청
+- 네트워크 통신 필요 (실시간 검색)
+
+**장점:**
+
+- ✅ **실시간 데이터**: Fuseki에 업로드된 최신 데이터 검색
+- ✅ **SPARQL 기능 활용**: CONTAINS, FILTER 등 고급 검색 가능
+- ✅ **인덱싱**: Fuseki가 자동으로 인덱싱하여 빠른 검색
+
+**단점:**
+
+- ⚠️ 네트워크 지연 (HTTP 요청)
+- ⚠️ Fuseki 서버가 실행 중이어야 함
+
+**코드 예시:**
+
+```python
+# SPARQL 쿼리로 Fuseki에서 검색
+sparql = """
+SELECT DISTINCT ?entity ?label ?type WHERE {
+    ?entity rdfs:label ?label .
+    FILTER (?label = "경복궁" || CONTAINS(?label, "경복궁"))
+} LIMIT 50
+"""
+response = requests.post(f"{FUSEKI_URL}/sparql", data={"query": sparql})
+```
+
+#### **2. TTL 정확 매칭 (`match_entities_with_ttl`)**
+
+**방식:**
+
+- TTL 파일을 메모리에 로드 (캐싱)
+- 정규식으로 파일 파싱하여 매칭
+- 로컬 메모리에서 검색
+
+**장점:**
+
+- ✅ **매우 빠름**: 네트워크 통신 없음 (~0ms)
+- ✅ **캐싱**: 파일 변경 시만 재로드
+- ✅ **다양한 매칭**: 정확 매칭 + 부분 매칭 + 키워드 기반 매칭
+
+**단점:**
+
+- ⚠️ TTL 파일이 최신 상태여야 함
+- ⚠️ 파일 I/O 필요 (캐싱으로 완화)
+
+**코드 예시:**
+
+```python
+# TTL 파일에서 정규식으로 파싱
+label_pattern = r'(hist:\w+_[^\s]+)\s+rdfs:label\s+"([^"]+)"\s*\.'
+for match in re.finditer(label_pattern, content):
+    uri = match.group(1)
+    label = match.group(2)
+    label_to_uri[label] = uri  # 메모리에 저장
+```
+
+#### **3. Fuseki와 TTL 데이터의 관계**
+
+**데이터 흐름:**
+
+```
+korean_history_instances.ttl (원본)
+    ↓ [정규화]
+korean_history_normalized.ttl (정규화된 파일)
+    ↓ [업로드]
+Fuseki 데이터베이스 (인덱싱된 RDF 저장소)
+```
+
+**차이점:**
+
+| 항목              | TTL 파일                      | Fuseki 데이터베이스       |
+| ----------------- | ----------------------------- | ------------------------- |
+| **형태**          | 텍스트 파일 (Turtle 형식)     | 인덱싱된 RDF 저장소       |
+| **위치**          | 로컬 파일 시스템              | 서버 메모리/디스크        |
+| **검색 방식**     | 정규식 파싱                   | SPARQL 쿼리               |
+| **속도**          | 파일 I/O 필요 (캐싱으로 완화) | 인덱싱으로 빠름           |
+| **데이터 일관성** | 원본 데이터                   | 업로드 시점의 스냅샷      |
+| **업데이트**      | 파일 수정                     | 업로드 스크립트 실행 필요 |
+
+**실제 사용 시나리오:**
+
+1. **TTL 정확 매칭 (주요 방법)**
+
+   - 확장된 키워드 + 원본 키워드로 TTL 파일에서 직접 매칭
+   - 예: "경복궁" → TTL 파일에서 URI 찾기
+   - 정확 매칭 + 부분 매칭 모두 지원
+
+2. **Milvus 유사도 검색 (fallback)**
+
+   - TTL 매칭 결과가 부족할 때 사용
+   - 벡터 유사도로 관련 엔티티 발견
+
+3. **데이터 동기화**
+   - TTL 파일만 관리하면 됨 (Fuseki 업로드 불필요)
+   - 파일 수정 시 캐시 자동 갱신
+
+**주의사항:**
+
+- ✅ TTL 파일만 관리하면 됨 (Fuseki 검색 제거로 단순화)
+- ✅ 파일 수정 시 캐시가 자동으로 갱신됨
+- ✅ 네트워크 통신 없이 로컬 파일에서 직접 검색하여 빠름
 
 ---
 
@@ -518,17 +712,22 @@ def story_enhancer_node(state: GraphState) -> GraphState:
 ```
 1. 사용자 질문: "궁궐을 지은 왕은?"
    ↓
-2. Query Classifier (LLM 1회):
+2. Query Classifier (LLM 1회 통합 분석):
+   - 키워드 추출 (kiwipiepy): ["궁궐", "지은", "왕"]
+   - 역사 관련 여부: true
    - 질문 유형: "causal"
    - 프로퍼티 그룹 선택: ["건설", "설립", "통치"]
    - 선택된 프로퍼티: ["built", "builtBy", "constructed", "founded", ...]
+   - 키워드 확장: {"궁궐": ["경복궁", "창덕궁", "경덕궁"], "왕": ["태조", "세종"]}
    ↓
 3. Entity Extractor (하이브리드):
-   - LLM 키워드 추출: ["궁궐", "왕"]  # "지은", "은" 제외
-   - TTL 매칭: 경복궁, 창덕궁, 태조, 세종
-   - Milvus 검색: 경복궁, 창덕궁 (유사도)
+   - 확장된 키워드 사용: ["경복궁", "창덕궁", "태조", "세종"]
+   - TTL 정확 매칭: 경복궁, 창덕궁, 태조, 세종 (확장된 키워드 + 원본 키워드)
+   - Milvus 검색: 경복궁, 창덕궁 (유사도, fallback)
+   - 엔티티 우선순위 정렬: "궁궐" 관련 엔티티 우선
    ↓
 4. Parallel Knowledge Retrieval (5 Thread - 모두 Fuseki SPARQL):
+   - 엔티티 우선순위: 경복궁, 창덕궁, 태조, 세종 순서
    - outgoing_relations: 경복궁 → [builtBy] → 태조 (FILTER 적용)
    - incoming_relations: 태조 → [built] → 경복궁 (FILTER 적용)
    - entity_properties: 경복궁.hasYear = 1395
@@ -546,6 +745,8 @@ def story_enhancer_node(state: GraphState) -> GraphState:
    - 근거 3: 경복궁 연도 정보 (가중치 0.20)
    ↓
 7. Story Generator (LLM):
+   - 추출된 엔티티 정보 포함: ["경복궁", "창덕궁", "태조", "세종"]
+   - 근거 설명 상세화: 각 근거의 의미 설명
    → "1395년 태조 이성계가 경복궁을 창건하였습니다.[1][2]"
    ↓
 8. (선택) Story Enhancer:
@@ -565,17 +766,18 @@ def story_enhancer_node(state: GraphState) -> GraphState:
 
 ## 📚 기술 스택
 
-| 컴포넌트                | 기술                           | 역할                                    | 최적화         |
-| ----------------------- | ------------------------------ | --------------------------------------- | -------------- |
-| **Query Classifier**    | LLM (GPT-4o-mini)              | 질문 유형 분류 + **프로퍼티 그룹 선택** | Entity와 통합  |
-| **Entity Extractor**    | TTL + Milvus + LLM             | 하이브리드 엔티티 추출                  | ⚡캐싱+LLM통합 |
-| **Knowledge Retrieval** | **Fuseki SPARQL (5개 Thread)** | **범용 관계 검색 + 프로퍼티 FILTER**    | 템플릿 SPARQL  |
-| **Triple Store**        | Apache Jena Fuseki             | RDF 저장/SPARQL 쿼리                    | -              |
-| **Vector DB**           | Milvus                         | 엔티티 추출 + 설화 검색용               | -              |
-| **Agent Orchestration** | LangGraph + ThreadPoolExecutor | 5개 Thread 병렬 실행                    | -              |
-| **Story Generator**     | LLM (GPT-4o)                   | 스토리 생성 (-입니다 체)                | -              |
-| **Story Enhancer**      | LLM + **Milvus 설화 검색**     | 설화/이야기 추가 (선택적)               | -              |
-| **Property Groups**     | JSON (70개 그룹)               | 프로퍼티 의미 그룹 분류                 | 자동 업데이트  |
+| 컴포넌트                | 기술                              | 역할                                            | 최적화             |
+| ----------------------- | --------------------------------- | ----------------------------------------------- | ------------------ |
+| **Query Classifier**    | LLM (GPT-4o-mini)                 | 통합 분석 (질문 유형/의도/프로퍼티/키워드 확장) | ⚡LLM 1회 통합     |
+| **Entity Extractor**    | kiwipiepy + Fuseki + TTL + Milvus | 하이브리드 엔티티 추출                          | ⚡캐싱+키워드 확장 |
+| **형태소 분석기**       | kiwipiepy                         | 조사/어미 자동 제거                             | 빠름, 무료         |
+| **Knowledge Retrieval** | **Fuseki SPARQL (5개 Thread)**    | **범용 관계 검색 + 프로퍼티 FILTER**            | 템플릿 SPARQL      |
+| **Triple Store**        | Apache Jena Fuseki                | RDF 저장/SPARQL 쿼리                            | -                  |
+| **Vector DB**           | Milvus                            | 엔티티 추출 + 설화 검색용                       | -                  |
+| **Agent Orchestration** | LangGraph + ThreadPoolExecutor    | 5개 Thread 병렬 실행                            | -                  |
+| **Story Generator**     | LLM (GPT-4o)                      | 스토리 생성 (-입니다 체)                        | -                  |
+| **Story Enhancer**      | LLM + **Milvus 설화 검색**        | 설화/이야기 추가 (선택적)                       | -                  |
+| **Property Groups**     | JSON (70개 그룹)                  | 프로퍼티 의미 그룹 분류                         | 자동 업데이트      |
 
 ---
 
@@ -638,11 +840,23 @@ TTL 캐싱:
 이전: 매번 파일 읽기 (~0.5초)
 현재: 파일 변경 시만 재로드 (캐시 사용 ~0ms)
 
-LLM 통합:
-이전: query_classifier LLM 1회 + entity_extractor LLM 1회 = 2회
-현재: entity_extractor에서 키워드+유형 통합 추출 = 1회
+LLM 호출 통합:
+이전: classify_node 1회 + entity_extractor (키워드 확장) 1회 = 2회
+현재: classify_node에서 통합 분석 (질문 유형/의도/프로퍼티/키워드 확장) = 1회
 
-총 효과: ~40% 응답시간 단축 (10-12초 → 5-7초)
+키워드 추출:
+이전: LLM으로 키워드 추출 (비용, 지연)
+현재: kiwipiepy 형태소 분석 (무료, 빠름, 정확)
+
+키워드 확장:
+이전: 없음 (일반명사로 검색 실패)
+현재: LLM으로 일반명사 확장 ("궁궐" → "경복궁, 창덕궁")
+
+Fuseki 직접 검색:
+이전: TTL 매칭만
+현재: 확장된 키워드로 Fuseki SPARQL 검색
+
+총 효과: ~50% 응답시간 단축 (10-12초 → 5-6초), LLM 호출 50% 감소
 ```
 
 ### 3. 프로퍼티 그룹 선택 + 범용 관계 검색 (하드코딩 없음) ⚡NEW
@@ -698,11 +912,44 @@ Thread별 범용 검색 (모두 Fuseki SPARQL):
 현재: causedBy, leadsTo 프로퍼티로 직접 검색
 ```
 
-### 5. 프롬프트 개선
+### 5. 역사 관련 질문 필터링 ⚡NEW
+
+```
+classify_node에서 조기 필터링:
+- is_historical=false: 조선시대 한국 역사와 무관한 질문
+  → 조기 종료: "답변을 생성할 수 없습니다" 메시지 반환
+- is_historical=true: 정상 플로우 진행
+
+예시:
+- "파이썬 프로그래밍 방법" → 조기 종료
+- "조선의 환국" → 정상 처리
+```
+
+### 6. 근거 설명 상세화 ⚡NEW
+
+```
+이전: 간략한 각주만 제공
+현재: 각 근거의 의미를 상세히 설명
+
+예시:
+이전: [1] 조선 ↔ [influences] ↔ 서울-지방 격차 심화
+현재: [1] (1680년) 조선 (조선이 influences 관계로 서울-지방 격차 심화와 연결됨):
+      경신환국으로 인해 중앙집권이 강화되면서...
+```
+
+### 7. 엔티티 우선순위 정렬 ⚡NEW
+
+```
+질문의 핵심 키워드와 관련된 엔티티를 우선 검색:
+- "조선의 환국" → "환국" 관련 엔티티(갑술환국, 기사환국, 경신환국) 우선
+- "궁궐을 건축한 왕" → "궁궐" 관련 엔티티(경복궁, 창덕궁) 우선
+```
+
+### 8. 프롬프트 개선
 
 ```
 이전: "~이다" 체, 되묻기 발생
-현재: "-입니다" 체, 되묻기 금지, 실제 근거 내용 포함
+현재: "-입니다" 체, 되묻기 금지, 실제 근거 내용 포함, 추출된 엔티티 반드시 언급
 ```
 
 ---
@@ -745,21 +992,35 @@ graph LR
 
 **핵심**: 5개의 서로 다른 SPARQL 쿼리가 병렬로 생성되고, 병렬로 Fuseki에 요청됨
 
-### LLM 키워드 추출
+### 키워드 추출 및 확장 흐름
 
 ```mermaid
 graph LR
-    Query([사용자 질문]) --> LLM[LLM 키워드 추출]
-    LLM --> Historical[역사적 키워드만]
-    LLM -.->|제외| Stopwords[조사/동사/일반 단어]
+    Query([사용자 질문]) --> Classify[classify_node<br/>질문 유형/의도/프로퍼티 분석]
 
-    Historical --> TTL[TTL 매칭]
-    Historical --> Milvus[Milvus 검색]
+    Classify --> EntityExtractor[entity_extractor_node]
+    EntityExtractor --> Kiwi[kiwipiepy 형태소 분석]
+    Kiwi --> Nouns[명사 추출<br/>조사/어미 자동 제거]
 
-    style LLM fill:#e1f5ff,stroke:#01579b
-    style Historical fill:#e8f5e9,stroke:#1b5e20
-    style Stopwords fill:#ffcdd2,stroke:#b71c1c
+    Nouns --> Expand[키워드 확장<br/>일반명사 → 구체적 인스턴스<br/>LLM 사용]
+
+    Expand --> TTLMatch[TTL 정확 매칭<br/>확장된 키워드 + 원본 키워드]
+    Expand --> MilvusSearch[Milvus 유사도 검색<br/>fallback]
+
+    TTLMatch --> Entities[엔티티 병합]
+    MilvusSearch --> Entities
+
+    Entities --> Priority[우선순위 정렬<br/>핵심 키워드 관련 우선]
+
+    style Kiwi fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px
+    style Classify fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style Expand fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style TTLMatch fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style Priority fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
 ```
+
+<｜ tool▁calls▁begin ｜><｜ tool▁call▁begin ｜>
+read_file
 
 ### 설화/이야기 모드 (Milvus 설화 검색)
 

@@ -12,10 +12,15 @@ from state import GraphState
 def multi_path_extractor_node(state: GraphState) -> GraphState:
     """5개 Thread별 추론 경로 추출"""
 
+    import time
+    node_start = time.time()
+
     parallel_results = state.get("parallel_inference_results", {})
     thread_weights = state.get("thread_weights", {})
 
-    print(f"\n🔍 다중 경로 추출 중... ({len(parallel_results)}개 Thread)")
+    print(f"\n{'='*70}")
+    print(f"[4/6] 다중 경로 추출 (Multi-Path Extractor)")
+    print(f"{'='*70}")
 
     inference_paths = {}
 
@@ -23,7 +28,6 @@ def multi_path_extractor_node(state: GraphState) -> GraphState:
         bindings = result.get("bindings", [])
 
         if not bindings:
-            print(f"   ⚠️ {thread_type}: 결과 없음")
             inference_paths[thread_type] = []
             continue
 
@@ -61,12 +65,21 @@ def multi_path_extractor_node(state: GraphState) -> GraphState:
 
         inference_paths[thread_type] = paths
 
-        print(f"   ✅ {thread_type}: {len(paths)}개 경로 추출 (가중치: {thread_weights.get(thread_type, 0):.0%})")
+    # 총 경로 수 계산
+    total_paths = sum(len(paths) for paths in inference_paths.values())
+    node_elapsed = time.time() - node_start
+    print(f"  └─ 완료: {total_paths}개 경로 추출 ({node_elapsed:.2f}초)")
+    print()
+
+    # 노드 실행 시간 기록
+    node_times = state.get("node_execution_times", {})
+    node_times["multi_path_extractor"] = node_elapsed
 
     return {
         **state,
         "inference_paths": inference_paths,
-        "executed_nodes": state.get("executed_nodes", []) + ["multi_path_extractor"]
+        "executed_nodes": state.get("executed_nodes", []) + ["multi_path_extractor"],
+        "node_execution_times": node_times
     }
 
 
@@ -768,7 +781,7 @@ def extract_connected_entities(bindings: list, base_weight: float) -> list:
             "predicate": predicate,
             "predicate_display": predicate_display,
             "entity2": entity2,
-            "weight": base_weight * 1.5,  # 연결 관계는 매우 중요
+            "weight": base_weight * 0.8,  # 가중치 낮춤 (무관한 결과 방지)
             "description": description
         })
     
