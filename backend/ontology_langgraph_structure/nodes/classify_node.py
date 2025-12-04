@@ -14,6 +14,7 @@ import sys
 import json
 import re
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from langchain_openai import ChatOpenAI
 
 # 환경변수 로드
@@ -72,17 +73,12 @@ def get_group_list() -> str:
     # ★ 항상 포함해야 할 핵심 그룹 (인과관계, 시간순서, 연결관계)
     always_include = {"인과관계", "시간순서", "연결관계"}
     
-    # 제외할 범용 그룹 (너무 많아서 필터링 비효율적)
-    # 주의: "인과관계", "시간순서", "연결관계"는 제외하지 않음
-    exclude_groups = {"기타", "속성", "포함", "소속", "위치", "장소", "연도", "날짜", "시기", "시대", "기간중"}
-    
-    # 명확한 행위/관계 그룹만 선택 (3~100개 사이)
-    # 너무 적으면 의미 없고, 너무 많으면 필터링 비효율적
+    # 모든 그룹이 의미 있는 관계 추출 가능하므로 제외 그룹 없음
+    # 적절한 크기의 그룹만 선택 (1개 이상, 100개 이하)
     main_groups = [
         name for name, props in groups.items() 
         if (name in always_include) or (  # 핵심 그룹은 항상 포함
-            name not in exclude_groups 
-            and 3 <= len(props) <= 100  # 적절한 크기의 그룹만
+            1 <= len(props) <= 100  # 모든 그룹 포함 (1개 이상)
         )
     ]
     
@@ -117,6 +113,9 @@ def query_classifier_node(state: GraphState) -> GraphState:
        - 키워드 확장: {"궁궐": ["경복궁", "창덕궁"], "왕": ["태조", "세종"]}
     """
 
+    import time
+    node_start = time.time()
+
     query = state.get("query", "")
 
     # LLM 초기화
@@ -138,56 +137,85 @@ def query_classifier_node(state: GraphState) -> GraphState:
     # 프로퍼티 그룹 목록
     group_list = get_group_list()
 
-    # ========== 3단계: LLM 1회 호출 (의도 + 프로퍼티 그룹 + 키워드 확장) ==========
-    classification_prompt = f"""당신은 역사 질문을 분석하는 전문가입니다.
+    # ========== 3단계: LLM 2개 병렬 호출 (시간 단축) ==========
+    # Thread 1: 의도 분석 + 프로퍼티 그룹 선택
+    def analyze_intent_and_properties():
+        """의도 분석 + 프로퍼티 그룹 선택 (병렬 실행 Thread 1)"""
+        intent_prompt = f"""당신은 역사 질문을 분석하는 전문가입니다.
 
-## 질문 (의도 파악용)
+## 질문
 {query}
-
-## 추출된 키워드 (kiwipiepy) - 키워드 확장용
-{keywords_text}
 
 ## 분석 항목
 
-### 1. 역사 관련 여부 (is_historical) - 질문만 보고 판단
+### 1. 역사 관련 여부 (is_historical)
 질문이 **조선시대 한국 역사**와 관련이 있는지 판단하세요.
 - true: 조선시대의 인물, 사건, 제도, 정책, 장소 등에 대한 질문
 - false: 현대, 다른 나라 역사, 과학, 수학, 일반 상식 등
 
-예시 (false):
-- "파이썬 프로그래밍 방법"
-- "2024년 대선 결과"
-- "태양계 행성 개수"
-- "미국의 독립전쟁"
+예시 (false): "파이썬 프로그래밍", "2024년 대선", "태양계 행성", "미국의 독립전쟁"
+예시 (true): "조선의 환국", "경복궁을 지은 왕", "세종대왕의 업적"
 
-예시 (true):
-- "조선의 환국"
-- "경복궁을 지은 왕"
-- "세종대왕의 업적"
-
-### 2. 질문 유형 (query_type) - is_historical이 true일 때만, 질문만 보고 판단
+### 2. 질문 유형 (query_type) - is_historical이 true일 때만
 - causal: 인과관계/패턴 ("왜?", "영향은?", "결과는?", "패턴은?")
 - deep_analysis: 심화 분석 ("진짜 이유?", "숨은 의도?", "이면에는?")
 
-### 3. 핵심 의도 (intent) - is_historical이 true일 때만, 질문만 보고 판단
+### 3. 핵심 의도 (intent) - is_historical이 true일 때만
 질문의 핵심 의도를 한 문장으로 설명하세요.
 
 예시:
 - "궁궐을 지은 왕은?" → "궁궐을 건설한 왕 찾기"
 - "을미사변의 원인은?" → "을미사변이 발생한 원인과 배경 분석"
 
-### 4. 관련 프로퍼티 그룹 (property_groups) - is_historical이 true일 때만, 핵심 의도 기반으로 선택
+### 4. 관련 프로퍼티 그룹 (property_groups) - is_historical이 true일 때만
 아래 목록에서 질문과 관련된 그룹을 **최대 5개** 선택하세요.
 
 사용 가능한 그룹:
 {group_list}
 
 예시:
-- "궁궐을 지은 왕" (의도: 궁궐 건설한 왕 찾기) → ["건설", "설립", "통치"]
-- "을미사변에서 죽은 사람" (의도: 을미사변 희생자 찾기) → ["사망", "참여", "원인"]
-- "세종이 만든 정책" (의도: 세종의 정책 찾기) → ["설립", "창제", "시행"]
+- "궁궐을 지은 왕" → ["건설", "설립", "통치"]
+- "을미사변에서 죽은 사람" → ["사망", "참여", "원인"]
+- "세종이 만든 정책" → ["설립", "창제", "시행"]
 
-### 5. 키워드 확장 (expanded_keywords) - is_historical이 true일 때만, 추출된 키워드 사용
+## 출력 형식 (JSON만)
+
+is_historical이 true인 경우:
+{{
+  "is_historical": true,
+  "query_type": "causal",
+  "intent": "궁궐을 건설한 왕 찾기",
+  "property_groups": ["건설", "설립", "통치"]
+}}
+
+is_historical이 false인 경우:
+{{
+  "is_historical": false
+}}
+"""
+        response = llm.invoke(intent_prompt)
+        content = response.content.strip()
+
+        # JSON 파싱
+        if "```" in content:
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+
+        return json.loads(content)
+
+    # Thread 2: 키워드 확장
+    def expand_keywords():
+        """키워드 확장 (병렬 실행 Thread 2)"""
+        expansion_prompt = f"""당신은 역사 키워드를 확장하는 전문가입니다.
+
+## 질문
+{query}
+
+## 추출된 키워드 (kiwipiepy)
+{keywords_text}
+
+## 작업
 **질문의 맥락을 파악하여** 추출된 키워드와 관련된 구체적인 역사적 인스턴스를 확장하세요.
 
 **확장 규칙:**
@@ -203,40 +231,42 @@ def query_classifier_node(state: GraphState) -> GraphState:
 - "정치" → 정치 관련 사건/제도 (예: ["환국", "사화", "당쟁"])
 - "제도" → 구체적 제도명 (예: ["의금부", "비변사", "경국대전"])
 
-**중요:** 위 예시는 참고용이며, 실제로는 질문의 맥락에 맞는 키워드만 확장하세요.
+**중요:** 위 예시는 참고���이며, 실제로는 질문의 맥락에 맞는 키워드만 확장하세요.
 확장할 키워드가 없으면 빈 객체를 출력하세요.
 
 ## 출력 형식 (JSON만)
-
-is_historical이 true인 경우:
 {{
-  "is_historical": true,
-  "query_type": "causal",
-  "intent": "궁궐을 건설한 왕 찾기",
-  "property_groups": ["건설", "설립"],
   "expanded_keywords": {{"궁궐": ["경복궁", "창덕궁"], "왕": ["태조", "세종"]}}
 }}
 
-is_historical이 false인 경우:
+또는 확장 없는 경우:
 {{
-  "is_historical": false
+  "expanded_keywords": {{}}
 }}
 """
-
-    try:
-        response = llm.invoke(classification_prompt)
+        response = llm.invoke(expansion_prompt)
         content = response.content.strip()
-        
+
         # JSON 파싱
         if "```" in content:
             content = content.split("```")[1]
             if content.startswith("json"):
                 content = content[4:]
-        
-        result = json.loads(content)
-        
-        is_historical = result.get("is_historical", True)  # 기본값은 true (안전하게)
-        
+
+        return json.loads(content)
+
+    # ========== 병렬 실행 ==========
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future1 = executor.submit(analyze_intent_and_properties)
+            future2 = executor.submit(expand_keywords)
+
+            result1 = future1.result()
+            result2 = future2.result()
+
+        # ========== 결과 병합 ==========
+        is_historical = result1.get("is_historical", True)
+
         # 역사 관련이 아닌 경우 조기 종료
         if not is_historical:
             print(f"⚠️ 역사 관련 질문이 아님 - 조기 종료")
@@ -245,7 +275,7 @@ is_historical이 false인 경우:
 이 시스템은 조선시대의 인물, 사건, 제도, 정책, 장소 등에 대한 질문에만 답변할 수 있습니다.
 
 조선시대 역사 관련 질문을 해주시면 도와드리겠습니다."""
-            
+
             return {
                 **state,
                 "is_historical": False,
@@ -258,11 +288,14 @@ is_historical이 false인 경우:
                 },
                 "executed_nodes": state.get("executed_nodes", []) + ["query_classifier"]
             }
-        
-        query_type = result.get("query_type", "causal")
-        selected_groups = result.get("property_groups", [])
-        intent = result.get("intent", "")
-        expanded_keywords_dict = result.get("expanded_keywords", {})
+
+        # Thread 1 결과 (의도 분석 + 프로퍼티 그룹)
+        query_type = result1.get("query_type", "causal")
+        selected_groups = result1.get("property_groups", [])
+        intent = result1.get("intent", "")
+
+        # Thread 2 결과 (키워드 확장)
+        expanded_keywords_dict = result2.get("expanded_keywords", {})
         
         # 검증
         if query_type not in ["causal", "deep_analysis"]:
@@ -294,6 +327,8 @@ is_historical이 false인 경우:
         expanded_keywords = []
         expanded_keywords_dict = {}
 
+    node_elapsed = time.time() - node_start
+
     print(f"\n{'='*70}")
     print(f"[1/6] 질문 분석 (Query Classifier)")
     print(f"{'='*70}")
@@ -306,8 +341,14 @@ is_historical이 false인 경우:
         # 확장된 키워드를 간결하게 표시 (최대 3개 그룹)
         sample_expansions = list(expanded_keywords_dict.items())[:3]
         expansion_summary = ', '.join([f"{k}→{len(v)}개" for k, v in sample_expansions])
-        print(f"  └─ 확장 키워드: {expansion_summary}{'...' if len(expanded_keywords_dict) > 3 else ''}")
+        print(f"  └─ 확장 키워드: {expansion_summary}{'...' if len(expanded_keywords_dict) > 3 else ''} ({node_elapsed:.2f}초)")
+    else:
+        print(f"  └─ 완료 ({node_elapsed:.2f}초)")
     print()
+
+    # 노드 실행 시간 기록
+    node_times = state.get("node_execution_times", {})
+    node_times["query_classifier"] = node_elapsed
 
     return {
         **state,
@@ -318,5 +359,6 @@ is_historical이 false인 경우:
         "selected_properties": selected_properties,
         "expanded_keywords": expanded_keywords,  # 확장된 키워드 리스트
         "expanded_keywords_dict": expanded_keywords_dict,  # 원본 매핑 (디버깅용)
-        "executed_nodes": state.get("executed_nodes", []) + ["query_classifier"]
+        "executed_nodes": state.get("executed_nodes", []) + ["query_classifier"],
+        "node_execution_times": node_times
     }

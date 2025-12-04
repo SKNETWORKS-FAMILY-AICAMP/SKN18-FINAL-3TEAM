@@ -47,17 +47,17 @@ def evidence_aggregator_node(state: GraphState) -> GraphState:
     # 2. 가중치 기준으로 정렬
     sorted_evidences = sorted(all_evidences, key=lambda x: x["weight"], reverse=True)
 
-    # 3. 상위 5-10개 선택
-    top_evidences = sorted_evidences[:10]
+    # 3. 상위 5개 선택 (generate_node 성능 최적화)
+    top_evidences = sorted_evidences[:5]
 
     # 4. 순위 부여
     for i, ev in enumerate(top_evidences, 1):
         ev["rank"] = i
 
-    # 최종 선택된 근거 목록 (상위 5개)
+    # 최종 선택된 근거 목록 (전체 표시)
     if top_evidences:
-        print(f"\n      [최종 근거 목록 (상위 5개)]")
-        for ev in top_evidences[:5]:
+        print(f"\n      [최종 근거 목록 (상위 {len(top_evidences)}개)]")
+        for ev in top_evidences:
             rank = ev.get("rank", 0)
             ev_type = ev.get("type", "unknown")
             description = ev.get("description", "")
