@@ -125,7 +125,7 @@ DATA_THREADS = {
         "use_milvus": False
     },
     "connected_entities": {
-        "description": "두 엔티티 사이의 모든 관계 (A ↔ B)",
+        "description": "두 엔티티 사이의 모든 관계 (A ↔ B) + 다중 hop 경로 탐색",
         "sparql_template": """
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -133,7 +133,7 @@ DATA_THREADS = {
 
             SELECT DISTINCT ?entity1 ?label1 ?predicate ?entity2 ?label2 WHERE {{
                 {{
-                    # A → B 방향
+                    # A → B 방향 (직접 연결)
                     ?entity1 rdfs:label ?label1 .
                     ?entity2 rdfs:label ?label2 .
                     FILTER ({label_filter1})
@@ -142,7 +142,7 @@ DATA_THREADS = {
                 }}
                 UNION
                 {{
-                    # B → A 방향
+                    # B → A 방향 (직접 연결)
                     ?entity2 rdfs:label ?label2 .
                     ?entity1 rdfs:label ?label1 .
                     FILTER ({label_filter1})
@@ -154,7 +154,8 @@ DATA_THREADS = {
                 FILTER(?predicate != rdfs:label)
             }} LIMIT 100
         """,
-        "use_milvus": False
+        "use_milvus": False,
+        "use_bidirectional_bfs": True  # 양방향 BFS 활성화 플래그
     },
     "type_and_summary": {
         "description": "엔티티 타입과 요약 정보",
@@ -389,7 +390,7 @@ def execute_unified_thread(
 ) -> dict:
     """
     개별 Thread에서 쿼리 생성 + 지식 검색을 순차적으로 수행
-    
+
     Args:
         llm: ChatOpenAI 인스턴스 (Thread 간 공유, QUERY_MODE=llm일 때만 사용)
         thread_type: Thread 타입 (outgoing_relations/incoming_relations/entity_properties/connected_entities/type_and_summary)
@@ -399,20 +400,48 @@ def execute_unified_thread(
         hypothetical: 가상 트리플 목록 (미사용)
         thread_config: Thread 설정 (sparql_template, use_milvus, description)
         selected_properties: 필터링할 프로퍼티 목록 (classify_node에서 선택)
-        
+
     Returns:
         검색 결과 딕셔너리
     """
-    
+
     description = thread_config.get("description", "")
     use_milvus = thread_config.get("use_milvus", False)
+    use_bidirectional_bfs = thread_config.get("use_bidirectional_bfs", False)
     sparql_template = thread_config.get("sparql_template", "")
     selected_properties = selected_properties or []
-    
+
     # similar_events는 Milvus 검색 사용
     if use_milvus:
         return execute_milvus_search(thread_type, entities, description)
-    
+
+    # connected_entities는 양방향 BFS 추가 실행
+    if use_bidirectional_bfs and thread_type == "connected_entities" and len(entities) >= 2:
+        # 양방향 BFS로 엔티티 간 경로 탐색
+        bfs_paths = execute_bidirectional_path_search(entities)
+
+        # SPARQL 쿼리도 실행 (직접 연결 찾기)
+        if sparql_template and QUERY_MODE == "template":
+            sparql = generate_template_sparql(thread_type, entities, sparql_template, selected_properties)
+        else:
+            sparql = generate_fallback_sparql(thread_type, entities)
+
+        sparql_result = execute_inference_api(
+            thread_type=thread_type,
+            sparql=sparql,
+            hypothetical=hypothetical,
+            query_type=query_type
+        )
+
+        # BFS 경로와 SPARQL 결과 병합
+        combined_bindings = sparql_result.get("bindings", []) + bfs_paths
+
+        sparql_result["bindings"] = combined_bindings
+        sparql_result["sparql"] = sparql
+        sparql_result["used_bfs"] = True
+
+        return sparql_result
+
     # 1️⃣ SPARQL 쿼리 생성
     if sparql_template and QUERY_MODE == "template":
         # 템플릿 모드: 미리 정의된 SPARQL 템플릿 사용
@@ -421,7 +450,7 @@ def execute_unified_thread(
     else:
         # Fallback 쿼리 사용
         sparql = generate_fallback_sparql(thread_type, entities)
-    
+
     # 2️⃣ 지식 검색 실행
     result = execute_inference_api(
         thread_type=thread_type,
@@ -429,11 +458,225 @@ def execute_unified_thread(
         hypothetical=hypothetical,
         query_type=query_type
     )
-    
+
     # 생성된 쿼리도 결과에 포함
     result["sparql"] = sparql
-    
+
     return result
+
+
+def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> list:
+    """
+    여러 엔티티 쌍에 대해 양방향 BFS 경로 탐색 실행
+
+    Args:
+        entities: 엔티티 목록
+        max_pairs: 최대 탐색 쌍 수
+
+    Returns:
+        Fuseki binding 형식의 경로 리스트
+    """
+
+    bindings = []
+
+    # 엔티티 쌍 생성 (상위 N개만)
+    entities_with_uri = [e for e in entities if e.get("uri")]
+
+    if len(entities_with_uri) < 2:
+        return []
+
+    # 모든 쌍 시도 (최대 max_pairs)
+    pairs_tried = 0
+    for i in range(len(entities_with_uri)):
+        for j in range(i + 1, len(entities_with_uri)):
+            if pairs_tried >= max_pairs:
+                break
+
+            entity_a = entities_with_uri[i]
+            entity_b = entities_with_uri[j]
+
+            uri_a = entity_a.get("uri")
+            uri_b = entity_b.get("uri")
+
+            # 양방향 BFS 실행
+            paths = find_bidirectional_paths(uri_a, uri_b, max_depth=5)
+
+            # 경로를 Fuseki binding 형식으로 변환
+            for path_info in paths:
+                path_uris = path_info.get("path", [])
+                predicates = path_info.get("predicates", [])
+                convergence = path_info.get("convergence_node", "")
+
+                if len(path_uris) >= 2:
+                    # 경로 정보를 binding으로 변환
+                    path_str = " → ".join([uri.split("#")[-1] for uri in path_uris])
+
+                    bindings.append({
+                        "entity1": {"value": uri_a},
+                        "label1": {"value": entity_a.get("name", "")},
+                        "entity2": {"value": uri_b},
+                        "label2": {"value": entity_b.get("name", "")},
+                        "path": {"value": path_str},
+                        "path_length": {"value": str(len(path_uris))},
+                        "convergence_node": {"value": convergence.split("#")[-1] if convergence else ""},
+                        "method": {"value": "bidirectional_bfs"}
+                    })
+
+            pairs_tried += 1
+
+        if pairs_tried >= max_pairs:
+            break
+
+    return bindings
+
+
+def find_bidirectional_paths(entity_a_uri: str, entity_b_uri: str, max_depth: int = 5) -> list:
+    """
+    양방향 BFS로 두 엔티티 간 최단 경로 탐색
+
+    Args:
+        entity_a_uri: 시작 엔티티 URI (예: hist:Person_정약용)
+        entity_b_uri: 목표 엔티티 URI (예: hist:Person_사도세자)
+        max_depth: 최대 탐색 깊이 (기본 5)
+
+    Returns:
+        경로 리스트 [{"path": [uri1, uri2, ..., uriN], "length": N, "predicates": [...]}]
+    """
+
+    if not entity_a_uri or not entity_b_uri:
+        return []
+
+    # 양방향 BFS 큐
+    queue_a = [(entity_a_uri, [entity_a_uri], [])]  # (current_uri, path, predicates)
+    queue_b = [(entity_b_uri, [entity_b_uri], [])]
+
+    visited_a = {entity_a_uri: ([entity_a_uri], [])}  # uri → (path, predicates)
+    visited_b = {entity_b_uri: ([entity_b_uri], [])}
+
+    found_paths = []
+
+    for depth in range(max_depth // 2 + 1):
+        # A에서 확장
+        if queue_a:
+            new_queue_a = []
+            for current_uri, path, predicates in queue_a:
+                neighbors = get_1hop_neighbors(current_uri)
+
+                for neighbor_uri, predicate in neighbors:
+                    # B측에서 이미 방문했는지 확인 (수렴점 발견)
+                    if neighbor_uri in visited_b:
+                        path_b, preds_b = visited_b[neighbor_uri]
+                        # 전체 경로 = path_a + path_b (역순)
+                        full_path = path + [neighbor_uri] + path_b[1:][::-1]
+                        full_preds = predicates + [predicate] + preds_b[::-1]
+
+                        found_paths.append({
+                            "path": full_path,
+                            "length": len(full_path),
+                            "predicates": full_preds,
+                            "convergence_node": neighbor_uri
+                        })
+
+                    if neighbor_uri not in visited_a:
+                        new_path = path + [neighbor_uri]
+                        new_preds = predicates + [predicate]
+                        visited_a[neighbor_uri] = (new_path, new_preds)
+                        new_queue_a.append((neighbor_uri, new_path, new_preds))
+
+            queue_a = new_queue_a
+
+        # B에서 확장 (대칭)
+        if queue_b:
+            new_queue_b = []
+            for current_uri, path, predicates in queue_b:
+                neighbors = get_1hop_neighbors(current_uri)
+
+                for neighbor_uri, predicate in neighbors:
+                    # A측에서 이미 방문했는지 확인
+                    if neighbor_uri in visited_a:
+                        path_a, preds_a = visited_a[neighbor_uri]
+                        full_path = path_a + path[1:][::-1]
+                        full_preds = preds_a + predicates[::-1]
+
+                        found_paths.append({
+                            "path": full_path,
+                            "length": len(full_path),
+                            "predicates": full_preds,
+                            "convergence_node": neighbor_uri
+                        })
+
+                    if neighbor_uri not in visited_b:
+                        new_path = path + [neighbor_uri]
+                        new_preds = predicates + [predicate]
+                        visited_b[neighbor_uri] = (new_path, new_preds)
+                        new_queue_b.append((neighbor_uri, new_path, new_preds))
+
+            queue_b = new_queue_b
+
+        # 경로를 찾았으면 조기 종료
+        if found_paths:
+            break
+
+    # 최단 경로 우선 정렬
+    found_paths.sort(key=lambda x: x["length"])
+    return found_paths[:5]  # 상위 5개 경로만
+
+
+def get_1hop_neighbors(entity_uri: str, timeout: int = 2) -> list:
+    """
+    엔티티의 1-hop 이웃 조회 (양방향)
+
+    Returns:
+        [(neighbor_uri, predicate), ...]
+    """
+
+    sparql = f"""
+        PREFIX hist: <http://www.example.org/korean-history#>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+        SELECT DISTINCT ?neighbor ?predicate WHERE {{
+            {{
+                # 나가는 관계
+                <{entity_uri}> ?predicate ?neighbor .
+                FILTER(?predicate != rdf:type)
+                FILTER(?predicate != rdfs:label)
+                FILTER(isURI(?neighbor))
+            }}
+            UNION
+            {{
+                # 들어오는 관계
+                ?neighbor ?predicate <{entity_uri}> .
+                FILTER(?predicate != rdf:type)
+                FILTER(?predicate != rdfs:label)
+            }}
+        }} LIMIT 50
+    """
+
+    try:
+        response = requests.post(
+            f"{FUSEKI_URL}/sparql",
+            data={"query": sparql},
+            headers={"Accept": "application/sparql-results+json"},
+            timeout=timeout
+        )
+
+        if response.status_code == 200:
+            results = response.json()
+            bindings = results.get("results", {}).get("bindings", [])
+
+            neighbors = []
+            for binding in bindings:
+                neighbor_uri = binding.get("neighbor", {}).get("value", "")
+                predicate = binding.get("predicate", {}).get("value", "")
+                if neighbor_uri and predicate:
+                    neighbors.append((neighbor_uri, predicate))
+
+            return neighbors
+    except:
+        pass
+
+    return []
 
 
 def execute_milvus_search(thread_type: str, entities: list, description: str) -> dict:
@@ -443,13 +686,13 @@ def execute_milvus_search(thread_type: str, entities: list, description: str) ->
         import sys
         from pathlib import Path
         sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-        
+
         from db_pipeline.services.milvus_service import get_milvus_service
-        
+
         milvus = get_milvus_service()
         if not milvus or not milvus.connect():
             return {"status": "error", "bindings": [], "thread_type": thread_type, "error": "Milvus 연결 실패"}
-        
+
         # 엔티티 이름으로 유사 사건 검색
         all_results = []
         for entity in entities[:5]:  # 상위 5개 엔티티만
@@ -457,7 +700,7 @@ def execute_milvus_search(thread_type: str, entities: list, description: str) ->
             if name:
                 results = milvus.search(name, top_k=3, threshold=0.5)
                 all_results.extend(results)
-        
+
         # 중복 제거
         seen = set()
         unique_results = []
@@ -465,7 +708,7 @@ def execute_milvus_search(thread_type: str, entities: list, description: str) ->
             if r["title"] not in seen:
                 seen.add(r["title"])
                 unique_results.append(r)
-        
+
         # Fuseki 형식으로 변환
         bindings = [
             {
@@ -477,14 +720,14 @@ def execute_milvus_search(thread_type: str, entities: list, description: str) ->
             }
             for r in unique_results[:10]
         ]
-        
+
         return {
             "status": "success",
             "bindings": bindings,
             "thread_type": thread_type,
             "source": "milvus"
         }
-        
+
     except Exception as e:
         return {"status": "error", "bindings": [], "thread_type": thread_type, "error": str(e)}
 
