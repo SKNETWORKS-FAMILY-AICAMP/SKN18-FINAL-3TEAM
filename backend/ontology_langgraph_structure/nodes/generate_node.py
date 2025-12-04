@@ -86,8 +86,19 @@ def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
             desc = ev.get('description', '')
             desc = clean_entity_name(desc)
 
-            # 기본 정보 추출
-            content = raw_data.get('content', '') or raw_data.get('summary', '') or ''
+            # 기본 정보 추출 (summary 우선, 없으면 content, 없으면 description에서 추출)
+            summary = raw_data.get('summary', '') or ''
+            content = raw_data.get('content', '') or ''
+            # summary나 content가 없으면 description에서 더 많은 정보 추출 시도
+            if not summary and not content:
+                # description에 ":" 가 있으면 그 뒤가 summary일 수 있음
+                if ':' in desc:
+                    parts = desc.split(':', 1)
+                    if len(parts) > 1:
+                        content = parts[1].strip()
+            
+            # 최종 content 결정 (summary 우선, 없으면 content)
+            final_content = summary if summary else content
             year = raw_data.get('year', '') or raw_data.get('hasYear', '')
 
             # 관계 정보 파싱
@@ -113,10 +124,12 @@ def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
                     sentence = f"{year}년에 발생한 {subject}"
                     if obj and predicate:
                         sentence += f"는 {obj}와 관련이 있습니다"
-                    if content:
-                        sentence += f". {content}"
-                elif content:
-                    sentence = content
+                    if final_content:
+                        sentence += f". {final_content}"
+                    elif not obj:  # 관계 정보가 없으면 description 사용
+                        sentence += f"는 {desc.split('→')[0].strip() if '→' in desc else desc}"
+                elif final_content:
+                    sentence = final_content
                 else:
                     sentence = desc
 
@@ -136,15 +149,15 @@ def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
                             sentence += f"는 {obj}에서 사망했습니다"
                         else:
                             sentence += f"는 {obj}와 관련된 활동을 했습니다"
-                    if content:
-                        sentence += f". {content}"
-                elif content:
-                    sentence = content
+                    if final_content:
+                        sentence += f". {final_content}"
+                elif final_content:
+                    sentence = final_content
                 else:
                     sentence = desc
 
             elif ev_type == 'Institution':
-                # 제도/기관: "제도명은 연도에 설립/운��..."
+                # 제도/기관: "제도명은 연도에 설립/운영..."
                 footnote_prefix = "【제도】 "
                 if subject:
                     sentence = f"{subject}"
@@ -157,10 +170,10 @@ def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
                             sentence += "는 폐지되었습니다"
                         else:
                             sentence += f"는 {obj}와 관련이 있습니다"
-                    if content:
-                        sentence += f". {content}"
-                elif content:
-                    sentence = content
+                    if final_content:
+                        sentence += f". {final_content}"
+                elif final_content:
+                    sentence = final_content
                 else:
                     sentence = desc
 
@@ -178,10 +191,10 @@ def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
                             sentence += f"는 {obj}에 위치합니다"
                         else:
                             sentence += f"는 {obj}와 관련이 있습니다"
-                    if content:
-                        sentence += f". {content}"
-                elif content:
-                    sentence = content
+                    if final_content:
+                        sentence += f". {final_content}"
+                elif final_content:
+                    sentence = final_content
                 else:
                     sentence = desc
 
@@ -197,15 +210,15 @@ def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
                             sentence += f"는 {obj}에 사상적 영향을 미쳤습니다"
                         else:
                             sentence += f"는 {obj}와 관련된 사상입니다"
-                    if content:
-                        sentence += f". {content}"
-                elif content:
-                    sentence = content
+                    if final_content:
+                        sentence += f". {final_content}"
+                elif final_content:
+                    sentence = final_content
                 else:
                     sentence = desc
             else:
                 # 기타
-                sentence = content if content else desc
+                sentence = final_content if final_content else desc
 
             # 프롬프트용 (LLM이 참고할 용도 - 간결하게)
             formatted_list.append(f"[{idx}] {sentence}")
@@ -292,11 +305,19 @@ def story_generator_node(state: GraphState) -> GraphState:
             "data_insufficient": True
         }
 
+        # Input 누적 문제 해결: 필요한 필드만 명시적으로 반환
         return {
-            **state,
+            # 필수 입력 (유지)
+            "query": query,
+            "is_historical": False,
+            "query_type": query_type,
+            
+            # 최종 결과만 반환
             "final_answer": final_answer,
             "answer_with_sources": answer_with_sources,
-            "executed_nodes": state.get("executed_nodes", []) + ["story_generator"]
+            
+            # 메타 정보
+            "executed_nodes": state.get("executed_nodes", []) + ["story_generator"],
         }
 
     # 추출된 엔티티 정보 포맷팅 (프롬프트에 포함)
@@ -470,10 +491,24 @@ def story_generator_node(state: GraphState) -> GraphState:
     node_times = state.get("node_execution_times", {})
     node_times["story_generator"] = node_elapsed
 
+    # Input 누적 문제 해결: 필요한 필드만 명시적으로 반환
+    # 이전 노드의 중간 결과는 제외하고 최종 결과만 반환
     return {
-        **state,
+        # 필수 입력 (유지)
+        "query": query,
+        "is_historical": is_historical,
+        "query_type": query_type,
+        "query_intent": query_intent,
+        
+        # 최종 결과만 반환 (중간 결과 제외)
         "final_answer": final_answer,
         "answer_with_sources": answer_with_sources,
+        
+        # 메타 정보
         "executed_nodes": state.get("executed_nodes", []) + ["story_generator"],
-        "node_execution_times": node_times
+        "node_execution_times": node_times,
+        
+        # 필요한 경우에만 포함 (선택적)
+        "extracted_entities": extracted_entities[:10] if extracted_entities else [],  # 최대 10개만
+        "evidences": evidences[:5] if evidences else [],  # 최대 5개만 (실제 사용)
     }
