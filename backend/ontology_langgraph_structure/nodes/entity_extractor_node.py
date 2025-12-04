@@ -360,7 +360,9 @@ def extract_keywords_from_query(query: str, for_vector_search: bool = False) -> 
         '것', '수', '등', '때', '중', '후', '전', '이', '그', '저',
         '사실', '이유', '내용', '설명', '정보', '관련', '대해',
         # 시간 관련 (너무 일반적)
-        '시대', '시기', '당시', '역사', '년', '월', '일'
+        '시대', '시기', '당시', '역사', '년', '월', '일',
+        # 너무 일반적인 키워드 (모든 데이터에 포함됨)
+        '조선', '조선시대', '조선왕조', '한국', '우리나라'
     }
     
     # 벡터 검색용 추가 필터 (모든 데이터가 조선시대라서 유사도가 다 높게 나옴)
@@ -758,12 +760,99 @@ def entity_extractor_node(state: GraphState) -> GraphState:
 
     # 원본 키워드와 확장된 키워드 병합
     all_keywords = list(set(query_keywords + expanded_keywords))
-    
+
     # query_type은 query_classifier_node에서 이미 설정됨
     current_query_type = state.get("query_type", "causal")
-    
+
     matched_entities = []
     seen = set()
+
+    # 키워드 기반 엔티티 점수 계산을 위한 함수
+    def calculate_entity_score_with_connections(entity, keywords, ttl_data):
+        """
+        엔티티와 키워드의 연관성 점수 계산
+
+        점수 구성:
+        1. 매칭 방법 기본 점수: exact(1.0), partial(0.7), milvus(유사도), llm(0.3)
+        2. 엔티티 이름에 키워드 포함: +0.5/keyword
+        3. 연결된 노드에 키워드 포함: +0.1/connection (최대 0.3)
+        """
+        # 1. 기본 점수
+        match_method = entity.get("match_method", "exact")
+        base_score = {
+            "exact": 1.0,
+            "partial": 0.7,
+            "llm": 0.3
+        }.get(match_method, entity.get("milvus_score", 0.5))
+
+        # 2. 이름에 키워드 포함 점수
+        name = entity.get("name", "").lower()
+        name_match_score = sum(0.5 for kw in keywords if kw.lower() in name)
+
+        # 3. 연결된 노드에 키워드 포함 점수 (SPARQL 기반)
+        connected_score = 0.0
+        uri = entity.get("uri")
+
+        if uri and uri in ttl_data.get("uri_to_type", {}):
+            # SPARQL로 이 엔티티와 연결된 모든 엔티티의 label 조회
+            # (양방향: 나가는 관계 + 들어오는 관계)
+            sparql_query = f"""
+                PREFIX hist: <http://www.example.org/korean-history#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+                SELECT DISTINCT ?connectedLabel WHERE {{
+                    {{
+                        # 나가는 관계 (이 엔티티 → 다른 엔티티)
+                        <{uri}> ?p ?connected .
+                        ?connected rdfs:label ?connectedLabel .
+                        FILTER(?p != rdf:type)
+                        FILTER(?p != rdfs:label)
+                    }}
+                    UNION
+                    {{
+                        # 들어오는 관계 (다른 엔티티 → 이 엔티티)
+                        ?connected ?p <{uri}> .
+                        ?connected rdfs:label ?connectedLabel .
+                        FILTER(?p != rdf:type)
+                        FILTER(?p != rdfs:label)
+                    }}
+                }} LIMIT 50
+            """
+
+            try:
+                fuseki_url = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
+                response = requests.post(
+                    f"{fuseki_url}/sparql",
+                    data={"query": sparql_query},
+                    headers={"Accept": "application/sparql-results+json"},
+                    timeout=2  # 2초 타임아웃 (성능 최적화)
+                )
+
+                if response.status_code == 200:
+                    results = response.json()
+                    bindings = results.get("results", {}).get("bindings", [])
+
+                    # 연결된 엔티티의 label에 키워드가 있는지 확인
+                    for binding in bindings:
+                        connected_label = binding.get("connectedLabel", {}).get("value", "")
+                        if connected_label:
+                            for kw in keywords:
+                                if kw.lower() in connected_label.lower():
+                                    connected_score += 0.1
+                                    if connected_score >= 0.3:  # 최대값 도달
+                                        break
+
+                        if connected_score >= 0.3:
+                            break
+
+            except Exception as e:
+                # SPARQL 실패 시 조용히 무시 (점수만 0으로 유지)
+                pass
+
+        total_score = base_score + name_match_score + min(connected_score, 0.3)
+        entity["relevance_score"] = total_score
+        return total_score
     
     # ========================================
     # TTL 정확 매칭 (Fuseki 검색 제거)
@@ -794,26 +883,28 @@ def entity_extractor_node(state: GraphState) -> GraphState:
                 })
                 ttl_matched += 1
         
-        # 부분 매칭 (키워드가 라벨에 포함된 경우) - 최대 5개
-        partial_count = 0
-        for label, uri in ttl_data["label_to_uri"].items():
-            if keyword in label and len(keyword) >= 2:
-                key = uri or label
-                if key not in seen:
-                    seen.add(key)
-                    entity_type = ttl_data["uri_to_type"].get(uri, "Event")
-                    matched_entities.append({
-                        "type": entity_type,
-                        "name": label,
-                        "uri": uri,
-                        "matched": True,
-                        "match_method": "partial",
-                        "matched_keyword": keyword
-                    })
-                    ttl_matched += 1
-                    partial_count += 1
-                    if partial_count >= 5:  # 키워드당 최대 5개 부분 매칭
-                        break
+        # 부분 매칭 (키워드가 라벨에 포함된 경우) - 최대 3개, 최소 길이 3글자
+        # "조선" 같은 일반 키워드 필터링 강화
+        if len(keyword) >= 3:  # 3글자 이상만 부분 매칭
+            partial_count = 0
+            for label, uri in ttl_data["label_to_uri"].items():
+                if keyword in label:
+                    key = uri or label
+                    if key not in seen:
+                        seen.add(key)
+                        entity_type = ttl_data["uri_to_type"].get(uri, "Event")
+                        matched_entities.append({
+                            "type": entity_type,
+                            "name": label,
+                            "uri": uri,
+                            "matched": True,
+                            "match_method": "partial",
+                            "matched_keyword": keyword
+                        })
+                        ttl_matched += 1
+                        partial_count += 1
+                        if partial_count >= 3:  # 키워드당 최대 3개 부분 매칭 (성능 최적화)
+                            break
     
     print(f"     └─ TTL 매칭: {ttl_matched}개")
 
@@ -943,6 +1034,19 @@ def entity_extractor_node(state: GraphState) -> GraphState:
             print(f"      ⚠️ LLM 추출 실패: {e}")
     
     # ========================================
+    # 엔티티 점수 계산 및 정렬
+    # ========================================
+    # 모든 엔티티에 대해 점수 계산
+    for entity in matched_entities:
+        calculate_entity_score_with_connections(entity, all_keywords, ttl_data)
+
+    # 점수 기준으로 정렬 (높은 점수 우선)
+    matched_entities.sort(key=lambda x: x.get("relevance_score", 0), reverse=True)
+
+    # 상위 30개만 선택 (너무 많으면 성능 저하)
+    matched_entities = matched_entities[:30]
+
+    # ========================================
     # 결과 정리
     # ========================================
     ontology_schema = get_schema_summary()
@@ -954,11 +1058,17 @@ def entity_extractor_node(state: GraphState) -> GraphState:
             name = entity.get("name", "")
             entity_type = entity.get("type", "Unknown")
             method = entity.get("match_method", "")
-            score = entity.get("milvus_score", "")
+            relevance_score = entity.get("relevance_score", 0)
+            milvus_score = entity.get("milvus_score")
 
             # 매칭 방법 레이블
             method_label = "[정확]" if method == "exact" else "[부분]" if method == "partial" else "[벡터]" if method == "milvus" else "[LLM]"
-            score_str = f" (유사도: {score:.2f})" if score else ""
+
+            # 점수 표시 (연관성 점수 우선, Milvus 점수는 참고용)
+            if milvus_score:
+                score_str = f" (점수: {relevance_score:.2f}, 벡터: {milvus_score:.2f})"
+            else:
+                score_str = f" (점수: {relevance_score:.2f})"
 
             print(f"      {i:2d}. {method_label:6s} [{entity_type:12s}] {name}{score_str}")
 

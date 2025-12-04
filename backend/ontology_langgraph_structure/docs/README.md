@@ -4,110 +4,134 @@
 
 ```mermaid
 graph TD
-    Start([사용자 질문]) --> QueryClassifier[query_classifier_node<br/>LLM 1회 통합 분석<br/>질문 유형/의도/프로퍼티 분석]
+    Start([사용자 질문]) --> QueryClassifier["[1/6] query_classifier_node<br/>━━━━━━━━━━━━━━━━<br/>🤖 LLM 병렬 호출 (2회)<br/>━━━━━━━━━━━━━━━━<br/>• kiwipiepy 키워드 추출<br/>• ThreadPoolExecutor (2개)<br/>  ├─ Thread 1: 의도분석<br/>  │   + 프로퍼티그룹<br/>  └─ Thread 2: 키워드확장"]
 
-    QueryClassifier --> HistoryCheck{역사 관련?}
+    QueryClassifier --> HistoryCheck{역사 관련?<br/>is_historical}
 
-    HistoryCheck -->|No| EarlyExit[조기 종료<br/>답변 불가 안내]
-    HistoryCheck -->|Yes| PropGroups[프로퍼티 그룹 선택<br/>건설, 설립, 통치...]
+    HistoryCheck -->|No| EarlyExit["❌ 조기 종료<br/>답변 불가 안내"]
+    HistoryCheck -->|Yes| PropGroups["✅ 프로퍼티 그룹 선택<br/>예: 건설, 설립, 통치..."]
 
-    PropGroups --> PropList[실제 프로퍼티 추출<br/>built, builtBy, founded...]
+    PropGroups --> PropList["프로퍼티 추출<br/>예: built, builtBy, founded..."]
 
-    QueryClassifier --> EntityExtractor[entity_extractor_node<br/>kiwipiepy 형태소 분석]
+    QueryClassifier --> EntityExtractor["[2/6] entity_extractor_node<br/>━━━━━━━━━━━━━━━━<br/>엔티티 추출 + 스코어링<br/>━━━━━━━━━━━━━━━━"]
 
-    %% 하이브리드 엔티티 추출 최적화
-    EntityExtractor --> TTLCache[(TTL 캐시<br/>파일 I/O 최소화)]
-    TTLCache --> KiwiExtract[kiwipiepy 명사 추출<br/>조사/어미 자동 제거]
+    EntityExtractor --> TTLCache["📦 TTL 캐시 로드<br/>(파일 변경 시만 재로드)"]
+    TTLCache --> KeywordMerge["확장 키워드 병합<br/>원본 + 확장 키워드"]
 
-    KiwiExtract --> KeywordExpand[키워드 확장<br/>일반명사 → 구체적 인스턴스<br/>궁궐 → 경복궁, 창덕궁...]
+    KeywordMerge --> TTLMatch["TTL 정확 매칭<br/>• 정확 매칭<br/>• 부분 매칭"]
+    KeywordMerge --> MilvusSearch["Milvus 유사도 검색<br/>(fallback)"]
 
-    KeywordExpand --> TTLMatch[TTL 정확 매칭<br/>확장된 키워드 + 원본 키워드<br/>캐시된 데이터 사용]
-    KeywordExpand --> MilvusSearch[Milvus 유사도 검색<br/>역사 키워드만<br/>fallback]
+    TTLMatch --> EntityScore["엔티티 스코어링<br/>━━━━━━━━━━━━━━━━<br/>🔍 SPARQL 호출 (각 엔티티)<br/>━━━━━━━━━━━━━━━━<br/>• 연결 노드 조회<br/>• 키워드 매칭 점수"]
+    MilvusSearch --> EntityScore
 
-    TTLMatch --> EntityMerge[엔티티 병합<br/>중복 제거]
-    MilvusSearch --> EntityMerge
+    MilvusDB[("💾 Milvus<br/>엔티티 벡터 DB")] -.->|유사도 검색| MilvusSearch
 
-    MilvusDB[(Milvus<br/>엔티티 DB)] -.->|title 유사도| MilvusSearch
+    EntityScore --> EntitySort["스코어 정렬<br/>상위 30개 선택"]
 
-    EntityMerge --> ParallelNode[parallel_inference_executor_node<br/>5개 Thread 병렬 실행<br/>프로퍼티 FILTER 적용]
+    EntitySort --> ParallelNode["[3/6] parallel_inference_executor_node<br/>━━━━━━━━━━━━━━━━━━━━━<br/>5개 Thread 병렬 실행<br/>━━━━━━━━━━━━━━━━━━━━━"]
 
-    PropList -.->|FILTER| ParallelNode
+    PropList -.->|"FILTER<br/>(선택된 프로퍼티만)"| ParallelNode
 
-    %% 5개 Thread - 각각 독립적으로 SPARQL 생성 + Fuseki 검색
-    subgraph ThreadPool["ThreadPoolExecutor - 5개 병렬"]
-        Thread1[Thread 1: outgoing_relations<br/>나가는 관계 + FILTER]
-        Thread2[Thread 2: incoming_relations<br/>들어오는 관계 + FILTER]
-        Thread3[Thread 3: entity_properties<br/>속성 정보]
-        Thread4[Thread 4: connected_entities<br/>연결된 엔티티]
-        Thread5[Thread 5: type_and_summary<br/>타입/요약]
+    subgraph ThreadPool["🔄 ThreadPoolExecutor (5개 병렬)"]
+        Thread1["Thread 1<br/>━━━━━━━━━━<br/>outgoing_relations<br/>나가는 관계 검색"]
+        Thread2["Thread 2<br/>━━━━━━━━━━<br/>incoming_relations<br/>들어오는 관계 검색"]
+        Thread3["Thread 3<br/>━━━━━━━━━━<br/>entity_properties<br/>속성 정보 검색"]
+        Thread4["Thread 4<br/>━━━━━━━━━━<br/>connected_entities<br/>연결 엔티티 검색<br/>(A-B 양방향)"]
+        Thread5["Thread 5<br/>━━━━━━━━━━<br/>type_and_summary<br/>타입/요약 검색"]
     end
 
     ParallelNode --> ThreadPool
 
-    Thread1 -.->|SPARQL 1| Fuseki[(Fuseki<br/>Triple Store)]
-    Thread2 -.->|SPARQL 2| Fuseki
-    Thread3 -.->|SPARQL 3| Fuseki
-    Thread4 -.->|SPARQL 4| Fuseki
-    Thread5 -.->|SPARQL 5| Fuseki
+    Thread1 -.->|"⚡ SPARQL<br/>템플릿 기반"| Fuseki[("💾 Fuseki<br/>Triple Store<br/>━━━━━━━━<br/>SPARQL 엔드포인트")]
+    Thread2 -.->|"⚡ SPARQL<br/>템플릿 기반"| Fuseki
+    Thread3 -.->|"⚡ SPARQL<br/>템플릿 기반"| Fuseki
+    Thread4 -.->|"⚡ SPARQL<br/>템플릿 기반<br/>(UNION 패턴)"| Fuseki
+    Thread5 -.->|"⚡ SPARQL<br/>템플릿 기반"| Fuseki
 
-    ThreadPool --> PathExtractor[multi_path_extractor_node<br/>5개 결과 통합]
+    ThreadPool --> PathExtractor["[4/6] multi_path_extractor_node<br/>━━━━━━━━━━━━━━━━<br/>5개 Thread 결과 통합<br/>추론 경로 추출"]
 
-    PathExtractor --> EvidenceAgg[evidence_aggregator_node<br/>근거 통합 + 가중치 정렬]
+    PathExtractor --> EvidenceAgg["[5/6] evidence_aggregator_node<br/>━━━━━━━━━━━━━━━━<br/>근거 통합 + 가중치 정렬<br/>상위 5개 선택"]
 
-    EvidenceAgg --> StoryGen[story_generator_node<br/>LLM 스토리 생성<br/>입니다 체]
+    EvidenceAgg --> StoryGen["[6/6] story_generator_node<br/>━━━━━━━━━━━━━━━━<br/>🤖 LLM 호출 (1회)<br/>━━━━━━━━━━━━━━━━<br/>스토리 생성 (입니다 체)"]
 
-    StoryGen --> StoryModeCheck{이야기 모드?}
-
-    StoryModeCheck -->|No| Output([최종 답변])
-    StoryModeCheck -->|Yes| KeywordExtract[LLM 키워드 추출<br/>스토리에서 핵심어]
-
-    %% 설화 검색 상세 흐름
-    KeywordExtract --> FolktaleSearch[Milvus 설화 컬렉션<br/>유사도 검색]
-    FolktaleSearch --> FolktaleDB[(Milvus<br/>설화 DB)]
-    FolktaleDB --> ContentFetch[설화 내용 조회<br/>title + content + summary]
-    ContentFetch --> StoryMerge[LLM 스토리 결합<br/>역사 + 설화]
-    StoryMerge --> EnhancedOutput([풍성한 스토리 답변<br/>사실/이야기 구분])
+    StoryGen --> Output([✅ 최종 답변])
 
     %% 스타일
-    classDef llmNode fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef llmNode fill:#ffe6e6,stroke:#cc0000,stroke-width:3px,color:#000
+    classDef sparqlNode fill:#e6f3ff,stroke:#0066cc,stroke-width:3px,color:#000
     classDef dbNode fill:#fff3e0,stroke:#e65100,stroke-width:2px
     classDef parallelNode fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
     classDef vectorNode fill:#fce4ec,stroke:#880e4f,stroke-width:3px
-    classDef hybridNode fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef storyNode fill:#e0f7fa,stroke:#006064,stroke-width:2px
-    classDef folktaleNode fill:#fff8e1,stroke:#ff6f00,stroke-width:2px
-    classDef nodeStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
     classDef cacheNode fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    classDef scoreNode fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef checkNode fill:#ffcdd2,stroke:#c62828,stroke-width:2px
+    classDef exitNode fill:#ffebee,stroke:#d32f2f,stroke-width:2px
 
-    class QueryClassifier,StoryGen,KeywordExtract,KeywordExpand llmNode
-    class KiwiExtract fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px
-    class Fuseki dbNode
-    class HistoryCheck fill:#ffcdd2,stroke:#c62828,stroke-width:2px
-    class EarlyExit fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+    class QueryClassifier,StoryGen llmNode
+    class EntityScore sparqlNode
+    class Fuseki,MilvusDB dbNode
     class Thread1,Thread2,Thread3,Thread4,Thread5 parallelNode
-    class MilvusDB,FolktaleDB vectorNode
-    class TTLMatch,MilvusSearch,EntityMerge hybridNode
-    class TTLMatch fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    class StoryModeCheck,StoryMerge,EnhancedOutput storyNode
-    class FolktaleSearch,ContentFetch folktaleNode
-    class ParallelNode,PathExtractor,EvidenceAgg,EntityExtractor nodeStyle
     class TTLCache cacheNode
-    class PropGroups,PropList fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    class PropGroups,PropList,EntitySort scoreNode
+    class HistoryCheck checkNode
+    class EarlyExit exitNode
 ```
+
+### 🔑 핵심 체크포인트
+
+| 단계                        | LLM 호출        | SPARQL 호출      | 주요 작업                                                            |
+| --------------------------- | --------------- | ---------------- | -------------------------------------------------------------------- |
+| **1. Query Classifier**     | ✅ **2회 병렬** | ❌               | 질문 분석, 키워드 확장, 프로퍼티 그룹 선택 (ThreadPoolExecutor 사용) |
+| **2. Entity Extractor**     | ❌              | ✅ 각 엔티티마다 | 엔티티 추출, 연결 노드 기반 스코어링                                 |
+| **3. Parallel Inference**   | ❌              | ✅ 5개 Thread    | 5개 관점에서 관계 검색 (템플릿 기반)                                 |
+| **4. Multi-Path Extractor** | ❌              | ❌               | 결과 파싱 및 경로 추출                                               |
+| **5. Evidence Aggregator**  | ❌              | ❌               | 근거 통합 및 가중치 정렬                                             |
+| **6. Story Generator**      | ✅ 1회          | ❌               | 최종 스토리 생성                                                     |
+
+**총 LLM 호출: 2회 (병렬 실행으로 시간 단축)** (Query Classifier 2회 병렬 + Story Generator 1회)
+**총 SPARQL 호출: 5 + N회** (병렬 검색 5회 + 엔티티 스코어링 N회)
 
 ---
 
 ## 🔧 핵심 컴포넌트
 
-### **1. Query Classifier (통합 분석 노드) ⚡LLM 1회 호출**
+### **1. Query Classifier (통합 분석 노드) ⚡LLM 2회 병렬 호출**
 
-**역할:** LLM 1회 호출로 다음을 모두 수행
+**역할:** ThreadPoolExecutor로 LLM 2개를 병렬 실행하여 시간 단축
+
+#### **병렬 실행 구조 (ThreadPoolExecutor)**
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+with ThreadPoolExecutor(max_workers=2) as executor:
+    # Thread 1: 의도 분석 + 프로퍼티 그룹 선택
+    future1 = executor.submit(analyze_intent_and_properties)
+
+    # Thread 2: 키워드 확장
+    future2 = executor.submit(expand_keywords)
+
+    # 결과 대기 (병렬 실행으로 시간 단축)
+    result1 = future1.result()  # is_historical, query_type, intent, property_groups
+    result2 = future2.result()  # expanded_keywords
+```
+
+#### **Thread 1: 의도 분석 + 프로퍼티 그룹 선택**
 
 1. **역사 관련 여부 판단** (`is_historical`)
 2. 질문 유형 분류 (`causal`/`deep_analysis`)
 3. 핵심 의도 파악 (`intent`)
-4. 프로퍼티 그룹 선택 (`property_groups`)
-5. 키워드 확장 (`expanded_keywords`: 일반명사 → 구체적 인스턴스)
+4. 프로퍼티 그룹 선택 (`property_groups`: 최대 5개)
+
+#### **Thread 2: 키워드 확장**
+
+5. 키워드 확장 (`expanded_keywords`: 일반명사 → 구체적 인스턴스 5-10개)
+
+**효과:**
+
+- ✅ **시간 단축**: 2개 작업을 병렬 실행하여 약 40-50% 시간 절약
+- ✅ **독립성 보장**: 각 Thread는 독립적으로 실행 가능 (의존성 없음)
+- ✅ **병렬 처리**: Parallel Inference Executor와 동일한 방식 (ThreadPoolExecutor 사용)
 
 **분류 유형:**
 
@@ -121,48 +145,66 @@ graph TD
   - → 조기 종료: "답변을 생성할 수 없습니다" 메시지 반환
 - `is_historical=true`: 정상 플로우 진행
 
-#### **키워드 확장 (일반명사 → 구체적 인스턴스)**
+#### **키워드 확장 (일반명사 → 구체적 인스턴스) - Thread 2**
 
 **문제:** "궁궐", "환국", "왕" 같은 일반명사로는 구체적인 엔티티를 찾을 수 없음
 
-**해결:** LLM으로 일반명사를 구체적 인스턴스로 확장
+**해결:** LLM으로 일반명사를 구체적 인스턴스로 확장 (Thread 1과 **병렬 실행**)
 
 ```
 질문: "궁궐을 건축한 왕들은 누가 있는지?"
          ↓
-1. 키워드 추출 (kiwipiepy)
+1. 키워드 추출 (kiwipiepy) - 메인 Thread
    → ["궁궐", "건축", "왕"]
          ↓
-2. 키워드 확장 (LLM)
+2. ThreadPoolExecutor로 병렬 실행
+   ├─ Thread 1: 의도분석 + 프로퍼티그룹 (analyze_intent_and_properties)
+   └─ Thread 2: 키워드 확장 (expand_keywords) ⬅️ 이 작업
+         ↓
+3. Thread 2 결과 (키워드 확장)
    → {"궁궐": ["경복궁", "창덕궁", "경덕궁", "창경궁"],
        "왕": ["태조", "세종", "숙종"]}
          ↓
-3. 확장된 키워드 + 원본 키워드로 TTL 정확 매칭
+4. 확장된 키워드 + 원본 키워드로 TTL 정확 매칭
    → 경복궁, 창덕궁, 태조, 세종 등 엔티티 발견
 ```
 
-#### **프로퍼티 그룹 선택**
+**병렬 실행 효과:**
+
+- ✅ **시간 단축**: Thread 1과 동시에 실행되어 대기 시간 없음
+- ✅ **독립적 실행**: 키워드 확장은 의도분석과 독립적으로 수행 가능
+
+#### **프로퍼티 그룹 선택 - Thread 1**
 
 **문제:** TTL에 4,056개의 프로퍼티가 있어서 하드코딩 불가능
 
-**해결:** 프로퍼티를 **70개 의미 그룹**으로 분류 → LLM이 관련 그룹 선택
+**해결:** 프로퍼티를 **70개 의미 그룹**으로 분류 → LLM이 관련 그룹 선택 (Thread 2와 **병렬 실행**)
 
 ```
 질문: "궁궐을 지은 왕"
          ↓
-1. 프로퍼티 그룹 목록 제공 (명확한 행위 그룹만)
+1. ThreadPoolExecutor로 병렬 실행
+   ├─ Thread 1: 의도분석 + 프로퍼티그룹 (analyze_intent_and_properties) ⬅️ 이 작업
+   └─ Thread 2: 키워드 확장 (expand_keywords)
+         ↓
+2. Thread 1: 프로퍼티 그룹 목록 제공 (명확한 행위 그룹만)
    - 건설, 설립, 통치, 임명, 사망, 처벌, 유배, 전쟁, 반란...
    - 제외: "속성"(623개), "기타"(1783개) 등 범용 그룹
          ↓
-2. LLM이 관련 그룹 선택 (최대 5개)
+3. Thread 1 결과: LLM이 관련 그룹 선택 (최대 5개)
    → ["건설", "설립", "통치"]
          ↓
-3. 선택된 그룹에서 실제 프로퍼티 추출
+4. 선택된 그룹에서 실제 프로퍼티 추출
    → ["built", "builtBy", "constructed", "founded", "established", ...]
          ↓
-4. SPARQL FILTER 적용
+5. SPARQL FILTER 적용 (Parallel Inference Executor에서 사용)
    FILTER(?predicate IN (hist:built, hist:builtBy, hist:founded, ...))
 ```
+
+**병렬 실행 효과:**
+
+- ✅ **시간 단축**: Thread 2 (키워드 확장)와 동시에 실행
+- ✅ **의도 기반 선택**: 질문의 핵심 의도를 파악하여 관련 프로퍼티 그룹 선택
 
 **효과:**
 
@@ -188,9 +230,9 @@ graph TD
 
 ---
 
-### **2. Entity Extractor (하이브리드 엔티티 추출) ⚡최적화**
+### **2. Entity Extractor (하이브리드 엔티티 추출 + SPARQL 스코어링) ⚡최적화**
 
-**역할:** 확장된 키워드 + TTL 정확 매칭 + Milvus 유사도 검색 (Fuseki 검색 제거됨)
+**역할:** 확장된 키워드 + TTL 정확 매칭 + Milvus 유사도 검색 + **SPARQL 기반 관련성 스코어링**
 
 **최적화 포인트:**
 
@@ -198,7 +240,8 @@ graph TD
 - ✅ **TTL 정확 매칭**: 확장된 키워드 + 원본 키워드 모두 사용하여 TTL 파일에서 직접 매칭
 - ✅ **kiwipiepy 형태소 분석**: 조사/어미 자동 제거 (빠름, 정확)
 - ✅ **TTL 캐싱**: 파일 수정 시만 재로드 (연속 질문 시 ~0.5초 절약)
-- ✅ **엔티티 우선순위 정렬**: 질문의 핵심 키워드와 관련된 엔티티 우선 검색
+- ✅ **SPARQL 기반 스코어링**: 각 엔티티의 연결 노드를 SPARQL로 조회하여 키워드 관련성 점수 계산
+- ✅ **엔티티 우선순위 정렬**: 관련성 점수 기준으로 상위 30개 선택
 - ✅ **의도 파악**: classify_node에서 이미 처리됨 (query_intent)
 
 #### **2-1. 키워드 확장 활용 (classify_node에서 처리)**
@@ -257,19 +300,121 @@ def extract_nouns_with_kiwi(query: str) -> list:
     return [t.form for t in tokens if t.tag in ('NNG', 'NNP')]  # 일반명사 + 고유명사
 ```
 
-#### **2-4. 엔티티 우선순위 정렬**
+#### **2-4. SPARQL 기반 엔티티 스코어링 (연결 노드 분석) 🔍**
+
+**목적:** 키워드와 관련된 엔티티를 우선 선택하기 위해 **연결된 노드**를 분석하여 관련성 점수 계산
+
+**점수 구성:**
+
+1. **기본 점수** (매칭 방법에 따라)
+
+   - 정확 매칭: 1.0
+   - 부분 매칭: 0.7
+   - Milvus 유사도: 0.0~1.0
+   - LLM 추출: 0.3
+
+2. **엔티티 이름 매칭 점수**
+
+   - 키워드가 엔티티 이름에 포함되면 **+0.5/keyword**
+
+3. **연결 노드 매칭 점수** ⚡ **SPARQL 사용**
+   - 엔티티와 연결된 노드의 `rdfs:label`에 키워드가 포함되면 **+0.1/connection** (최대 0.3)
+
+**SPARQL 쿼리 (양방향 연결 검색):**
+
+```sparql
+PREFIX hist: <http://www.example.org/korean-history#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT DISTINCT ?connectedLabel WHERE {
+    {
+        # 나가는 관계 (이 엔티티 → 다른 엔티티)
+        <hist:Event_abc123> ?p ?connected .
+        ?connected rdfs:label ?connectedLabel .
+        FILTER(?p != rdf:type)
+        FILTER(?p != rdfs:label)
+    }
+    UNION
+    {
+        # 들어오는 관계 (다른 엔티티 → 이 엔티티)
+        ?connected ?p <hist:Event_abc123> .
+        ?connected rdfs:label ?connectedLabel .
+        FILTER(?p != rdf:type)
+        FILTER(?p != rdfs:label)
+    }
+} LIMIT 50
+```
+
+**예시:**
 
 ```python
-# 질문의 핵심 키워드와 관련된 엔티티 우선 검색
-def entity_priority(entity):
-    name = entity.get("name", "").lower()
-    score = 0
-    for kw in core_keywords:  # "환국", "궁궐" 등
-        if kw.lower() in name:
-            score += 10  # 핵심 키워드 매칭 시 높은 점수
-    return score
+질문: "일본 왜군과 조선이 싸운 전투"
+키워드: ["일본", "왜", "전투", "조선"]
 
-entities_sorted = sorted(entities, key=entity_priority, reverse=True)
+엔티티: hist:Event_진주성전투 (label: "진주성 전투(1차)")
+  ├─ 기본 점수: 1.0 (정확 매칭)
+  ├─ 이름 매칭: +0.5 ("전투" 포함)
+  └─ 연결 노드 분석 (SPARQL):
+      ├─ hist:Person_이순신 (label: "이순신") → 매칭 없음
+      ├─ hist:Nation_일본 (label: "일본") → +0.1 ("일본" 매칭!)
+      ├─ hist:Nation_조선 (label: "조선") → +0.1 ("조선" 매칭!)
+      └─ hist:Place_한산도 (label: "한산도") → 매칭 없음
+
+총 점수: 1.0 + 0.5 + 0.2 = 1.7
+```
+
+**핵심 개선:**
+
+- ✅ **URI가 아닌 Label 매칭**: URI는 해시로 정규화되어 있어서 자연어 매칭 불가 → `rdfs:label` 사용
+- ✅ **실제 관계 기반**: SPARQL로 실제 연결된 노드만 조회 (모든 엔티티 검색 X)
+- ✅ **양방향 검색**: 나가는 관계 + 들어오는 관계 모두 확인
+- ✅ **성능 최적화**: LIMIT 50, Timeout 2초로 성능 보장
+
+**코드:**
+
+```python
+def calculate_entity_score_with_connections(entity, keywords, ttl_data):
+    # 1. 기본 점수
+    base_score = 1.0 if entity["match_method"] == "exact" else 0.7
+
+    # 2. 이름 매칭 점수
+    name_match_score = sum(0.5 for kw in keywords if kw in entity["name"])
+
+    # 3. 연결 노드 매칭 점수 (SPARQL)
+    connected_score = 0.0
+    sparql = f"""
+        SELECT DISTINCT ?connectedLabel WHERE {{
+            {{ <{entity['uri']}> ?p ?connected . ?connected rdfs:label ?connectedLabel }}
+            UNION
+            {{ ?connected ?p <{entity['uri']}> . ?connected rdfs:label ?connectedLabel }}
+        }} LIMIT 50
+    """
+
+    response = requests.post(f"{FUSEKI_URL}/sparql", data={"query": sparql})
+    for binding in response.json()["results"]["bindings"]:
+        label = binding["connectedLabel"]["value"]
+        for kw in keywords:
+            if kw in label:
+                connected_score += 0.1
+                if connected_score >= 0.3:
+                    break
+
+    return base_score + name_match_score + min(connected_score, 0.3)
+```
+
+**우선순위 정렬:**
+
+```python
+# 모든 엔티티에 대해 점수 계산
+for entity in matched_entities:
+    calculate_entity_score_with_connections(entity, all_keywords, ttl_data)
+
+# 점수 기준으로 정렬 (높은 점수 우선)
+matched_entities.sort(key=lambda x: x.get("relevance_score", 0), reverse=True)
+
+# 상위 30개만 선택 (성능 최적화)
+matched_entities = matched_entities[:30]
 ```
 
 #### **2-5. TTL 정확 매칭 (캐시 사용)**
@@ -295,117 +440,6 @@ milvus_entities = search_entities_with_milvus(
     top_k=dynamic_top_k
 )
 ```
-
----
-
-### **Fuseki 검색 vs TTL 정확 매칭 비교**
-
-#### **1. Fuseki 검색 (`search_fuseki_with_keywords`)**
-
-**방식:**
-
-- SPARQL 쿼리를 통해 Fuseki 서버에 HTTP 요청
-- 네트워크 통신 필요 (실시간 검색)
-
-**장점:**
-
-- ✅ **실시간 데이터**: Fuseki에 업로드된 최신 데이터 검색
-- ✅ **SPARQL 기능 활용**: CONTAINS, FILTER 등 고급 검색 가능
-- ✅ **인덱싱**: Fuseki가 자동으로 인덱싱하여 빠른 검색
-
-**단점:**
-
-- ⚠️ 네트워크 지연 (HTTP 요청)
-- ⚠️ Fuseki 서버가 실행 중이어야 함
-
-**코드 예시:**
-
-```python
-# SPARQL 쿼리로 Fuseki에서 검색
-sparql = """
-SELECT DISTINCT ?entity ?label ?type WHERE {
-    ?entity rdfs:label ?label .
-    FILTER (?label = "경복궁" || CONTAINS(?label, "경복궁"))
-} LIMIT 50
-"""
-response = requests.post(f"{FUSEKI_URL}/sparql", data={"query": sparql})
-```
-
-#### **2. TTL 정확 매칭 (`match_entities_with_ttl`)**
-
-**방식:**
-
-- TTL 파일을 메모리에 로드 (캐싱)
-- 정규식으로 파일 파싱하여 매칭
-- 로컬 메모리에서 검색
-
-**장점:**
-
-- ✅ **매우 빠름**: 네트워크 통신 없음 (~0ms)
-- ✅ **캐싱**: 파일 변경 시만 재로드
-- ✅ **다양한 매칭**: 정확 매칭 + 부분 매칭 + 키워드 기반 매칭
-
-**단점:**
-
-- ⚠️ TTL 파일이 최신 상태여야 함
-- ⚠️ 파일 I/O 필요 (캐싱으로 완화)
-
-**코드 예시:**
-
-```python
-# TTL 파일에서 정규식으로 파싱
-label_pattern = r'(hist:\w+_[^\s]+)\s+rdfs:label\s+"([^"]+)"\s*\.'
-for match in re.finditer(label_pattern, content):
-    uri = match.group(1)
-    label = match.group(2)
-    label_to_uri[label] = uri  # 메모리에 저장
-```
-
-#### **3. Fuseki와 TTL 데이터의 관계**
-
-**데이터 흐름:**
-
-```
-korean_history_instances.ttl (원본)
-    ↓ [정규화]
-korean_history_normalized.ttl (정규화된 파일)
-    ↓ [업로드]
-Fuseki 데이터베이스 (인덱싱된 RDF 저장소)
-```
-
-**차이점:**
-
-| 항목              | TTL 파일                      | Fuseki 데이터베이스       |
-| ----------------- | ----------------------------- | ------------------------- |
-| **형태**          | 텍스트 파일 (Turtle 형식)     | 인덱싱된 RDF 저장소       |
-| **위치**          | 로컬 파일 시스템              | 서버 메모리/디스크        |
-| **검색 방식**     | 정규식 파싱                   | SPARQL 쿼리               |
-| **속도**          | 파일 I/O 필요 (캐싱으로 완화) | 인덱싱으로 빠름           |
-| **데이터 일관성** | 원본 데이터                   | 업로드 시점의 스냅샷      |
-| **업데이트**      | 파일 수정                     | 업로드 스크립트 실행 필요 |
-
-**실제 사용 시나리오:**
-
-1. **TTL 정확 매칭 (주요 방법)**
-
-   - 확장된 키워드 + 원본 키워드로 TTL 파일에서 직접 매칭
-   - 예: "경복궁" → TTL 파일에서 URI 찾기
-   - 정확 매칭 + 부분 매칭 모두 지원
-
-2. **Milvus 유사도 검색 (fallback)**
-
-   - TTL 매칭 결과가 부족할 때 사용
-   - 벡터 유사도로 관련 엔티티 발견
-
-3. **데이터 동기화**
-   - TTL 파일만 관리하면 됨 (Fuseki 업로드 불필요)
-   - 파일 수정 시 캐시 자동 갱신
-
-**주의사항:**
-
-- ✅ TTL 파일만 관리하면 됨 (Fuseki 검색 제거로 단순화)
-- ✅ 파일 수정 시 캐시가 자동으로 갱신됨
-- ✅ 네트워크 통신 없이 로컬 파일에서 직접 검색하여 빠름
 
 ---
 
@@ -472,18 +506,19 @@ SELECT ?entity ?predicate ?object WHERE {
 
 #### **5개 Thread 범용 관계 검색 (하드코딩 없음)**
 
-| Thread       | 이름                 | 역할          | 검색 방식 (모두 Fuseki SPARQL)          |
-| ------------ | -------------------- | ------------- | --------------------------------------- |
-| **Thread 1** | `outgoing_relations` | 나가는 관계   | 엔티티 → ? (모든 프로퍼티, FILTER 적용) |
-| **Thread 2** | `incoming_relations` | 들어오는 관계 | ? → 엔티티 (모든 프로퍼티, FILTER 적용) |
-| **Thread 3** | `entity_properties`  | 속성 정보     | 엔티티의 리터럴 값 (연도, 설명 등)      |
-| **Thread 4** | `connected_entities` | 연결된 엔티티 | 엔티티 간 직접 연결 (2-hop)             |
-| **Thread 5** | `type_and_summary`   | 타입/요약     | 엔티티 타입, 요약, 카테고리, 연도       |
+| Thread       | 이름                 | 역할                | 검색 방식 (모두 Fuseki SPARQL)          |
+| ------------ | -------------------- | ------------------- | --------------------------------------- |
+| **Thread 1** | `outgoing_relations` | 나가는 관계         | 엔티티 → ? (모든 프로퍼티, FILTER 적용) |
+| **Thread 2** | `incoming_relations` | 들어오는 관계       | ? → 엔티티 (모든 프로퍼티, FILTER 적용) |
+| **Thread 3** | `entity_properties`  | 속성 정보           | 엔티티의 리터럴 값 (연도, 설명 등)      |
+| **Thread 4** | `connected_entities` | 연결된 엔티티 (A-B) | **A ↔ B 양방향** 관계 검색 (UNION 패턴) |
+| **Thread 5** | `type_and_summary`   | 타입/요약           | 엔티티 타입, 요약, 카테고리, 연도       |
 
 **핵심 개선:**
 
 - ✅ **하드코딩 없음**: 특정 프로퍼티가 아닌 **모든 관계** 검색
 - ✅ **프로퍼티 FILTER**: classify_node에서 선택된 프로퍼티만 우선 검색
+- ✅ **A-B 관계 패턴**: `connected_entities` Thread에서 **양방향** 관계 검색 지원
 - ✅ **범용성**: 데이터 추가 시 자동으로 새 프로퍼티도 검색됨
 
 #### **범용 관계 검색 SPARQL 예시**
@@ -541,10 +576,44 @@ SELECT ?entity ?entityLabel ?predicate ?value WHERE {
 # 을미사변 → [hasSummary] → "명성황후 시해 사건"
 ```
 
+```sparql
+# Thread 4: connected_entities - A-B 양방향 관계 검색 (UNION 패턴)
+# 목적: "일본 왜군과 조선이 싸운 전투" 같은 A-B 관계 질문 처리
+
+SELECT DISTINCT ?entity1 ?label1 ?predicate ?entity2 ?label2 WHERE {
+    {
+        # A → B 방향
+        ?entity1 rdfs:label ?label1 .
+        ?entity2 rdfs:label ?label2 .
+        FILTER (?label1 = "일본" || ?label1 = "왜군")
+        FILTER (?label2 = "조선")
+        ?entity1 ?predicate ?entity2 .
+    }
+    UNION
+    {
+        # B → A 방향
+        ?entity2 rdfs:label ?label2 .
+        ?entity1 rdfs:label ?label1 .
+        FILTER (?label1 = "일본" || ?label1 = "왜군")
+        FILTER (?label2 = "조선")
+        ?entity2 ?predicate ?entity1 .
+    }
+    FILTER(?entity1 != ?entity2)
+    FILTER(?predicate != rdf:type)
+    FILTER(?predicate != rdfs:label)
+} LIMIT 100
+
+# 결과 예시:
+# 일본 ↔ [participated] ↔ 임진왜란
+# 왜군 ↔ [attackedBy] ↔ 조선
+# 조선 ↔ [defendedAgainst] ↔ 왜군
+```
+
 **핵심 차이:**
 
 - ✅ **하드코딩 없음**: 특정 프로퍼티가 아닌 **모든 프로퍼티** 검색
 - ✅ **FILTER로 정확도 향상**: 관련 프로퍼티만 우선 검색
+- ✅ **A-B 양방향 검색**: 엔티티를 2개 그룹으로 나눠 UNION 패턴으로 양방향 관계 검색
 - ✅ **범용성**: 데이터에 새 프로퍼티가 추가되어도 자동 검색
 
 ---

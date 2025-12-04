@@ -125,21 +125,34 @@ DATA_THREADS = {
         "use_milvus": False
     },
     "connected_entities": {
-        "description": "두 엔티티 사이의 관계",
+        "description": "두 엔티티 사이의 모든 관계 (A ↔ B)",
         "sparql_template": """
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
             PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-            
+
             SELECT DISTINCT ?entity1 ?label1 ?predicate ?entity2 ?label2 WHERE {{
-                ?entity1 rdfs:label ?label1 .
-                ?entity2 rdfs:label ?label2 .
-                FILTER ({label_filter1})
-                ?entity1 ?predicate ?entity2 .
+                {{
+                    # A → B 방향
+                    ?entity1 rdfs:label ?label1 .
+                    ?entity2 rdfs:label ?label2 .
+                    FILTER ({label_filter1})
+                    FILTER ({label_filter2})
+                    ?entity1 ?predicate ?entity2 .
+                }}
+                UNION
+                {{
+                    # B → A 방향
+                    ?entity2 rdfs:label ?label2 .
+                    ?entity1 rdfs:label ?label1 .
+                    FILTER ({label_filter1})
+                    FILTER ({label_filter2})
+                    ?entity2 ?predicate ?entity1 .
+                }}
                 FILTER(?entity1 != ?entity2)
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
-            }} LIMIT 50
+            }} LIMIT 100
         """,
         "use_milvus": False
     },
@@ -519,11 +532,24 @@ def generate_template_sparql(thread_type: str, entities: list, template: str, se
         return ""
     
     label_filter = " || ".join(label_conditions)
-    
-    # connected_entities는 두 개의 라벨 필터 필요
+
+    # connected_entities는 두 개의 라벨 필터 필요 (A-B 관계 검색)
     if thread_type == "connected_entities":
-        label_filter1 = " || ".join([f'?label1 = "{l}"' for l in labels[:5]])
-        sparql = template.format(label_filter1=label_filter1)
+        # 엔티티를 2개 그룹으로 나눔 (A 그룹, B 그룹)
+        mid = len(labels) // 2 if len(labels) > 1 else 1
+        group_a = labels[:mid] if mid > 0 else labels
+        group_b = labels[mid:] if len(labels) > 1 else labels
+
+        label_filter1 = " || ".join([f'?label1 = "{l}"' for l in group_a[:5]])
+        label_filter2 = " || ".join([f'?label2 = "{l}"' for l in group_b[:5]])
+
+        # label_filter1이 비어있으면 기본값 설정
+        if not label_filter1:
+            label_filter1 = f'?label1 = "{labels[0]}"' if labels else '?label1 != ""'
+        if not label_filter2:
+            label_filter2 = f'?label2 = "{labels[0]}"' if labels else '?label2 != ""'
+
+        sparql = template.format(label_filter1=label_filter1, label_filter2=label_filter2)
     else:
         sparql = template.format(label_filter=label_filter)
     
