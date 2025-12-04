@@ -63,3 +63,6 @@ services:
       timeout: 5s
       retries: 5
 
+volumes:
+  fuseki-data:
+    driver: local

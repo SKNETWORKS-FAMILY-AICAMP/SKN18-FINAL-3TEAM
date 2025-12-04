@@ -1,7 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- 예제 테이블 생성
-CREATE TABLE documents (
+CREATE TABLE korean_history (
     id SERIAL PRIMARY KEY,
     category VARCHAR(20),
     title VARCHAR(255),
