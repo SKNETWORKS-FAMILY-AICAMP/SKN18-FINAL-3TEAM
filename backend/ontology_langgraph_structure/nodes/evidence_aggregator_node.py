@@ -47,6 +47,44 @@ def evidence_aggregator_node(state: GraphState) -> GraphState:
     # 2. 가중치 기준으로 정렬
     sorted_evidences = sorted(all_evidences, key=lambda x: x["weight"], reverse=True)
 
+    # ========================================
+    # [테스트용] 쓰레드별 검색 결과 출력 (나중에 원복 가능하도록 주석 처리)
+    # ========================================
+    print(f"\n      [테스트용] 쓰레드별 검색 결과:")
+    for thread_type, paths in inference_paths.items():
+        print(f"        - {thread_type}: {len(paths)}개 경로")
+        # 상위 5개만 미리보기
+        for i, path in enumerate(paths[:5], 1):
+            desc = path.get("description", "")[:50]
+            weight = path.get("weight", 0)
+            print(f"          {i}. {desc} (가중치: {weight:.3f})")
+        if len(paths) > 5:
+            print(f"          ... 외 {len(paths) - 5}개")
+    
+    # [테스트용] 전체 근거 목록 출력 (정렬 후)
+    print(f"\n      [테스트용] 전체 근거 목록 (총 {len(sorted_evidences)}개, 가중치 순):")
+    for i, ev in enumerate(sorted_evidences[:20], 1):  # 상위 20개만 출력
+        ev_type = ev.get("type", "unknown")
+        description = ev.get("description", "")
+        weight = ev.get("weight", 0)
+        
+        type_map = {
+            "outgoing_relations": "나가는관계",
+            "incoming_relations": "들어오는관계",
+            "entity_properties": "엔티티속성",
+            "connected_entities": "연결엔티티",
+            "type_and_summary": "타입/요약",
+        }
+        type_display = type_map.get(ev_type, ev_type)
+        desc_display = description[:60] + "..." if len(description) > 60 else description
+        
+        print(f"        {i:2d}. [{type_display:12s}] {desc_display} (가중치: {weight:.4f})")
+    if len(sorted_evidences) > 20:
+        print(f"        ... 외 {len(sorted_evidences) - 20}개")
+    # ========================================
+    # [테스트용] 끝
+    # ========================================
+
     # 3. 상위 5개 선택 (generate_node 성능 최적화)
     top_evidences = sorted_evidences[:5]
 
