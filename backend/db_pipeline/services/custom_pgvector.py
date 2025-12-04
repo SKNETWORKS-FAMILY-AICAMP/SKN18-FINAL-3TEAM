@@ -5,6 +5,7 @@ from langchain_core.documents import Document
 from psycopg2.extras import Json
 import psycopg2
 from pgvector.psycopg2 import register_vector
+import time
 
 class CustomPGVector(VectorStore):
     def __init__(self, conn_str: str, embedding_fn, table: str = "vectordb"):
@@ -28,20 +29,36 @@ class CustomPGVector(VectorStore):
         store.add_texts(texts, metadatas=metadatas)
         return store
 
-    def add_texts(self, texts: List[str], metadatas: List[Dict[str, Any]] = None):
-        metadatas = metadatas or [{} for _ in texts]
-        embeddings = self.embedding_fn.embed_documents(texts)
+    import time
 
-        with self.conn.cursor() as cur:
-            for text, emb, meta in zip(texts, embeddings, metadatas):
-                cur.execute(
-                    f"""
-                    INSERT INTO {self.table} (content, embedding, metadata)
-                    VALUES (%s, %s, %s)
-                    """,
-                    (text, emb, Json(meta)),
-                )
-        self.conn.commit()
+    def add_texts(self, texts, metadatas=None, batch_size=50, sleep_sec=1.0):
+        metadatas = metadatas or [{} for _ in texts]
+
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i:i+batch_size]
+            batch_metas = metadatas[i:i+batch_size]
+
+            embeddings = self.embedding_fn.embed_documents(batch_texts)
+
+            with self.conn.cursor() as cur:
+                for text, emb, meta in zip(batch_texts, embeddings, batch_metas):
+                    cur.execute(
+                        f"""
+                        INSERT INTO {self.table}
+                        (category, title, summary, content, embedding, metadata)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        """,
+                        (
+                            meta.get("category"),
+                            meta.get("title"),
+                            meta.get("summary"),
+                            text,
+                            emb,
+                            Json(meta),
+                        ),
+                    )
+            self.conn.commit()
+            time.sleep(sleep_sec)  # 필요시 백오프
 
     def similarity_search(self, query: str, k: int = 4,
                           filter: Optional[Dict[str, Any]] = None) -> List[Document]:
