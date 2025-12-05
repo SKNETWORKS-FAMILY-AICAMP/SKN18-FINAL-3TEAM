@@ -134,6 +134,7 @@ volumes:
   milvus-data:
     driver: local
   postgres-data:
+    name: sknfinal_postgres-data
     driver: local
 
 networks:
