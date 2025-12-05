@@ -52,3 +52,10 @@ jupyter==1.1.1
 
 accelerate==0.27.2
 tqdm==4.66.5
+
+# REST API
+djangorestframework==3.15.1
+djangorestframework-simplejwt==5.3.1
+
+# CORS
+django-cors-headers==4.3.1
