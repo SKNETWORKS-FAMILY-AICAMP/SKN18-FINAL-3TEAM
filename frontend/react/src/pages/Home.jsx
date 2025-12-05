@@ -27,8 +27,14 @@ function Home() {
   }, [navigate]);
 
   const handleLogout = () => {
+    // localStorage에서 토큰 삭제
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+
+    // Django 세션 삭제 (선택사항)
     api.post('/api/logout/')
       .then(() => {
+        console.log('✅ 로그아웃 성공!');
         navigate('/login');
       })
       .catch(error => {
