@@ -44,9 +44,9 @@ services:
 
     environment:
       # PostgreSQL 기본 계정 정보
-      POSTGRES_USER: admin               # PostgreSQL 접속 사용자 이름
-      POSTGRES_PASSWORD: admin123        # PostgreSQL 접속 비밀번호
-      POSTGRES_DB: vectordb              # 기본으로 생성할 데이터베이스 이름
+      POSTGRES_USER: root               # PostgreSQL 접속 사용자 이름
+      POSTGRES_PASSWORD: root1234        # PostgreSQL 접속 비밀번호
+      POSTGRES_DB: skn18final              # 기본으로 생성할 데이터베이스 이름
 
     ports:
       - "5432:5432"                      # 호스트 포트:컨테이너 포트 (기본 PostgreSQL 포트 5432)
