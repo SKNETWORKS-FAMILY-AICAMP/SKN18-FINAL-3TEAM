@@ -58,7 +58,7 @@ services:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U root"]
+      test: ["CMD-SHELL", "pg_isready -U root -d skn18final"]
       interval: 10s
       timeout: 5s
       retries: 5
