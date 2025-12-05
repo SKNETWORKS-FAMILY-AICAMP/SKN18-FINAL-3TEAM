@@ -264,6 +264,9 @@ error_log.txt
 # neo4j
 infra/neo4j/
 
+# postgres
+infra/database/
+
 ### react ###
 .DS_*
 *.log
