@@ -31,7 +31,9 @@ EXTRACT_SCRIPT="$SCRIPT_DIR/extract_property_groups.py"
 FUSEKI_URL="${FUSEKI_URL:-http://localhost:3030}"
 DATASET="${DATASET:-korean-history}"
 FUSEKI_USER="${FUSEKI_USER:-admin}"
-FUSEKI_PASSWORD="${FUSEKI_PASSWORD:-fuseki1234}"
+# docker-compose.yml의 ADMIN_PASSWORD 기본값과 일치시킴
+# 우선순위: FUSEKI_PASSWORD > FUSEKI_ADMIN_PASSWORD > "fuseki1234" (docker-compose.yml 기본값)
+FUSEKI_PASSWORD="${FUSEKI_PASSWORD:-${FUSEKI_ADMIN_PASSWORD:-fuseki1234}}"
 
 # ==============================================================================
 # 1단계: TTL 정규화
@@ -140,33 +142,66 @@ echo "TTL 파일 업로드 중..."
 FILE_SIZE=$(du -h "$OUTPUT_TTL" | cut -f1)
 echo "파일 크기: $FILE_SIZE"
 
-curl -X POST "$FUSEKI_URL/$DATASET/data" \
+HTTP_CODE=$(curl -X POST "$FUSEKI_URL/$DATASET/data" \
     -u "$FUSEKI_USER:$FUSEKI_PASSWORD" \
     -H "Content-Type: text/turtle" \
     --data-binary "@$OUTPUT_TTL" \
     -s -o /dev/null \
-    -w "HTTP Status: %{http_code}\n"
+    -w "%{http_code}" \
+    --max-time 60)
 
-if [ $? -eq 0 ]; then
+echo "HTTP Status: $HTTP_CODE"
+
+if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
     echo -e "${GREEN}SUCCESS: TTL 업로드 완료${NC}"
-else
-    echo -e "${RED}ERROR: TTL 업로드 실패${NC}"
+elif [ "$HTTP_CODE" = "401" ]; then
+    echo -e "${RED}ERROR: 인증 실패 (401) - Fuseki 사용자명/비밀번호를 확인하세요${NC}"
     exit 1
+elif [ "$HTTP_CODE" = "404" ]; then
+    echo -e "${RED}ERROR: 데이터셋을 찾을 수 없습니다 (404)${NC}"
+    exit 1
+else
+    echo -e "${YELLOW}WARNING: HTTP $HTTP_CODE - 업로드 상태 불명확${NC}"
 fi
 
 echo ""
 
 # 업로드 확인 (트리플 개수 조회)
 echo "업로드 확인 중..."
-TRIPLE_COUNT=$(curl -s "$FUSEKI_URL/$DATASET/query" \
+TRIPLE_COUNT=$(curl -s -X POST "$FUSEKI_URL/$DATASET/sparql" \
+    -u "$FUSEKI_USER:$FUSEKI_PASSWORD" \
     --data-urlencode "query=SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o }" \
-    -H "Accept: application/sparql-results+json" | \
-    python3 -c "import sys, json; print(json.load(sys.stdin)['results']['bindings'][0]['count']['value'])")
+    -H "Accept: application/sparql-results+json" \
+    --max-time 10 \
+    2>/dev/null | \
+    python3 -c "import sys, json; data=json.load(sys.stdin); print(data['results']['bindings'][0]['count']['value'])" 2>/dev/null)
 
-if [ -n "$TRIPLE_COUNT" ]; then
+if [ -n "$TRIPLE_COUNT" ] && [ "$TRIPLE_COUNT" != "None" ]; then
     echo -e "${GREEN}OK: 업로드된 트리플 개수: $TRIPLE_COUNT${NC}"
 else
-    echo -e "${YELLOW}WARNING: 트리플 개수 확인 실패${NC}"
+    echo -e "${YELLOW}WARNING: 트리플 개수 확인 실패 (Fuseki 서버 응답 없음 또는 데이터 없음)${NC}"
+fi
+
+# TTL 파일에서 노드 및 엣지 수 계산
+echo ""
+echo "TTL 파일 통계 계산 중..."
+STATS_SCRIPT="$SCRIPT_DIR/count_ttl_stats.py"
+if [ -f "$STATS_SCRIPT" ]; then
+    STATS_OUTPUT=$(python3 "$STATS_SCRIPT" --ttl "$OUTPUT_TTL" --quiet 2>&1)
+    if [ $? -eq 0 ] && [ -n "$STATS_OUTPUT" ]; then
+        NODE_COUNT=$(echo "$STATS_OUTPUT" | grep "노드 수:" | awk '{print $3}' | tr -d ',')
+        EDGE_COUNT=$(echo "$STATS_OUTPUT" | grep "엣지 수:" | awk '{print $3}' | tr -d ',')
+        if [ -n "$NODE_COUNT" ] && [ -n "$EDGE_COUNT" ]; then
+            echo -e "${GREEN}OK: 적재된 노드 수: ${NODE_COUNT}${NC}"
+            echo -e "${GREEN}OK: 적재된 엣지 수: ${EDGE_COUNT}${NC}"
+        else
+            echo -e "${YELLOW}WARNING: 노드/엣지 수 파싱 실패${NC}"
+        fi
+    else
+        echo -e "${YELLOW}WARNING: TTL 통계 계산 실패${NC}"
+    fi
+else
+    echo -e "${YELLOW}WARNING: 통계 스크립트를 찾을 수 없습니다: $STATS_SCRIPT${NC}"
 fi
 
 echo ""
