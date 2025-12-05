@@ -280,4 +280,4 @@ psd
 thumb
 sketch
 
-infra/database/*
+infra/database/
