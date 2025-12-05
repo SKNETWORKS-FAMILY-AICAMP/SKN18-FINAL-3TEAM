@@ -10,7 +10,7 @@ def prepare_vectordb(connection_string):
             register_vector(conn)
             with conn.cursor() as cursor:
                 cursor.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-        print("pgvector 확장이 성공적으로 설치되었습니다.")
+        print("pgvector 확장 설치 완료")
     except Exception as e:
         print(f"pgvector 설정 중 오류 발생: {e}")
         print("PostgreSQL이 실행 중이고 연결 정보가 올바른지 확인하세요.")

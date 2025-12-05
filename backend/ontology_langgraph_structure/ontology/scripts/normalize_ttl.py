@@ -88,7 +88,8 @@ def normalize_ttl_file(input_path: str, output_path: str):
     if not input_file.exists():
         raise FileNotFoundError(f"파일을 찾을 수 없습니다: {input_path}")
     
-    print(f"📂 입력 파일: {input_path}")
+    print(f"[1/5] URI 정규화")
+    print(f"  입력 파일: {input_path}")
     
     with open(input_file, 'r', encoding='utf-8') as f:
         content = f.read()
@@ -98,9 +99,11 @@ def normalize_ttl_file(input_path: str, output_path: str):
     label_mapping = {}
     
     # 모든 hist: URI 찾기 (공백, 점, 세미콜론 전까지)
-    uri_pattern = re.compile(r'hist:([^\s\.\;\,\)\]]+)')
+    # 괄호를 포함해서 매칭하되, 공백/점/세미콜론 전까지 매칭
+    # TTL 문법상 URI는 공백/점/세미콜론으로 끝나므로 괄호도 포함해서 매칭
+    uri_pattern = re.compile(r'hist:([^\s\.\;]+)')
     all_uris = set(uri_pattern.findall(content))
-    print(f"📊 발견된 URI: {len(all_uris)}개")
+    print(f"  발견된 URI: {len(all_uris)}개")
     
     for uri_part in all_uris:
         new_uri_part, original_name = normalize_uri(uri_part)
@@ -109,7 +112,7 @@ def normalize_ttl_file(input_path: str, output_path: str):
             if original_name:
                 label_mapping[new_uri_part] = original_name
     
-    print(f"🔄 변환 필요한 URI: {len(uri_mapping)}개")
+    print(f"  변환 필요한 URI: {len(uri_mapping)}개")
     
     # URI 치환
     normalized_content = content
@@ -117,9 +120,10 @@ def normalize_ttl_file(input_path: str, output_path: str):
         normalized_content = normalized_content.replace(f'hist:{old_uri}', f'hist:{new_uri}')
     
     # ========== 2. 프로퍼티 정규화 ==========
+    print(f"[2/5] 프로퍼티 정규화")
     prop_pattern = re.compile(r'hist:([a-zA-Z]+[가-힣()（）]+[^\s]*)')
     all_props = set(prop_pattern.findall(normalized_content))
-    print(f"📊 발견된 비표준 프로퍼티: {len(all_props)}개")
+    print(f"  발견된 비표준 프로퍼티: {len(all_props)}개")
     
     prop_mapping = {}
     for prop in all_props:
@@ -127,17 +131,26 @@ def normalize_ttl_file(input_path: str, output_path: str):
         if new_prop != prop:
             prop_mapping[prop] = new_prop
     
-    print(f"🔄 변환 필요한 프로퍼티: {len(prop_mapping)}개")
+    print(f"  변환 필요한 프로퍼티: {len(prop_mapping)}개")
     
     # 프로퍼티 치환
     for old_prop, new_prop in prop_mapping.items():
         normalized_content = normalized_content.replace(f'hist:{old_prop}', f'hist:{new_prop}')
     
     # ========== 3. 잘못된 문법 수정 ==========
+    print(f"[3/5] 문법 수정")
     # 잘못된 괄호 제거
     normalized_content = re.sub(r'hist:(\w+)\(([^)]+)\)', r'hist:\1_\2', normalized_content)
     # 남은 한글 괄호 처리
     normalized_content = re.sub(r'hist:(\w+)（([^）]+)）', r'hist:\1_\2', normalized_content)
+    
+    # Python 스타일 불리언 값을 TTL 형식으로 변환
+    # True → true, False → false (소문자로 변환)
+    bool_count = len(re.findall(r'\bTrue\b|\bFalse\b', normalized_content))
+    normalized_content = re.sub(r'\bTrue\b', 'true', normalized_content)
+    normalized_content = re.sub(r'\bFalse\b', 'false', normalized_content)
+    if bool_count > 0:
+        print(f"  불리언 값 변환: {bool_count}개 (True/False → true/false)")
     
     # ========== 4. 누락된 rdfs:label 추가 ==========
     lines = normalized_content.split('\n')
@@ -170,10 +183,13 @@ def normalize_ttl_file(input_path: str, output_path: str):
     # ========== 5. 최종 정리 ==========
     final_content = '\n'.join(new_lines)
     
+    # ========== 5. 최종 정리 ==========
+    print(f"[4/5] 최종 정리")
+    
     # 남은 한글 문자가 있는 프로퍼티 제거 (주석 처리)
     remaining_korean_props = re.findall(r'hist:[a-zA-Z]*[가-힣]+[^\s]*', final_content)
     if remaining_korean_props:
-        print(f"⚠️ 남은 한글 프로퍼티 {len(set(remaining_korean_props))}개 발견, 주석 처리...")
+        print(f"  경고: 남은 한글 프로퍼티 {len(set(remaining_korean_props))}개 발견, 주석 처리")
         for prop in set(remaining_korean_props):
             lines_with_prop = [l for l in final_content.split('\n') if prop in l]
             for line in lines_with_prop:
@@ -192,7 +208,7 @@ def normalize_ttl_file(input_path: str, output_path: str):
             cleaned_lines.append(line)
     
     if removed_json_count > 0:
-        print(f"⚠️ JSON 형태 값 {removed_json_count}개 줄 주석 처리...")
+        print(f"  경고: JSON 형태 값 {removed_json_count}개 줄 주석 처리")
     
     final_content = '\n'.join(cleaned_lines)
     
@@ -217,7 +233,8 @@ def normalize_ttl_file(input_path: str, output_path: str):
         if special_uri_match:
             invalid_uris.add(special_uri_match.group(1))
     
-    print(f"⚠️ 잘못된 URI {len(invalid_uris)}개 발견...")
+    if len(invalid_uris) > 0:
+        print(f"  경고: 잘못된 URI {len(invalid_uris)}개 발견")
     
     # 문제 URI를 포함하는 모든 줄 제거
     final_lines = []
@@ -236,38 +253,39 @@ def normalize_ttl_file(input_path: str, output_path: str):
             final_lines.append(line)
     
     if removed_invalid > 0:
-        print(f"⚠️ 잘못된 URI 관련 {removed_invalid}개 줄 제거...")
+        print(f"  경고: 잘못된 URI 관련 {removed_invalid}개 줄 제거")
     
     final_content = '\n'.join(final_lines)
     
     # 결과 저장
+    print(f"[5/5] 결과 저장")
     output_file = Path(output_path)
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(final_content)
     
-    print(f"✅ 정규화 완료: {output_path}")
-    print(f"   - 원본 크기: {input_file.stat().st_size:,} bytes")
-    print(f"   - 정규화 크기: {output_file.stat().st_size:,} bytes")
+    print(f"  출력 파일: {output_path}")
+    print(f"  원본 크기: {input_file.stat().st_size:,} bytes")
+    print(f"  정규화 크기: {output_file.stat().st_size:,} bytes")
     
     # 검증
     try:
         from rdflib import Graph
         g = Graph()
         g.parse(output_path, format='turtle')
-        print(f"   ✅ TTL 검증 성공: {len(g)} 트리플")
+        print(f"  TTL 검증 성공: {len(g)} 트리플")
     except ImportError:
-        print("   - rdflib 없음, TTL 검증 건너뜀")
+        print(f"  TTL 검증 건너뜀 (rdflib 없음)")
     except Exception as e:
-        print(f"   ⚠️ TTL 검증 실패: {e}")
+        print(f"  경고: TTL 검증 실패: {e}")
         # 실패 줄 찾기
         error_line = re.search(r'at line (\d+)', str(e))
         if error_line:
             line_num = int(error_line.group(1))
             lines = final_content.split('\n')
-            print(f"   문제 줄 ({line_num}):")
+            print(f"  문제 줄 ({line_num}):")
             for i in range(max(0, line_num-3), min(len(lines), line_num+3)):
                 marker = ">>>" if i == line_num-1 else "   "
-                print(f"   {marker} {i+1}: {lines[i][:100]}")
+                print(f"    {marker} {i+1}: {lines[i][:100]}")
     
     return uri_mapping, prop_mapping
 
@@ -291,13 +309,13 @@ def main():
     output_path = script_dir / args.output if not Path(args.output).is_absolute() else Path(args.output)
     
     print("=" * 60)
-    print("🔧 TTL 파일 정규화 시작 (v2 - 프로퍼티 포함)")
+    print("TTL 파일 정규화")
     print("=" * 60)
     
     normalize_ttl_file(str(input_path), str(output_path))
     
     print("=" * 60)
-    print("✅ 완료!")
+    print("정규화 완료")
     print("=" * 60)
 
 
