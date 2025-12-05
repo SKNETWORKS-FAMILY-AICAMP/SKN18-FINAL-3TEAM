@@ -61,7 +61,7 @@ STOPWORDS = {
     "도","만","까지","부터",
     "뭐","뭐야","뭔데","왜","어떻게",
     "알려줘","설명","대해","대해서",
-    "에","의","것","거",
+    "에","의","것","거", "관계"
 }
 
 def extract_nouns(text):
@@ -69,7 +69,7 @@ def extract_nouns(text):
     raw = clean.split()
     out = []
     for t in raw:
-        t = re.sub(r"(은|는|이|가|을|를|과|와|에서|에|으로|의|로|에게)$", "", t)
+        t = re.sub(r"(은|는|이|가|을|를|과|와|에서|에|때|으로|의|로|에게)$", "", t)
         if len(t) < 2: continue
         if t in STOPWORDS: continue
         out.append(t)
