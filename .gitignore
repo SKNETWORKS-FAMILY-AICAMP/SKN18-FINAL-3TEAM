@@ -325,3 +325,6 @@ bower_components
 psd
 thumb
 sketch
+
+# neo4j
+infra/database/

@@ -10,7 +10,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 #    - chunk_size, chunk_overlap만 조절하면 됨
 # -------------------------------------------------------------------
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=500,        # 대략 800~1200 정도를 많이 사용
+    chunk_size=800,        # 대략 800~1200 정도를 많이 사용
     chunk_overlap=100,      # 앞/뒤로 겹치게 해서 문맥 보존
     separators=["\n\n", "\n", " ", ""],  # 우선순위: 문단 > 줄 > 공백 > 문자
 )

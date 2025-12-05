@@ -8,6 +8,7 @@ from pgvector.psycopg2 import register_vector
 import time
 from tqdm import tqdm
 
+
 class CustomPGVector(VectorStore):
     def __init__(self, conn_str: str, embedding_fn, table: str = "vectordb"):
         self.conn = psycopg2.connect(conn_str)
@@ -181,3 +182,4 @@ class CustomPGVector(VectorStore):
                 unique_documents.append(row) # 중복이 아닐 때 원본 튜플을 저장
 
         return unique_documents # 중복 제거된 리스트 반환
+
