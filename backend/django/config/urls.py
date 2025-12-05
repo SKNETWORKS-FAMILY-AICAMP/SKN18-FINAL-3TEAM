@@ -19,6 +19,11 @@ from django.urls import path, include
 from django.http import JsonResponse
 from django.contrib.auth import logout
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+    TokenVerifyView,
+)
 
 # 인증 상태 확인 API
 def check_auth(request):
@@ -51,6 +56,9 @@ urlpatterns = [
     # API 엔드포인트
     path('api/check-auth/', check_auth, name='check_auth'),
     path('api/logout/', logout_view, name='logout'),
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
 
     path('', include('home.urls')),        # 메인 홈
     path('login/', include('login.urls')), # 로그인 페이지(UI)
