@@ -69,16 +69,6 @@ services:
 volumes:
   fuseki-data:
     driver: local
-  etcd-data:
-    driver: local
-  minio-data:
-    driver: local
-  milvus-data:
-    driver: local
   postgres-data:
     name: sknfinal_postgres-data
     driver: local
-
-networks:
-  default:
-    name: milvus

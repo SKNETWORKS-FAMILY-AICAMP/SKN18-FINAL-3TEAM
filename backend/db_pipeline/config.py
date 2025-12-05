@@ -2,9 +2,7 @@
 import os
 from dotenv import load_dotenv
 
-# .env 파일 경로: 프로젝트 루트 기준
-env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.env"))
-load_dotenv(override=True, dotenv_path=env_path)
+load_dotenv(override=True,dotenv_path="../.env")
 
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
