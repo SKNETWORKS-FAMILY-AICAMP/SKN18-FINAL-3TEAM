@@ -14,3 +14,11 @@ POSTGRES_CONN_STR = (
     f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}"
     f"@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 )
+
+# 임베딩 모델 설정
+EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
+
+# 데이터 경로 설정
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+INPUT_CSV = os.path.join(DATA_DIR, "encykorea_cleaned6.csv")
+OUTPUT_CSV = os.path.join(DATA_DIR, "transformed_chunks.csv")
