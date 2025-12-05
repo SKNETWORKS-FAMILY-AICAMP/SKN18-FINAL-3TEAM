@@ -21,81 +21,48 @@ from graph import graph
 
 def print_header():
     """헤더 출력"""
-    print("\n" + "="*70)
-    print("🏛️  Korean History LangGraph - 조선시대 역사 스토리텔링")
-    print("="*70)
-    print("\n💡 질문 예시:")
-    print("  - 이순신이 명량해전에서 왜 승리했을까?")
-    print("  - 만약 세종대왕이 한글을 창제하지 않았다면?")
-    print("  - 왕자의 난의 진짜 이유는 무엇일까?")
-    print("\n종료하려면 'quit' 또는 'exit'를 입력하세요.\n")
-    print("="*70 + "\n")
+    print(f"\n{'='*70}")
+    print(f"Korean History LangGraph - 조선시대 역사 스토리텔링")
+    print(f"{'='*70}")
+    print(f"  ├─ 질문 예시:")
+    print(f"  │   • 경복궁을 건축한 왕은 누구인가?")
+    print(f"  │   • 갑술환국의 원인은 무엇인가?")
+    print(f"  │   • 세종대왕이 창제한 것은 무엇인가?")
+    print(f"  └─ 종료: 'quit' 또는 'exit' 입력")
+    print(f"{'='*70}\n")
 
 
 def print_result(state: dict):
     """실행 결과 출력"""
-    print("\n" + "="*70)
-    print("📊 실행 결과")
-    print("="*70 + "\n")
-
-    # 질문 유형
-    query_type = state.get("query_type", "N/A")
-    print(f"🔍 질문 유형: {query_type}")
-
-    # 추출된 엔티티
-    entities = state.get("extracted_entities", [])
-    if entities:
-        print(f"\n🎯 추출된 엔티티 ({len(entities)}개):")
-        for i, entity in enumerate(entities[:5], 1):
-            entity_type = entity.get("type", "Unknown")
-            entity_name = entity.get("name", entity.get("value", "N/A"))
-            print(f"  {i}. [{entity_type}] {entity_name}")
-
-    # 생성된 SPARQL 쿼리
-    multi_queries = state.get("multi_queries", {})
-    if multi_queries:
-        print(f"\n📝 생성된 SPARQL 쿼리 ({len(multi_queries)}개):")
-        for thread_type in multi_queries.keys():
-            print(f"  ✓ {thread_type}")
-
-    # 추론 결과
-    inference_results = state.get("parallel_inference_results", {})
-    if inference_results:
-        total_bindings = sum(len(r.get("bindings", [])) for r in inference_results.values())
-        print(f"\n⚡ 추론 결과: {total_bindings}개 트리플")
-        for thread_type, result in inference_results.items():
-            count = len(result.get("bindings", []))
-            status = result.get("status", "unknown")
-            if count > 0:
-                print(f"  ✓ {thread_type}: {count}개 ({status})")
-
-    # 근거
-    evidences = state.get("evidences", [])
-    if evidences:
-        print(f"\n📚 추출된 근거 ({len(evidences)}개):")
-        for i, evidence in enumerate(evidences[:3], 1):
-            ev_type = evidence.get("type", "Unknown")
-            weight = evidence.get("weight", 0)
-            print(f"  {i}. [{ev_type}] 가중치: {weight:.2f}")
-
     # 최종 답변
     final_answer = state.get("final_answer", "")
     if final_answer:
-        print("\n" + "="*70)
-        print("📖 최종 답변")
-        print("="*70 + "\n")
+        print(f"\n{'='*70}")
+        print(f"[6/6] 최종 답변")
+        print(f"{'='*70}\n")
         print(final_answer)
     else:
-        print("\n⚠️  최종 답변이 생성되지 않았습니다.")
+        print(f"\n경고: 최종 답변이 생성되지 않았습니다.")
 
     # 실행 정보
-    executed_nodes = state.get("executed_nodes", [])
     execution_time = state.get("execution_time", 0)
+    node_times = state.get("node_execution_times", {})
 
-    print("\n" + "="*70)
-    print(f"⏱️  실행 시간: {execution_time:.2f}초")
-    print(f"🔗 실행된 노드: {len(executed_nodes)}개")
-    print("="*70 + "\n")
+    print(f"\n{'='*70}")
+    print(f"실행 완료")
+    print(f"{'='*70}")
+
+    # 노드별 실행 시간
+    if node_times:
+        print(f"  노드별 실행 시간:")
+        node_order = ["query_classifier", "entity_extractor", "parallel_knowledge_retrieval",
+                      "multi_path_extractor", "evidence_aggregator", "story_generator"]
+        for node_name in node_order:
+            if node_name in node_times:
+                print(f"    - {node_name}: {node_times[node_name]:.2f}초")
+
+    print(f"  총 실행 시간: {execution_time:.2f}초")
+    print(f"{'='*70}\n")
 
 
 def main():
@@ -109,16 +76,16 @@ def main():
 
             # 종료 명령 체크
             if query.lower() in ['quit', 'exit', 'q', '종료']:
-                print("\n👋 프로그램을 종료합니다.\n")
+                print("\n프로그램을 종료합니다.\n")
                 break
 
             # 빈 입력 체크
             if not query:
-                print("⚠️  질문을 입력해주세요.\n")
+                print("경고: 질문을 입력해주세요.\n")
                 continue
 
             # LangGraph 실행
-            print(f"\n🚀 처리 중...\n")
+            print(f"\n처리 시작...\n")
 
             import time
             start_time = time.time()
@@ -132,10 +99,10 @@ def main():
             print_result(result)
 
         except KeyboardInterrupt:
-            print("\n\n👋 프로그램을 종료합니다.\n")
+            print("\n\n프로그램을 종료합니다.\n")
             break
         except Exception as e:
-            print(f"\n❌ 오류 발생: {e}\n")
+            print(f"\n오류 발생: {e}\n")
             import traceback
             traceback.print_exc()
             print()

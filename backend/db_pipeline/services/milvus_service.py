@@ -52,26 +52,26 @@ class MilvusService:
                 port=MILVUS_PORT
             )
             self._connected = True
-            print(f"✅ Milvus 연결 성공: {MILVUS_HOST}:{MILVUS_PORT}")
+            # Milvus 연결 성공 (로그 간소화)
             return True
         except Exception as e:
-            print(f"❌ Milvus 연결 실패: {e}")
+            print(f"Milvus 연결 실패: {e}")
             self._connected = False
             return False
-    
+
     def disconnect(self):
         """Milvus 연결 해제"""
         if self._connected:
             connections.disconnect("default")
             self._connected = False
-            print("🔌 Milvus 연결 해제")
-    
+            # Milvus 연결 해제 (로그 간소화)
+
     def load_model(self):
         """임베딩 모델 로드"""
         if self.model is None:
-            print(f"📦 임베딩 모델 로딩: {EMBED_MODEL_NAME}")
+            # 임베딩 모델 로딩 중... (로그 간소화)
             self.model = SentenceTransformer(EMBED_MODEL_NAME)
-            print(f"✅ 모델 로드 완료 (차원: {self.model.get_sentence_embedding_dimension()})")
+            # 모델 로드 완료 (로그 간소화)
         return self.model
     
     def create_collection(self, drop_existing: bool = False) -> Collection:
