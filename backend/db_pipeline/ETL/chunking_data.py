@@ -1,60 +1,66 @@
 # db_pipeline/ETL/chunking_data.py
 
 from typing import List, Dict
-import tiktoken
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# OpenAI text-embedding-3-small tokenizer
-enc = tiktoken.encoding_for_model("text-embedding-3-small")
+# -------------------------------------------------------------------
+# 1) 실무에서 가장 흔하게 쓰는 LangChain 청킹 전략:
+#    RecursiveCharacterTextSplitter
+#    - 문단 / 줄바꿈 / 공백 위주로 자연스럽게 끊어줌
+#    - chunk_size, chunk_overlap만 조절하면 됨
+# -------------------------------------------------------------------
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=800,        # 대략 800~1200 정도를 많이 사용
+    chunk_overlap=100,      # 앞/뒤로 겹치게 해서 문맥 보존
+    separators=["\n\n", "\n", " ", ""],  # 우선순위: 문단 > 줄 > 공백 > 문자
+)
+
 
 def count_tokens(text: str) -> int:
-    return len(enc.encode(text))
+    """
+    엄밀한 '토큰 수'가 아니라 대략적인 길이 정보용.
+    비용/컨텍스트 정확 계산이 필요하면 tiktoken 을 나중에만 붙여도 됩니다.
+    """
+    return len(text.split())  # 대략적인 단어 수
 
 
-def chunk_text(text: str, max_tokens: int = 500, overlap: int = 100) -> List[str]:
-    """ 긴 본문을 토큰 단위로 청킹 """
-    tokens = enc.encode(text)
-    chunks = []
+def chunk_text(text: str) -> List[str]:
+    """긴 본문을 RecursiveCharacterTextSplitter 로 청킹"""
+    chunks = text_splitter.split_text(text)
 
-    start = 0
-    end = max_tokens
-
-    while start < len(tokens):
-        chunk = enc.decode(tokens[start:end])
-        chunks.append(chunk)
-
-        # 다음 chunk를 위해 overlap 만큼 뒤로 물러서기
-        start = end - overlap
-        end = start + max_tokens
+    # 공백만 있는 chunk 제거
+    chunks = [c for c in chunks if c.strip()]
 
     return chunks
 
 
 def chunk_dataframe(df):
     """
-    df: category, title, summary, contents가 있는 DataFrame
+    df: category, title, summary, contents 가 있는 DataFrame
     반환: [{"text": chunk_text, "metadata": {...}}]
     """
     results = []
 
-    for _, row in df.iterrows():
-        content = row["contents"]
+    # 성능상 iterrows()보다 itertuples()이 빠릅니다.
+    for row in df.itertuples(index=False):
+        content = getattr(row, "contents", "") or ""
 
         # contents를 chunk로 분할
         chunks = chunk_text(content)
 
         for idx, chunk in enumerate(chunks):
             meta = {
-                "category": row["category"],
-                "title": row["title"],
-                "summary": row["summary"],
+                "category": getattr(row, "category", None),
+                "title": getattr(row, "title", None),
+                "summary": getattr(row, "summary", None),
                 "chunk_index": idx,
-                "source": row["title"],      # 검색시 유용
+                "source": getattr(row, "title", None),  # 검색시 유용
                 "token_length": count_tokens(chunk),
             }
 
             results.append({
                 "text": chunk,
-                "metadata": meta
+                "metadata": meta,
             })
 
     return results
