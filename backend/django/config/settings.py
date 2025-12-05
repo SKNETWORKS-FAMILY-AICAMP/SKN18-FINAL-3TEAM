@@ -11,9 +11,21 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def env_required(key: str) -> str:
+    """Read required environment variable or raise to avoid leaking defaults."""
+    value = os.getenv(key)
+    if value is None:
+        raise RuntimeError(f"Environment variable {key} is required but not set.")
+    return value
 
 
 # Quick-start development settings - unsuitable for production
@@ -106,10 +118,15 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': env_required('POSTGRES_DB'),
+        'USER': env_required('POSTGRES_USER'),
+        'PASSWORD': env_required('POSTGRES_PASSWORD'),
+        'HOST': env_required('POSTGRES_HOST'),
+        'PORT': env_required('POSTGRES_PORT'),
     }
 }
+
 
 
 # Password validation
