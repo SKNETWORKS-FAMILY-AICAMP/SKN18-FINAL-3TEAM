@@ -2,223 +2,158 @@
 Transform: CSV 데이터 정규화 + 청킹
 
 1. Extract: encykorea_cleaned6.csv 읽기
-2. Normalize: 데이터 정규화 (공백, 특수문자 제거)
-3. Chunking: contents 긴 텍스트 청킹 (500자 단위, 100자 오버랩)
-4. Output: transformed_chunks.json 생성
+2. Normalize: 데이터 정규화 (한자 제거, 괄호 제거, 공백 정리)
+3. Chunking: contents 긴 텍스트 청킹 (800자, 100자 오버랩)
+4. Output: transformed_chunks.csv 생성
 """
 
-import csv
-import json
 import re
-from pathlib import Path
 from typing import List, Dict
-
-
-# 경로 설정
-DATA_DIR = Path(__file__).parent.parent / "data"
-INPUT_CSV = DATA_DIR / "encykorea_cleaned6.csv"
-OUTPUT_JSON = DATA_DIR / "transformed_chunks.json"
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+import pandas as pd
+from ..config import INPUT_CSV, OUTPUT_CSV, EMBED_MODEL
 
 # 청킹 파라미터
-CHUNK_SIZE = 500  # 500자 단위
-OVERLAP_SIZE = 100  # 100자 오버랩
+CHUNK_SIZE = 800  # 800자
+OVERLAP_SIZE = 100  # 100자
+
+# RecursiveCharacterTextSplitter 초기화
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=CHUNK_SIZE,
+    chunk_overlap=OVERLAP_SIZE,
+    separators=["\n\n", "\n", " ", ""],  # 우선순위: 문단 > 줄 > 공백 > 문자
+)
 
 
-def normalize_text(text: str) -> str:
+def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
+    # 원본 보호용 복사
+    df_ = df.copy()
+
+    # 필수 컬럼 체크 (category, title, summary, contents는 반드시 있어야 한다고 가정)
+    required_cols = ["category", "title", "summary", "contents"]
+    missing = [col for col in required_cols if col not in df_.columns]
+    if missing:
+        raise KeyError(f"입력 DataFrame에 '{', '.join(missing)}' 컬럼이 없습니다.")
+
+    # 결측치 처리 및 문자열 변환
+    df_[required_cols] = df_[required_cols].fillna("").astype(str)
+
+    # contents 기준으로 완전히 빈 행 제거
+    df_ = df_[df_["contents"].str.strip() != ""].reset_index(drop=True)
+
+    # 정규식 패턴: 확장 한자 포함, 모든 괄호와 내용 제거
+    han_pattern = r"[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]"
+    paren_pattern = r"\([^)]*\)"
+
+    for col in required_cols:
+        # 한자 제거
+        df_[col] = df_[col].str.replace(han_pattern, "", regex=True)
+        # 괄호 및 괄호 내부 내용 제거
+        df_[col] = df_[col].str.replace(paren_pattern, "", regex=True)
+        # 연속 공백 → 단일 공백
+        df_[col] = df_[col].str.replace(r'\s+', ' ', regex=True)
+        # Zero-width characters 제거
+        df_[col] = df_[col].str.replace(r'[\u200b-\u200d\ufeff]', '', regex=True)
+        # BOM 제거
+        df_[col] = df_[col].str.replace('\ufeff', '', regex=False)
+        # 앞뒤 공백 제거
+        df_[col] = df_[col].str.strip()
+
+    return df_
+
+
+def count_tokens(text: str) -> int:
     """
-    텍스트 정규화
-
-    - 연속된 공백 → 단일 공백
-    - 특수 유니코드 제거
-    - 앞뒤 공백 제거
+    엄밀한 '토큰 수'가 아니라 대략적인 길이 정보용.
+    비용/컨텍스트 정확 계산이 필요하면 tiktoken 을 나중에만 붙여도 됩니다.
     """
-    if not text or not isinstance(text, str):
-        return ""
-
-    # 연속 공백 → 단일 공백
-    text = re.sub(r'\s+', ' ', text)
-
-    # Zero-width characters 제거
-    text = re.sub(r'[\u200b-\u200d\ufeff]', '', text)
-
-    # BOM 제거
-    text = text.replace('\ufeff', '')
-
-    # 앞뒤 공백 제거
-    text = text.strip()
-
-    return text
+    return len(text.split())  # 대략적인 단어 수
 
 
-def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = OVERLAP_SIZE) -> List[Dict]:
-    """
-    긴 텍스트를 청킹
+def chunk_text(text: str) -> List[str]:
+    """긴 본문을 RecursiveCharacterTextSplitter 로 청킹"""
+    chunks = text_splitter.split_text(text)
 
-    Args:
-        text: 청킹할 텍스트
-        chunk_size: 청크 크기 (기본 500자)
-        overlap: 오버랩 크기 (기본 100자)
-
-    Returns:
-        [{"chunk_id": 0, "text": "...", "start": 0, "end": 500}, ...]
-    """
-
-    if not text or len(text) <= chunk_size:
-        # 청킹 불필요
-        return [{"chunk_id": 0, "text": text, "start": 0, "end": len(text)}]
-
-    chunks = []
-    chunk_id = 0
-    start = 0
-
-    while start < len(text):
-        end = start + chunk_size
-
-        # 마지막 청크인 경우
-        if end >= len(text):
-            chunk_text = text[start:]
-            chunks.append({
-                "chunk_id": chunk_id,
-                "text": chunk_text,
-                "start": start,
-                "end": len(text)
-            })
-            break
-
-        # 문장 경계에서 자르기 (마침표, 느낌표, 물음표)
-        # 청크 끝에서 역방향으로 100자 이내에서 문장 경계 찾기
-        search_start = max(end - 100, start)
-        search_text = text[search_start:end]
-
-        # 문장 경계 찾기
-        sentence_endings = ['.', '!', '?', '。']
-        best_split = -1
-
-        for i in range(len(search_text) - 1, -1, -1):
-            if search_text[i] in sentence_endings:
-                # 마침표 뒤에 공백이 있는지 확인
-                if i + 1 < len(search_text) and search_text[i + 1] == ' ':
-                    best_split = search_start + i + 2  # 마침표 + 공백 다음
-                    break
-                elif i + 1 == len(search_text):
-                    best_split = search_start + i + 1
-                    break
-
-        # 문장 경계를 찾았으면 그곳에서 자르기
-        if best_split > start:
-            end = best_split
-
-        chunk_text = text[start:end]
-        chunks.append({
-            "chunk_id": chunk_id,
-            "text": chunk_text,
-            "start": start,
-            "end": end
-        })
-
-        # 다음 청크는 오버랩을 고려하여 시작
-        start = end - overlap
-        chunk_id += 1
+    # 공백만 있는 chunk 제거
+    chunks = [c for c in chunks if c.strip()]
 
     return chunks
 
 
-def transform_csv_to_chunks() -> List[Dict]:
+def chunk_dataframe(df):
     """
-    CSV 데이터를 읽어 정규화 + 청킹하여 JSON 구조로 변환
-
-    Returns:
-        [
-            {
-                "doc_id": "doc_0",
-                "category": "물품",
-                "title": "가",
-                "summary": "죄수의 목에 채우는 형구.",
-                "chunks": [
-                    {"chunk_id": 0, "text": "...", "start": 0, "end": 500},
-                    ...
-                ]
-            },
-            ...
-        ]
+    df: category, title, summary, contents 가 있는 DataFrame
+    반환: [{"text": chunk_text, "metadata": {...}}]
     """
+    results = []
 
-    # CSV 필드 크기 제한 증가 (큰 contents 필드 처리)
-    import sys
-    max_int = sys.maxsize
-    while True:
-        try:
-            csv.field_size_limit(max_int)
-            break
-        except OverflowError:
-            max_int = int(max_int / 10)
+    # 성능상 iterrows()보다 itertuples()이 빠릅니다.
+    for row in df.itertuples(index=False):
+        content = getattr(row, "contents", "") or ""
 
-    transformed_data = []
+        # contents를 chunk로 분할
+        chunks = chunk_text(content)
 
-    print(f"📖 Reading CSV: {INPUT_CSV}")
-
-    with open(INPUT_CSV, 'r', encoding='utf-8') as f:
-        # BOM 제거
-        content = f.read()
-        if content.startswith('\ufeff'):
-            content = content[1:]
-
-        # CSV 파싱
-        reader = csv.DictReader(content.splitlines())
-
-        for idx, row in enumerate(reader):
-            # 데이터 추출
-            category = normalize_text(row.get('category', ''))
-            title = normalize_text(row.get('title', ''))
-            summary = normalize_text(row.get('summary', ''))
-            contents = normalize_text(row.get('contents', ''))
-
-            # 청킹 (contents만)
-            content_chunks = chunk_text(contents, chunk_size=CHUNK_SIZE, overlap=OVERLAP_SIZE)
-
-            # 문서 구조 생성
-            doc = {
-                "doc_id": f"doc_{idx}",
-                "category": category,
-                "title": title,
-                "summary": summary,
-                "contents_length": len(contents),
-                "num_chunks": len(content_chunks),
-                "chunks": content_chunks
+        for idx, chunk in enumerate(chunks):
+            meta = {
+                "category": getattr(row, "category", None),
+                "title": getattr(row, "title", None),
+                "summary": getattr(row, "summary", None),
+                "chunk_index": idx,
+                "source": getattr(row, "title", None),  # 검색시 유용
+                "token_length": count_tokens(chunk),
             }
 
-            transformed_data.append(doc)
+            results.append({
+                "text": chunk,
+                "metadata": meta,
+            })
 
-            # 진행상황 출력
-            if (idx + 1) % 1000 == 0:
-                print(f"  ├─ Processed: {idx + 1} documents")
-
-    print(f"  └─ Total documents: {len(transformed_data)}")
-
-    return transformed_data
+    return results
 
 
-def main():
-    """메인 실행 함수"""
+def transform_csv_to_chunks() -> pd.DataFrame:
+    """
+    CSV 데이터를 읽어 정규화 + 청킹하여 DataFrame으로 변환
 
-    print("="*70)
-    print("ETL Transform: CSV → Normalized + Chunked JSON")
-    print("="*70)
+    Returns:
+        DataFrame with columns: text, category, title, summary, chunk_index, source, token_length
+    """
+    print(f"CSV 파일 읽기: {INPUT_CSV}")
+    
+    # CSV를 DataFrame으로 읽기
+    df = pd.read_csv(INPUT_CSV, encoding='utf-8')
+    
+    # 전처리
+    print("데이터 전처리 중...")
+    df_processed = preprocess_data(df)
+    print(f"  └─ 처리된 문서 수: {len(df_processed):,}개")
+    
+    # 청킹
+    print("텍스트 청킹 중...")
+    results = chunk_dataframe(df_processed)
+    print(f"  └─ 총 청크 수: {len(results):,}개")
 
-    # Transform
-    transformed_data = transform_csv_to_chunks()
+    # 결과를 DataFrame으로 변환
+    chunks_df = pd.DataFrame([
+        {
+            "text": item["text"],
+            "category": item["metadata"]["category"],
+            "title": item["metadata"]["title"],
+            "summary": item["metadata"]["summary"],
+            "chunk_index": item["metadata"]["chunk_index"],
+            "source": item["metadata"]["source"],
+            "token_length": item["metadata"]["token_length"],
+        }
+        for item in results
+    ])
 
-    total_chunks = sum(doc["num_chunks"] for doc in transformed_data)
-    print(f"\n✅ 총 {len(transformed_data):,}개 문서, {total_chunks:,}개 청크 생성")
-
-    # JSON 저장
-    print(f"\n💾 Saving to: {OUTPUT_JSON}")
-    with open(OUTPUT_JSON, 'w', encoding='utf-8') as f:
-        json.dump({"documents": transformed_data}, f, ensure_ascii=False, indent=2)
-
-    print(f"✅ Transform completed!")
-    print(f"  └─ Output: {OUTPUT_JSON}")
+    return chunks_df
 
 
-if __name__ == "__main__":
-    main()
+def save_chunks_to_csv(chunks_df: pd.DataFrame, output_path: str):
+    """청킹된 데이터를 CSV로 저장"""
+    print(f"\nCSV 파일 저장 중: {output_path}")
+    chunks_df.to_csv(output_path, index=False, encoding='utf-8')
+    print(f"Transform 완료")
+    print(f"  └─ 출력 파일: {output_path}")

@@ -1,6 +1,8 @@
 """
 Query Classifier Node
 
+전제 조건: 0단계에서 역사 관련 질문으로 확인된 경우에만 실행
+
 사용자 질문을 분석하여:
 1. 질문 유형 분류 (causal/deep_analysis)
 2. 관련 프로퍼티 그룹 선택 (TTL 기반)
@@ -148,26 +150,18 @@ def query_classifier_node(state: GraphState) -> GraphState:
 
 ## 분석 항목
 
-### 1. 역사 관련 여부 (is_historical)
-질문이 **조선시대 한국 역사**와 관련이 있는지 판단하세요.
-- true: 조선시대의 인물, 사건, 제도, 정책, 장소 등에 대한 질문
-- false: 현대, 다른 나라 역사, 과학, 수학, 일반 상식 등
-
-예시 (false): "파이썬 프로그래밍", "2024년 대선", "태양계 행성", "미국의 독립전쟁"
-예시 (true): "조선의 환국", "경복궁을 지은 왕", "세종대왕의 업적"
-
-### 2. 질문 유형 (query_type) - is_historical이 true일 때만
+### 1. 질문 유형 (query_type)
 - causal: 인과관계/패턴 ("왜?", "영향은?", "결과는?", "패턴은?")
 - deep_analysis: 심화 분석 ("진짜 이유?", "숨은 의도?", "이면에는?")
 
-### 3. 핵심 의도 (intent) - is_historical이 true일 때만
+### 2. 핵심 의도 (intent)
 질문의 핵심 의도를 한 문장으로 설명하세요.
 
 예시:
 - "궁궐을 지은 왕은?" → "궁궐을 건설한 왕 찾기"
 - "을미사변의 원인은?" → "을미사변이 발생한 원인과 배경 분석"
 
-### 4. 관련 프로퍼티 그룹 (property_groups) - is_historical이 true일 때만
+### 3. 관련 프로퍼티 그룹 (property_groups)
 아래 목록에서 질문과 관련된 그룹을 **최대 5개** 선택하세요.
 
 사용 가능한 그룹:
@@ -179,18 +173,10 @@ def query_classifier_node(state: GraphState) -> GraphState:
 - "세종이 만든 정책" → ["설립", "창제", "시행"]
 
 ## 출력 형식 (JSON만)
-
-is_historical이 true인 경우:
 {{
-  "is_historical": true,
   "query_type": "causal",
   "intent": "궁궐을 건설한 왕 찾기",
   "property_groups": ["건설", "설립", "통치"]
-}}
-
-is_historical이 false인 경우:
-{{
-  "is_historical": false
 }}
 """
         response = llm.invoke(intent_prompt)
@@ -265,30 +251,6 @@ is_historical이 false인 경우:
             result2 = future2.result()
 
         # ========== 결과 병합 ==========
-        is_historical = result1.get("is_historical", True)
-
-        # 역사 관련이 아닌 경우 조기 종료
-        if not is_historical:
-            print(f"⚠️ 역사 관련 질문이 아님 - 조기 종료")
-            final_answer = f"""죄송합니다. "{query}"는 조선시대 한국 역사와 관련된 질문이 아닙니다.
-
-이 시스템은 조선시대의 인물, 사건, 제도, 정책, 장소 등에 대한 질문에만 답변할 수 있습니다.
-
-조선시대 역사 관련 질문을 해주시면 도와드리겠습니다."""
-
-            return {
-                **state,
-                "is_historical": False,
-                "final_answer": final_answer,
-                "answer_with_sources": {
-                    "story": final_answer,
-                    "sources": [],
-                    "query_type": "non_historical",
-                    "evidence_count": 0
-                },
-                "executed_nodes": state.get("executed_nodes", []) + ["query_classifier"]
-            }
-
         # Thread 1 결과 (의도 분석 + 프로퍼티 그룹)
         query_type = result1.get("query_type", "causal")
         selected_groups = result1.get("property_groups", [])
@@ -319,7 +281,6 @@ is_historical이 false인 경우:
     except Exception as e:
         print(f"⚠️ 질문 분석 실패: {e}")
         # 분석 실패 시 기본값으로 진행 (안전하게)
-        is_historical = True
         query_type = "causal"
         selected_groups = []
         selected_properties = []

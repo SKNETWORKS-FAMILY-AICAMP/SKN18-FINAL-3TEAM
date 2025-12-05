@@ -45,25 +45,23 @@ load_dotenv(env_path, override=True)
 from state import GraphState
 from ontology_schema import get_schema_summary
 
-# Milvus 서비스 import (선택적)
-USE_MILVUS = os.getenv("USE_MILVUS", "true").lower() == "true"
-_milvus_service = None
+# pgvector 서비스 import (선택적)
+USE_PGVECTOR = os.getenv("USE_PGVECTOR", "true").lower() == "true"
+_pgvector_service = None
 
-def get_milvus_service():
-    """Milvus 서비스 lazy loading"""
-    global _milvus_service
-    if _milvus_service is None and USE_MILVUS:
+def get_pgvector_service():
+    """pgvector 서비스 lazy loading"""
+    global _pgvector_service
+    if _pgvector_service is None and USE_PGVECTOR:
         try:
-            from db_pipeline.services.milvus_service import get_milvus_service as _get_milvus
-            _milvus_service = _get_milvus()
-            if not _milvus_service.connect():
-                print("⚠️ Milvus 연결 실패 - TTL 매칭만 사용")
-                _milvus_service = None
+            from db_pipeline.services.postgres_service import PostgresVectorService
+            _pgvector_service = PostgresVectorService()
+            print("✅ pgvector 서비스 초기화 완료")
         except ImportError:
-            print("⚠️ Milvus 서비스 import 실패 - TTL 매칭만 사용")
+            print("⚠️ pgvector 서비스 import 실패 - TTL 매칭만 사용")
         except Exception as e:
-            print(f"⚠️ Milvus 초기화 실패: {e}")
-    return _milvus_service
+            print(f"⚠️ pgvector 초기화 실패: {e}")
+    return _pgvector_service
 
 
 # TTL 파일 경로 (normalized 버전 사용 - Fuseki에 업로드된 데이터와 일치)
@@ -662,58 +660,58 @@ def search_entities_with_milvus(keywords: list, ttl_data: dict, top_k: int = 5) 
     Returns:
         매칭된 엔티티 리스트
     """
-    milvus = get_milvus_service()
-    if milvus is None:
+    pgvector = get_pgvector_service()
+    if pgvector is None:
         return []
-    
+
     entities = []
     seen_titles = set()
-    
+
     try:
-        # 키워드별로 유사도 검색
-        for keyword in keywords:
-            results = milvus.search(keyword, top_k=top_k, threshold=0.5)
-            
-            for result in results:
-                title = result["title"]
-                if title in seen_titles:
-                    continue
-                seen_titles.add(title)
-                
-                # TTL에서 URI 찾기
-                uri = ttl_data["label_to_uri"].get(title)
-                entity_type = "Event"  # 기본값
-                
-                if uri:
-                    entity_type = ttl_data["uri_to_type"].get(uri, "Event")
-                else:
-                    # category로 타입 추정
-                    category = result.get("category", "")
-                    type_map = {
-                        "인물": "Person",
-                        "사건": "Event",
-                        "제도": "Institution",
-                        "문헌": "Document",
-                        "전투": "Battle",
-                        "장소": "Place",
-                        "물품": "Object"
-                    }
-                    entity_type = type_map.get(category, "Event")
-                
-                entities.append({
-                    "type": entity_type,
-                    "name": title,
-                    "uri": uri,
-                    "matched": uri is not None,
-                    "milvus_score": result["score"],
-                    "matched_keyword": keyword
-                })
+        # 키워드로 벡터 검색
+        query_text = " ".join(keywords)
+        results = pgvector.search(query=query_text, top_k=top_k, threshold=0.5)
+
+        for result in results:
+            title = result["title"]
+            if title in seen_titles:
+                continue
+            seen_titles.add(title)
+
+            # TTL에서 URI 찾기
+            uri = ttl_data["label_to_uri"].get(title)
+            entity_type = "Event"  # 기본값
+
+            if uri:
+                entity_type = ttl_data["uri_to_type"].get(uri, "Event")
+            else:
+                # category로 타입 추정
+                category = result.get("category", "")
+                type_map = {
+                    "인물": "Person",
+                    "사건": "Event",
+                    "제도": "Institution",
+                    "문헌": "Document",
+                    "전투": "Battle",
+                    "장소": "Place",
+                    "물품": "Object"
+                }
+                entity_type = type_map.get(category, "Event")
+
+            entities.append({
+                "type": entity_type,
+                "name": title,
+                "uri": uri,
+                "matched": uri is not None,
+                "pgvector_score": result["similarity"],
+                "matched_keyword": query_text
+            })
         
         # 점수 순 정렬
-        entities.sort(key=lambda x: x.get("milvus_score", 0), reverse=True)
+        entities.sort(key=lambda x: x.get("pgvector_score", 0), reverse=True)
         
     except Exception as e:
-        print(f"⚠️ Milvus 검색 실패: {e}")
+        print(f"⚠️ pgvector 검색 실패: {e}")
     
     return entities
 
@@ -912,30 +910,30 @@ def entity_extractor_node(state: GraphState) -> GraphState:
     # ⚡ 리팩토링: LLM 대신 규칙 기반 키워드로 벡터 검색
     # - "조선시대/조선" 제외 (모든 데이터가 조선시대라서)
     # - 조사/동사 제거된 명확한 단어만 사용
-    milvus_added = 0
-    if USE_MILVUS and vector_keywords:
-        print(f"  ├─ Milvus 벡터 검색 중...")
-        
+    pgvector_added = 0
+    if USE_PGVECTOR and vector_keywords:
+        print(f"  ├─ pgvector 벡터 검색 중...")
+
         # 동적 top_k: 키워드 수에 따라 조절
         dynamic_top_k = max(3, min(10, 15 // max(len(vector_keywords), 1)))
-        
-        # 규칙 기반으로 추출된 키워드로 Milvus 검색
-        milvus_entities = search_entities_with_milvus(
+
+        # 규칙 기반으로 추출된 키워드로 pgvector 검색
+        pgvector_entities = search_entities_with_milvus(
             vector_keywords,  # 조선시대/조선 제외된 키워드
-            ttl_data, 
+            ttl_data,
             top_k=dynamic_top_k
         )
-        
+
         # 기존에 없는 엔티티만 추가
-        for e in milvus_entities:
+        for e in pgvector_entities:
             key = e.get("uri") or e.get("name")
             if key not in seen:
                 seen.add(key)
-                e["match_method"] = "milvus"
+                e["match_method"] = "pgvector"
                 matched_entities.append(e)
-                milvus_added += 1
-        
-        print(f"     └─ Milvus 추가: {milvus_added}개")
+                pgvector_added += 1
+
+        print(f"     └─ pgvector 추가: {pgvector_added}개")
     
     # ========================================
     # 3단계: LLM 엔티티 추출 (결과가 부족할 때만)

@@ -4,7 +4,7 @@ Semantic Expander Node
 엔티티 추출 후, 의미론적으로 관련된 엔티티를 확장하는 노드:
 1. 시간적 맥락 확장 (±10년 이내 이벤트)
 2. 카테고리 기반 주제 확장 (동일 카테고리 이벤트)
-3. 벡터 유사도 확장 (Milvus)
+3. 벡터 유사도 확장 (pgvector)
 4. 인과관계 체인 확장 (leadsTo, causedBy)
 
 이 노드는 entity_extractor 이후, parallel_knowledge_retrieval 이전에 실행됩니다.
@@ -18,27 +18,25 @@ from state import GraphState
 # Fuseki 설정
 FUSEKI_URL = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
 
-# Milvus 서비스 lazy loading
-USE_MILVUS = os.getenv("USE_MILVUS", "true").lower() == "true"
-_milvus_service = None
+# pgvector 서비스 lazy loading
+USE_PGVECTOR = os.getenv("USE_PGVECTOR", "true").lower() == "true"
+_pgvector_service = None
 
-def get_milvus_service():
-    """Milvus 서비스 lazy loading"""
-    global _milvus_service
-    if _milvus_service is None and USE_MILVUS:
+def get_pgvector_service():
+    """pgvector 서비스 lazy loading"""
+    global _pgvector_service
+    if _pgvector_service is None and USE_PGVECTOR:
         try:
             import sys
             from pathlib import Path
             sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-            from db_pipeline.services.milvus_service import get_milvus_service as _get_milvus
-            _milvus_service = _get_milvus()
-            if not _milvus_service.connect():
-                print("⚠️ Milvus 연결 실패 - 벡터 확장 비활성화")
-                _milvus_service = None
+            from db_pipeline.services.postgres_service import PostgresVectorService
+            _pgvector_service = PostgresVectorService()
+            print("✅ pgvector 서비스 초기화 완료")
         except Exception as e:
-            print(f"⚠️ Milvus 초기화 실패: {e}")
-    return _milvus_service
+            print(f"⚠️ pgvector 초기화 실패: {e}")
+    return _pgvector_service
 
 
 def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int = 10) -> list:
@@ -331,9 +329,9 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
     return expanded_entities
 
 
-def expand_by_milvus(entities: list, query: str, top_k: int = 15) -> list:
+def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
     """
-    벡터 유사도 기반 확장 (Milvus)
+    벡터 유사도 기반 확장 (pgvector)
 
     Args:
         entities: 추출된 엔티티 리스트
@@ -344,8 +342,8 @@ def expand_by_milvus(entities: list, query: str, top_k: int = 15) -> list:
         벡터 유사도가 높은 엔티티 리스트
     """
 
-    milvus = get_milvus_service()
-    if milvus is None:
+    pgvector = get_pgvector_service()
+    if pgvector is None:
         return []
 
     expanded_entities = []
@@ -353,7 +351,7 @@ def expand_by_milvus(entities: list, query: str, top_k: int = 15) -> list:
 
     try:
         # 1. 원본 질문으로 검색 (가장 관련성 높음)
-        results = milvus.search(query, top_k=top_k, threshold=0.6)
+        results = pgvector.search(query=query, top_k=top_k, threshold=0.6)
 
         for result in results:
             title = result.get("title", "")
@@ -362,12 +360,12 @@ def expand_by_milvus(entities: list, query: str, top_k: int = 15) -> list:
                 expanded_entities.append({
                     "type": "Event",  # 기본값
                     "name": title,
-                    "uri": None,  # Milvus에서는 URI 없음 (나중에 TTL 매칭)
+                    "uri": None,  # pgvector에서는 URI 없음 (나중에 TTL 매칭)
                     "matched": False,
-                    "expansion_method": "milvus",
+                    "expansion_method": "pgvector",
                     "expansion_source": "query",
-                    "milvus_score": result.get("score", 0),
-                    "relevance_score": result.get("score", 0) * 0.8  # 벡터 유사도 × 0.8
+                    "pgvector_score": result.get("similarity", 0),
+                    "relevance_score": result.get("similarity", 0) * 0.8  # 벡터 유사도 × 0.8
                 })
 
         # 2. 추출된 엔티티 이름으로도 검색
@@ -376,7 +374,7 @@ def expand_by_milvus(entities: list, query: str, top_k: int = 15) -> list:
             if not name:
                 continue
 
-            results = milvus.search(name, top_k=5, threshold=0.6)
+            results = pgvector.search(query=name, top_k=5, threshold=0.6)
 
             for result in results:
                 title = result.get("title", "")
@@ -387,14 +385,14 @@ def expand_by_milvus(entities: list, query: str, top_k: int = 15) -> list:
                         "name": title,
                         "uri": None,
                         "matched": False,
-                        "expansion_method": "milvus",
+                        "expansion_method": "pgvector",
                         "expansion_source": name,
-                        "milvus_score": result.get("score", 0),
-                        "relevance_score": result.get("score", 0) * 0.7
+                        "pgvector_score": result.get("similarity", 0),
+                        "relevance_score": result.get("similarity", 0) * 0.7
                     })
 
     except Exception as e:
-        print(f"⚠️ Milvus 확장 실패: {e}")
+        print(f"⚠️ pgvector 확장 실패: {e}")
 
     return expanded_entities
 
@@ -408,7 +406,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
     1. 시간적 맥락 (±10년)
     2. 카테고리/주제
     3. 인과관계 체인
-    4. 벡터 유사도 (Milvus)
+    4. 벡터 유사도 (pgvector)
     """
 
     import time
@@ -431,7 +429,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
     temporal_expanded = expand_by_temporal_context(extracted_entities, ttl_data, window_years=10)
     category_expanded = expand_by_category(extracted_entities, ttl_data)
     causal_expanded = expand_by_causal_chain(extracted_entities, ttl_data, max_hops=3)
-    milvus_expanded = expand_by_milvus(extracted_entities, query, top_k=15)
+    pgvector_expanded = expand_by_pgvector(extracted_entities, query, top_k=15)
 
     # 결과 병합 (중복 제거)
     all_expanded = []
@@ -447,7 +445,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
             all_expanded.append(entity)
 
     # 확장된 엔티티 추가 (관련도 순)
-    for expanded_list in [causal_expanded, temporal_expanded, category_expanded, milvus_expanded]:
+    for expanded_list in [causal_expanded, temporal_expanded, category_expanded, pgvector_expanded]:
         for entity in expanded_list:
             uri = entity.get("uri") or entity.get("name")
             name = entity.get("name", "")
@@ -483,7 +481,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
         "temporal": len(temporal_expanded),
         "category": len(category_expanded),
         "causal": len(causal_expanded),
-        "milvus": len(milvus_expanded)
+        "pgvector": len(pgvector_expanded)
     }
 
     print(f"  ├─ 확장 결과:")

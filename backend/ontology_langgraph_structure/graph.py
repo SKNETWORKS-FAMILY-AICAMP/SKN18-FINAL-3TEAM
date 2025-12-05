@@ -5,7 +5,7 @@
 풍부한 근거 기반 역사 스토리 생성
 
 특징:
-- 하이브리드 엔티티 추출 (TTL + Milvus)
+- 하이브리드 엔티티 추출 (TTL + pgvector)
 - 데이터 기반 5개 Thread (event_context, actor_network, timeline, similar_events, background)
 - 이야기 모드 지원 (선택적)
 """
@@ -25,6 +25,7 @@ from langgraph.graph import StateGraph, END
 from state import GraphState
 
 # 노드 import
+from nodes.history_check_node import history_check_node
 from nodes.classify_node import query_classifier_node
 from nodes.entity_extractor_node import entity_extractor_node
 from nodes.semantic_expander_node import semantic_expander_node
@@ -39,8 +40,11 @@ def create_graph_flow():
     데이터 기반 창작 모드 랭그래프 (개선된 버전)
 
     Flow:
+    0. History Check → 역사 관련 여부 체크 (LLM 1회) ⭐NEW
+       ├─ false → 조기 종료 (비용 절감)
+       └─ true → Query Classifier로 진행
     1. Query Classifier → 질문 유형 분류 (causal/deep_analysis)
-    2. Entity Extractor → 하이브리드 엔티티 추출 (TTL + Milvus)
+    2. Entity Extractor → 하이브리드 엔티티 추출 (TTL + pgvector)
     3. Semantic Expander → 의미론적 엔티티 확장 (NEW)
        ├─ 시간적 맥락 (±10년)
        ├─ 카테고리/주제
@@ -60,6 +64,7 @@ def create_graph_flow():
     workflow = StateGraph(GraphState)
 
     # ========== 노드 등록 ==========
+    workflow.add_node("history_check", history_check_node)  # NEW: 0단계
     workflow.add_node("query_classifier", query_classifier_node)
     workflow.add_node("entity_extractor", entity_extractor_node)
     workflow.add_node("semantic_expander", semantic_expander_node)  # NEW
@@ -69,31 +74,34 @@ def create_graph_flow():
     workflow.add_node("story_generator", story_generator_node)
 
     # ========== 플로우 정의 ==========
-    # 1. 시작: 질문 분류
-    workflow.set_entry_point("query_classifier")
+    # 0. 시작: 역사 관련 여부 체크 (최우선)
+    workflow.set_entry_point("history_check")
 
-    # 2. 조건부 분기: 역사 관련 질문 여부에 따라 분기
-    def route_after_classify(state: GraphState) -> str:
-        """classify_node 이후 라우팅"""
+    # 1. 조건부 분기: 역사 관련 질문 여부에 따라 분기
+    def route_after_history_check(state: GraphState) -> str:
+        """history_check_node 이후 라우팅"""
         is_historical = state.get("is_historical", True)
 
         if not is_historical:
             # 역사 관련이 아니면 바로 스토리 생성으로 (조기 종료 메시지 출력)
             return "story_generator"
         else:
-            # 역사 관련이면 정상 플로우 진행
-            return "entity_extractor"
+            # 역사 관련이면 Query Classifier로 진행
+            return "query_classifier"
 
     workflow.add_conditional_edges(
-        "query_classifier",
-        route_after_classify,
+        "history_check",
+        route_after_history_check,
         {
-            "entity_extractor": "entity_extractor",
+            "query_classifier": "query_classifier",
             "story_generator": "story_generator"
         }
     )
 
-    # 3. 엔티티 추출 (하이브리드: TTL + Milvus)
+    # 2. Query Classifier → Entity Extractor
+    workflow.add_edge("query_classifier", "entity_extractor")
+
+    # 3. 엔티티 추출 (하이브리드: TTL + pgvector)
     # 4. 의미론적 확장 (NEW)
     workflow.add_edge("entity_extractor", "semantic_expander")
 
