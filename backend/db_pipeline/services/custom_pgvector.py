@@ -37,18 +37,27 @@ class CustomPGVector(VectorStore):
         
         total_batches = (len(texts) + batch_size - 1) // batch_size
         
-        with tqdm(total=len(texts), desc="임베딩 생성 및 DB 저장", unit="chunk") as pbar:
+        # 한 줄로 고정하여 업데이트 (ncols로 너비 제한, leave=False로 완료 후 삭제 방지)
+        with tqdm(
+            total=len(texts), 
+            desc="임베딩 생성 및 DB 저장", 
+            unit="chunk",
+            ncols=100,  # 진행 바 너비 고정
+            mininterval=0.5,  # 최소 업데이트 간격 (너무 자주 업데이트 방지)
+            maxinterval=1.0,  # 최대 업데이트 간격
+            dynamic_ncols=False  # 동적 너비 변경 방지
+        ) as pbar:
             for i in range(0, len(texts), batch_size):
                 batch_texts = texts[i:i+batch_size]
                 batch_metas = metadatas[i:i+batch_size]
                 batch_num = i // batch_size + 1
 
                 # 임베딩 생성
-                pbar.set_description(f"임베딩 생성 중 (배치 {batch_num}/{total_batches})")
+                pbar.set_postfix_str(f"배치 {batch_num}/{total_batches} | 임베딩 생성 중")
                 embeddings = self.embedding_fn.embed_documents(batch_texts)
 
                 # DB 저장
-                pbar.set_description(f"DB 저장 중 (배치 {batch_num}/{total_batches})")
+                pbar.set_postfix_str(f"배치 {batch_num}/{total_batches} | DB 저장 중")
                 with self.conn.cursor() as cur:
                     for text, emb, meta in zip(batch_texts, embeddings, batch_metas):
                         cur.execute(
@@ -68,7 +77,9 @@ class CustomPGVector(VectorStore):
                         )
                 self.conn.commit()
                 
+                # 배치 단위로 업데이트 (개별 chunk가 아닌 배치 단위)
                 pbar.update(len(batch_texts))
+                pbar.set_postfix_str(f"배치 {batch_num}/{total_batches} | 완료")
                 time.sleep(sleep_sec)  # 필요시 백오프
 
     def similarity_search(self, query: str, k: int = 4,
