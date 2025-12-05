@@ -96,6 +96,34 @@ services:
       - ./neo4j/logs:/logs
       - ./neo4j/import:/import
 
+  # PostgreSQL
+  postgres:
+    image: pgvector/pgvector:pg16 # PostgreSQL 16 + pgvector 확장 기능 포함 이미지
+    platform: linux/amd64 # Windows/Mac (Intel/Apple Silicon) 호환
+    container_name: postgres_pgvector # 컨테이너 이름
+    restart: always # 컨테이너 비정상 종료 시 항상 재시작
+
+    environment:
+      # PostgreSQL 기본 계정 정보 (.env 파일의 환경변수 사용)
+      POSTGRES_USER: ${POSTGRES_USER:-root} # PostgreSQL 접속 사용자 이름
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root1234} # PostgreSQL 접속 비밀번호
+      POSTGRES_DB: ${POSTGRES_DB:-skn18final} # 기본으로 생성할 데이터베이스 이름
+
+    ports:
+      - "5432:5432" # 호스트 포트:컨테이너 포트 (기본 PostgreSQL 포트 5432)
+
+    volumes:
+      # PostgreSQL 데이터 영속화 (named volume 사용으로 권한 문제 해결)
+      - postgres-data:/var/lib/postgresql/data
+      # 초기화 SQL 스크립트 실행
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   fuseki-data:
     driver: local
@@ -104,6 +132,8 @@ volumes:
   minio-data:
     driver: local
   milvus-data:
+    driver: local
+  postgres-data:
     driver: local
 
 networks:

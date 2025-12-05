@@ -109782,3 +109782,3232 @@ hist:Person_유영순 hist:affiliatedWith hist:Institution_경상도관찰사 .
 hist:Person_유영순 hist:affiliatedWith hist:Institution_한성부윤 .
 hist:Person_유영순 hist:affiliatedWith hist:Institution_호조참판 .
 hist:Person_유영순 hist:participatesIn hist:Event_정유재란 .
+
+# 유예신 (인물)
+hist:Person_유예신 rdf:type hist:Person .
+hist:Person_유예신 rdfs:label "유예신" .
+hist:Person_유예신 hist:hasRank "승문원박사" .
+hist:Person_유예신 hist:hasRank "병조정랑" .
+hist:Person_유예신 hist:hasAchievement "1504년 생원시 합격; 1510년 식년 문과 급제" .
+hist:Institution_승문원 rdf:type hist:Institution .
+hist:Institution_승문원 rdfs:label "승문원" .
+hist:Institution_병조 rdf:type hist:Institution .
+hist:Institution_병조 rdfs:label "병조" .
+hist:Event_생원시합격 rdf:type hist:Event .
+hist:Event_생원시합격 rdfs:label "생원시 합격" .
+hist:Event_생원시합격 hist:hasYear 1504 .
+hist:Event_식년문과급제 rdf:type hist:Event .
+hist:Event_식년문과급제 rdfs:label "식년 문과 급제" .
+hist:Event_식년문과급제 hist:hasYear 1510 .
+hist:Person_유예신 hist:participatesIn hist:Event_생원시합격 .
+hist:Person_유예신 hist:participatesIn hist:Event_식년문과급제 .
+hist:Person_유예신 hist:affiliatedWith hist:Institution_승문원 .
+hist:Person_유예신 hist:affiliatedWith hist:Institution_병조 .
+hist:Event_생원시합격 hist:leadsTo hist:Event_식년문과급제 .
+
+
+# 유영하 (인물)
+hist:Person_유영하 rdf:type hist:Person .
+hist:Person_유영하 rdfs:label "유영하" .
+hist:Person_유영하 hist:hasRank "사간원대사간; 공조참판; 오위도총부부총관" .
+hist:Event_식년문과갑과급제(1819) rdf:type hist:Event .
+hist:Event_식년문과갑과급제(1819) rdfs:label "식년문과 갑과 급제(1819)" .
+hist:Event_식년문과갑과급제(1819) hist:hasYear 1819 .
+hist:Institution_은산현감 rdf:type hist:Institution .
+hist:Institution_은산현감 rdfs:label "은산현감" .
+hist:Institution_은산현감 hist:hasYear 1834 .
+hist:Institution_오위도총부부총관 rdf:type hist:Institution .
+hist:Institution_오위도총부부총관 rdfs:label "오위도총부부총관" .
+hist:Institution_오위도총부부총관 hist:hasYear 1866 .
+hist:Institution_오위도총부부총관 hist:hasFunction "공조참판 겸" .
+hist:Person_이준 rdf:type hist:Person .
+hist:Person_이준 rdfs:label "이준" .
+hist:Person_유영하 hist:participatesIn hist:Event_식년문과갑과급제(1819) .
+hist:Person_유영하 hist:affiliatedWith hist:Institution_은산현감 .
+hist:Person_유영하 hist:affiliatedWith hist:Institution_오위도총부부총관 .
+hist:Person_유영하 hist:contemporaryWith hist:Person_이준 .
+
+
+# 유옥 (인물)
+hist:Person_유옥 rdf:type hist:Person .
+hist:Person_유옥 rdfs:label "유옥" .
+hist:Person_유옥 hist:hasRank "사헌부장령" .
+hist:Person_유옥 hist:hasRank "의정부사인" .
+hist:Person_유옥 hist:hasField "정치학" .
+hist:Person_유옥 hist:hasMotive "학문추구/개혁/충절" .
+hist:Person_유옥 hist:hasAchievement "사헌부장령과 의정부사인 재임; 경연에서 한전균전제 제시; 복위소를 올림" .
+hist:Institution_사헌부 rdf:type hist:Institution .
+hist:Institution_사헌부 rdfs:label "사헌부" .
+hist:Institution_사헌부 hist:hasYear 1515 .
+hist:Institution_사헌부 hist:hasFunction "장령" .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Institution_홍문관 hist:hasYear 1509 .
+hist:Institution_홍문관 hist:hasFunction "수찬" .
+hist:Institution_의정부 rdf:type hist:Institution .
+hist:Institution_의정부 rdfs:label "의정부" .
+hist:Institution_의정부 hist:hasYear 1518 .
+hist:Institution_의정부 hist:hasFunction "사인" .
+hist:Document_복위소 rdf:type hist:Document .
+hist:Document_복위소 rdfs:label "복위소" .
+hist:Document_복위소 hist:hasYear 1509 .
+hist:Person_유옥 hist:affiliatedWith hist:Institution_사헌부 .
+hist:Person_유옥 hist:affiliatedWith hist:Institution_홍문관 .
+hist:Person_유옥 hist:affiliatedWith hist:Institution_의정부 .
+hist:Person_유옥 hist:authored hist:Document_복위소 .
+
+
+# 유용근 (인물)
+hist:Person_유용근 rdf:type hist:Person .
+hist:Person_유용근 rdfs:label "유용근" .
+hist:Person_유용근 hist:hasBirthYear 1507 .
+hist:Person_유용근 hist:hasDeathYear 1528 .
+hist:Person_유용근 hist:hasRank "홍문관 정자" .
+hist:Person_유용근 hist:hasRank "승정원 승지" .
+hist:Person_유용근 hist:hasRank "함경도병마절도사" .
+hist:Person_유용근 hist:hasAchievement "조광조 일파로 지목되어 기묘사화로 유배" .
+hist:Person_조광조 rdf:type hist:Person .
+hist:Person_조광조 rdfs:label "조광조" .
+hist:Event_기묘사화 rdf:type hist:Event .
+hist:Event_기묘사화 rdfs:label "기묘사화" .
+hist:Institution_함경도병마절도사 rdf:type hist:Institution .
+hist:Institution_함경도병마절도사 rdfs:label "함경도병마절도사" .
+hist:Institution_함경도병마절도사 hist:hasYear 1519 .
+hist:Institution_승정원 rdf:type hist:Institution .
+hist:Institution_승정원 rdfs:label "승정원" .
+hist:Person_유용근 hist:participatesIn hist:Event_기묘사화 .
+hist:Person_유용근 hist:contemporaryWith hist:Person_조광조 .
+hist:Person_유용근 hist:affiliatedWith hist:Institution_함경도병마절도사 .
+hist:Person_유용근 hist:affiliatedWith hist:Institution_승정원 .
+
+
+# 유용생 (인물)
+hist:Person_유용생 rdf:type hist:Person .
+hist:Person_유용생 rdfs:label "유용생" .
+hist:Person_유용생 hist:hasRank "참찬의정부사, 공조판서, 중군도총제(역임)" .
+hist:Person_유용생 hist:hasField "문신" .
+hist:Person_유용생 hist:hasAchievement "왜구 퇴치에 큰 공; 시호 양정" .
+hist:Person_유용생 hist:hasMotive "왜구 퇴치 및 국방 강화" .
+hist:Institution_중군도총제 rdf:type hist:Institution .
+hist:Institution_중군도총제 rdfs:label "중군도총제" .
+hist:Institution_중군도총제 hist:hasYear 1401 .
+hist:Institution_중군도총제 hist:hasFunction "병력 지휘 및 총괄" .
+hist:Institution_공조판서 rdf:type hist:Institution .
+hist:Institution_공조판서 rdfs:label "공조판서" .
+hist:Institution_공조판서 hist:hasYear 1407 .
+hist:Institution_공조판서 hist:hasFunction "조세/공문 관리 등 행정 담당" .
+hist:Institution_참찬의정부사 rdf:type hist:Institution .
+hist:Institution_참찬의정부사 rdfs:label "참찬의정부사" .
+hist:Institution_참찬의정부사 hist:hasYear 1407 .
+hist:Institution_참찬의정부사 hist:hasFunction "국정 회의 및 의정부 관련 업무" .
+hist:Event_성절사로명나라에다녀옴 rdf:type hist:Event .
+hist:Event_성절사로명나라에다녀옴 rdfs:label "성절사로 명나라에 다녀옴" .
+hist:Event_성절사로명나라에다녀옴 hist:hasYear 1402 .
+hist:Person_유용생 hist:affiliatedWith hist:Institution_중군도총제 .
+hist:Person_유용생 hist:affiliatedWith hist:Institution_공조판서 .
+hist:Person_유용생 hist:affiliatedWith hist:Institution_참찬의정부사 .
+hist:Person_유용생 hist:participatesIn hist:Event_성절사로명나라에다녀옴 .
+
+
+# 유원동 (인물)
+hist:Person_유원동 rdf:type hist:Person .
+hist:Person_유원동 rdfs:label "유원동" .
+hist:Person_유원동 hist:hasField "역사학" .
+hist:Person_유원동 hist:hasAchievement "백제문화연구회 창설" .
+hist:Person_유원동 hist:hasRank "교무처장; 문리과대학 학장; 총장직무대리" .
+hist:Institution_서울대학교 rdf:type hist:Institution .
+hist:Institution_서울대학교 rdfs:label "서울대학교" .
+hist:Institution_서울대학교 hist:hasFunction "학위수여 및 연구활동" .
+hist:Institution_숙명여자대학교 rdf:type hist:Institution .
+hist:Institution_숙명여자대학교 rdfs:label "숙명여자대학교" .
+hist:Institution_숙명여자대학교 hist:hasFunction "사학과 및 한국사학과 교수로 재직, 교무처장·문리과대학 학장·총장직무대리 등 역임" .
+hist:Institution_충남대학교 rdf:type hist:Institution .
+hist:Institution_충남대학교 rdfs:label "충남대학교" .
+hist:Institution_충남대학교 hist:hasFunction "사학과 교수 및 학장 역임" .
+hist:Institution_백제문화연구회 rdf:type hist:Institution .
+hist:Institution_백제문화연구회 rdfs:label "백제문화연구회" .
+hist:Institution_백제문화연구회 hist:hasFunction "백제사와 호서사림파 연구 등 지방 문화 창달에 공헌" .
+hist:Person_유원동 hist:affiliatedWith hist:Institution_서울대학교 .
+hist:Person_유원동 hist:affiliatedWith hist:Institution_숙명여자대학교 .
+hist:Person_유원동 hist:affiliatedWith hist:Institution_충남대학교 .
+hist:Person_유원동 hist:affiliatedWith hist:Institution_백제문화연구회 .
+hist:Institution_백제문화연구회 hist:establishedBy hist:Person_유원동 .
+
+
+# 유우기 (인물)
+hist:Person_유우기 rdf:type hist:Person .
+hist:Person_유우기 rdfs:label "유우기" .
+hist:Person_유우기 hist:hasRank "응교; 세자시강원필선; 집의; 수찬; 교리; 헌납; 사간; 승지" .
+hist:Person_유우기 hist:hasField "정치/행정" .
+hist:Event_정시문과급제 rdf:type hist:Event .
+hist:Event_정시문과급제 rdfs:label "정시문과 급제" .
+hist:Event_정시문과급제 hist:hasYear 1739 .
+hist:Event_사헌부장령제수 rdf:type hist:Event .
+hist:Event_사헌부장령제수 rdfs:label "사헌부장령 제수" .
+hist:Event_사헌부장령제수 hist:hasYear 1743 .
+hist:Event_청나라방문(동지사·사은사의서장관) rdf:type hist:Event .
+hist:Event_청나라방문(동지사·사은사의서장관) rdfs:label "청나라 방문(동지사·사은사의 서장관)" .
+hist:Event_청나라방문(동지사·사은사의서장관) hist:hasYear 1743 .
+hist:Event_승지임명 rdf:type hist:Event .
+hist:Event_승지임명 rdfs:label "승지 임명" .
+hist:Event_승지임명 hist:hasYear 1749 .
+hist:Person_유우기 hist:participatesIn hist:Event_정시문과급제 .
+hist:Person_유우기 hist:participatesIn hist:Event_사헌부장령제수 .
+hist:Person_유우기 hist:participatesIn hist:Event_청나라방문(동지사·사은사의서장관) .
+hist:Person_유우기 hist:participatesIn hist:Event_승지임명 .
+hist:Person_유우기 hist:hasMotive "학문추구" .
+
+
+# 유운 (인물)
+hist:Person_유운 rdf:type hist:Person .
+hist:Person_유운 rdfs:label "유운" .
+hist:Event_진사 rdf:type hist:Event .
+hist:Event_진사 rdfs:label "진사" .
+hist:Event_진사 hist:hasYear 1501 .
+hist:Event_식년문과에갑과로급제 rdf:type hist:Event .
+hist:Event_식년문과에갑과로급제 rdfs:label "식년문과에 갑과로 급제" .
+hist:Event_식년문과에갑과로급제 hist:hasYear 1504 .
+hist:Institution_충청도관찰사 rdf:type hist:Institution .
+hist:Institution_충청도관찰사 rdfs:label "충청도관찰사" .
+hist:Institution_충청도관찰사 hist:hasYear 1518 .
+hist:Institution_충청도관찰사 hist:hasFunction "관찰사 직무" .
+hist:Document_편저(2권2책) rdf:type hist:Document .
+hist:Document_편저(2권2책) rdfs:label "편저(2권 2책)" .
+hist:Document_편저(2권2책) hist:hasYear 1519 .
+hist:Person_유운 hist:participatesIn hist:Event_진사 .
+hist:Person_유운 hist:participatesIn hist:Event_식년문과에갑과로급제 .
+hist:Person_유운 hist:affiliatedWith hist:Institution_충청도관찰사 .
+hist:Person_유운 hist:compiled hist:Document_편저(2권2책) .
+
+
+# 유원위 (제도)
+hist:Institution_토관서반 rdf:type hist:Institution .
+hist:Institution_토관서반 rdfs:label "토관 서반" .
+hist:Institution_토관서반 hist:hasFunction "서반은 군사를 담당" .
+hist:Person_정6품여과 rdf:type hist:Person .
+hist:Person_정6품여과 rdfs:label "정6품 여과" .
+hist:Person_정6품여과 hist:hasRank "정6품 여과" .
+hist:Person_종6품부여과 rdf:type hist:Person .
+hist:Person_종6품부여과 rdfs:label "종6품 부여과" .
+hist:Person_종6품부여과 hist:hasRank "종6품 부여과" .
+hist:Person_정7품여정 rdf:type hist:Person .
+hist:Person_정7품여정 rdfs:label "정7품 여정" .
+hist:Person_정7품여정 hist:hasRank "정7품 여정" .
+hist:Person_종7품부여정 rdf:type hist:Person .
+hist:Person_종7품부여정 rdfs:label "종7품 부여정" .
+hist:Person_종7품부여정 hist:hasRank "종7품 부여정" .
+hist:Institution_토관서반 hist:affiliatedWith hist:Person_정6품여과 .
+hist:Institution_토관서반 hist:affiliatedWith hist:Person_종6품부여과 .
+hist:Institution_토관서반 hist:affiliatedWith hist:Person_정7품여정 .
+hist:Institution_토관서반 hist:affiliatedWith hist:Person_종7품부여정 .
+
+
+# 유원정 (인물)
+hist:Person_유원정 rdf:type hist:Person .
+hist:Person_유원정 rdfs:label "유원정" .
+hist:Person_유원정 hist:hasRank "밀직부사; 한양부윤; 진위사; 중추원부사; 서해도관찰사" .
+hist:Person_유원정 hist:hasAchievement "개국공신 3등 책록; 서성군에 책봉" .
+hist:Person_유원정 hist:hasMotive "충절" .
+hist:Event_진위사로서명나라방문 rdf:type hist:Event .
+hist:Event_진위사로서명나라방문 rdfs:label "진위사로서 명나라 방문" .
+hist:Event_진위사로서명나라방문 hist:hasYear 1390 .
+hist:Event_탄핵및삭직,유배 rdf:type hist:Event .
+hist:Event_탄핵및삭직,유배 rdfs:label "탄핵 및 삭직, 유배" .
+hist:Event_탄핵및삭직,유배 hist:hasYear 1391 .
+hist:Event_개국공신3등책록 rdf:type hist:Event .
+hist:Event_개국공신3등책록 rdfs:label "개국공신 3등 책록" .
+hist:Event_개국공신3등책록 hist:hasYear 1392 .
+hist:Person_조준 rdf:type hist:Person .
+hist:Person_조준 rdfs:label "조준" .
+hist:Person_조준 hist:hasMotive "천거에 의한 추천" .
+hist:Person_유원정 hist:participatesIn hist:Event_진위사로서명나라방문 .
+hist:Person_유원정 hist:participatesIn hist:Event_탄핵및삭직,유배 .
+hist:Person_유원정 hist:participatesIn hist:Event_개국공신3등책록 .
+hist:Person_유원정 hist:contemporaryWith hist:Person_조준 .
+
+
+# 유원총보 (문헌)
+hist:Document_유원총보 rdf:type hist:Document .
+hist:Document_유원총보 rdfs:label "유원총보" .
+hist:Person_김육 rdf:type hist:Person .
+hist:Person_김육 rdfs:label "김육" .
+hist:Person_김육 hist:hasRank "문신" .
+hist:Person_이식 rdf:type hist:Person .
+hist:Person_이식 rdfs:label "이식" .
+hist:Person_김육 hist:compiled hist:Document_유원총보 .
+hist:Person_이식 hist:authored hist:Document_유원총보 .
+
+
+# 유위 (인물)
+hist:Person_유위 rdf:type hist:Person .
+hist:Person_유위 rdfs:label "유위" .
+hist:Person_유위 hist:hasRank "문신" .
+hist:Person_유위 hist:hasField "경세치용" .
+hist:Person_유위 hist:hasField "문학" .
+hist:Person_유위 hist:hasField "무술" .
+hist:Person_유위 hist:hasAchievement "삼절" .
+hist:Person_유위 hist:hasMotive "학문추구" .
+hist:Institution_창평현령 rdf:type hist:Institution .
+hist:Institution_창평현령 rdfs:label "창평현령" .
+hist:Institution_창평현령 hist:hasFunction "현령" .
+hist:Institution_종사관 rdf:type hist:Institution .
+hist:Institution_종사관 rdfs:label "종사관" .
+hist:Institution_종사관 hist:hasFunction "종사관" .
+hist:Event_임진왜란 rdf:type hist:Event .
+hist:Event_임진왜란 rdfs:label "임진왜란" .
+hist:Person_권율 rdf:type hist:Person .
+hist:Person_권율 rdfs:label "권율" .
+hist:Person_유위 hist:affiliatedWith hist:Institution_창평현령 .
+hist:Person_유위 hist:affiliatedWith hist:Institution_종사관 .
+hist:Person_유위 hist:participatesIn hist:Event_임진왜란 .
+hist:Person_유위 hist:servedUnder hist:Person_권율 .
+
+
+# 유윤겸 (인물)
+hist:Person_유윤겸 rdf:type hist:Person .
+hist:Person_유윤겸 rdfs:label "유윤겸" .
+hist:Person_유윤겸 hist:hasRank "대사간" .
+hist:Person_유윤겸 hist:hasRank "부제학" .
+hist:Person_유윤겸 hist:hasRank "돈녕부도정" .
+hist:Person_유윤겸 hist:hasRank "성균관사성" .
+hist:Person_유윤겸 hist:hasRank "홍문관부제학" .
+hist:Person_유윤겸 hist:hasField "국문학" .
+hist:Person_유윤겸 hist:hasAchievement "두시 찬주 참여" .
+hist:Person_유윤겸 hist:hasAchievement "25권 간행" .
+hist:Person_유윤겸 hist:hasAchievement "한글 번역 참여" .
+hist:Document_을해자 rdf:type hist:Document .
+hist:Document_을해자 rdfs:label "을해자" .
+hist:Document_을해자 hist:hasYear 1481 .
+hist:Institution_성균관 rdf:type hist:Institution .
+hist:Institution_성균관 rdfs:label "성균관" .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Event_과거응시허락상언 rdf:type hist:Event .
+hist:Event_과거응시허락상언 rdfs:label "과거 응시 허락 상언" .
+hist:Event_과거응시허락상언 hist:hasYear 1455 .
+hist:Person_유윤겸 hist:compiled hist:Document_을해자 .
+hist:Person_유윤겸 hist:affiliatedWith hist:Institution_성균관 .
+hist:Person_유윤겸 hist:affiliatedWith hist:Institution_홍문관 .
+hist:Person_유윤겸 hist:participatesIn hist:Event_과거응시허락상언 .
+
+
+# 유윤덕 (인물)
+hist:Person_유윤덕 rdf:type hist:Person .
+hist:Person_유윤덕 rdfs:label "유윤덕" .
+hist:Person_유윤덕 hist:hasRank "대사간" .
+hist:Person_유윤덕 hist:hasRank "병조참지" .
+hist:Person_유윤덕 hist:hasRank "전라도관찰사" .
+hist:Person_유윤덕 hist:hasRank "사헌부장령" .
+hist:Person_유윤덕 hist:hasRank "대사헌" .
+hist:Person_유윤덕 hist:hasField "문신" .
+hist:Person_유윤덕 hist:hasAchievement "다수의 관직 역임" .
+hist:Event_별시문과급제 rdf:type hist:Event .
+hist:Event_별시문과급제 rdfs:label "별시 문과 급제" .
+hist:Event_별시문과급제 hist:hasYear 1509 .
+hist:Event_예문관헌납제수 rdf:type hist:Event .
+hist:Event_예문관헌납제수 rdfs:label "예문관헌납 제수" .
+hist:Event_예문관헌납제수 hist:hasYear 1514 .
+hist:Event_파직 rdf:type hist:Event .
+hist:Event_파직 rdfs:label "파직" .
+hist:Event_파직 hist:hasYear 1516 .
+hist:Event_사은사(명나라방문) rdf:type hist:Event .
+hist:Event_사은사(명나라방문) rdfs:label "사은사(명나라 방문)" .
+hist:Event_사은사(명나라방문) hist:hasYear 1534 .
+hist:Person_유윤덕 hist:participatesIn hist:Event_별시문과급제 .
+hist:Person_유윤덕 hist:participatesIn hist:Event_예문관헌납제수 .
+hist:Person_유윤덕 hist:participatesIn hist:Event_파직 .
+hist:Person_유윤덕 hist:participatesIn hist:Event_사은사(명나라방문) .
+
+
+# 유윤창 (인물)
+hist:Person_유윤창 rdf:type hist:Person .
+hist:Person_유윤창 rdfs:label "유윤창" .
+hist:Institution_개령현감 rdf:type hist:Institution .
+hist:Institution_개령현감 rdfs:label "개령현감" .
+hist:Institution_개령현감 hist:hasFunction "현감" .
+hist:Institution_영덕현감 rdf:type hist:Institution .
+hist:Institution_영덕현감 rdfs:label "영덕현감" .
+hist:Institution_영덕현감 hist:hasFunction "현감" .
+hist:Institution_마전현감 rdf:type hist:Institution .
+hist:Institution_마전현감 rdfs:label "마전현감" .
+hist:Institution_마전현감 hist:hasFunction "현감" .
+hist:Person_유윤창 hist:affiliatedWith hist:Institution_개령현감 .
+hist:Person_유윤창 hist:affiliatedWith hist:Institution_영덕현감 .
+hist:Person_유윤창 hist:affiliatedWith hist:Institution_마전현감 .
+
+
+# 유은지 (인물)
+hist:Person_유은지 rdf:type hist:Person .
+hist:Person_유은지 rdfs:label "유은지" .
+hist:Person_유은지 hist:hasField "무신" .
+hist:Person_유은지 hist:hasRank "우군도총제; 지중추부사; 동지중추부사; 총제; 정랑" .
+hist:Person_유은지 hist:hasAchievement "총제 취임; 개천도감제조 겸직; 우군도총제 승직" .
+hist:Institution_이조 rdf:type hist:Institution .
+hist:Institution_이조 rdfs:label "이조" .
+hist:Institution_이조 hist:hasFunction "조선의 관리기관" .
+hist:Institution_병조 rdf:type hist:Institution .
+hist:Institution_병조 rdfs:label "병조" .
+hist:Institution_병조 hist:hasFunction "조선의 관리기관" .
+hist:Institution_개천도감 rdf:type hist:Institution .
+hist:Institution_개천도감 rdfs:label "개천도감" .
+hist:Institution_개천도감 hist:hasFunction "도감 기관" .
+hist:Institution_우군도총제 rdf:type hist:Institution .
+hist:Institution_우군도총제 rdfs:label "우군도총제" .
+hist:Institution_우군도총제 hist:hasFunction "병마 도합 지휘 기관" .
+hist:Person_유은지 hist:affiliatedWith hist:Institution_이조 .
+hist:Person_유은지 hist:affiliatedWith hist:Institution_병조 .
+hist:Person_유은지 hist:affiliatedWith hist:Institution_개천도감 .
+hist:Person_유은지 hist:affiliatedWith hist:Institution_우군도총제 .
+
+
+# 유응부 (인물)
+hist:Person_유응부 rdf:type hist:Person .
+hist:Person_유응부 rdfs:label "유응부" .
+hist:Person_유응부 hist:hasField "무과" .
+hist:Person_유응부 hist:hasAchievement "단종 복위에 목숨을 바친 무신" .
+hist:Person_유응부 hist:hasMotive "충절" .
+hist:Event_임명:첨지중추원사 rdf:type hist:Event .
+hist:Event_임명:첨지중추원사 rdfs:label "임명: 첨지중추원사" .
+hist:Event_임명:첨지중추원사 hist:hasYear 1448 .
+hist:Event_임명:경원도호부사 rdf:type hist:Event .
+hist:Event_임명:경원도호부사 rdfs:label "임명: 경원도호부사" .
+hist:Event_임명:경원도호부사 hist:hasYear 1449 .
+hist:Event_임명:경원절제사 rdf:type hist:Event .
+hist:Event_임명:경원절제사 rdfs:label "임명: 경원절제사" .
+hist:Event_임명:경원절제사 hist:hasYear 1449 .
+hist:Event_임명:의주목사 rdf:type hist:Event .
+hist:Event_임명:의주목사 rdfs:label "임명: 의주목사" .
+hist:Event_임명:의주목사 hist:hasYear 1452 .
+hist:Person_유응부 hist:participatesIn hist:Event_임명:첨지중추원사 .
+hist:Person_유응부 hist:participatesIn hist:Event_임명:경원도호부사 .
+hist:Person_유응부 hist:participatesIn hist:Event_임명:경원절제사 .
+hist:Person_유응부 hist:participatesIn hist:Event_임명:의주목사 .
+
+
+# 유응수 (인물)
+hist:Person_유응수 rdf:type hist:Person .
+hist:Person_유응수 rdfs:label "유응수" .
+hist:Person_유응수 hist:hasRank "영건만호" .
+hist:Person_유응수 hist:hasRank "삼수군수" .
+hist:Person_유응수 hist:hasRank "첨지중추부사" .
+hist:Person_유응수 hist:hasField "무신" .
+hist:Person_유응수 hist:hasDeathYear 1597 .
+hist:Person_유응수 hist:hasAchievement "풍산만호로서 삼수군수로 승진, 토적장을 통한 왜적토벌 주도, 의병 규합 및 전사" .
+hist:Person_윤탁연 rdf:type hist:Person .
+hist:Person_윤탁연 rdfs:label "윤탁연" .
+hist:Person_민정중 rdf:type hist:Person .
+hist:Person_민정중 rdfs:label "민정중" .
+hist:Document_장계 rdf:type hist:Document .
+hist:Document_장계 rdfs:label "장계" .
+hist:Document_장계 hist:hasYear 1666 .
+hist:Institution_병조판서 rdf:type hist:Institution .
+hist:Institution_병조판서 rdfs:label "병조판서" .
+hist:Institution_병조판서 hist:hasYear 1666 .
+hist:Person_유응수 hist:participatesIn "풍산만호로서 반호 마산덕의 군사 격파 (1590)" .
+hist:Person_유응수 hist:participatesIn "임진왜란(1592)에서 왜적토벌에 앞장섰다" .
+hist:Person_유응수 hist:participatesIn "전사(1597)" .
+hist:Person_유응수 hist:servedUnder hist:Person_윤탁연 .
+hist:Person_민정중 hist:authored hist:Document_장계 .
+hist:Person_유응수 hist:affiliatedWith hist:Institution_병조판서 .
+
+
+# 유의 (인물)
+hist:Person_유의 rdf:type hist:Person .
+hist:Person_유의 rdfs:label "유의" .
+hist:Person_유의 hist:hasRank "승지" .
+hist:Person_유의 hist:hasRank "홍주목사" .
+hist:Person_유의 hist:hasRank "대사헌" .
+hist:Person_유의 hist:hasRank "병조참의" .
+hist:Person_유의 hist:hasRank "병조참판" .
+hist:Person_유의 hist:hasRank "대사간" .
+hist:Person_유의 hist:hasField "문신" .
+hist:Person_유의 hist:hasAchievement "조정에서 신중한 언행과 목민관으로서의 청렴함과 위엄으로 행정 운영에 기여" .
+hist:Person_유의 hist:hasDeathYear 1797 .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Institution_홍문관 hist:hasFunction "조정의 학문 및 문서 편찬 보좌" .
+hist:Institution_홍문관 hist:hasYear 1778 .
+hist:Event_강원도안핵어사파견 rdf:type hist:Event .
+hist:Event_강원도안핵어사파견 rdfs:label "강원도 안핵어사 파견" .
+hist:Event_강원도안핵어사파견 hist:hasYear 1780 .
+hist:Event_평안도암행어사파견 rdf:type hist:Event .
+hist:Event_평안도암행어사파견 rdfs:label "평안도 암행어사 파견" .
+hist:Event_평안도암행어사파견 hist:hasYear 1781 .
+hist:Event_실록청도청낭청편찬참여 rdf:type hist:Event .
+hist:Event_실록청도청낭청편찬참여 rdfs:label "실록청도청낭청 편찬 참여" .
+hist:Event_실록청도청낭청편찬참여 hist:hasYear 1781 .
+hist:Person_유의 hist:affiliatedWith hist:Institution_홍문관 .
+hist:Person_유의 hist:participatesIn hist:Event_강원도안핵어사파견 .
+hist:Person_유의 hist:participatesIn hist:Event_평안도암행어사파견 .
+hist:Person_유의 hist:participatesIn hist:Event_실록청도청낭청편찬참여 .
+
+
+# 유의손 (인물)
+hist:Person_유의손 rdf:type hist:Person .
+hist:Person_유의손 rdfs:label "유의손" .
+hist:Person_유의손 hist:hasBirthYear 1419 .
+hist:Person_유의손 hist:hasField "학문" .
+hist:Person_유의손 hist:hasRank "도승지" .
+hist:Person_유의손 hist:hasRank "이조참판" .
+hist:Person_유의손 hist:hasRank "예조참판" .
+hist:Person_유의손 hist:hasAchievement "생원시 합격(1419), 식년문과 동진사로 급제(1426), 문과 중시에 급제(1436)" .
+hist:Institution_도승지 rdf:type hist:Institution .
+hist:Institution_도승지 rdfs:label "도승지" .
+hist:Institution_도승지 hist:hasFunction "고위 관직" .
+hist:Institution_이조참판 rdf:type hist:Institution .
+hist:Institution_이조참판 rdfs:label "이조참판" .
+hist:Institution_이조참판 hist:hasFunction "고위 관직" .
+hist:Institution_예조참판 rdf:type hist:Institution .
+hist:Institution_예조참판 rdfs:label "예조참판" .
+hist:Institution_예조참판 hist:hasFunction "고위 관직" .
+hist:Person_유의손 hist:affiliatedWith hist:Institution_도승지 .
+hist:Person_유의손 hist:affiliatedWith hist:Institution_이조참판 .
+hist:Person_유의손 hist:affiliatedWith hist:Institution_예조참판 .
+
+
+# 유의신 (인물)
+hist:Person_유의신 rdf:type hist:Person .
+hist:Person_유의신 rdfs:label "유의신" .
+hist:Person_유의신 hist:hasBirthYear 1492 .
+hist:Person_유의신 hist:hasAchievement "생원시 합격; 별시문과 3등 급제; 지평 역임; 성균관사성 역임" .
+hist:Institution_지평 rdf:type hist:Institution .
+hist:Institution_지평 rdfs:label "지평" .
+hist:Institution_성균관사성 rdf:type hist:Institution .
+hist:Institution_성균관사성 rdfs:label "성균관사성" .
+hist:Event_생원시합격 rdf:type hist:Event .
+hist:Event_생원시합격 rdfs:label "생원시 합격" .
+hist:Event_생원시합격 hist:hasYear 1492 .
+hist:Event_별시문과급제 rdf:type hist:Event .
+hist:Event_별시문과급제 rdfs:label "별시문과 급제" .
+hist:Event_별시문과급제 hist:hasYear 1502 .
+hist:Person_유의신 hist:affiliatedWith hist:Institution_지평 .
+hist:Person_유의신 hist:affiliatedWith hist:Institution_성균관사성 .
+hist:Person_유의신 hist:participatesIn hist:Event_생원시합격 .
+hist:Person_유의신 hist:participatesIn hist:Event_별시문과급제 .
+hist:Event_생원시합격 hist:leadsTo hist:Event_별시문과급제 .
+
+
+# 유의정 (인물)
+hist:Person_유의정 rdf:type hist:Person .
+hist:Person_유의정 rdfs:label "유의정" .
+hist:Person_유의정 hist:hasRank "이조정랑" .
+hist:Person_유의정 hist:hasAchievement "승문원정자, 박사, 전적, 예조좌랑, 후릉령, 사직령, 병조좌랑, 지평, 장령 및 이조정랑 역임; 현풍현감, 지평, 부수찬, 사간, 수찬, 집의 역임; 폐정 개혁을 주장하는 상소로 경흥에 유배되었다가 이듬해 풀려남; 자경·심물망도 저술" .
+hist:Person_유의정 hist:hasField "학문 및 정치개혁" .
+hist:Institution_현풍현감 rdf:type hist:Institution .
+hist:Institution_현풍현감 rdfs:label "현풍현감" .
+hist:Institution_지평 rdf:type hist:Institution .
+hist:Institution_지평 rdfs:label "지평" .
+hist:Document_자경 rdf:type hist:Document .
+hist:Document_자경 rdfs:label "자경" .
+hist:Event_경흥유배 rdf:type hist:Event .
+hist:Event_경흥유배 rdfs:label "경흥 유배" .
+hist:Person_유의정 hist:affiliatedWith hist:Institution_현풍현감 .
+hist:Person_유의정 hist:affiliatedWith hist:Institution_지평 .
+hist:Person_유의정 hist:authored hist:Document_자경 .
+hist:Person_유의정 hist:participatesIn hist:Event_경흥유배 .
+
+
+# 유의양 (인물)
+hist:Person_유의양 rdf:type hist:Person .
+hist:Person_유의양 rdfs:label "유의양" .
+hist:Person_유의양 hist:hasBirthYear 1756 .
+hist:Person_유의양 hist:hasRank "생원, 현감, 예조참의, 예조참판, 대사간, 승지" .
+hist:Institution_예조 rdf:type hist:Institution .
+hist:Institution_예조 rdfs:label "예조" .
+hist:Institution_예조 hist:hasFunction "조선의 관리기관" .
+hist:Institution_의주부윤 rdf:type hist:Institution .
+hist:Institution_의주부윤 rdfs:label "의주부윤" .
+hist:Institution_의주부윤 hist:hasFunction "의주부의 관직" .
+hist:Institution_강릉부사 rdf:type hist:Institution .
+hist:Institution_강릉부사 rdfs:label "강릉부사" .
+hist:Institution_강릉부사 hist:hasFunction "강릉부의 부사 직무" .
+hist:Event_증광문과병과급제 rdf:type hist:Event .
+hist:Event_증광문과병과급제 rdfs:label "증광 문과 병과 급제" .
+hist:Event_증광문과병과급제 hist:hasYear 1763 .
+hist:Person_유의양 hist:affiliatedWith hist:Institution_예조 .
+hist:Person_유의양 hist:affiliatedWith hist:Institution_의주부윤 .
+hist:Person_유의양 hist:affiliatedWith hist:Institution_강릉부사 .
+hist:Person_유의양 hist:participatesIn hist:Event_증광문과병과급제 .
+
+
+# 유익명 (인물)
+hist:Person_유익명 rdf:type hist:Person .
+hist:Person_유익명 rdfs:label "유익명" .
+hist:Person_유익명 hist:hasField "무신" .
+hist:Person_유익명 hist:hasAchievement "사량만호, 지자성군사, 의주목사, 판회령도호부사, 동지중추원사, 중추원부사, 행첨지중추원사, 경상우도병마절제사, 경상우도도절제사, 좌익원종공신, 전라도처치사" .
+hist:Institution_중추원 rdf:type hist:Institution .
+hist:Institution_중추원 rdfs:label "중추원" .
+hist:Institution_중추원 hist:hasYear 1452 .
+hist:Institution_중추원 hist:hasFunction "정부기관의 중추 기구" .
+hist:Place_금산 rdf:type hist:Place .
+hist:Place_금산 rdfs:label "금산" .
+hist:Place_금산 hist:hasLocation "금산" .
+hist:Place_의주 rdf:type hist:Place .
+hist:Place_의주 rdfs:label "의주" .
+hist:Place_의주 hist:hasLocation "의주" .
+hist:Place_제포 rdf:type hist:Place .
+hist:Place_제포 rdfs:label "제포" .
+hist:Place_제포 hist:hasLocation "제포" .
+hist:Person_유익명 hist:affiliatedWith hist:Institution_중추원 .
+hist:Person_유익명 hist:participatesIn "1440년 지자성군사 수행" .
+hist:Person_유익명 hist:participatesIn "1443년 의주목사 취임" .
+hist:Person_유익명 hist:participatesIn "1449년 판회령도호부사 임무" .
+hist:Person_유익명 hist:participatesIn "1452년 동지중추원사 취임" .
+hist:Person_유익명 hist:participatesIn "1453년 중추원부사 및 행첨지중추원사 취임" .
+
+
+# 유인 (제도)
+hist:Institution_유인 rdf:type hist:Institution .
+hist:Institution_유인 rdfs:label "유인" .
+hist:Institution_유인 hist:hasYear 1396 .
+hist:Institution_유인 hist:hasFunction "정9품·종9품의 적처에게 봉작된 작호" .
+hist:Institution_유인 hist:hasPurpose "문무관 각 품의 적처에게 주어지는 봉호" .
+
+
+# 유자광 (인물)
+hist:Person_유자광 rdf:type hist:Person .
+hist:Person_유자광 rdfs:label "유자광" .
+hist:Person_유자광 hist:hasRank "병조정랑; 한성부판윤; 장악원제조" .
+hist:Person_유자광 hist:hasField "문학(기사, 서사)" .
+hist:Person_유자광 hist:hasAchievement "무령군 1등 공신" .
+hist:Event_이시애의난 rdf:type hist:Event .
+hist:Event_이시애의난 rdfs:label "이시애의 난" .
+hist:Event_이시애의난 hist:hasYear 1467 .
+hist:Event_건춘문수비 rdf:type hist:Event .
+hist:Event_건춘문수비 rdfs:label "건춘문 수비" .
+hist:Event_건춘문수비 hist:hasYear 1467 .
+hist:Event_온양행차 rdf:type hist:Event .
+hist:Event_온양행차 rdfs:label "온양 행차" .
+hist:Event_온양행차 hist:hasYear 1468 .
+hist:Person_임금 rdf:type hist:Person .
+hist:Person_임금 rdfs:label "임금" .
+hist:Person_유자광 hist:participatesIn hist:Event_이시애의난 .
+hist:Person_유자광 hist:participatesIn hist:Event_건춘문수비 .
+hist:Person_유자광 hist:participatesIn hist:Event_온양행차 .
+hist:Person_유자광 hist:servedUnder hist:Person_임금 .
+
+
+# 유인귀 (인물)
+hist:Person_유인귀 rdf:type hist:Person .
+hist:Person_유인귀 rdfs:label "유인귀" .
+hist:Person_유인귀 hist:hasRank "성균관대사성" .
+hist:Person_유인귀 hist:hasField "경서" .
+hist:Person_유인귀 hist:hasAchievement "1493년 성균관 유생시험 수석 합격; 1494년 식년 문과 급제; 1503년 홍문관수찬; 1509년 홍문관교리 승진; 1525년 봉상시정으로 황해도재상사 재임; 1527년 성균관대사성 취임 및 예조참의 취임" .
+hist:Event_성균관유생시험 rdf:type hist:Event .
+hist:Event_성균관유생시험 rdfs:label "성균관 유생시험" .
+hist:Event_성균관유생시험 hist:hasYear 1493 .
+hist:Event_식년문과급제 rdf:type hist:Event .
+hist:Event_식년문과급제 rdfs:label "식년 문과 급제" .
+hist:Event_식년문과급제 hist:hasYear 1494 .
+hist:Event_홍문관수찬 rdf:type hist:Event .
+hist:Event_홍문관수찬 rdfs:label "홍문관수찬" .
+hist:Event_홍문관수찬 hist:hasYear 1503 .
+hist:Event_봉상시정으로황해도재상사임명 rdf:type hist:Event .
+hist:Event_봉상시정으로황해도재상사임명 rdfs:label "봉상시정으로 황해도재상사 임명" .
+hist:Event_봉상시정으로황해도재상사임명 hist:hasYear 1525 .
+hist:Person_유인귀 hist:participatesIn hist:Event_성균관유생시험 .
+hist:Person_유인귀 hist:participatesIn hist:Event_식년문과급제 .
+hist:Person_유인귀 hist:participatesIn hist:Event_홍문관수찬 .
+hist:Person_유인귀 hist:participatesIn hist:Event_봉상시정으로황해도재상사임명 .
+
+
+# 유인숙 (인물)
+hist:Person_유인숙 rdf:type hist:Person .
+hist:Person_유인숙 rdfs:label "유인숙" .
+hist:Person_유인숙 hist:hasRank "한성부우윤; 공조판서; 우찬성" .
+hist:Person_유인숙 hist:hasAchievement "진사시 합격 (1507); 생원시 합격 (1507); 식년 문과 병과로 급제 (1510); 홍문관부수찬 및 전한이 됨 (1515)" .
+hist:Event_진사시합격(1507) rdf:type hist:Event .
+hist:Event_진사시합격(1507) rdfs:label "진사시 합격 (1507)" .
+hist:Event_생원시합격(1507) rdf:type hist:Event .
+hist:Event_생원시합격(1507) rdfs:label "생원시 합격 (1507)" .
+hist:Event_식년문과병과로급제(1510) rdf:type hist:Event .
+hist:Event_식년문과병과로급제(1510) rdfs:label "식년 문과 병과로 급제 (1510)" .
+hist:Event_홍문관부수찬및전한이됨(1515) rdf:type hist:Event .
+hist:Event_홍문관부수찬및전한이됨(1515) rdfs:label "홍문관부수찬 및 전한이 됨 (1515)" .
+hist:Person_유인숙 hist:participatesIn hist:Event_진사시합격(1507) .
+hist:Person_유인숙 hist:participatesIn hist:Event_생원시합격(1507) .
+hist:Person_유인숙 hist:participatesIn hist:Event_식년문과병과로급제(1510) .
+hist:Person_유인숙 hist:participatesIn hist:Event_홍문관부수찬및전한이됨(1515) .
+
+
+# 유자미 (인물)
+hist:Person_유자미 rdf:type hist:Person .
+hist:Person_유자미 rdfs:label "유자미" .
+hist:Person_유자미 hist:hasDeathYear 1462 .
+hist:Person_유자미 hist:hasField "서예 및 그림" .
+hist:Document_지곡송학도 rdf:type hist:Document .
+hist:Document_지곡송학도 rdfs:label "지곡송학도" .
+hist:Document_지곡송학도 hist:hasYear 1434 .
+hist:Event_1451년급제및감찰 rdf:type hist:Event .
+hist:Event_1451년급제및감찰 rdfs:label "1451년 급제 및 감찰" .
+hist:Event_1451년급제및감찰 hist:hasYear 1451 .
+hist:Event_1455년공문으로들어갔다 rdf:type hist:Event .
+hist:Event_1455년공문으로들어갔다 rdfs:label "1455년 공문으로 들어갔다" .
+hist:Event_1455년공문으로들어갔다 hist:hasYear 1455 .
+hist:Event_1456년단종복위운동 rdf:type hist:Event .
+hist:Event_1456년단종복위운동 rdfs:label "1456년 단종복위운동" .
+hist:Event_1456년단종복위운동 hist:hasYear 1456 .
+hist:Person_유자미 hist:authored hist:Document_지곡송학도 .
+hist:Person_유자미 hist:participatesIn hist:Event_1451년급제및감찰 .
+hist:Person_유자미 hist:participatesIn hist:Event_1455년공문으로들어갔다 .
+hist:Person_유자미 hist:participatesIn hist:Event_1456년단종복위운동 .
+
+
+# 유자신 (인물)
+hist:Person_유자신 rdf:type hist:Person .
+hist:Person_유자신 rdfs:label "유자신" .
+hist:Person_유자신 hist:hasRank "한성부우윤; 한성판윤; 도총부도총관; 영돈녕부사" .
+hist:Person_유자신 hist:hasField "정치/행정" .
+hist:Person_유자신 hist:hasAchievement "임진왜란 때 대가를 호종하고 광해군을 따라 강원도 방면으로 이동하였으며, 다수의 관직을 역임" .
+hist:Event_정여립옥사 rdf:type hist:Event .
+hist:Event_정여립옥사 rdfs:label "정여립 옥사" .
+hist:Event_정여립옥사 hist:hasYear 1589 .
+hist:Event_임진왜란 rdf:type hist:Event .
+hist:Event_임진왜란 rdfs:label "임진왜란" .
+hist:Event_임진왜란 hist:hasYear 1592 .
+hist:Event_명군구타한사건 rdf:type hist:Event .
+hist:Event_명군구타한사건 rdfs:label "명군 구타한 사건" .
+hist:Event_명군구타한사건 hist:hasYear 1598 .
+hist:Institution_돈녕부 rdf:type hist:Institution .
+hist:Institution_돈녕부 rdfs:label "돈녕부" .
+hist:Institution_돈녕부 hist:hasFunction "중앙 행정기관" .
+hist:Person_유자신 hist:participatesIn hist:Event_정여립옥사 .
+hist:Person_유자신 hist:participatesIn hist:Event_임진왜란 .
+hist:Person_유자신 hist:participatesIn hist:Event_명군구타한사건 .
+hist:Person_유자신 hist:affiliatedWith hist:Institution_돈녕부 .
+
+
+# 유자한 (인물)
+hist:Person_유자한 rdf:type hist:Person .
+hist:Person_유자한 rdfs:label "유자한" .
+hist:Person_유자한 hist:hasDeathYear 1504 .
+hist:Person_유자한 hist:hasRank "홍문관부교리; 예문관응교; 양양부사; 지평" .
+hist:Person_유자한 hist:hasField "조선시대 문신" .
+hist:Person_유자한 hist:hasAchievement "생육신의 한 사람으로 활동; 백성 구휼에 힘씀" .
+hist:Event_장원급제(1460) rdf:type hist:Event .
+hist:Event_장원급제(1460) rdfs:label "장원급제(1460)" .
+hist:Event_장원급제(1460) hist:hasYear 1460 .
+hist:Event_갑자사화(1504) rdf:type hist:Event .
+hist:Event_갑자사화(1504) rdfs:label "갑자사화(1504)" .
+hist:Event_갑자사화(1504) hist:hasYear 1504 .
+hist:Institution_경기도경차관 rdf:type hist:Institution .
+hist:Institution_경기도경차관 rdfs:label "경기도경차관" .
+hist:Institution_경기도경차관 hist:hasYear 1464 .
+hist:Person_김시습 rdf:type hist:Person .
+hist:Person_김시습 rdfs:label "김시습" .
+hist:Person_유자한 hist:participatesIn hist:Event_장원급제(1460) .
+hist:Person_유자한 hist:participatesIn hist:Event_갑자사화(1504) .
+hist:Person_유자한 hist:affiliatedWith hist:Institution_경기도경차관 .
+hist:Person_유자한 hist:contemporaryWith hist:Person_김시습 .
+hist:Person_유자한 hist:hasMotive "민생구휼" .
+
+
+# 유자환 (인물)
+hist:Person_유자환 rdf:type hist:Person .
+hist:Person_유자환 rdfs:label "유자환" .
+hist:Person_유자환 hist:hasRank "호조참판" .
+hist:Person_유자환 hist:hasRank "대사헌" .
+hist:Person_유자환 hist:hasRank "전라도관찰사" .
+hist:Person_유자환 hist:hasRank "이조참판" .
+hist:Person_유자환 hist:hasRank "승정원주서" .
+hist:Person_유자환 hist:hasRank "우부승지" .
+hist:Person_유자환 hist:hasRank "우승지" .
+hist:Person_유자환 hist:hasRank "좌승지" .
+hist:Person_유자환 hist:hasRank "도승지" .
+hist:Person_유자환 hist:hasRank "중추원부사" .
+hist:Person_유자환 hist:hasRank "오성군에 봉해짐" .
+hist:Person_유자환 hist:hasAchievement "정난공신 3등에 책록" .
+hist:Event_계유정난 rdf:type hist:Event .
+hist:Event_계유정난 rdfs:label "계유정난" .
+hist:Event_계유정난 hist:hasYear 1453 .
+hist:Event_명나라사은사방문 rdf:type hist:Event .
+hist:Event_명나라사은사방문 rdfs:label "명나라 사은사 방문" .
+hist:Event_명나라사은사방문 hist:hasStartYear 1462 .
+hist:Event_명나라사은사방문 hist:hasEndYear 1463 .
+hist:Event_전라도관찰사파견 rdf:type hist:Event .
+hist:Event_전라도관찰사파견 rdfs:label "전라도관찰사 파견" .
+hist:Event_전라도관찰사파견 hist:hasYear 1466 .
+hist:Event_사직 rdf:type hist:Event .
+hist:Event_사직 rdfs:label "사직" .
+hist:Event_사직 hist:hasYear 1463 .
+hist:Person_유자환 hist:participatesIn hist:Event_계유정난 .
+hist:Person_유자환 hist:participatesIn hist:Event_명나라사은사방문 .
+hist:Person_유자환 hist:participatesIn hist:Event_전라도관찰사파견 .
+hist:Person_유자환 hist:participatesIn hist:Event_사직 .
+
+
+# 유적 삭제 (제도)
+hist:Institution_성균관 rdf:type hist:Institution .
+hist:Institution_성균관 rdfs:label "성균관" .
+hist:Institution_성균관 hist:hasFunction "학적 기록 관리 및 유생 명단 기록" .
+hist:Institution_향교 rdf:type hist:Institution .
+hist:Institution_향교 rdfs:label "향교" .
+hist:Institution_향교 hist:hasFunction "학적 기록" .
+hist:Event_재회 rdf:type hist:Event .
+hist:Event_재회 rdfs:label "재회" .
+hist:Person_장의 rdf:type hist:Person .
+hist:Person_장의 rdfs:label "장의" .
+hist:Event_삭적 rdf:type hist:Event .
+hist:Event_삭적 rdfs:label "삭적" .
+hist:Institution_성균관 hist:affiliatedWith "조선" .
+hist:Institution_향교 hist:affiliatedWith "조선" .
+hist:Event_재회 hist:leadsTo hist:Event_삭적 .
+hist:Person_장의 hist:participatesIn hist:Event_재회 .
+
+
+# 유잠 (인물)
+hist:Person_유잠 rdf:type hist:Person .
+hist:Person_유잠 rdfs:label "유잠" .
+hist:Person_유잠 hist:hasField "학문" .
+hist:Person_유잠 hist:hasRank "동부승지" .
+hist:Person_유잠 hist:hasRank "병조참판" .
+hist:Person_유잠 hist:hasRank "형조판서" .
+hist:Person_유잠 hist:hasRank "전주부윤" .
+hist:Person_유잠 hist:hasAchievement "당상관에 오른 공로" .
+hist:Person_유잠 hist:hasMotive "민생안정" .
+hist:Institution_전주부윤 rdf:type hist:Institution .
+hist:Institution_전주부윤 rdfs:label "전주부윤" .
+hist:Institution_전주부윤 hist:hasYear 1555 .
+hist:Institution_전주부윤 hist:hasFunction "외직으로 나갔다(부윤)" .
+hist:Institution_병조참판 rdf:type hist:Institution .
+hist:Institution_병조참판 rdfs:label "병조참판" .
+hist:Event_지평으로진출 rdf:type hist:Event .
+hist:Event_지평으로진출 rdfs:label "지평으로 진출" .
+hist:Event_지평으로진출 hist:hasYear 1546 .
+hist:Event_정시의시관에참여 rdf:type hist:Event .
+hist:Event_정시의시관에참여 rdfs:label "정시의 시관에 참여" .
+hist:Event_정시의시관에참여 hist:hasYear 1573 .
+hist:Person_유잠 hist:affiliatedWith hist:Institution_전주부윤 .
+hist:Person_유잠 hist:affiliatedWith hist:Institution_병조참판 .
+hist:Person_유잠 hist:participatesIn hist:Event_지평으로진출 .
+hist:Person_유잠 hist:participatesIn hist:Event_정시의시관에참여 .
+
+
+# 유전 (인물)
+hist:Person_유전 rdf:type hist:Person .
+hist:Person_유전 rdfs:label "유전" .
+hist:Person_유전 hist:hasRank "진사(1553) → 별시 문과(이듬해) → 문과 중시 급제(1556) → 한성부판윤(1583) → 우의정(1585) → 좌의정(1588) → 영의정(1589)" .
+hist:Person_유전 hist:hasAchievement "평난공신 2등 추록, 시령부원군 추봉, 시호 문정" .
+hist:Person_유전 hist:hasField "정치/행정" .
+hist:Institution_한성부판윤 rdf:type hist:Institution .
+hist:Institution_한성부판윤 rdfs:label "한성부판윤" .
+hist:Institution_한성부판윤 hist:hasYear 1583 .
+hist:Institution_한성부판윤 hist:hasPurpose "한성부의 판윤 임무" .
+hist:Institution_한성부판윤 hist:hasFunction "행정 감독 및 통치" .
+hist:Institution_우의정 rdf:type hist:Institution .
+hist:Institution_우의정 rdfs:label "우의정" .
+hist:Institution_우의정 hist:hasYear 1585 .
+hist:Institution_우의정 hist:hasPurpose "왕의 보좌" .
+hist:Institution_우의정 hist:hasFunction "정치 자문 및 행정 총괄" .
+hist:Institution_좌의정 rdf:type hist:Institution .
+hist:Institution_좌의정 rdfs:label "좌의정" .
+hist:Institution_좌의정 hist:hasYear 1588 .
+hist:Institution_좌의정 hist:hasPurpose "왕의 정책 자문 및 행정 총괄" .
+hist:Institution_좌의정 hist:hasFunction "좌의정 임무" .
+hist:Event_사은사(명나라방문) rdf:type hist:Event .
+hist:Event_사은사(명나라방문) rdfs:label "사은사(명나라 방문)" .
+hist:Event_사은사(명나라방문) hist:hasYear 1588 .
+hist:Person_유전 hist:affiliatedWith hist:Institution_한성부판윤 .
+hist:Person_유전 hist:affiliatedWith hist:Institution_우의정 .
+hist:Person_유전 hist:affiliatedWith hist:Institution_좌의정 .
+hist:Person_유전 hist:participatesIn hist:Event_사은사(명나라방문) .
+
+
+# 유정 (인물)
+hist:Person_유정 rdf:type hist:Person .
+hist:Person_유정 rdfs:label "유정" .
+hist:Person_유정 hist:hasDeathYear 1549 .
+hist:Person_유정 hist:hasRank "생원(1516); 승문원정자(1519); 강음현감(1546)" .
+hist:Person_유정 hist:hasAchievement "생원(1516), 승문원정자(1519), 복직(1536), 전적(1545), 강음현감(1546)" .
+hist:Event_생원(1516) rdf:type hist:Event .
+hist:Event_생원(1516) rdfs:label "생원(1516)" .
+hist:Event_생원(1516) hist:hasYear 1516 .
+hist:Event_승문원정자취임(1519) rdf:type hist:Event .
+hist:Event_승문원정자취임(1519) rdfs:label "승문원정자 취임(1519)" .
+hist:Event_승문원정자취임(1519) hist:hasYear 1519 .
+hist:Event_복직(1536) rdf:type hist:Event .
+hist:Event_복직(1536) rdfs:label "복직(1536)" .
+hist:Event_복직(1536) hist:hasYear 1536 .
+hist:Event_장살(1549) rdf:type hist:Event .
+hist:Event_장살(1549) rdfs:label "장살(1549)" .
+hist:Event_장살(1549) hist:hasYear 1549 .
+hist:Person_유정 hist:participatesIn hist:Event_생원(1516) .
+hist:Person_유정 hist:participatesIn hist:Event_승문원정자취임(1519) .
+hist:Person_유정 hist:participatesIn hist:Event_복직(1536) .
+hist:Person_유정 hist:participatesIn hist:Event_장살(1549) .
+hist:Person_유정 hist:affiliatedWith "조선" .
+
+
+# 유정 (인물)
+hist:Person_유정 rdf:type hist:Person .
+hist:Person_유정 rdfs:label "유정" .
+hist:Person_유정 hist:hasRank "한성부우윤, 형조참판" .
+hist:Event_진사시합격 rdf:type hist:Event .
+hist:Event_진사시합격 rdfs:label "진사시 합격" .
+hist:Event_진사시합격 hist:hasYear 1705 .
+hist:Event_증광문과병과로급제 rdf:type hist:Event .
+hist:Event_증광문과병과로급제 rdfs:label "증광문과 병과로 급제" .
+hist:Event_증광문과병과로급제 hist:hasYear 1710 .
+hist:Event_승지재임 rdf:type hist:Event .
+hist:Event_승지재임 rdfs:label "승지 재임" .
+hist:Event_승지재임 hist:hasStartYear 1727 .
+hist:Event_승지재임 hist:hasEndYear 1738 .
+hist:Institution_삼사 rdf:type hist:Institution .
+hist:Institution_삼사 rdfs:label "삼사" .
+hist:Institution_삼사 hist:hasFunction "고위관청 출입" .
+hist:Person_유정 hist:participatesIn hist:Event_진사시합격 .
+hist:Person_유정 hist:participatesIn hist:Event_증광문과병과로급제 .
+hist:Person_유정 hist:participatesIn hist:Event_승지재임 .
+hist:Person_유정 hist:affiliatedWith hist:Institution_삼사 .
+hist:Event_진사시합격 hist:leadsTo hist:Event_증광문과병과로급제 .
+hist:Event_증광문과병과로급제 hist:leadsTo hist:Event_승지재임 .
+
+
+# 유정량 (인물)
+hist:Person_유정량 rdf:type hist:Person .
+hist:Person_유정량 rdfs:label "유정량" .
+hist:Person_유정량 hist:hasRank "도총관" .
+hist:Person_유정량 hist:hasField "문신" .
+hist:Person_유정량 hist:hasAchievement "도총관 역임; 숭덕대부 승품 및 성록대부로 승진" .
+hist:Event_유배(1612) rdf:type hist:Event .
+hist:Event_유배(1612) rdfs:label "유배(1612)" .
+hist:Event_유배(1612) hist:hasYear 1612 .
+hist:Event_사은사방문(1646) rdf:type hist:Event .
+hist:Event_사은사방문(1646) rdfs:label "사은사 방문(1646)" .
+hist:Event_사은사방문(1646) hist:hasYear 1646 .
+hist:Event_진향사방문(1651) rdf:type hist:Event .
+hist:Event_진향사방문(1651) rdfs:label "진향사 방문(1651)" .
+hist:Event_진향사방문(1651) hist:hasYear 1651 .
+hist:Event_사은사방문(1655) rdf:type hist:Event .
+hist:Event_사은사방문(1655) rdfs:label "사은사 방문(1655)" .
+hist:Event_사은사방문(1655) hist:hasYear 1655 .
+hist:Person_유정량 hist:participatesIn hist:Event_유배(1612) .
+hist:Person_유정량 hist:participatesIn hist:Event_사은사방문(1646) .
+hist:Person_유정량 hist:participatesIn hist:Event_진향사방문(1651) .
+hist:Person_유정량 hist:participatesIn hist:Event_사은사방문(1655) .
+
+
+# 유정양 (인물)
+hist:Person_유정양 rdf:type hist:Person .
+hist:Person_유정양 rdfs:label "유정양" .
+hist:Person_유정양 hist:hasRank "생원(1809), 갑과급제" .
+hist:Person_유정양 hist:hasField "문신" .
+hist:Person_유정양 hist:hasAchievement "홍문관 등용, 태천현감(1811), 영변부사 재직, 동지사 서장관 파견(1813)" .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Institution_홍문관 hist:hasFunction "등용" .
+hist:Institution_태천현감 rdf:type hist:Institution .
+hist:Institution_태천현감 rdfs:label "태천현감" .
+hist:Institution_태천현감 hist:hasYear 1811 .
+hist:Institution_태천현감 hist:hasFunction "현감" .
+hist:Event_동지사의청나라방문(서장관파견) rdf:type hist:Event .
+hist:Event_동지사의청나라방문(서장관파견) rdfs:label "동지사의 청나라 방문(서장관 파견)" .
+hist:Event_동지사의청나라방문(서장관파견) hist:hasYear 1813 .
+hist:Person_한용탁 rdf:type hist:Person .
+hist:Person_한용탁 rdfs:label "한용탁" .
+hist:Person_유정양 hist:affiliatedWith hist:Institution_홍문관 .
+hist:Person_유정양 hist:affiliatedWith hist:Institution_태천현감 .
+hist:Person_유정양 hist:participatesIn hist:Event_동지사의청나라방문(서장관파견) .
+hist:Person_유정양 hist:contemporaryWith hist:Person_한용탁 .
+
+
+# 유정수 (인물)
+hist:Person_유정수 rdf:type hist:Person .
+hist:Person_유정수 rdfs:label "유정수" .
+hist:Person_유정수 hist:hasRank "봉상시판관; 이조정랑; 장령" .
+hist:Person_유정수 hist:hasAchievement "봉상시판관, 이조정랑, 장령 역임" .
+hist:Event_무오사화 rdf:type hist:Event .
+hist:Event_무오사화 rdfs:label "무오사화" .
+hist:Event_무오사화 hist:hasYear 1498 .
+hist:Institution_봉상시 rdf:type hist:Institution .
+hist:Institution_봉상시 rdfs:label "봉상시" .
+hist:Institution_봉상시 hist:hasYear 1494 .
+hist:Institution_봉상시 hist:hasPurpose "봉상시판관 역임" .
+hist:Institution_봉상시 hist:hasFunction "봉상시" .
+hist:Institution_영안도도사 rdf:type hist:Institution .
+hist:Institution_영안도도사 rdfs:label "영안도도사" .
+hist:Institution_영안도도사 hist:hasYear 1491 .
+hist:Institution_영안도도사 hist:hasPurpose "연변읍성 축성에 진력" .
+hist:Institution_영안도도사 hist:hasFunction "도도사" .
+hist:Institution_이조 rdf:type hist:Institution .
+hist:Institution_이조 rdfs:label "이조" .
+hist:Institution_이조 hist:hasYear 1494 .
+hist:Institution_이조 hist:hasPurpose "이조정랑 역임" .
+hist:Institution_이조 hist:hasFunction "이조" .
+hist:Person_유정수 hist:participatesIn hist:Event_무오사화 .
+hist:Person_유정수 hist:affiliatedWith hist:Institution_봉상시 .
+hist:Person_유정수 hist:affiliatedWith hist:Institution_영안도도사 .
+hist:Person_유정수 hist:affiliatedWith hist:Institution_이조 .
+
+
+# 유정현 (인물)
+hist:Person_유정현 rdf:type hist:Person .
+hist:Person_유정현 rdfs:label "유정현" .
+hist:Person_유정현 hist:hasRank "병조판서" .
+hist:Person_유정현 hist:hasRank "찬성사" .
+hist:Person_유정현 hist:hasRank "영의정" .
+hist:Person_유정현 hist:hasRank "좌의정" .
+hist:Person_유정현 hist:hasDeathYear 1426 .
+hist:Person_유정현 hist:hasAchievement "삼군도통사 임명(대마도 정벌)" .
+hist:Person_유정현 hist:hasField "관료/정치" .
+hist:Event_상주목사발탁 rdf:type hist:Event .
+hist:Event_상주목사발탁 rdfs:label "상주목사 발탁" .
+hist:Event_상주목사발탁 hist:hasYear 1394 .
+hist:Event_삼군도통사임명(대마도정벌) rdf:type hist:Event .
+hist:Event_삼군도통사임명(대마도정벌) rdfs:label "삼군도통사 임명(대마도 정벌)" .
+hist:Event_삼군도통사임명(대마도정벌) hist:hasYear 1419 .
+hist:Event_좌의정임명 rdf:type hist:Event .
+hist:Event_좌의정임명 rdfs:label "좌의정 임명" .
+hist:Event_좌의정임명 hist:hasYear 1416 .
+hist:Nation_조선 rdf:type hist:Nation .
+hist:Nation_조선 rdfs:label "조선" .
+hist:Person_유정현 hist:affiliatedWith hist:Nation_조선 .
+hist:Person_유정현 hist:participatesIn hist:Event_상주목사발탁 .
+hist:Person_유정현 hist:participatesIn hist:Event_삼군도통사임명(대마도정벌) .
+hist:Person_유정현 hist:participatesIn hist:Event_좌의정임명 .
+
+
+# 유조생 (인물)
+hist:Person_유조생 rdf:type hist:Person .
+hist:Person_유조생 rdfs:label "유조생" .
+hist:Person_유조생 hist:hasField "무과" .
+hist:Person_유조생 hist:hasRank "무신" .
+hist:Person_유조생 hist:hasAchievement "호성공신 3등 녹훈; 완원군으로 봉하여졌다" .
+hist:Institution_영암군수 rdf:type hist:Institution .
+hist:Institution_영암군수 rdfs:label "영암군수" .
+hist:Institution_영암군수 hist:hasFunction "군수" .
+hist:Institution_오위도총부 rdf:type hist:Institution .
+hist:Institution_오위도총부 rdfs:label "오위도총부" .
+hist:Institution_오위도총부 hist:hasFunction "부총관" .
+hist:Institution_사헌부 rdf:type hist:Institution .
+hist:Institution_사헌부 rdfs:label "사헌부" .
+hist:Institution_사헌부 hist:hasFunction "탄핵 주도 기관" .
+hist:Event_탄핵_1599 rdf:type hist:Event .
+hist:Event_탄핵_1599 rdfs:label "탄핵_1599" .
+hist:Event_탄핵_1599 hist:hasYear 1599 .
+hist:Person_유조생 hist:affiliatedWith hist:Institution_영암군수 .
+hist:Person_유조생 hist:affiliatedWith hist:Institution_오위도총부 .
+hist:Person_유조생 hist:affiliatedWith hist:Institution_사헌부 .
+hist:Person_유조생 hist:participatesIn hist:Event_탄핵_1599 .
+
+
+# 유정휘 (인물)
+hist:Person_유정휘 rdf:type hist:Person .
+hist:Person_유정휘 rdfs:label "유정휘" .
+hist:Person_유정휘 hist:hasAchievement "장령, 정언, 직강 역임 및 목사 취임" .
+hist:Institution_장령 rdf:type hist:Institution .
+hist:Institution_장령 rdfs:label "장령" .
+hist:Institution_장령 hist:hasYear 1690 .
+hist:Institution_장령 hist:hasFunction "장령" .
+hist:Institution_정언 rdf:type hist:Institution .
+hist:Institution_정언 rdfs:label "정언" .
+hist:Institution_정언 hist:hasFunction "정언" .
+hist:Institution_목사 rdf:type hist:Institution .
+hist:Institution_목사 rdfs:label "목사" .
+hist:Institution_목사 hist:hasFunction "목사" .
+hist:Event_1651년별시문과에을과로급제 rdf:type hist:Event .
+hist:Event_1651년별시문과에을과로급제 rdfs:label "1651년 별시문과에 을과로 급제" .
+hist:Event_1651년별시문과에을과로급제 hist:hasYear 1651 .
+hist:Person_유정휘 hist:participatesIn hist:Event_1651년별시문과에을과로급제 .
+hist:Person_유정휘 hist:affiliatedWith hist:Institution_장령 .
+hist:Person_유정휘 hist:affiliatedWith hist:Institution_정언 .
+hist:Person_유정휘 hist:affiliatedWith hist:Institution_목사 .
+
+
+# 유조인 (인물)
+hist:Person_유조인 rdf:type hist:Person .
+hist:Person_유조인 rdfs:label "유조인" .
+hist:Person_유조인 hist:hasRank "사재감정" .
+hist:Person_유조인 hist:hasRank "통정대부" .
+hist:Person_유조인 hist:hasRank "형조참의" .
+hist:Person_유조인 hist:hasAchievement "학문에 근면하고 행의가 단정하여 동학들의 존경을 받았다" .
+hist:Person_이중호 rdf:type hist:Person .
+hist:Person_이중호 rdfs:label "이중호" .
+hist:Person_정지연 rdf:type hist:Person .
+hist:Person_정지연 rdfs:label "정지연" .
+hist:Person_박응로 rdf:type hist:Person .
+hist:Person_박응로 rdfs:label "박응로" .
+hist:Person_최황 rdf:type hist:Person .
+hist:Person_최황 rdfs:label "최황" .
+hist:Person_유조인 hist:studentOf hist:Person_이중호 .
+hist:Person_유조인 hist:contemporaryWith hist:Person_정지연 .
+hist:Person_유조인 hist:contemporaryWith hist:Person_박응로 .
+hist:Person_유조인 hist:contemporaryWith hist:Person_최황 .
+hist:Person_유조인 hist:participatesIn "임진왜란" .
+
+
+# 유종개 (인물)
+hist:Person_유종개 rdf:type hist:Person .
+hist:Person_유종개 rdfs:label "유종개" .
+hist:Person_유종개 hist:hasRank "전적" .
+hist:Person_유종개 hist:hasAchievement "임진왜란 중 전사; 참의에 추증; 경현사우에 제향" .
+hist:Person_유종개 hist:hasField "문신" .
+hist:Event_임진왜란 rdf:type hist:Event .
+hist:Event_임진왜란 rdfs:label "임진왜란" .
+hist:Institution_전적 rdf:type hist:Institution .
+hist:Institution_전적 rdfs:label "전적" .
+hist:Institution_전적 hist:hasFunction "역임" .
+hist:Institution_교서관정자 rdf:type hist:Institution .
+hist:Institution_교서관정자 rdfs:label "교서관정자" .
+hist:Institution_교서관정자 hist:hasFunction "직책" .
+hist:Institution_향리 rdf:type hist:Institution .
+hist:Institution_향리 rdfs:label "향리" .
+hist:Institution_향리 hist:hasFunction "향리" .
+hist:Person_유종개 hist:participatesIn hist:Event_임진왜란 .
+hist:Person_유종개 hist:affiliatedWith hist:Institution_전적 .
+hist:Person_유종개 hist:affiliatedWith hist:Institution_교서관정자 .
+hist:Person_유종개 hist:affiliatedWith hist:Institution_향리 .
+
+
+# 유주 (인물)
+hist:Person_유주 rdf:type hist:Person .
+hist:Person_유주 rdfs:label "유주" .
+hist:Person_유주 hist:hasDeathYear 1636 .
+hist:Person_유주 hist:hasAchievement "폐모론 반대 및 정조의 처형 주장" .
+hist:Event_폐모론 rdf:type hist:Event .
+hist:Event_폐모론 rdfs:label "폐모론" .
+hist:Event_폐모론 hist:hasYear 1613 .
+hist:Person_유주 hist:participatesIn hist:Event_폐모론 .
+
+
+# 유종선 (인물)
+hist:Person_유종선 rdf:type hist:Person .
+hist:Person_유종선 rdfs:label "유종선" .
+hist:Person_유종선 hist:hasField "문신(조선시대 관리)" .
+hist:Person_유종선 hist:hasRank "이조판서" .
+hist:Event_진사합격 rdf:type hist:Event .
+hist:Event_진사합격 rdfs:label "진사 합격" .
+hist:Event_진사합격 hist:hasYear 1543 .
+hist:Event_급제:증광문과(을과) rdf:type hist:Event .
+hist:Event_급제:증광문과(을과) rdfs:label "급제: 증광문과(을과)" .
+hist:Event_급제:증광문과(을과) hist:hasYear 1546 .
+hist:Institution_승문원부정자 rdf:type hist:Institution .
+hist:Institution_승문원부정자 rdfs:label "승문원부정자" .
+hist:Person_유정 rdf:type hist:Person .
+hist:Person_유정 rdfs:label "유정" .
+hist:Person_유종선 hist:participatesIn hist:Event_진사합격 .
+hist:Person_유종선 hist:participatesIn hist:Event_급제:증광문과(을과) .
+hist:Person_유종선 hist:affiliatedWith hist:Institution_승문원부정자 .
+hist:Person_유종선 hist:studentOf hist:Person_유정 .
+
+
+# 유종흥 (인물)
+hist:Person_유종흥 rdf:type hist:Person .
+hist:Person_유종흥 rdfs:label "유종흥" .
+hist:Person_유종흥 hist:hasField "학문" .
+hist:Person_유종흥 hist:hasAchievement "학문에 통달" .
+hist:Person_최서림 rdf:type hist:Person .
+hist:Person_최서림 rdfs:label "최서림" .
+hist:Event_1689년인현왕후폐위관련입궐항의 rdf:type hist:Event .
+hist:Event_1689년인현왕후폐위관련입궐항의 rdfs:label "1689년 인현왕후 폐위 관련 입궐 항의" .
+hist:Event_1689년인현왕후폐위관련입궐항의 hist:hasYear 1689 .
+hist:Institution_용계사 rdf:type hist:Institution .
+hist:Institution_용계사 rdfs:label "용계사" .
+hist:Person_유종흥 hist:studentOf hist:Person_최서림 .
+hist:Person_유종흥 hist:participatesIn hist:Event_1689년인현왕후폐위관련입궐항의 .
+hist:Person_유종흥 hist:affiliatedWith hist:Institution_용계사 .
+
+
+# 유준창 (인물)
+hist:Person_유준창 rdf:type hist:Person .
+hist:Person_유준창 rdfs:label "유준창" .
+hist:Person_유준창 hist:hasRank "장령, 사간, 집의, 헌납, 동부승지, 판교, 장릉헌관" .
+hist:Person_유준창 hist:hasAchievement "조선 후기 문신으로 여러 관직 역임" .
+hist:Event_사마시 rdf:type hist:Event .
+hist:Event_사마시 rdfs:label "사마시" .
+hist:Event_사마시 hist:hasYear 1627 .
+hist:Event_생원으로급제 rdf:type hist:Event .
+hist:Event_생원으로급제 rdfs:label "생원으로 급제" .
+hist:Event_생원으로급제 hist:hasYear 1630 .
+hist:Event_정언 rdf:type hist:Event .
+hist:Event_정언 rdfs:label "정언" .
+hist:Event_정언 hist:hasYear 1643 .
+hist:Event_동부승지 rdf:type hist:Event .
+hist:Event_동부승지 rdfs:label "동부승지" .
+hist:Event_동부승지 hist:hasYear 1668 .
+hist:Person_유준창 hist:participatesIn hist:Event_사마시 .
+hist:Person_유준창 hist:participatesIn hist:Event_생원으로급제 .
+hist:Person_유준창 hist:participatesIn hist:Event_정언 .
+hist:Person_유준창 hist:participatesIn hist:Event_동부승지 .
+
+
+# 유중룡 (인물)
+hist:Person_유중룡 rdf:type hist:Person .
+hist:Person_유중룡 rdfs:label "유중룡" .
+hist:Person_유중룡 hist:hasRank "사예; 예조정랑; 홍문관수찬; 교리; 사성; 치사" .
+hist:Person_유중룡 hist:hasAchievement "진사 합격(1582); 별시문과 병과 급제(1600); 장령(1612); 문과 중시로 장원급제; 홍문관수찬; 사성; 치사" .
+hist:Person_유중룡 hist:hasField "문학/학문" .
+hist:Person_유중룡 hist:hasMotive "충절" .
+hist:Person_유중룡 hist:hasMotive "방어" .
+hist:Person_오건 rdf:type hist:Person .
+hist:Person_오건 rdfs:label "오건" .
+hist:Event_임진왜란 rdf:type hist:Event .
+hist:Event_임진왜란 rdfs:label "임진왜란" .
+hist:Person_곽재우 rdf:type hist:Person .
+hist:Person_곽재우 rdfs:label "곽재우" .
+hist:Document_유중룡저서3권 rdf:type hist:Document .
+hist:Document_유중룡저서3권 rdfs:label "유중룡 저서 3권" .
+hist:Person_유중룡 hist:studentOf hist:Person_오건 .
+hist:Person_유중룡 hist:participatesIn hist:Event_임진왜란 .
+hist:Person_유중룡 hist:servedUnder hist:Person_곽재우 .
+hist:Person_유중룡 hist:authored hist:Document_유중룡저서3권 .
+
+# 유중무 (인물)
+hist:Person_유중무 rdf:type hist:Person .
+hist:Person_유중무 rdfs:label "유중무" .
+hist:Institution_예조참판 rdf:type hist:Institution .
+hist:Institution_예조참판 rdfs:label "예조참판" .
+hist:Institution_예조참판 hist:hasFunction "조선 왕조의 관리 직무 담당" .
+hist:Institution_호조참판 rdf:type hist:Institution .
+hist:Institution_호조참판 rdfs:label "호조참판" .
+hist:Institution_호조참판 hist:hasFunction "조선 왕조의 관리 직무 담당" .
+hist:Institution_개성유수 rdf:type hist:Institution .
+hist:Institution_개성유수 rdfs:label "개성유수" .
+hist:Institution_개성유수 hist:hasFunction "개성 지역 관리" .
+hist:Event_1694년알성문과병과급제 rdf:type hist:Event .
+hist:Event_1694년알성문과병과급제 rdfs:label "1694년 알성 문과 병과 급제" .
+hist:Event_1694년알성문과병과급제 hist:hasYear 1694 .
+hist:Person_유중무 hist:affiliatedWith hist:Institution_예조참판 .
+hist:Person_유중무 hist:affiliatedWith hist:Institution_호조참판 .
+hist:Person_유중무 hist:affiliatedWith hist:Institution_개성유수 .
+hist:Person_유중무 hist:participatesIn hist:Event_1694년알성문과병과급제 .
+hist:Person_유중무 hist:hasMotive "붕당 폐해 혁파 및 개혁 추구" .
+
+
+# 유중영 (인물)
+hist:Person_유중영 rdf:type hist:Person .
+hist:Person_유중영 rdfs:label "유중영" .
+hist:Person_유중영 hist:hasRank "정주목사, 예조참의, 경연관 역임; 황주·상주·양주·안동의 훈도; 양현고직장 겸임; 박사 되었으나 파직; 승지까지 역임" .
+hist:Person_유중영 hist:hasField "문신" .
+hist:Person_유중영 hist:hasAchievement "1540년 식년 문과 급제; 국경지방의 밀수 조절 및 생산 권장; 황해도관찰사로 민폐 제거 및 교육 진흥; 정주목사 부임(1560)로 교육 진흥 및 민생 안정; 1572년 승지 거쳐 예조참의·경연관 역임" .
+hist:Institution_정주목사 rdf:type hist:Institution .
+hist:Institution_정주목사 rdfs:label "정주목사" .
+hist:Institution_정주목사 hist:hasYear 1560 .
+hist:Institution_정주목사 hist:hasFunction "목사 직책 및 관직 수행" .
+hist:Institution_의주목사 rdf:type hist:Institution .
+hist:Institution_의주목사 rdfs:label "의주목사" .
+hist:Institution_의주목사 hist:hasYear 1554 .
+hist:Institution_의주목사 hist:hasFunction "목사 직책" .
+hist:Institution_황해도관찰사 rdf:type hist:Institution .
+hist:Institution_황해도관찰사 rdfs:label "황해도관찰사" .
+hist:Institution_황해도관찰사 hist:hasYear 1564 .
+hist:Institution_황해도관찰사 hist:hasFunction "관찰사 직책" .
+hist:Institution_예조참의 rdf:type hist:Institution .
+hist:Institution_예조참의 rdfs:label "예조참의" .
+hist:Institution_예조참의 hist:hasYear 1572 .
+hist:Institution_예조참의 hist:hasFunction "참의 직책 및 경연관 역임" .
+hist:Person_유중영 hist:affiliatedWith hist:Institution_정주목사 .
+hist:Person_유중영 hist:affiliatedWith hist:Institution_의주목사 .
+hist:Person_유중영 hist:affiliatedWith hist:Institution_황해도관찰사 .
+hist:Person_유중영 hist:affiliatedWith hist:Institution_예조참의 .
+hist:Person_유중영 hist:hasMotive "학문추구 및 민생안정" .
+
+
+# 유즙 (인물)
+hist:Person_이름미상 rdf:type hist:Person .
+hist:Person_이름미상 rdfs:label "이름미상" .
+hist:Person_이름미상 hist:hasRank "오수찰방" .
+hist:Person_이름미상 hist:hasRank "의금부도사" .
+hist:Person_이름미상 hist:hasField "학문" .
+hist:Person_이름미상 hist:hasAchievement "지평에 추증" .
+hist:Person_이름미상 hist:hasMotive "학문추구" .
+hist:Person_이름미상 hist:hasMotive "후진양성" .
+hist:Person_이름미상 hist:hasMotive "충절" .
+hist:Person_최명룡 rdf:type hist:Person .
+hist:Person_최명룡 rdfs:label "최명룡" .
+hist:Person_김장생 rdf:type hist:Person .
+hist:Person_김장생 rdfs:label "김장생" .
+hist:Institution_오수찰방 rdf:type hist:Institution .
+hist:Institution_오수찰방 rdfs:label "오수찰방" .
+hist:Event_정묘호란 rdf:type hist:Event .
+hist:Event_정묘호란 rdfs:label "정묘호란" .
+hist:Event_정묘호란 hist:hasYear 1627 .
+hist:Person_이름미상 hist:studentOf hist:Person_최명룡 .
+hist:Person_이름미상 hist:studentOf hist:Person_김장생 .
+hist:Person_이름미상 hist:affiliatedWith hist:Institution_오수찰방 .
+hist:Person_이름미상 hist:participatesIn hist:Event_정묘호란 .
+
+
+# 유지 (인물)
+hist:Person_유지 rdf:type hist:Person .
+hist:Person_유지 rdfs:label "유지" .
+hist:Person_유지 hist:hasField "학문분야: 유학·시학·문학" .
+hist:Person_유지 hist:hasAchievement "예조판서, 평안도관찰사, 좌참찬 등을 역임" .
+hist:Person_유지 hist:hasMotive "학문추구" .
+hist:Institution_예조판서 rdf:type hist:Institution .
+hist:Institution_예조판서 rdfs:label "예조판서" .
+hist:Institution_평안도관찰사 rdf:type hist:Institution .
+hist:Institution_평안도관찰사 rdfs:label "평안도관찰사" .
+hist:Institution_좌참찬 rdf:type hist:Institution .
+hist:Institution_좌참찬 rdfs:label "좌참찬" .
+hist:Institution_집현전교리 rdf:type hist:Institution .
+hist:Institution_집현전교리 rdfs:label "집현전교리" .
+hist:Person_유지 hist:affiliatedWith hist:Institution_예조판서 .
+hist:Person_유지 hist:affiliatedWith hist:Institution_평안도관찰사 .
+hist:Person_유지 hist:affiliatedWith hist:Institution_좌참찬 .
+hist:Person_유지 hist:affiliatedWith hist:Institution_집현전교리 .
+
+
+# 유지 (제도)
+hist:Document_유지 rdf:type hist:Document .
+hist:Document_유지 rdfs:label "유지" .
+hist:Person_담당승지 rdf:type hist:Person .
+hist:Person_담당승지 rdfs:label "담당 승지" .
+hist:Person_담당승지 hist:hasRank "승지" .
+hist:Institution_승정원 rdf:type hist:Institution .
+hist:Institution_승정원 rdfs:label "승정원" .
+hist:Institution_승정원 hist:hasFunction "왕명서 작성 및 송부 감독" .
+hist:Person_담당승지 hist:authored hist:Document_유지 .
+hist:Person_담당승지 hist:affiliatedWith hist:Institution_승정원 .
+
+
+# 유지선 (인물)
+hist:Person_유지선 rdf:type hist:Person .
+hist:Person_유지선 rdfs:label "유지선" .
+hist:Institution_충청도관찰사 rdf:type hist:Institution .
+hist:Institution_충청도관찰사 rdfs:label "충청도관찰사" .
+hist:Institution_형조참판 rdf:type hist:Institution .
+hist:Institution_형조참판 rdfs:label "형조참판" .
+hist:Event_사마시에합격 rdf:type hist:Event .
+hist:Event_사마시에합격 rdfs:label "사마시에 합격" .
+hist:Event_사은사로명나라에갔다 rdf:type hist:Event .
+hist:Event_사은사로명나라에갔다 rdfs:label "사은사로 명나라에 갔다" .
+hist:Person_유지선 hist:affiliatedWith hist:Institution_충청도관찰사 .
+hist:Person_유지선 hist:affiliatedWith hist:Institution_형조참판 .
+hist:Person_유지선 hist:participatesIn hist:Event_사마시에합격 .
+hist:Person_유지선 hist:participatesIn hist:Event_사은사로명나라에갔다 .
+
+
+# 유지걸 (인물)
+hist:Person_유지걸 rdf:type hist:Person .
+hist:Person_유지걸 rdfs:label "유지걸" .
+hist:Person_유지걸 hist:hasField "의학" .
+hist:Person_유지걸 hist:hasAchievement "전쟁에 참전" .
+hist:Event_요동정벌군출정 rdf:type hist:Event .
+hist:Event_요동정벌군출정 rdfs:label "요동정벌군 출정" .
+hist:Event_요동정벌군출정 hist:hasStartYear 1618 .
+hist:Event_요동정벌군출정 hist:hasEndYear 1619 .
+hist:Event_후금군항복 rdf:type hist:Event .
+hist:Event_후금군항복 rdfs:label "후금군 항복" .
+hist:Event_후금군항복 hist:hasYear 1619 .
+hist:Person_유효걸 rdf:type hist:Person .
+hist:Person_유효걸 rdfs:label "유효걸" .
+hist:Person_유지걸 hist:participatesIn hist:Event_요동정벌군출정 .
+hist:Event_요동정벌군출정 hist:leadsTo hist:Event_후금군항복 .
+hist:Person_유지걸 hist:contemporaryWith hist:Person_유효걸 .
+hist:Person_유지걸 hist:hasMotive "충절" .
+
+
+# 유지화 (인물)
+hist:Person_유지화 rdf:type hist:Person .
+hist:Person_유지화 rdfs:label "유지화" .
+hist:Person_유지화 hist:hasField "학문/경전 토론" .
+hist:Person_유지화 hist:hasRank "통정대부(승서), 호종공신 추록" .
+hist:Person_유지화 hist:hasAchievement "효행으로 천거되어 창릉참봉 제수; 선공감봉사·상의원주부 역임; 병자호란 때 남한산성에 호종하고 척화론을 주장; 1680년 호종공신 추록 및 통정대부 승서" .
+hist:Institution_창릉참봉 rdf:type hist:Institution .
+hist:Institution_창릉참봉 rdfs:label "창릉참봉" .
+hist:Institution_창릉참봉 hist:hasYear 1633 .
+hist:Institution_창릉참봉 hist:hasPurpose "참봉 임무 부여" .
+hist:Institution_창릉참봉 hist:hasFunction "지방 관리" .
+hist:Institution_상의원주부 rdf:type hist:Institution .
+hist:Institution_상의원주부 rdfs:label "상의원주부" .
+hist:Institution_상의원주부 hist:hasFunction "주무 행정" .
+hist:Institution_통진현감 rdf:type hist:Institution .
+hist:Institution_통진현감 rdfs:label "통진현감" .
+hist:Institution_통진현감 hist:hasFunction "현감 직무" .
+hist:Institution_회덕현감 rdf:type hist:Institution .
+hist:Institution_회덕현감 rdfs:label "회덕현감" .
+hist:Institution_회덕현감 hist:hasFunction "현감 직무" .
+hist:Person_유지화 hist:affiliatedWith hist:Institution_창릉참봉 .
+hist:Person_유지화 hist:affiliatedWith hist:Institution_상의원주부 .
+hist:Person_유지화 hist:affiliatedWith hist:Institution_통진현감 .
+hist:Person_유지화 hist:affiliatedWith hist:Institution_회덕현감 .
+hist:Person_유지화 hist:participatesIn "병자호란" .
+
+
+# 유직 (인물)
+hist:Person_유직 rdf:type hist:Person .
+hist:Person_유직 rdfs:label "유직" .
+hist:Person_유직 hist:hasField "도학" .
+hist:Person_유직 hist:hasAchievement "진사 합격(1630), 상소(1650)" .
+hist:Person_유직 hist:hasMotive "학문추구" .
+hist:Event_진사시합격 rdf:type hist:Event .
+hist:Event_진사시합격 rdfs:label "진사시 합격" .
+hist:Event_진사시합격 hist:hasYear 1630 .
+hist:Event_1650년상소 rdf:type hist:Event .
+hist:Event_1650년상소 rdfs:label "1650년 상소" .
+hist:Event_1650년상소 hist:hasYear 1650 .
+hist:Document_유직의저서 rdf:type hist:Document .
+hist:Document_유직의저서 rdfs:label "유직의 저서" .
+hist:Person_유직 hist:participatesIn hist:Event_진사시합격 .
+hist:Person_유직 hist:participatesIn hist:Event_1650년상소 .
+hist:Person_유직 hist:authored hist:Document_유직의저서 .
+
+
+# 유진 (인물)
+hist:Person_유진 rdf:type hist:Person .
+hist:Person_유진 rdfs:label "유진" .
+hist:Person_유진 hist:hasRank "장령, 사성, 부제학" .
+hist:Person_유진 hist:hasAchievement "식년문과 정과 급제(1462년)" .
+hist:Person_유진 hist:hasField "경학" .
+hist:Institution_성균관 rdf:type hist:Institution .
+hist:Institution_성균관 rdfs:label "성균관" .
+hist:Institution_성균관 hist:hasFunction "교훈 담당 및 경학 교육" .
+hist:Event_식년문과급제 rdf:type hist:Event .
+hist:Event_식년문과급제 rdfs:label "식년문과 급제" .
+hist:Event_식년문과급제 hist:hasYear 1462 .
+hist:Person_유진 hist:affiliatedWith hist:Institution_성균관 .
+hist:Person_유진 hist:participatesIn hist:Event_식년문과급제 .
+
+
+# 유진 (인물)
+hist:Person_유진 rdf:type hist:Person .
+hist:Person_유진 rdfs:label "유진" .
+hist:Person_유진 hist:hasAchievement "승문원정자, 형조좌랑, 형조정랑, 성균관직강; 태천·단천·평창 수령 경력" .
+hist:Person_유진 hist:hasMotive "학문추구" .
+hist:Institution_승문원정자 rdf:type hist:Institution .
+hist:Institution_승문원정자 rdfs:label "승문원정자" .
+hist:Institution_승문원정자 hist:hasFunction "관직" .
+hist:Institution_형조좌랑 rdf:type hist:Institution .
+hist:Institution_형조좌랑 rdfs:label "형조좌랑" .
+hist:Institution_형조좌랑 hist:hasFunction "관직" .
+hist:Institution_형조정랑 rdf:type hist:Institution .
+hist:Institution_형조정랑 rdfs:label "형조정랑" .
+hist:Institution_형조정랑 hist:hasFunction "관직" .
+hist:Person_이중호 rdf:type hist:Person .
+hist:Person_이중호 rdfs:label "이중호" .
+hist:Person_유진 hist:affiliatedWith hist:Institution_승문원정자 .
+hist:Person_유진 hist:affiliatedWith hist:Institution_형조좌랑 .
+hist:Person_유진 hist:affiliatedWith hist:Institution_형조정랑 .
+hist:Person_유진 hist:studentOf hist:Person_이중호 .
+hist:Person_유진 hist:participatesIn "식년 문과 급제" .
+
+
+# 유진 (인물)
+hist:Person_유진 rdf:type hist:Person .
+hist:Person_유진 rdfs:label "유진" .
+hist:Person_유진 hist:hasRank "세자익위사세마 제수(1616); 봉화현감(1623); 형조정랑(1624); 청도군수(1627)" .
+hist:Person_유진 hist:hasAchievement "수령으로 전묘와 부세를 바로잡았다; 이조참판에 추증되었다" .
+hist:Person_유성룡 rdf:type hist:Person .
+hist:Person_유성룡 rdfs:label "유성룡" .
+hist:Institution_세자익위사세마 rdf:type hist:Institution .
+hist:Institution_세자익위사세마 rdfs:label "세자익위사세마" .
+hist:Institution_세자익위사세마 hist:hasYear 1616 .
+hist:Institution_세자익위사세마 hist:hasFunction "제수" .
+hist:Institution_봉화현감 rdf:type hist:Institution .
+hist:Institution_봉화현감 rdfs:label "봉화현감" .
+hist:Institution_봉화현감 hist:hasYear 1623 .
+hist:Institution_봉화현감 hist:hasFunction "현감" .
+hist:Institution_청도군수 rdf:type hist:Institution .
+hist:Institution_청도군수 rdfs:label "청도군수" .
+hist:Institution_청도군수 hist:hasYear 1627 .
+hist:Institution_청도군수 hist:hasFunction "군수" .
+hist:Person_유진 hist:studentOf hist:Person_유성룡 .
+hist:Person_유진 hist:affiliatedWith hist:Institution_세자익위사세마 .
+hist:Person_유진 hist:affiliatedWith hist:Institution_봉화현감 .
+hist:Person_유진 hist:affiliatedWith hist:Institution_청도군수 .
+hist:Person_유진 hist:participatesIn "사마시에 합격(1610)" .
+hist:Person_유진 hist:participatesIn "무고를 당해 옥고를 치름(1612)" .
+
+
+# 유진삼 (인물)
+hist:Person_유진삼 rdf:type hist:Person .
+hist:Person_유진삼 rdfs:label "유진삼" .
+hist:Person_유진삼 hist:hasRank "곡산군수, 사간원정언, 사헌부장령" .
+hist:Person_유진삼 hist:hasField "문신" .
+hist:Institution_사간원 rdf:type hist:Institution .
+hist:Institution_사간원 rdfs:label "사간원" .
+hist:Institution_사헌부 rdf:type hist:Institution .
+hist:Institution_사헌부 rdfs:label "사헌부" .
+hist:Event_진사1633 rdf:type hist:Event .
+hist:Event_진사1633 rdfs:label "진사 1633" .
+hist:Event_진사1633 hist:hasYear 1633 .
+hist:Event_급제1635 rdf:type hist:Event .
+hist:Event_급제1635 rdfs:label "급제 1635" .
+hist:Event_급제1635 hist:hasYear 1635 .
+hist:Person_유진삼 hist:affiliatedWith hist:Institution_사간원 .
+hist:Person_유진삼 hist:affiliatedWith hist:Institution_사헌부 .
+hist:Person_유진삼 hist:participatesIn hist:Event_진사1633 .
+hist:Person_유진삼 hist:participatesIn hist:Event_급제1635 .
+
+
+# 유진동 (인물)
+hist:Person_유진동 rdf:type hist:Person .
+hist:Person_유진동 rdfs:label "유진동" .
+hist:Person_유진동 hist:hasRank "다양한 관직(한성부좌윤, 함경도관찰사, 공조판서, 오위도총부도총관 등)" .
+hist:Person_유진동 hist:hasField "문학/예술" .
+hist:Person_유진동 hist:hasAchievement "다양한 관직 역임; 문사에 뛰어나고 죽화를 잘 그림; 글씨에 뛰어나며 시호 정민" .
+hist:Institution_한성부좌윤 rdf:type hist:Institution .
+hist:Institution_한성부좌윤 rdfs:label "한성부좌윤" .
+hist:Institution_한성부좌윤 hist:hasYear 1550 .
+hist:Institution_공조판서 rdf:type hist:Institution .
+hist:Institution_공조판서 rdfs:label "공조판서" .
+hist:Institution_공조판서 hist:hasYear 1554 .
+hist:Institution_오위도총부도총관 rdf:type hist:Institution .
+hist:Institution_오위도총부도총관 rdfs:label "오위도총부도총관" .
+hist:Institution_오위도총부도총관 hist:hasYear 1559 .
+hist:Event_식년문과급제 rdf:type hist:Event .
+hist:Event_식년문과급제 rdfs:label "식년문과급제" .
+hist:Event_식년문과급제 hist:hasYear 1531 .
+hist:Person_유진동 hist:affiliatedWith hist:Institution_한성부좌윤 .
+hist:Person_유진동 hist:affiliatedWith hist:Institution_공조판서 .
+hist:Person_유진동 hist:affiliatedWith hist:Institution_오위도총부도총관 .
+hist:Person_유진동 hist:participatesIn hist:Event_식년문과급제 .
+
+
+# 유진정 (인물)
+hist:Person_유진정 rdf:type hist:Person .
+hist:Person_유진정 rdfs:label "유진정" .
+hist:Person_유진정 hist:hasDeathYear 1628 .
+hist:Person_유진정 hist:hasField "문신" .
+hist:Person_유진정 hist:hasAchievement "예문관대교, 예문관검열, 세자시강원설서, 예문관봉교·응교 역임" .
+hist:Institution_예문관 rdf:type hist:Institution .
+hist:Institution_예문관 rdfs:label "예문관" .
+hist:Institution_예문관 hist:hasFunction "검열, 대교, 봉교, 응교" .
+hist:Institution_세자시강원 rdf:type hist:Institution .
+hist:Institution_세자시강원 rdfs:label "세자시강원" .
+hist:Institution_세자시강원 hist:hasFunction "설서" .
+hist:Event_사마시합격 rdf:type hist:Event .
+hist:Event_사마시합격 rdfs:label "사마시 합격" .
+hist:Event_사마시합격 hist:hasYear 1603 .
+hist:Event_인조반정 rdf:type hist:Event .
+hist:Event_인조반정 rdfs:label "인조반정" .
+hist:Event_인조반정 hist:hasYear 1623 .
+hist:Person_유진정 hist:affiliatedWith hist:Institution_예문관 .
+hist:Person_유진정 hist:affiliatedWith hist:Institution_세자시강원 .
+hist:Person_유진정 hist:participatesIn hist:Event_사마시합격 .
+hist:Person_유진정 hist:participatesIn hist:Event_인조반정 .
+
+
+# 유질 (인물)
+hist:Person_유질 rdf:type hist:Person .
+hist:Person_유질 rdfs:label "유질" .
+hist:Person_유질 hist:hasBirthYear 1606 .
+hist:Person_유질 hist:hasDeathYear 1636 .
+hist:Person_유질 hist:hasAchievement "병자호란에서 청군에 맞서 싸워 전사" .
+hist:Event_을과로급제 rdf:type hist:Event .
+hist:Event_을과로급제 rdfs:label "을과로 급제" .
+hist:Event_을과로급제 hist:hasYear 1623 .
+hist:Event_폐모론상소(1621년) rdf:type hist:Event .
+hist:Event_폐모론상소(1621년) rdfs:label "폐모론 상소(1621년)" .
+hist:Event_폐모론상소(1621년) hist:hasYear 1621 .
+hist:Event_원종추숭행사(1635년) rdf:type hist:Event .
+hist:Event_원종추숭행사(1635년) rdfs:label "원종 추숭 행사(1635년)" .
+hist:Event_원종추숭행사(1635년) hist:hasYear 1635 .
+hist:Event_병자호란(16361637) rdf:type hist:Event .
+hist:Event_병자호란(16361637) rdfs:label "병자호란(1636-1637)" .
+hist:Event_병자호란(16361637) hist:hasStartYear 1636 .
+hist:Event_병자호란(16361637) hist:hasEndYear 1637 .
+hist:Person_유질 hist:participatesIn hist:Event_을과로급제 .
+hist:Person_유질 hist:participatesIn hist:Event_폐모론상소(1621년) .
+hist:Person_유질 hist:participatesIn hist:Event_원종추숭행사(1635년) .
+hist:Person_유질 hist:participatesIn hist:Event_병자호란(16361637) .
+
+
+# 유진증 (인물)
+hist:Person_유진증 rdf:type hist:Person .
+hist:Person_유진증 rdfs:label "유진증" .
+hist:Person_유진증 hist:hasRank "좌승지" .
+hist:Person_유진증 hist:hasAchievement "승지 도달; 좌승지 직함" .
+hist:Person_유진증 hist:hasField "정치/행정" .
+hist:Event_1605년증광문과병과급제 rdf:type hist:Event .
+hist:Event_1605년증광문과병과급제 rdfs:label "1605년 증광문과 병과 급제" .
+hist:Event_1605년증광문과병과급제 hist:hasYear 1605 .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Institution_홍문관 hist:hasFunction "정사 및 학문 논의 기관" .
+hist:Person_유진증 hist:participatesIn hist:Event_1605년증광문과병과급제 .
+hist:Person_유진증 hist:affiliatedWith hist:Institution_홍문관 .
+
+
+# 유진항 (인물)
+hist:Person_유진항 rdf:type hist:Person .
+hist:Person_유진항 rdfs:label "유진항" .
+hist:Person_유진항 hist:hasAchievement "오위도총부 부총관, 삼도수군통제사, 우포도대장, 선전관, 금군별장, 훈련원도정, 경상좌수사, 경상좌병사, 회령부사" .
+hist:Event_무과급제 rdf:type hist:Event .
+hist:Event_무과급제 rdfs:label "무과 급제" .
+hist:Event_무과급제 hist:hasYear 1753 .
+hist:Institution_오위도총부 rdf:type hist:Institution .
+hist:Institution_오위도총부 rdfs:label "오위도총부" .
+hist:Institution_삼도수군통제사 rdf:type hist:Institution .
+hist:Institution_삼도수군통제사 rdfs:label "삼도수군통제사" .
+hist:Institution_우포도대장 rdf:type hist:Institution .
+hist:Institution_우포도대장 rdfs:label "우포도대장" .
+hist:Person_유진항 hist:participatesIn hist:Event_무과급제 .
+hist:Person_유진항 hist:affiliatedWith hist:Institution_오위도총부 .
+hist:Person_유진항 hist:affiliatedWith hist:Institution_삼도수군통제사 .
+hist:Person_유진항 hist:affiliatedWith hist:Institution_우포도대장 .
+
+
+# 유집일 (인물)
+hist:Person_유집일 rdf:type hist:Person .
+hist:Person_유집일 rdfs:label "유집일" .
+hist:Person_유집일 hist:hasAchievement "대사간, 예조참판, 형조판서 역임" .
+hist:Person_유집일 hist:hasField "문신" .
+hist:Institution_양사 rdf:type hist:Institution .
+hist:Institution_양사 rdfs:label "양사" .
+hist:Institution_양사 hist:hasYear 1694 .
+hist:Institution_양사 hist:hasFunction "제수" .
+hist:Institution_승지 rdf:type hist:Institution .
+hist:Institution_승지 rdfs:label "승지" .
+hist:Institution_승지 hist:hasYear 1696 .
+hist:Institution_승지 hist:hasFunction "승지 임명" .
+hist:Institution_예조참판 rdf:type hist:Institution .
+hist:Institution_예조참판 rdfs:label "예조참판" .
+hist:Institution_예조참판 hist:hasYear 1705 .
+hist:Institution_예조참판 hist:hasFunction "예조참판 취임" .
+hist:Institution_형조판서 rdf:type hist:Institution .
+hist:Institution_형조판서 rdfs:label "형조판서" .
+hist:Institution_형조판서 hist:hasYear 1718 .
+hist:Institution_형조판서 hist:hasFunction "형조판서 취임" .
+hist:Person_유집일 hist:affiliatedWith hist:Institution_양사 .
+hist:Person_유집일 hist:affiliatedWith hist:Institution_승지 .
+hist:Person_유집일 hist:affiliatedWith hist:Institution_예조참판 .
+hist:Person_유집일 hist:affiliatedWith hist:Institution_형조판서 .
+
+
+# 유찬 (인물)
+hist:Person_유찬 rdf:type hist:Person .
+hist:Person_유찬 rdfs:label "유찬" .
+hist:Person_유찬 hist:hasField "역사학" .
+hist:Person_유찬 hist:hasDeathYear 1616 .
+hist:Event_해주옥사 rdf:type hist:Event .
+hist:Event_해주옥사 rdfs:label "해주옥사" .
+hist:Event_해주옥사 hist:hasYear 1616 .
+hist:Event_옥사 rdf:type hist:Event .
+hist:Event_옥사 rdfs:label "옥사" .
+hist:Event_옥사 hist:hasYear 1616 .
+hist:Institution_사헌부 rdf:type hist:Institution .
+hist:Institution_사헌부 rdfs:label "사헌부" .
+hist:Institution_사헌부 hist:hasFunction "감찰 및 형정" .
+hist:Institution_이조참판 rdf:type hist:Institution .
+hist:Institution_이조참판 rdfs:label "이조참판" .
+hist:Institution_이조참판 hist:hasYear 1623 .
+hist:Person_유찬 hist:participatesIn hist:Event_해주옥사 .
+hist:Event_해주옥사 hist:leadsTo hist:Event_옥사 .
+hist:Person_유찬 hist:affiliatedWith hist:Institution_사헌부 .
+hist:Person_유찬 hist:affiliatedWith hist:Institution_이조참판 .
+
+
+# 유창 (인물)
+hist:Person_유창 rdf:type hist:Person .
+hist:Person_유창 rdfs:label "유창" .
+hist:Person_유창 hist:hasRank "수묘관주2" .
+hist:Person_유창 hist:hasAchievement "개국공신 2등 책록(1392)" .
+hist:Institution_성균관 rdf:type hist:Institution .
+hist:Institution_성균관 rdfs:label "성균관" .
+hist:Event_문과급제 rdf:type hist:Event .
+hist:Event_문과급제 rdfs:label "문과 급제" .
+hist:Event_문과급제 hist:hasYear 1371 .
+hist:Event_개국공신2등책록 rdf:type hist:Event .
+hist:Event_개국공신2등책록 rdfs:label "개국공신 2등 책록" .
+hist:Event_개국공신2등책록 hist:hasYear 1392 .
+hist:Person_이성계 rdf:type hist:Person .
+hist:Person_이성계 rdfs:label "이성계" .
+hist:Person_유창 hist:participatesIn hist:Event_문과급제 .
+hist:Person_유창 hist:participatesIn hist:Event_개국공신2등책록 .
+hist:Person_유창 hist:affiliatedWith hist:Institution_성균관 .
+hist:Person_유창 hist:teacherOf hist:Person_이성계 .
+
+
+# 유창 (인물)
+hist:Person_유창 rdf:type hist:Person .
+hist:Person_유창 rdfs:label "유창" .
+hist:Person_유창 hist:hasBirthYear 1635 .
+hist:Person_유창 hist:hasAchievement "예조참의, 개성부유수 등 다수 관직 역임" .
+hist:Event_을과로급제 rdf:type hist:Event .
+hist:Event_을과로급제 rdfs:label "을과로 급제" .
+hist:Event_을과로급제 hist:hasYear 1650 .
+hist:Event_통신부사로일본에다녀옴 rdf:type hist:Event .
+hist:Event_통신부사로일본에다녀옴 rdfs:label "통신부사로 일본에 다녀옴" .
+hist:Event_통신부사로일본에다녀옴 hist:hasYear 1655 .
+hist:Institution_우부승지 rdf:type hist:Institution .
+hist:Institution_우부승지 rdfs:label "우부승지" .
+hist:Institution_우부승지 hist:hasYear 1662 .
+hist:Institution_우부승지 hist:hasFunction "관직 임명" .
+hist:Event_진상물임의제공 rdf:type hist:Event .
+hist:Event_진상물임의제공 rdfs:label "진상물 임의 제공" .
+hist:Event_진상물임의제공 hist:hasYear 1666 .
+hist:Person_유창 hist:participatesIn hist:Event_을과로급제 .
+hist:Person_유창 hist:participatesIn hist:Event_통신부사로일본에다녀옴 .
+hist:Person_유창 hist:affiliatedWith hist:Institution_우부승지 .
+hist:Person_유창 hist:participatesIn hist:Event_진상물임의제공 .
+
+
+# 유척기 (인물)
+hist:Person_유척기 rdf:type hist:Person .
+hist:Person_유척기 rdfs:label "유척기" .
+hist:Person_유척기 hist:hasRank "이조참의, 호조판서, 우의정, 정언, 수찬, 이조정랑, 사간, 대사간, 승지, 경상도관찰사, 양주목사, 함경도관찰사, 도승지, 원자보양관, 세자시강원빈객, 평안도관찰사, 영의정" .
+hist:Person_유척기 hist:hasField "문신" .
+hist:Person_유척기 hist:hasAchievement "김창집의 문인; 신원시킨 복관 관련 활동" .
+hist:Person_김창집 rdf:type hist:Person .
+hist:Person_김창집 rdfs:label "김창집" .
+hist:Event_세제책립 rdf:type hist:Event .
+hist:Event_세제책립 rdfs:label "세제책립" .
+hist:Event_세제책립 hist:hasYear 1721 .
+hist:Event_신임사화 rdf:type hist:Event .
+hist:Event_신임사화 rdfs:label "신임사화" .
+hist:Event_신임사화 hist:hasYear 1722 .
+hist:Nation_조선 rdf:type hist:Nation .
+hist:Nation_조선 rdfs:label "조선" .
+hist:Person_유척기 hist:studentOf hist:Person_김창집 .
+hist:Person_유척기 hist:participatesIn hist:Event_세제책립 .
+hist:Person_유척기 hist:participatesIn hist:Event_신임사화 .
+hist:Person_유척기 hist:affiliatedWith hist:Nation_조선 .
+
+
+# 유철 (인물)
+hist:Person_유철 rdf:type hist:Person .
+hist:Person_유철 rdfs:label "유철" .
+hist:Person_유철 hist:hasBirthYear 1627 .
+hist:Person_유철 hist:hasField "정치/행정" .
+hist:Person_유철 hist:hasRank "경기도관찰사" .
+hist:Person_유철 hist:hasRank "대사간" .
+hist:Person_유철 hist:hasRank "대사헌" .
+hist:Person_유철 hist:hasRank "예조참판" .
+hist:Event_1633년식년문과병과급제 rdf:type hist:Event .
+hist:Event_1633년식년문과병과급제 rdfs:label "1633년 식년문과 병과 급제" .
+hist:Event_1633년식년문과병과급제 hist:hasYear 1633 .
+hist:Event_1636년삼학사가족은혜청원및북방7개조항채택 rdf:type hist:Event .
+hist:Event_1636년삼학사가족은혜청원및북방7개조항채택 rdfs:label "1636년 삼학사 가족 은혜 청원 및 북방 7개 조항 채택" .
+hist:Event_1636년삼학사가족은혜청원및북방7개조항채택 hist:hasYear 1636 .
+hist:Event_1652년사은부사로청나라방문 rdf:type hist:Event .
+hist:Event_1652년사은부사로청나라방문 rdfs:label "1652년 사은부사로 청나라 방문" .
+hist:Event_1652년사은부사로청나라방문 hist:hasYear 1652 .
+hist:Event_1653년경기도관찰사취임 rdf:type hist:Event .
+hist:Event_1653년경기도관찰사취임 rdfs:label "1653년 경기도관찰사 취임" .
+hist:Event_1653년경기도관찰사취임 hist:hasYear 1653 .
+hist:Person_유철 hist:participatesIn hist:Event_1633년식년문과병과급제 .
+hist:Person_유철 hist:participatesIn hist:Event_1636년삼학사가족은혜청원및북방7개조항채택 .
+hist:Person_유철 hist:participatesIn hist:Event_1652년사은부사로청나라방문 .
+hist:Person_유철 hist:participatesIn hist:Event_1653년경기도관찰사취임 .
+
+
+# 유최기 (인물)
+hist:Person_유최기 rdf:type hist:Person .
+hist:Person_유최기 rdfs:label "유최기" .
+hist:Person_유최기 hist:hasField "시문" .
+hist:Person_유최기 hist:hasRank "대사헌, 판의금부사, 우참찬" .
+hist:Person_유최기 hist:hasAchievement "시문에 능하였다; 시호 정간" .
+hist:Event_사마시합격 rdf:type hist:Event .
+hist:Event_사마시합격 rdfs:label "사마시 합격" .
+hist:Event_사마시합격 hist:hasYear 1715 .
+hist:Event_급제(증광문과,병과) rdf:type hist:Event .
+hist:Event_급제(증광문과,병과) rdfs:label "급제(증광문과, 병과)" .
+hist:Event_급제(증광문과,병과) hist:hasYear 1723 .
+hist:Event_설서임명 rdf:type hist:Event .
+hist:Event_설서임명 rdfs:label "설서 임명" .
+hist:Event_설서임명 hist:hasYear 1726 .
+hist:Event_탄핵및삭출당 rdf:type hist:Event .
+hist:Event_탄핵및삭출당 rdfs:label "탄핵 및 삭출당" .
+hist:Event_탄핵및삭출당 hist:hasYear 1727 .
+hist:Person_유최기 hist:participatesIn hist:Event_사마시합격 .
+hist:Person_유최기 hist:participatesIn hist:Event_급제(증광문과,병과) .
+hist:Person_유최기 hist:participatesIn hist:Event_설서임명 .
+hist:Person_유최기 hist:participatesIn hist:Event_탄핵및삭출당 .
+
+
+# 유청색 (제도)
+hist:Institution_유청색 rdf:type hist:Institution .
+hist:Institution_유청색 rdfs:label "유청색" .
+hist:Institution_유청색 hist:hasPurpose "조선 후기 병조에 속한 행정기관으로 포의 징수 및 재정 관리 업무를 수행" .
+hist:Institution_유청색 hist:hasFunction "포를 징수하여 관아 하인의 급료를 지급하고, 시상비 및 기타 경비(의정부·중추부의 통지비, 군복·식량·부식대 등) 지출을 관리하며, 1691년 영종진 방어영 설치 시 경비 지출 업무까지 관장" .
+hist:Institution_병조 rdf:type hist:Institution .
+hist:Institution_병조 rdfs:label "병조" .
+hist:Institution_유청색 hist:affiliatedWith hist:Institution_병조 .
+
+
+# 유충걸 (인물)
+hist:Person_유충걸 rdf:type hist:Person .
+hist:Person_유충걸 rdfs:label "유충걸" .
+hist:Event_상소제출(1613) rdf:type hist:Event .
+hist:Event_상소제출(1613) rdfs:label "상소 제출(1613)" .
+hist:Event_상소제출(1613) hist:hasYear 1613 .
+hist:Event_진사합격(1618) rdf:type hist:Event .
+hist:Event_진사합격(1618) rdfs:label "진사 합격(1618)" .
+hist:Event_진사합격(1618) hist:hasYear 1618 .
+hist:Event_의병모집및남한산성향함(1636) rdf:type hist:Event .
+hist:Event_의병모집및남한산성향함(1636) rdfs:label "의병 모집 및 남한산성 향함(1636)" .
+hist:Event_의병모집및남한산성향함(1636) hist:hasYear 1636 .
+hist:Event_설욕책상소 rdf:type hist:Event .
+hist:Event_설욕책상소 rdfs:label "설욕책 상소" .
+hist:Person_유충걸 hist:participatesIn hist:Event_상소제출(1613) .
+hist:Person_유충걸 hist:participatesIn hist:Event_진사합격(1618) .
+hist:Person_유충걸 hist:participatesIn hist:Event_의병모집및남한산성향함(1636) .
+hist:Person_유충걸 hist:participatesIn hist:Event_설욕책상소 .
+
+
+# 유취장 (인물)
+hist:Person_유취장 rdf:type hist:Person .
+hist:Person_유취장 rdfs:label "유취장" .
+hist:Person_유취장 hist:hasField "무과" .
+hist:Person_유취장 hist:hasAchievement "무과 급제; 봉산군수; 숙천부사; 삭주부사; 전라도수군절도사; 경상도병마절도사; 분부총관; 훈련중군; 시호 무민; 처형" .
+hist:Institution_숙천부사 rdf:type hist:Institution .
+hist:Institution_숙천부사 rdfs:label "숙천부사" .
+hist:Institution_숙천부사 hist:hasYear 1718 .
+hist:Institution_숙천부사 hist:hasFunction "부사" .
+hist:Institution_숙천부사 hist:hasPurpose "정치 행정" .
+hist:Institution_전라도수군절도사 rdf:type hist:Institution .
+hist:Institution_전라도수군절도사 rdfs:label "전라도수군절도사" .
+hist:Institution_전라도수군절도사 hist:hasYear 1718 .
+hist:Institution_전라도수군절도사 hist:hasFunction "수군절도사" .
+hist:Institution_전라도수군절도사 hist:hasPurpose "영해 방위" .
+hist:Institution_경상도병마절도사 rdf:type hist:Institution .
+hist:Institution_경상도병마절도사 rdfs:label "경상도병마절도사" .
+hist:Institution_경상도병마절도사 hist:hasYear 1718 .
+hist:Institution_경상도병마절도사 hist:hasFunction "병마절도사" .
+hist:Institution_경상도병마절도사 hist:hasPurpose "영토 방위" .
+hist:Person_김창집 rdf:type hist:Person .
+hist:Person_김창집 rdfs:label "김창집" .
+hist:Person_유취장 hist:affiliatedWith hist:Institution_숙천부사 .
+hist:Person_유취장 hist:affiliatedWith hist:Institution_전라도수군절도사 .
+hist:Person_유취장 hist:affiliatedWith hist:Institution_경상도병마절도사 .
+hist:Person_유취장 hist:participatesIn "처형(신임옥사)" .
+hist:Person_김창집 hist:participatesIn "처형(신임옥사)" .
+
+
+# 유충립 (인물)
+hist:Person_유충립 rdf:type hist:Person .
+hist:Person_유충립 rdfs:label "유충립" .
+hist:Institution_동부승지 rdf:type hist:Institution .
+hist:Institution_동부승지 rdfs:label "동부승지" .
+hist:Institution_공조참의 rdf:type hist:Institution .
+hist:Institution_공조참의 rdfs:label "공조참의" .
+hist:Institution_대사성 rdf:type hist:Institution .
+hist:Institution_대사성 rdfs:label "대사성" .
+hist:Event_박재를탄핵한사건 rdf:type hist:Event .
+hist:Event_박재를탄핵한사건 rdfs:label "박재를 탄핵한 사건" .
+hist:Person_유충립 hist:affiliatedWith hist:Institution_동부승지 .
+hist:Person_유충립 hist:affiliatedWith hist:Institution_공조참의 .
+hist:Person_유충립 hist:affiliatedWith hist:Institution_대사성 .
+hist:Person_유충립 hist:participatesIn hist:Event_박재를탄핵한사건 .
+
+
+# 유치선 (인물)
+hist:Person_유치선 rdf:type hist:Person .
+hist:Person_유치선 rdfs:label "유치선" .
+hist:Person_유치선 hist:hasRank "대사성, 부총관, 경기도관찰사, 참의, 판서" .
+hist:Person_유치선 hist:hasField "문신" .
+hist:Person_유치선 hist:hasAchievement "1831년 사마시에 합격" .
+hist:Person_유치선 hist:hasAchievement "1844년 증광문과 을과 급제" .
+hist:Person_유치선 hist:hasAchievement "1867년 경기도관찰사 재임" .
+hist:Person_유치선 hist:hasAchievement "1874년 경상도관찰사 재임" .
+hist:Event_사마시에합격 rdf:type hist:Event .
+hist:Event_사마시에합격 rdfs:label "사마시에 합격" .
+hist:Event_사마시에합격 hist:hasYear 1831 .
+hist:Event_1844년증광문과을과급제 rdf:type hist:Event .
+hist:Event_1844년증광문과을과급제 rdfs:label "1844년 증광문과 을과 급제" .
+hist:Event_1844년증광문과을과급제 hist:hasYear 1844 .
+hist:Institution_경기도관찰사 rdf:type hist:Institution .
+hist:Institution_경기도관찰사 rdfs:label "경기도관찰사" .
+hist:Institution_경기도관찰사 hist:hasYear 1867 .
+hist:Institution_경기도관찰사 hist:hasFunction "관찰사 재임" .
+hist:Institution_경상도관찰사 rdf:type hist:Institution .
+hist:Institution_경상도관찰사 rdfs:label "경상도관찰사" .
+hist:Institution_경상도관찰사 hist:hasYear 1874 .
+hist:Institution_경상도관찰사 hist:hasFunction "관찰사 재임" .
+hist:Person_유치선 hist:participatesIn hist:Event_사마시에합격 .
+hist:Person_유치선 hist:participatesIn hist:Event_1844년증광문과을과급제 .
+hist:Person_유치선 hist:affiliatedWith hist:Institution_경기도관찰사 .
+hist:Person_유치선 hist:affiliatedWith hist:Institution_경상도관찰사 .
+
+
+# 유토궁방전 (제도)
+hist:Institution_유토궁방전 rdf:type hist:Institution .
+hist:Institution_유토궁방전 rdfs:label "유토궁방전" .
+hist:Institution_유토궁방전 hist:hasPurpose "궁방이 보유한 전답의 면세결 여부를 기준으로 출세결과를 구분하는 제도" .
+hist:Institution_유토궁방전 hist:hasFunction "면세결과 출세결을 구분하고, 호조에 대한 납세 여부를 관리하는 제도" .
+
+
+# 유토면세전 (제도)
+hist:Institution_유토면세전 rdf:type hist:Institution .
+hist:Institution_유토면세전 rdfs:label "유토면세전" .
+hist:Institution_유토면세전 hist:hasPurpose "조선 시대 궁방의 면세 토지 제도" .
+hist:Institution_유토면세전 hist:hasFunction "국가로부터 면세 특권을 누리는 토지" .
+
+
+# 유팽로 (인물)
+hist:Person_유팽로 rdf:type hist:Person .
+hist:Person_유팽로 rdfs:label "유팽로" .
+hist:Person_유팽로 hist:hasAchievement "의병장으로 활동" .
+hist:Person_유팽로 hist:hasField "의병/병법" .
+hist:Person_유팽로 hist:hasMotive "충절" .
+hist:Person_고경명 rdf:type hist:Person .
+hist:Person_고경명 rdfs:label "고경명" .
+hist:Battle_금산전투 rdf:type hist:Battle .
+hist:Battle_금산전투 rdfs:label "금산전투" .
+hist:Battle_금산전투 hist:hasYear 1592 .
+hist:Document_격문 rdf:type hist:Document .
+hist:Document_격문 rdfs:label "격문" .
+hist:Person_유팽로 hist:servedUnder hist:Person_고경명 .
+hist:Person_유팽로 hist:participatesIn hist:Battle_금산전투 .
+hist:Person_유팽로 hist:authored hist:Document_격문 .
+
+
+# 유하 (인물)
+hist:Person_유하 rdf:type hist:Person .
+hist:Person_유하 rdfs:label "유하" .
+hist:Person_유하 hist:hasField "무신" .
+hist:Person_유하 hist:hasRank "첨지중추원사; 평안도도절제사; 인순부윤" .
+hist:Person_유하 hist:hasAchievement "무과 급제(1453); 정난공신 2등 책록(1453년)" .
+hist:Place_문화 rdf:type hist:Place .
+hist:Place_문화 rdfs:label "문화" .
+hist:Place_문화 hist:hasLocation "조선시대" .
+hist:Institution_내금위 rdf:type hist:Institution .
+hist:Institution_내금위 rdfs:label "내금위" .
+hist:Institution_내금위 hist:hasYear 1439 .
+hist:Institution_내금위 hist:hasFunction "군무 담당 기관으로 제수됨" .
+hist:Event_무과급제 rdf:type hist:Event .
+hist:Event_무과급제 rdfs:label "무과 급제" .
+hist:Event_무과급제 hist:hasYear 1453 .
+hist:Event_계유정난가담 rdf:type hist:Event .
+hist:Event_계유정난가담 rdfs:label "계유정난 가담" .
+hist:Event_계유정난가담 hist:hasYear 1453 .
+hist:Person_유하 hist:participatesIn hist:Event_무과급제 .
+hist:Person_유하 hist:participatesIn hist:Event_계유정난가담 .
+hist:Person_유하 hist:affiliatedWith hist:Institution_내금위 .
+
+
+# 유하원 (인물)
+hist:Person_유하원 rdf:type hist:Person .
+hist:Person_유하원 rdfs:label "유하원" .
+hist:Person_유하원 hist:hasRank "통정대부" .
+hist:Person_유하원 hist:hasAchievement "급제(증광문과, 병과)" .
+hist:Person_유하원 hist:hasField "문신" .
+hist:Institution_형조 rdf:type hist:Institution .
+hist:Institution_형조 rdfs:label "형조" .
+hist:Institution_형조 hist:hasFunction "정부 행정 기관" .
+hist:Institution_한성부 rdf:type hist:Institution .
+hist:Institution_한성부 rdfs:label "한성부" .
+hist:Institution_한성부 hist:hasFunction "판윤 지위" .
+hist:Event_1785년지평이청의상소에의한복직 rdf:type hist:Event .
+hist:Event_1785년지평이청의상소에의한복직 rdfs:label "1785년 지평 이청의 상소에 의한 복직" .
+hist:Event_1785년지평이청의상소에의한복직 hist:hasYear 1785 .
+hist:Event_1812년통정대부취임및이후역임 rdf:type hist:Event .
+hist:Event_1812년통정대부취임및이후역임 rdfs:label "1812년 통정대부 취임 및 이후 역임" .
+hist:Event_1812년통정대부취임및이후역임 hist:hasYear 1812 .
+hist:Person_유하원 hist:affiliatedWith hist:Institution_형조 .
+hist:Person_유하원 hist:affiliatedWith hist:Institution_한성부 .
+hist:Person_유하원 hist:participatesIn hist:Event_1785년지평이청의상소에의한복직 .
+hist:Person_유하원 hist:participatesIn hist:Event_1812년통정대부취임및이후역임 .
+
+
+# 유한소 (인물)
+hist:Person_유한소 rdf:type hist:Person .
+hist:Person_유한소 rdfs:label "유한소" .
+hist:Person_유한소 hist:hasRank "홍문관부수찬" .
+hist:Person_유한소 hist:hasRank "대사간" .
+hist:Person_유한소 hist:hasRank "장례원판결사" .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Institution_사헌부 rdf:type hist:Institution .
+hist:Institution_사헌부 rdfs:label "사헌부" .
+hist:Institution_장례원 rdf:type hist:Institution .
+hist:Institution_장례원 rdfs:label "장례원" .
+hist:Event_1740년증광문과병과급제 rdf:type hist:Event .
+hist:Event_1740년증광문과병과급제 rdfs:label "1740년 증광 문과 병과 급제" .
+hist:Event_1740년증광문과병과급제 hist:hasYear 1740 .
+hist:Person_유한소 hist:affiliatedWith hist:Institution_홍문관 .
+hist:Person_유한소 hist:affiliatedWith hist:Institution_사헌부 .
+hist:Person_유한소 hist:affiliatedWith hist:Institution_장례원 .
+hist:Person_유한소 hist:participatesIn hist:Event_1740년증광문과병과급제 .
+
+
+# 유하익 (인물)
+hist:Person_유하익 rdf:type hist:Person .
+hist:Person_유하익 rdfs:label "유하익" .
+hist:Person_유하익 hist:hasRank "대사헌, 좌참찬, 형조판서, 도승지, 이조참판, 공조판서, 한성부판윤, 예조판서" .
+hist:Person_유하익 hist:hasField "문신" .
+hist:Person_유하익 hist:hasAchievement "글씨를 잘 썼다" .
+hist:Event_진사시합격 rdf:type hist:Event .
+hist:Event_진사시합격 rdfs:label "진사시 합격" .
+hist:Event_진사시합격 hist:hasYear 1651 .
+hist:Event_증광문과병과급제 rdf:type hist:Event .
+hist:Event_증광문과병과급제 rdfs:label "증광문과 병과 급제" .
+hist:Event_증광문과병과급제 hist:hasYear 1660 .
+hist:Event_황해도암행어사파견 rdf:type hist:Event .
+hist:Event_황해도암행어사파견 rdfs:label "황해도암행어사 파견" .
+hist:Event_황해도암행어사파견 hist:hasYear 1667 .
+hist:Nation_조선 rdf:type hist:Nation .
+hist:Nation_조선 rdfs:label "조선" .
+hist:Person_유하익 hist:affiliatedWith hist:Nation_조선 .
+hist:Person_유하익 hist:participatesIn hist:Event_진사시합격 .
+hist:Person_유하익 hist:participatesIn hist:Event_증광문과병과급제 .
+hist:Person_유하익 hist:participatesIn hist:Event_황해도암행어사파견 .
+hist:Event_진사시합격 hist:leadsTo hist:Event_증광문과병과급제 .
+hist:Event_증광문과병과급제 hist:leadsTo hist:Event_황해도암행어사파견 .
+
+
+# 유학 (제도)
+hist:Institution_성균관 rdf:type hist:Institution .
+hist:Institution_성균관 rdfs:label "성균관" .
+hist:Person_유생 rdf:type hist:Person .
+hist:Person_유생 rdfs:label "유생" .
+hist:Institution_사학 rdf:type hist:Institution .
+hist:Institution_사학 rdfs:label "사학" .
+hist:Institution_향교 rdf:type hist:Institution .
+hist:Institution_향교 rdfs:label "향교" .
+hist:Institution_성균관 hist:affiliatedWith hist:Person_유생 .
+hist:Institution_사학 hist:affiliatedWith hist:Person_유생 .
+hist:Institution_향교 hist:affiliatedWith hist:Person_유생 .
+
+
+# 유한순 (인물)
+hist:Person_유한순 rdf:type hist:Person .
+hist:Person_유한순 rdfs:label "유한순" .
+hist:Person_유한순 hist:hasDeathYear 1812 .
+hist:Person_유한순 hist:hasAchievement "홍경래의 난 가담자" .
+hist:Event_홍경래의난 rdf:type hist:Event .
+hist:Event_홍경래의난 rdfs:label "홍경래의 난" .
+hist:Event_홍경래의난 hist:hasStartYear 1811 .
+hist:Event_홍경래의난 hist:hasEndYear 1812 .
+hist:Person_유한순 hist:participatesIn hist:Event_홍경래의난 .
+
+
+# 유항 (인물)
+hist:Person_유항 rdf:type hist:Person .
+hist:Person_유항 rdfs:label "유항" .
+hist:Person_유항 hist:hasField "문신" .
+hist:Event_진사시합격 rdf:type hist:Event .
+hist:Event_진사시합격 rdfs:label "진사시 합격" .
+hist:Event_진사시합격 hist:hasYear 1601 .
+hist:Event_증광문과을과급제 rdf:type hist:Event .
+hist:Event_증광문과을과급제 rdfs:label "증광문과 을과 급제" .
+hist:Event_증광문과을과급제 hist:hasYear 1606 .
+hist:Event_삼수에안치되었다 rdf:type hist:Event .
+hist:Event_삼수에안치되었다 rdfs:label "삼수에 안치되었다" .
+hist:Event_삼수에안치되었다 hist:hasYear 1612 .
+hist:Event_장령등용 rdf:type hist:Event .
+hist:Event_장령등용 rdfs:label "장령 등용" .
+hist:Event_장령등용 hist:hasYear 1623 .
+hist:Person_유항 hist:participatesIn hist:Event_진사시합격 .
+hist:Person_유항 hist:participatesIn hist:Event_증광문과을과급제 .
+hist:Person_유항 hist:participatesIn hist:Event_삼수에안치되었다 .
+hist:Person_유항 hist:participatesIn hist:Event_장령등용 .
+
+
+# 유향소 (제도)
+hist:Institution_유향소 rdf:type hist:Institution .
+hist:Institution_유향소 rdfs:label "유향소" .
+hist:Institution_유향소 hist:hasYear 1406 .
+hist:Institution_유향소 hist:hasPurpose "지방의 품관들이 조직한 자치기구로 향리 규찰 및 향풍 바로잡기를 목표" .
+hist:Institution_유향소 hist:hasFunction "수령의 비행을 직언할 수 있는 권한 부여 및 향리 규찰 지원" .
+
+
+# 유향품관 (제도)
+hist:Institution_유향품관 rdf:type hist:Institution .
+hist:Institution_유향품관 rdfs:label "유향품관" .
+hist:Institution_유향품관 hist:hasFunction "향촌 지배질서 확립" .
+hist:Institution_유향품관 hist:hasPurpose "향촌에 거주하는 품관의 역할 및 향임층 형성" .
+hist:Institution_경재소 rdf:type hist:Institution .
+hist:Institution_경재소 rdfs:label "경재소" .
+hist:Institution_경재소 hist:hasFunction "재경관의 조직 및 관리" .
+hist:Institution_경재소 hist:hasPurpose "향촌 지역의 재경관 조직" .
+hist:Institution_향소 rdf:type hist:Institution .
+hist:Institution_향소 rdfs:label "향소" .
+hist:Institution_향소 hist:hasFunction "향임층의 조직" .
+hist:Institution_향소 hist:hasPurpose "향촌 자치 지배질서의 실행 기구" .
+hist:Institution_유향품관 hist:affiliatedWith hist:Institution_경재소 .
+hist:Institution_유향품관 hist:affiliatedWith hist:Institution_향소 .
+
+
+# 유헌 (인물)
+hist:Person_유헌 rdf:type hist:Person .
+hist:Person_유헌 rdfs:label "유헌" .
+hist:Person_유헌 hist:hasRank "대사간" .
+hist:Person_유헌 hist:hasDeathYear 1506 .
+hist:Person_유헌 hist:hasField "문신/정치행정" .
+hist:Person_유헌 hist:hasAchievement "청백리에 녹선" .
+hist:Institution_충청수사 rdf:type hist:Institution .
+hist:Institution_충청수사 rdfs:label "충청수사" .
+hist:Institution_대사간 rdf:type hist:Institution .
+hist:Institution_대사간 rdfs:label "대사간" .
+hist:Institution_대사간 hist:hasYear 1504 .
+hist:Event_사마양시에합격 rdf:type hist:Event .
+hist:Event_사마양시에합격 rdfs:label "사마양시에 합격" .
+hist:Event_사마양시에합격 hist:hasYear 1486 .
+hist:Person_연산군 rdf:type hist:Person .
+hist:Person_연산군 rdfs:label "연산군" .
+hist:Person_유헌 hist:affiliatedWith hist:Institution_충청수사 .
+hist:Person_유헌 hist:affiliatedWith hist:Institution_대사간 .
+hist:Person_유헌 hist:participatesIn hist:Event_사마양시에합격 .
+hist:Person_유헌 hist:servedUnder hist:Person_연산군 .
+hist:Person_유헌 hist:hasMotive "충절" .
+
+
+# 유헌 (인물)
+hist:Person_유헌 rdf:type hist:Person .
+hist:Person_유헌 rdfs:label "유헌" .
+hist:Person_유헌 hist:hasBirthYear 1651 .
+hist:Person_유헌 hist:hasRank "호조좌랑, 예조참판" .
+hist:Person_유헌 hist:hasAchievement "정시문과 을과 급제(1665); 예조참판까지 역임" .
+hist:Institution_사간원 rdf:type hist:Institution .
+hist:Institution_사간원 rdfs:label "사간원" .
+hist:Institution_사헌부 rdf:type hist:Institution .
+hist:Institution_사헌부 rdfs:label "사헌부" .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Event_인현왕후폐위반대상소참여 rdf:type hist:Event .
+hist:Event_인현왕후폐위반대상소참여 rdfs:label "인현왕후 폐위 반대 상소 참여" .
+hist:Event_인현왕후폐위반대상소참여 hist:hasYear 1689 .
+hist:Person_유헌 hist:affiliatedWith hist:Institution_사간원 .
+hist:Person_유헌 hist:affiliatedWith hist:Institution_사헌부 .
+hist:Person_유헌 hist:affiliatedWith hist:Institution_홍문관 .
+hist:Person_유헌 hist:participatesIn hist:Event_인현왕후폐위반대상소참여 .
+
+
+# 유혁연 (인물)
+hist:Person_유혁연 rdf:type hist:Person .
+hist:Person_유혁연 rdfs:label "유혁연" .
+hist:Person_유혁연 hist:hasRank "무신; 형조참판, 우포도대장, 공조판서, 어영대장, 삼도수군통제사, 수원부사, 황해도병마절도사, 현감, 부사, 승지" .
+hist:Person_유혁연 hist:hasField "무신" .
+hist:Person_유혁연 hist:hasAchievement "무과 급제(1644); 북벌 참여 및 군비 확충 기여" .
+hist:Person_유혁연 hist:hasMotive "국방 강화 및 북벌 추진" .
+hist:Event_1644년무과급제 rdf:type hist:Event .
+hist:Event_1644년무과급제 rdfs:label "1644년 무과 급제" .
+hist:Event_1644년무과급제 hist:hasYear 1644 .
+hist:Event_1653년황해도병마절도사승진 rdf:type hist:Event .
+hist:Event_1653년황해도병마절도사승진 rdfs:label "1653년 황해도병마절도사 승진" .
+hist:Event_1653년황해도병마절도사승진 hist:hasYear 1653 .
+hist:Event_1654년삼도수군통제사로승서 rdf:type hist:Event .
+hist:Event_1654년삼도수군통제사로승서 rdfs:label "1654년 삼도수군통제사로 승서" .
+hist:Event_1654년삼도수군통제사로승서 hist:hasYear 1654 .
+hist:Person_효종 rdf:type hist:Person .
+hist:Person_효종 rdfs:label "효종" .
+hist:Person_유혁연 hist:participatesIn hist:Event_1644년무과급제 .
+hist:Person_유혁연 hist:participatesIn hist:Event_1653년황해도병마절도사승진 .
+hist:Person_유혁연 hist:participatesIn hist:Event_1654년삼도수군통제사로승서 .
+hist:Person_유혁연 hist:servedUnder hist:Person_효종 .
+
+
+# 유헌장 (인물)
+hist:Person_유헌장 rdf:type hist:Person .
+hist:Person_유헌장 rdfs:label "유헌장" .
+hist:Person_유헌장 hist:hasRank "통덕랑; 예조좌랑; 경기도사; 사헌부지평; 홍문관교리; 수찬; 교리; 장령; 부교리; 형조참의" .
+hist:Person_유헌장 hist:hasField "문신" .
+hist:Person_유헌장 hist:hasAchievement "다양한 중앙 관직 역임" .
+hist:Institution_사헌부 rdf:type hist:Institution .
+hist:Institution_사헌부 rdfs:label "사헌부" .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Event_1681년급제 rdf:type hist:Event .
+hist:Event_1681년급제 rdfs:label "1681년 급제" .
+hist:Event_1690년사헌부지평취임 rdf:type hist:Event .
+hist:Event_1690년사헌부지평취임 rdfs:label "1690년 사헌부지평 취임" .
+hist:Person_유헌장 hist:affiliatedWith hist:Institution_사헌부 .
+hist:Person_유헌장 hist:affiliatedWith hist:Institution_홍문관 .
+hist:Person_유헌장 hist:participatesIn hist:Event_1681년급제 .
+hist:Person_유헌장 hist:participatesIn hist:Event_1690년사헌부지평취임 .
+
+
+# 유혁연 옥사 (사건)
+hist:Person_유혁연 rdf:type hist:Person .
+hist:Person_유혁연 rdfs:label "유혁연" .
+hist:Person_유혁연 hist:hasRank "훈련대장" .
+hist:Person_유혁연 hist:hasDeathYear 1680 .
+hist:Event_경신환국 rdf:type hist:Event .
+hist:Event_경신환국 rdfs:label "경신환국" .
+hist:Event_경신환국 hist:hasYear 1680 .
+hist:Event_옥사 rdf:type hist:Event .
+hist:Event_옥사 rdfs:label "옥사" .
+hist:Event_옥사 hist:hasYear 1680 .
+hist:Person_허견 rdf:type hist:Person .
+hist:Person_허견 rdfs:label "허견" .
+hist:Institution_둔전 rdf:type hist:Institution .
+hist:Institution_둔전 rdfs:label "둔전" .
+hist:Institution_둔전 hist:hasFunction "둔전 경영" .
+hist:Person_유혁연 hist:participatesIn hist:Event_경신환국 .
+hist:Event_옥사 hist:partOf hist:Event_경신환국 .
+hist:Person_허견 hist:participatesIn hist:Event_경신환국 .
+hist:Institution_둔전 hist:establishedBy hist:Person_유혁연 .
+
+
+# 유형 (인물)
+hist:Person_유상지의증손 rdf:type hist:Person .
+hist:Person_유상지의증손 rdfs:label "유상지의 증손" .
+hist:Person_유상지의증손 hist:hasRank "이조정랑" .
+hist:Person_유상지의증손 hist:hasRank "충청도도사" .
+hist:Person_유상지의증손 hist:hasRank "회양부사" .
+hist:Person_유상지의증손 hist:hasAchievement "1514년 별시 문과 급제, 예문관검열 경유, 1519년 상소 참여(조광조 구하는 상소)" .
+hist:Institution_이조정랑 rdf:type hist:Institution .
+hist:Institution_이조정랑 rdfs:label "이조정랑" .
+hist:Institution_충청도도사 rdf:type hist:Institution .
+hist:Institution_충청도도사 rdfs:label "충청도도사" .
+hist:Institution_회양부사 rdf:type hist:Institution .
+hist:Institution_회양부사 rdfs:label "회양부사" .
+hist:Event_상소(조광조구하는상소) rdf:type hist:Event .
+hist:Event_상소(조광조구하는상소) rdfs:label "상소(조광조 구하는 상소)" .
+hist:Event_상소(조광조구하는상소) hist:hasYear 1519 .
+hist:Person_유상지의증손 hist:affiliatedWith hist:Institution_이조정랑 .
+hist:Person_유상지의증손 hist:affiliatedWith hist:Institution_충청도도사 .
+hist:Person_유상지의증손 hist:affiliatedWith hist:Institution_회양부사 .
+hist:Person_유상지의증손 hist:participatesIn hist:Event_상소(조광조구하는상소) .
+
+
+# 유형 (인물)
+hist:Person_유형 rdf:type hist:Person .
+hist:Person_유형 rdfs:label "유형" .
+hist:Person_유형 hist:hasField "무신" .
+hist:Person_유형 hist:hasAchievement "경상우도수군절도사 임명(1600); 삼도수군통제사 임명(1602)" .
+hist:Institution_경상우도수군절도사 rdf:type hist:Institution .
+hist:Institution_경상우도수군절도사 rdfs:label "경상우도수군절도사" .
+hist:Institution_경상우도수군절도사 hist:hasYear 1600 .
+hist:Institution_경상우도수군절도사 hist:hasFunction "수군절도사" .
+hist:Institution_삼도수군통제사 rdf:type hist:Institution .
+hist:Institution_삼도수군통제사 rdfs:label "삼도수군통제사" .
+hist:Institution_삼도수군통제사 hist:hasYear 1602 .
+hist:Institution_삼도수군통제사 hist:hasFunction "수군통제사" .
+hist:Institution_해남현감 rdf:type hist:Institution .
+hist:Institution_해남현감 rdfs:label "해남현감" .
+hist:Institution_해남현감 hist:hasFunction "현감" .
+hist:Event_노량해전 rdf:type hist:Event .
+hist:Event_노량해전 rdfs:label "노량해전" .
+hist:Person_유형 hist:affiliatedWith hist:Institution_경상우도수군절도사 .
+hist:Person_유형 hist:affiliatedWith hist:Institution_삼도수군통제사 .
+hist:Person_유형 hist:affiliatedWith hist:Institution_해남현감 .
+hist:Person_유형 hist:commands hist:Event_노량해전 .
+
+
+# 유형 (제도)
+hist:Policy_유죄수속법 rdf:type hist:Policy .
+hist:Policy_유죄수속법 rdfs:label "유죄수속법" .
+hist:Policy_유죄수속법 hist:hasYear 1402 .
+hist:Person_태종 rdf:type hist:Person .
+hist:Person_태종 rdfs:label "태종" .
+hist:Policy_유죄수속법 hist:initiatedBy hist:Person_태종 .
+
+# 유형원 (인물)
+hist:Person_유형원 rdf:type hist:Person .
+hist:Person_유형원 rdfs:label "유형원" .
+hist:Person_유형원 hist:hasField "농촌경제" .
+hist:Person_유형원 hist:hasMotive "학문추구" .
+hist:Person_유형원 hist:hasAchievement "저술: 반계수신" .
+hist:Event_병자호란 rdf:type hist:Event .
+hist:Event_병자호란 rdfs:label "병자호란" .
+hist:Event_병자호란 hist:hasYear 1636 .
+hist:Event_1644년과거시험응시 rdf:type hist:Event .
+hist:Event_1644년과거시험응시 rdfs:label "1644년 과거시험응시" .
+hist:Event_1644년과거시험응시 hist:hasYear 1644 .
+hist:Event_1648년과거시험응시 rdf:type hist:Event .
+hist:Event_1648년과거시험응시 rdfs:label "1648년 과거시험응시" .
+hist:Event_1648년과거시험응시 hist:hasYear 1648 .
+hist:Event_1644년할머니상 rdf:type hist:Event .
+hist:Event_1644년할머니상 rdfs:label "1644년 할머니상" .
+hist:Event_1644년할머니상 hist:hasYear 1644 .
+hist:Person_유형원 hist:participatesIn hist:Event_병자호란 .
+hist:Person_유형원 hist:participatesIn hist:Event_1644년과거시험응시 .
+hist:Person_유형원 hist:participatesIn hist:Event_1648년과거시험응시 .
+hist:Person_유형원 hist:participatesIn hist:Event_1644년할머니상 .
+
+
+# 유형 장군 묘 (유적)
+hist:Person_유진동의손자 rdf:type hist:Person .
+hist:Person_유진동의손자 rdfs:label "유진동의손자" .
+hist:Event_임진왜란 rdf:type hist:Event .
+hist:Event_임진왜란 rdfs:label "임진왜란" .
+hist:Event_임진왜란 hist:hasStartYear 1592 .
+hist:Event_임진왜란 hist:hasEndYear 1598 .
+hist:Event_정유재란 rdf:type hist:Event .
+hist:Event_정유재란 rdfs:label "정유재란" .
+hist:Event_정유재란 hist:hasStartYear 1597 .
+hist:Event_정유재란 hist:hasEndYear 1598 .
+hist:Person_김천일 rdf:type hist:Person .
+hist:Person_김천일 rdfs:label "김천일" .
+hist:Person_이순신 rdf:type hist:Person .
+hist:Person_이순신 rdfs:label "이순신" .
+hist:Person_유진동의손자 hist:participatesIn hist:Event_임진왜란 .
+hist:Person_유진동의손자 hist:participatesIn hist:Event_정유재란 .
+hist:Person_유진동의손자 hist:contemporaryWith hist:Person_김천일 .
+hist:Person_유진동의손자 hist:servedUnder hist:Person_이순신 .
+
+
+# 유형원 선생 묘 (유적)
+hist:Person_유형원 rdf:type hist:Person .
+hist:Person_유형원 rdfs:label "유형원" .
+hist:Person_유형원 hist:hasField "실학" .
+hist:Person_유형원 hist:hasAchievement "실학자로서 많은 업적" .
+hist:Document_묘비비문 rdf:type hist:Document .
+hist:Document_묘비비문 rdfs:label "묘비 비문" .
+hist:Document_묘비비문 hist:hasYear 1768 .
+hist:Person_홍계희 rdf:type hist:Person .
+hist:Person_홍계희 rdfs:label "홍계희" .
+hist:Person_홍계희 hist:hasRank "판중추부사" .
+hist:Person_홍계희 hist:authored hist:Document_묘비비문 .
+
+
+# 유홍 (인물)
+hist:Person_유홍 rdf:type hist:Person .
+hist:Person_유홍 rdfs:label "유홍" .
+hist:Person_유홍 hist:hasRank "형조정랑, 공조정랑, 훈련원도정, 동지중추부사, 병마사, 수군절도사, 경상우도병마사, 전라도수군절도사, 회령부사, 북병사" .
+hist:Person_유홍 hist:hasField "무신" .
+hist:Person_유홍 hist:hasAchievement "다수의 관직 역임(사복시부정, 제포첨사, 훈련원부정, 동지중추부사 등); 무과 급제(1511); 문인·유사 교유; 청렴과 폐습근절" .
+hist:Person_유홍 hist:hasMotive "개혁/청렴" .
+hist:Event_중종반정 rdf:type hist:Event .
+hist:Event_중종반정 rdfs:label "중종반정" .
+hist:Event_중종반정 hist:hasYear 1506 .
+hist:Event_삼포왜란 rdf:type hist:Event .
+hist:Event_삼포왜란 rdfs:label "삼포왜란" .
+hist:Event_삼포왜란 hist:hasYear 1510 .
+hist:Event_을사사화 rdf:type hist:Event .
+hist:Event_을사사화 rdfs:label "을사사화" .
+hist:Event_을사사화 hist:hasYear 1545 .
+hist:Institution_사복시 rdf:type hist:Institution .
+hist:Institution_사복시 rdfs:label "사복시" .
+hist:Institution_사복시 hist:hasFunction "사복시부정(임명)" .
+hist:Person_유홍 hist:participatesIn hist:Event_중종반정 .
+hist:Person_유홍 hist:participatesIn hist:Event_삼포왜란 .
+hist:Person_유홍 hist:participatesIn hist:Event_을사사화 .
+hist:Person_유홍 hist:affiliatedWith hist:Institution_사복시 .
+
+
+# 유홍 (인물)
+hist:Person_유홍 rdf:type hist:Person .
+hist:Person_유홍 rdfs:label "유홍" .
+hist:Person_유홍 hist:hasRank "한성판윤, 이조판서, 우의정" .
+hist:Person_유홍 hist:hasField "문신" .
+hist:Person_유홍 hist:hasMotive "민생안정" .
+hist:Person_유홍 hist:hasMotive "개혁" .
+hist:Institution_승문원 rdf:type hist:Institution .
+hist:Institution_승문원 rdfs:label "승문원" .
+hist:Institution_승문원 hist:hasFunction "문관 요직" .
+hist:Institution_개성부유수 rdf:type hist:Institution .
+hist:Institution_개성부유수 rdfs:label "개성부유수" .
+hist:Institution_개성부유수 hist:hasFunction "관찰사 계열" .
+hist:Nation_조선 rdf:type hist:Nation .
+hist:Nation_조선 rdfs:label "조선" .
+hist:Person_유홍 hist:participatesIn "사마시에 합격" .
+hist:Person_유홍 hist:participatesIn "별시 문과 급제" .
+hist:Person_유홍 hist:participatesIn "강원도 암행어사 파견" .
+hist:Person_유홍 hist:affiliatedWith hist:Institution_승문원 .
+hist:Person_유홍 hist:affiliatedWith hist:Institution_개성부유수 .
+hist:Person_유홍 hist:affiliatedWith hist:Nation_조선 .
+
+
+# 유황 (인물)
+hist:Person_유황 rdf:type hist:Person .
+hist:Person_유황 rdfs:label "유황" .
+hist:Person_유황 hist:hasRank "병조참의" .
+hist:Person_유황 hist:hasRank "부승지" .
+hist:Person_유황 hist:hasRank "공조참의" .
+hist:Person_유황 hist:hasRank "병조좌랑" .
+hist:Person_유황 hist:hasRank "지평" .
+hist:Person_유황 hist:hasMotive "방어" .
+hist:Person_이정구 rdf:type hist:Person .
+hist:Person_이정구 rdfs:label "이정구" .
+hist:Institution_금오랑 rdf:type hist:Institution .
+hist:Institution_금오랑 rdfs:label "금오랑" .
+hist:Institution_금오랑 hist:hasYear 1633 .
+hist:Policy_반청주전론 rdf:type hist:Policy .
+hist:Policy_반청주전론 rdfs:label "반청주전론" .
+hist:Event_사마시에합격 rdf:type hist:Event .
+hist:Event_사마시에합격 rdfs:label "사마시에합격" .
+hist:Event_사마시에합격 hist:hasYear 1624 .
+hist:Person_유황 hist:studentOf hist:Person_이정구 .
+hist:Person_유황 hist:affiliatedWith hist:Institution_금오랑 .
+hist:Policy_반청주전론 hist:initiatedBy hist:Person_유황 .
+hist:Person_유황 hist:participatesIn hist:Event_사마시에합격 .
+
+
+# 유활 (인물)
+hist:Person_유활 rdf:type hist:Person .
+hist:Person_유활 rdfs:label "유활" .
+hist:Person_유활 hist:hasField "문신" .
+hist:Person_유활 hist:hasAchievement "성균관직강, 홍문관교리, 이조정랑 역임; 편찬 참여" .
+hist:Institution_성균관 rdf:type hist:Institution .
+hist:Institution_성균관 rdfs:label "성균관" .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Event_탄핵(1621) rdf:type hist:Event .
+hist:Event_탄핵(1621) rdfs:label "탄핵(1621)" .
+hist:Event_탄핵(1621) hist:hasYear 1621 .
+hist:Event_위리안치(1623) rdf:type hist:Event .
+hist:Event_위리안치(1623) rdfs:label "위리안치(1623)" .
+hist:Event_위리안치(1623) hist:hasYear 1623 .
+hist:Person_유활 hist:affiliatedWith hist:Institution_성균관 .
+hist:Person_유활 hist:affiliatedWith hist:Institution_홍문관 .
+hist:Person_유활 hist:participatesIn hist:Event_탄핵(1621) .
+hist:Person_유활 hist:participatesIn hist:Event_위리안치(1623) .
+
+
+# 유황 (인물)
+hist:Person_유황 rdf:type hist:Person .
+hist:Person_유황 rdfs:label "유황" .
+hist:Person_유황 hist:hasRank "의금부도사, 교리" .
+hist:Person_유황 hist:hasAchievement "효성이 돈독하고, 실천궁행에 힘써 향인들과 더불어 여씨향약을 행함" .
+hist:Institution_의금부 rdf:type hist:Institution .
+hist:Institution_의금부 rdfs:label "의금부" .
+hist:Event_임진왜란 rdf:type hist:Event .
+hist:Event_임진왜란 rdfs:label "임진왜란" .
+hist:Event_임진왜란 hist:hasStartYear 1592 .
+hist:Event_임진왜란 hist:hasEndYear 1598 .
+hist:Event_증광문과합격 rdf:type hist:Event .
+hist:Event_증광문과합격 rdfs:label "증광문과 합격" .
+hist:Event_증광문과합격 hist:hasYear 1616 .
+hist:Person_유황 hist:affiliatedWith hist:Institution_의금부 .
+hist:Person_유황 hist:participatesIn hist:Event_임진왜란 .
+hist:Person_유황 hist:participatesIn hist:Event_증광문과합격 .
+
+
+# 유황점 (개념)
+hist:Institution_유황점 rdf:type hist:Institution .
+hist:Institution_유황점 rdfs:label "유황점" .
+hist:Institution_유황점 hist:hasYear 1593 .
+hist:Institution_유황점 hist:hasPurpose "유황의 채굴 및 조달" .
+hist:Institution_유황점 hist:hasFunction "국방 무기와 관련되어 각 군문이 설치하고 감관을 파견해 경영하는 관영 형태의 광업소" .
+
+
+# 유효걸 (인물)
+hist:Person_유효걸 rdf:type hist:Person .
+hist:Person_유효걸 rdfs:label "유효걸" .
+hist:Person_유효걸 hist:hasRank "무신" .
+hist:Person_유효걸 hist:hasAchievement "진무공신 2등 책록; 진양군 봉해짐; 평안도병사절도사를 역임" .
+hist:Person_장만 rdf:type hist:Person .
+hist:Person_장만 rdfs:label "장만" .
+hist:Battle_황주전투 rdf:type hist:Battle .
+hist:Battle_황주전투 rdfs:label "황주전투" .
+hist:Battle_황주전투 hist:hasYear 1624 .
+hist:Institution_황주목사 rdf:type hist:Institution .
+hist:Institution_황주목사 rdfs:label "황주목사" .
+hist:Institution_평안도병사절도사 rdf:type hist:Institution .
+hist:Institution_평안도병사절도사 rdfs:label "평안도병사절도사" .
+hist:Person_유효걸 hist:servedUnder hist:Person_장만 .
+hist:Person_유효걸 hist:participatesIn hist:Battle_황주전투 .
+hist:Person_유효걸 hist:affiliatedWith hist:Institution_황주목사 .
+hist:Person_유효걸 hist:affiliatedWith hist:Institution_평안도병사절도사 .
+
+
+# 유효립 (인물)
+hist:Person_유효립 rdf:type hist:Person .
+hist:Person_유효립 rdfs:label "유효립" .
+hist:Person_유효립 hist:hasField "문신" .
+hist:Person_유효립 hist:hasAchievement "주모자, 반란 음모 주도" .
+hist:Event_유효립의반란음모 rdf:type hist:Event .
+hist:Event_유효립의반란음모 rdfs:label "유효립의 반란 음모" .
+hist:Event_유효립의반란음모 hist:hasYear 1628 .
+hist:Event_유효립의반란음모 hist:hasStartYear 1628 .
+hist:Event_유효립의반란음모 hist:hasEndYear 1628 .
+hist:Event_거사체포 rdf:type hist:Event .
+hist:Event_거사체포 rdfs:label "거사 체포" .
+hist:Event_거사체포 hist:hasYear 1628 .
+hist:Person_유효립 hist:participatesIn hist:Event_유효립의반란음모 .
+hist:Event_유효립의반란음모 hist:leadsTo hist:Event_거사체포 .
+
+
+# 유효원 (인물)
+hist:Person_유효원 rdf:type hist:Person .
+hist:Person_유효원 rdfs:label "유효원" .
+hist:Person_유효원 hist:hasField "군사" .
+hist:Person_유효원 hist:hasAchievement "무신; 금군별장, 좌포도대장, 삼도수군통제사 역임" .
+hist:Person_유효원 hist:hasDeathYear 1813 .
+hist:Institution_금군별장 rdf:type hist:Institution .
+hist:Institution_금군별장 rdfs:label "금군별장" .
+hist:Institution_금군별장 hist:hasFunction "금군의 병방 업무 주관" .
+hist:Institution_좌포도대장 rdf:type hist:Institution .
+hist:Institution_좌포도대장 rdfs:label "좌포도대장" .
+hist:Institution_좌포도대장 hist:hasFunction "좌포도대장 직무 수행" .
+hist:Institution_삼도수군통제사 rdf:type hist:Institution .
+hist:Institution_삼도수군통제사 rdfs:label "삼도수군통제사" .
+hist:Institution_삼도수군통제사 hist:hasYear 1804 .
+hist:Institution_삼도수군통제사 hist:hasFunction "삼도수군 지휘 및 통제" .
+hist:Person_유효원 hist:affiliatedWith hist:Institution_금군별장 .
+hist:Person_유효원 hist:affiliatedWith hist:Institution_좌포도대장 .
+hist:Person_유효원 hist:affiliatedWith hist:Institution_삼도수군통제사 .
+
+
+# 유희령 (인물)
+hist:Person_유희령 rdf:type hist:Person .
+hist:Person_유희령 rdfs:label "유희령" .
+hist:Person_유희령 hist:hasRank "병조좌랑, 영천군수, 호조참의" .
+hist:Person_유희령 hist:hasDeathYear 1545 .
+hist:Person_유희령 hist:hasAchievement "문집 편찬: 2권 2책" .
+hist:Person_유희령 hist:hasAchievement "시를 지어 성절사로 북경에 다녀감" .
+hist:Event_별시문과급제 rdf:type hist:Event .
+hist:Event_별시문과급제 rdfs:label "별시 문과 급제" .
+hist:Event_별시문과급제 hist:hasYear 1516 .
+hist:Event_영천군수재임 rdf:type hist:Event .
+hist:Event_영천군수재임 rdfs:label "영천군수 재임" .
+hist:Event_영천군수재임 hist:hasStartYear 1524 .
+hist:Event_영천군수재임 hist:hasEndYear 1529 .
+hist:Event_호조참의제수 rdf:type hist:Event .
+hist:Event_호조참의제수 rdfs:label "호조참의 제수" .
+hist:Event_호조참의제수 hist:hasYear 1543 .
+hist:Person_송인수 rdf:type hist:Person .
+hist:Person_송인수 rdfs:label "송인수" .
+hist:Person_유희령 hist:participatesIn hist:Event_별시문과급제 .
+hist:Person_유희령 hist:participatesIn hist:Event_영천군수재임 .
+hist:Person_유희령 hist:participatesIn hist:Event_호조참의제수 .
+hist:Person_유희령 hist:contemporaryWith hist:Person_송인수 .
+
+
+# 유희량 (인물)
+hist:Person_유희량 rdf:type hist:Person .
+hist:Person_유희량 rdfs:label "유희량" .
+hist:Person_유희량 hist:hasDeathYear 1628 .
+hist:Person_유희량 hist:hasRank "분승지; 사복시정; 예조참판; 이조정랑; 교리; 수찬; 지평; 사인; 직제학" .
+hist:Person_유희량 hist:hasField "정치/행정" .
+hist:Person_유희량 hist:hasAchievement "글씨를 잘 쓴 문신" .
+hist:Event_사마시에합격 rdf:type hist:Event .
+hist:Event_사마시에합격 rdfs:label "사마시에 합격" .
+hist:Event_사마시에합격 hist:hasYear 1603 .
+hist:Event_별시문과급제 rdf:type hist:Event .
+hist:Event_별시문과급제 rdfs:label "별시문과 급제" .
+hist:Event_별시문과급제 hist:hasYear 1608 .
+hist:Event_거제도유배 rdf:type hist:Event .
+hist:Event_거제도유배 rdfs:label "거제도 유배" .
+hist:Event_거제도유배 hist:hasYear 1623 .
+hist:Event_교살 rdf:type hist:Event .
+hist:Event_교살 rdfs:label "교살" .
+hist:Event_교살 hist:hasYear 1628 .
+hist:Person_유희량 hist:participatesIn hist:Event_사마시에합격 .
+hist:Person_유희량 hist:participatesIn hist:Event_별시문과급제 .
+hist:Person_유희량 hist:participatesIn hist:Event_거제도유배 .
+hist:Person_유희량 hist:participatesIn hist:Event_교살 .
+
+
+# 유희림 (인물)
+hist:Person_유희림 rdf:type hist:Person .
+hist:Person_유희림 rdfs:label "유희림" .
+hist:Person_유희림 hist:hasRank "사헌부장령, 좌승지, 예조참판, 형조참판, 첨지중추부사, 동지중추부사, 동지돈녕부사, 지평" .
+hist:Person_유희림 hist:hasDeathYear 1604 .
+hist:Person_유희림 hist:hasField "문신" .
+hist:Person_유희림 hist:hasAchievement "호성공신 3등에 책록, 문양군에 봉해짐" .
+hist:Person_유희림 hist:hasMotive "개혁" .
+hist:Event_상소제출:불교비판및선교양종폐지청원 rdf:type hist:Event .
+hist:Event_상소제출:불교비판및선교양종폐지청원 rdfs:label "상소 제출: 불교 비판 및 선교양종 폐지 청원" .
+hist:Event_상소제출:불교비판및선교양종폐지청원 hist:hasYear 1560 .
+hist:Event_식년문과급제 rdf:type hist:Event .
+hist:Event_식년문과급제 rdfs:label "식년문과 급제" .
+hist:Event_식년문과급제 hist:hasYear 1561 .
+hist:Event_임진왜란 rdf:type hist:Event .
+hist:Event_임진왜란 rdfs:label "임진왜란" .
+hist:Event_임진왜란 hist:hasYear 1592 .
+hist:Person_유성룡 rdf:type hist:Person .
+hist:Person_유성룡 rdfs:label "유성룡" .
+hist:Person_유희림 hist:participatesIn hist:Event_상소제출:불교비판및선교양종폐지청원 .
+hist:Person_유희림 hist:participatesIn hist:Event_식년문과급제 .
+hist:Person_유희림 hist:participatesIn hist:Event_임진왜란 .
+hist:Person_유희림 hist:contemporaryWith hist:Person_유성룡 .
+
+
+# 유희발 (인물)
+hist:Person_유희발 rdf:type hist:Person .
+hist:Person_유희발 rdfs:label "유희발" .
+hist:Person_유희발 hist:hasRank "이조정랑" .
+hist:Person_유희발 hist:hasField "문신" .
+hist:Event_세자익위사사어로세자를보필 rdf:type hist:Event .
+hist:Event_세자익위사사어로세자를보필 rdfs:label "세자익위사사어로 세자를 보필" .
+hist:Event_세자익위사사어로세자를보필 hist:hasYear 1605 .
+hist:Event_재령군수로부임 rdf:type hist:Event .
+hist:Event_재령군수로부임 rdfs:label "재령군수로 부임" .
+hist:Event_재령군수로부임 hist:hasYear 1606 .
+hist:Event_증광문과에병과로급제 rdf:type hist:Event .
+hist:Event_증광문과에병과로급제 rdfs:label "증광 문과에 병과로 급제" .
+hist:Event_증광문과에병과로급제 hist:hasYear 1609 .
+hist:Event_유배 rdf:type hist:Event .
+hist:Event_유배 rdfs:label "유배" .
+hist:Event_유배 hist:hasYear 1612 .
+hist:Person_유희발 hist:participatesIn hist:Event_세자익위사사어로세자를보필 .
+hist:Person_유희발 hist:participatesIn hist:Event_재령군수로부임 .
+hist:Person_유희발 hist:participatesIn hist:Event_증광문과에병과로급제 .
+hist:Person_유희발 hist:participatesIn hist:Event_유배 .
+
+
+# 유희분 (인물)
+hist:Person_유희분 rdf:type hist:Person .
+hist:Person_유희분 rdfs:label "유희분" .
+hist:Person_유희분 hist:hasAchievement "예조좌랑, 형조참판, 병조판서 등 요직 역임" .
+hist:Event_생원·진사합격 rdf:type hist:Event .
+hist:Event_생원·진사합격 rdfs:label "생원·진사 합격" .
+hist:Event_생원·진사합격 hist:hasYear 1590 .
+hist:Event_임진왜란발발 rdf:type hist:Event .
+hist:Event_임진왜란발발 rdfs:label "임진왜란 발발" .
+hist:Event_임진왜란발발 hist:hasYear 1592 .
+hist:Institution_예조 rdf:type hist:Institution .
+hist:Institution_예조 rdfs:label "예조" .
+hist:Institution_예조 hist:hasYear 1597 .
+hist:Institution_예조 hist:hasFunction "관청" .
+hist:Person_광해군 rdf:type hist:Person .
+hist:Person_광해군 rdfs:label "광해군" .
+hist:Person_유희분 hist:participatesIn hist:Event_생원·진사합격 .
+hist:Person_유희분 hist:participatesIn hist:Event_임진왜란발발 .
+hist:Person_유희분 hist:affiliatedWith hist:Institution_예조 .
+hist:Person_유희분 hist:servedUnder hist:Person_광해군 .
+
+
+# 유희서 (인물)
+hist:Person_유희서 rdf:type hist:Person .
+hist:Person_유희서 rdfs:label "유희서" .
+hist:Person_유희서 hist:hasDeathYear 1603 .
+hist:Person_유희서 hist:hasField "정치/행정" .
+hist:Person_유희서 hist:hasAchievement "임진왜란 때 유성룡의 종사관으로 명나라 군대와의 외교적 사무를 맡아 활약" .
+hist:Person_유성룡 rdf:type hist:Person .
+hist:Person_유성룡 rdfs:label "유성룡" .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Institution_홍문관 hist:hasFunction "홍문관정자" .
+hist:Event_임진왜란 rdf:type hist:Event .
+hist:Event_임진왜란 rdfs:label "임진왜란" .
+hist:Event_임진왜란 hist:hasYear 1592 .
+hist:Institution_사간원 rdf:type hist:Institution .
+hist:Institution_사간원 rdfs:label "사간원" .
+hist:Institution_사간원 hist:hasFunction "정언" .
+hist:Person_유희서 hist:servedUnder hist:Person_유성룡 .
+hist:Person_유희서 hist:participatesIn hist:Event_임진왜란 .
+hist:Person_유희서 hist:affiliatedWith hist:Institution_홍문관 .
+hist:Person_유희서 hist:affiliatedWith hist:Institution_사간원 .
+
+
+# 유희춘 (인물)
+hist:Person_유희춘 rdf:type hist:Person .
+hist:Person_유희춘 rdfs:label "유희춘" .
+hist:Person_유희춘 hist:hasRank "직강; 응교; 교리; 지제교; 장령; 집의; 사인; 전한; 대사성; 부제학; 전라도관찰사; 이조참판" .
+hist:Person_유희춘 hist:hasAchievement "경전에 널리 통했고 제자와 역사에도 능하였다" .
+hist:Person_김안국 rdf:type hist:Person .
+hist:Person_김안국 rdfs:label "김안국" .
+hist:Person_최산두 rdf:type hist:Person .
+hist:Person_최산두 rdfs:label "최산두" .
+hist:Institution_전라도관찰사 rdf:type hist:Institution .
+hist:Institution_전라도관찰사 rdfs:label "전라도관찰사" .
+hist:Event_급제(별시문과,병과로1538년) rdf:type hist:Event .
+hist:Event_급제(별시문과,병과로1538년) rdfs:label "급제(별시 문과, 병과로 1538년)" .
+hist:Person_유희춘 hist:studentOf hist:Person_김안국 .
+hist:Person_유희춘 hist:studentOf hist:Person_최산두 .
+hist:Person_유희춘 hist:affiliatedWith hist:Institution_전라도관찰사 .
+hist:Person_유희춘 hist:participatesIn hist:Event_급제(별시문과,병과로1538년) .
+
+
+# 육경 (제도)
+hist:Institution_육경 rdf:type hist:Institution .
+hist:Institution_육경 rdfs:label "육경" .
+hist:Institution_육경 hist:hasFunction "육조의 판서를 총칭하며 중앙정부의 육부로 구성되는 관제 체계" .
+
+
+# 유희춘 미암일기 및 미암집 목판 (문헌)
+hist:Document_유희춘미암일기및미암집목판 rdf:type hist:Document .
+hist:Document_유희춘미암일기및미암집목판 rdfs:label "유희춘 미암일기 및 미암집 목판" .
+hist:Person_유희춘 rdf:type hist:Person .
+hist:Person_유희춘 rdfs:label "유희춘" .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Institution_사헌부 rdf:type hist:Institution .
+hist:Institution_사헌부 rdfs:label "사헌부" .
+hist:Event_일기작성기간15671577 rdf:type hist:Event .
+hist:Event_일기작성기간15671577 rdfs:label "일기 작성 기간 1567-1577" .
+hist:Event_일기작성기간15671577 hist:hasStartYear 1567 .
+hist:Event_일기작성기간15671577 hist:hasEndYear 1577 .
+hist:Person_유희춘 hist:authored hist:Document_유희춘미암일기및미암집목판 .
+hist:Person_유희춘 hist:affiliatedWith hist:Institution_홍문관 .
+hist:Person_유희춘 hist:affiliatedWith hist:Institution_사헌부 .
+hist:Person_유희춘 hist:participatesIn hist:Event_일기작성기간15671577 .
+
+
+# 육방 (제도)
+hist:Institution_육방 rdf:type hist:Institution .
+hist:Institution_육방 rdfs:label "육방" .
+hist:Institution_육방 hist:hasYear 1400 .
+hist:Institution_육방 hist:hasPurpose "조선시대 6방 체제의 편제" .
+hist:Institution_육방 hist:hasFunction "이·호·예·병·형·공의 6방이 각기 사무를 분장하고 육조의 사무를 대응편제로 다루도록 구성" .
+hist:Event_1400년승정원분리 rdf:type hist:Event .
+hist:Event_1400년승정원분리 rdfs:label "1400년 승정원 분리" .
+hist:Event_1400년승정원분리 hist:hasYear 1400 .
+hist:Event_1405년동부대언직신설 rdf:type hist:Event .
+hist:Event_1405년동부대언직신설 rdfs:label "1405년 동부대언직 신설" .
+hist:Event_1405년동부대언직신설 hist:hasYear 1405 .
+hist:Event_1433년도승지·승지직명통일 rdf:type hist:Event .
+hist:Event_1433년도승지·승지직명통일 rdfs:label "1433년 도승지·승지 직명 통일" .
+hist:Event_1433년도승지·승지직명통일 hist:hasYear 1433 .
+hist:Event_1466년관제경정으로6방업무배정 rdf:type hist:Event .
+hist:Event_1466년관제경정으로6방업무배정 rdfs:label "1466년 관제경정으로 6방 업무 배정" .
+hist:Event_1466년관제경정으로6방업무배정 hist:hasYear 1466 .
+hist:Event_1400년승정원분리 hist:leadsTo hist:Event_1405년동부대언직신설 .
+hist:Event_1405년동부대언직신설 hist:leadsTo hist:Event_1433년도승지·승지직명통일 .
+hist:Event_1433년도승지·승지직명통일 hist:leadsTo hist:Event_1466년관제경정으로6방업무배정 .
+
+
+# 육방 (제도)
+hist:Institution_육방 rdf:type hist:Institution .
+hist:Institution_육방 rdfs:label "육방" .
+hist:Institution_육방 hist:hasFunction "군현의 행정부서" .
+hist:Institution_육방 hist:hasPurpose "지방 행정의 중심 기구" .
+
+
+# 육신사기첩 (문헌)
+hist:Document_육신사기첩 rdf:type hist:Document .
+hist:Document_육신사기첩 rdfs:label "육신사기첩" .
+hist:Person_송시열 rdf:type hist:Person .
+hist:Person_송시열 rdfs:label "송시열" .
+hist:Person_박기정 rdf:type hist:Person .
+hist:Person_박기정 rdfs:label "박기정" .
+hist:Person_박기정 hist:hasRank "영월부사" .
+hist:Person_권상하 rdf:type hist:Person .
+hist:Person_권상하 rdfs:label "권상하" .
+hist:Document_육신사기 rdf:type hist:Document .
+hist:Document_육신사기 rdfs:label "육신사기" .
+hist:Person_송시열 hist:authored hist:Document_육신사기 .
+hist:Person_박기정 hist:compiled hist:Document_육신사기 .
+hist:Person_권상하 hist:authored hist:Document_육신사기 .
+hist:Person_송시열 hist:teacherOf hist:Person_권상하 .
+
+
+# 육조 (제도)
+hist:Institution_육조 rdf:type hist:Institution .
+hist:Institution_육조 rdfs:label "육조" .
+hist:Institution_육조 hist:hasYear 982 .
+hist:Institution_육조 hist:hasFunction "국가의 정무를 나누어 맡아보던 여섯 조" .
+
+
+# 육진 (제도)
+hist:Institution_육진 rdf:type hist:Institution .
+hist:Institution_육진 rdfs:label "육진" .
+hist:Institution_육진 hist:hasFunction "군사 행정구역" .
+hist:Person_태조이성계 rdf:type hist:Person .
+hist:Person_태조이성계 rdfs:label "태조 이성계" .
+hist:Person_태조이성계 hist:hasRank "왕" .
+hist:Person_태조이성계 hist:hasAchievement "북진 정책 주도" .
+hist:Person_세종 rdf:type hist:Person .
+hist:Person_세종 rdfs:label "세종" .
+hist:Person_세종 hist:hasRank "왕" .
+hist:Person_세종 hist:hasAchievement "진취적 정책 추진" .
+hist:Policy_북진정책 rdf:type hist:Policy .
+hist:Policy_북진정책 rdfs:label "북진 정책" .
+hist:Event_쌍성총관부회복 rdf:type hist:Event .
+hist:Event_쌍성총관부회복 rdfs:label "쌍성총관부 회복" .
+hist:Event_쌍성총관부회복 hist:hasYear 1356 .
+hist:Person_태조이성계 hist:founded hist:Institution_육진 .
+hist:Person_세종 hist:affiliatedWith hist:Institution_육진 .
+hist:Policy_북진정책 hist:initiatedBy hist:Person_태조이성계 .
+hist:Policy_북진정책 hist:initiatedBy hist:Person_세종 .
+hist:Person_태조이성계 hist:participatesIn hist:Event_쌍성총관부회복 .
+
+
+# 육주비전 (제도)
+hist:Institution_육주비전 rdf:type hist:Institution .
+hist:Institution_육주비전 rdfs:label "육주비전" .
+hist:Institution_육주비전 hist:hasFunction "국역 부담의 의무를 지닌 시전 중 6개" .
+hist:Person_상인 rdf:type hist:Person .
+hist:Person_상인 rdfs:label "상인" .
+hist:Person_상인 hist:affiliatedWith hist:Institution_육주비전 .
+
+
+# 육주약선 (문헌)
+hist:Document_육주약선 rdf:type hist:Document .
+hist:Document_육주약선 rdfs:label "육주약선" .
+hist:Document_육주약선 hist:hasYear 1797 .
+hist:Person_정조 rdf:type hist:Person .
+hist:Person_정조 rdfs:label "정조" .
+hist:Person_정조 hist:hasRank "제22대 왕" .
+hist:Person_정조 hist:hasAchievement "육주약선 편찬" .
+hist:Person_육지 rdf:type hist:Person .
+hist:Person_육지 rdfs:label "육지" .
+hist:Person_육지 hist:hasField "정치" .
+hist:Institution_교서관 rdf:type hist:Institution .
+hist:Institution_교서관 rdfs:label "교서관" .
+hist:Institution_교서관 hist:hasFunction "간행·배포 지시 및 관리" .
+hist:Document_주의문 rdf:type hist:Document .
+hist:Document_주의문 rdfs:label "주의문" .
+hist:Person_정조 hist:compiled hist:Document_육주약선 .
+hist:Person_정조 hist:affiliatedWith hist:Institution_교서관 .
+hist:Person_육지 hist:authored hist:Document_주의문 .
+
+
+# 윤강원 (인물)
+hist:Person_윤강원 rdf:type hist:Person .
+hist:Person_윤강원 rdfs:label "윤강원" .
+hist:Person_윤강원 hist:hasRank "장령; 승문원판교; 예조정랑" .
+hist:Person_윤강원 hist:hasField "유학" .
+hist:Person_윤강원 hist:hasAchievement "직언으로 명성" .
+hist:Institution_승문원판교 rdf:type hist:Institution .
+hist:Institution_승문원판교 rdfs:label "승문원판교" .
+hist:Institution_승문원판교 hist:hasFunction "판교" .
+hist:Institution_장령 rdf:type hist:Institution .
+hist:Institution_장령 rdfs:label "장령" .
+hist:Institution_장령 hist:hasFunction "관직" .
+hist:Institution_예조정랑 rdf:type hist:Institution .
+hist:Institution_예조정랑 rdfs:label "예조정랑" .
+hist:Institution_예조정랑 hist:hasFunction "정랑" .
+hist:Event_양재역벽서사건 rdf:type hist:Event .
+hist:Event_양재역벽서사건 rdfs:label "양재역벽서사건" .
+hist:Event_양재역벽서사건 hist:hasYear 1547 .
+hist:Person_윤강원 hist:affiliatedWith hist:Institution_승문원판교 .
+hist:Person_윤강원 hist:affiliatedWith hist:Institution_장령 .
+hist:Person_윤강원 hist:affiliatedWith hist:Institution_예조정랑 .
+hist:Person_윤강원 hist:participatesIn hist:Event_양재역벽서사건 .
+
+
+# 윤각 (인물)
+hist:Person_윤각 rdf:type hist:Person .
+hist:Person_윤각 rdfs:label "윤각" .
+hist:Person_윤각 hist:hasDeathYear 1724 .
+hist:Person_윤각 hist:hasField "군사" .
+hist:Person_윤각 hist:hasRank "무신" .
+hist:Person_윤각 hist:hasAchievement "병조참판, 삼도수군통제사, 총융사 역임; 시호 충민" .
+hist:Event_신축옥사 rdf:type hist:Event .
+hist:Event_신축옥사 rdfs:label "신축옥사" .
+hist:Event_신축옥사 hist:hasYear 1721 .
+hist:Event_의금부투옥 rdf:type hist:Event .
+hist:Event_의금부투옥 rdfs:label "의금부 투옥" .
+hist:Event_의금부투옥 hist:hasYear 1724 .
+hist:Event_장살 rdf:type hist:Event .
+hist:Event_장살 rdfs:label "장살" .
+hist:Event_장살 hist:hasYear 1724 .
+hist:Nation_조선 rdf:type hist:Nation .
+hist:Nation_조선 rdfs:label "조선" .
+hist:Person_윤각 hist:participatesIn hist:Event_신축옥사 .
+hist:Person_윤각 hist:participatesIn hist:Event_의금부투옥 .
+hist:Person_윤각 hist:participatesIn hist:Event_장살 .
+hist:Person_윤각 hist:affiliatedWith hist:Nation_조선 .
+
+
+# 윤강 (인물)
+hist:Person_윤강 rdf:type hist:Person .
+hist:Person_윤강 rdfs:label "윤강" .
+hist:Person_윤강 hist:hasRank "승정원승지, 이조참의, 가선대부, 이조참판, 대사헌, 도승지, 형조판서, 판의금부사" .
+hist:Person_윤강 hist:hasAchievement "숭정대부에 승격, 판의금부사 취임, 이조판서 역임" .
+hist:Institution_승문원 rdf:type hist:Institution .
+hist:Institution_승문원 rdfs:label "승문원" .
+hist:Institution_예문관 rdf:type hist:Institution .
+hist:Institution_예문관 rdfs:label "예문관" .
+hist:Institution_승정원 rdf:type hist:Institution .
+hist:Institution_승정원 rdfs:label "승정원" .
+hist:Institution_이조 rdf:type hist:Institution .
+hist:Institution_이조 rdfs:label "이조" .
+hist:Person_윤강 hist:affiliatedWith hist:Institution_승문원 .
+hist:Person_윤강 hist:affiliatedWith hist:Institution_예문관 .
+hist:Person_윤강 hist:affiliatedWith hist:Institution_승정원 .
+hist:Person_윤강 hist:affiliatedWith hist:Institution_이조 .
+hist:Person_윤강 hist:participatesIn "1642년 청나라 방문" .
+hist:Person_윤강 hist:participatesIn "1657년 동지사 파견" .
+
+
+# 윤개 (인물)
+hist:Person_윤개 rdf:type hist:Person .
+hist:Person_윤개 rdfs:label "윤개" .
+hist:Person_윤개 hist:hasRank "한성부좌윤; 예조판서; 우의정" .
+hist:Person_윤개 hist:hasAchievement "명나라와의 외교 활동에 이바지 및 국위를 선양" .
+hist:Event_식년문과병과급제 rdf:type hist:Event .
+hist:Event_식년문과병과급제 rdfs:label "식년 문과 병과 급제" .
+hist:Event_식년문과병과급제 hist:hasYear 1516 .
+hist:Event_이조좌랑으로서인사에관여 rdf:type hist:Event .
+hist:Event_이조좌랑으로서인사에관여 rdfs:label "이조좌랑으로서 인사에 관여" .
+hist:Event_이조좌랑으로서인사에관여 hist:hasYear 1519 .
+hist:Event_명나라로부터제조법배움 rdf:type hist:Event .
+hist:Event_명나라로부터제조법배움 rdfs:label "명나라로부터 제조법 배움" .
+hist:Event_명나라로부터제조법배움 hist:hasYear 1534 .
+hist:Event_1543년형조참판이되어편찬에관여 rdf:type hist:Event .
+hist:Event_1543년형조참판이되어편찬에관여 rdfs:label "1543년 형조참판이 되어 편찬에 관여" .
+hist:Event_1543년형조참판이되어편찬에관여 hist:hasYear 1543 .
+hist:Person_윤개 hist:participatesIn hist:Event_식년문과병과급제 .
+hist:Person_윤개 hist:participatesIn hist:Event_이조좌랑으로서인사에관여 .
+hist:Person_윤개 hist:participatesIn hist:Event_명나라로부터제조법배움 .
+hist:Person_윤개 hist:participatesIn hist:Event_1543년형조참판이되어편찬에관여 .
+
+
+# 윤결 (인물)
+hist:Person_윤결 rdf:type hist:Person .
+hist:Person_윤결 rdfs:label "윤결" .
+hist:Person_윤결 hist:hasDeathYear 1548 .
+hist:Person_윤결 hist:hasRank "진사" .
+hist:Person_윤결 hist:hasField "시문/문학" .
+hist:Person_윤결 hist:hasAchievement "홍문관수찬(1548); 복관(1567); 저술(1546)" .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Institution_홍문관 hist:hasYear 1548 .
+hist:Institution_홍문관 hist:hasFunction "조선 시대의 문서 관리 및 학술 연구 기관" .
+hist:Document_박손의경험담 rdf:type hist:Document .
+hist:Document_박손의경험담 rdfs:label "박손의 경험담" .
+hist:Document_박손의경험담 hist:hasYear 1546 .
+hist:Event_옥사 rdf:type hist:Event .
+hist:Event_옥사 rdfs:label "옥사" .
+hist:Event_옥사 hist:hasYear 1548 .
+hist:Event_복관 rdf:type hist:Event .
+hist:Event_복관 rdfs:label "복관" .
+hist:Event_복관 hist:hasYear 1567 .
+hist:Person_윤결 hist:affiliatedWith hist:Institution_홍문관 .
+hist:Person_윤결 hist:authored hist:Document_박손의경험담 .
+hist:Person_윤결 hist:participatesIn hist:Event_옥사 .
+hist:Person_윤결 hist:participatesIn hist:Event_복관 .
+
+
+# 윤겸 (인물)
+hist:Person_윤겸 rdf:type hist:Person .
+hist:Person_윤겸 rdfs:label "윤겸" .
+hist:Person_윤겸 hist:hasRank "병조정랑; 세자시강원문학; 강원도도사" .
+hist:Person_윤겸 hist:hasField "문학" .
+hist:Person_윤겸 hist:hasAchievement "대각에서 직언을 잘 하였고, 지방관으로서 군현의 송사를 공정하게 처리하여 선정을 베풀었다. 강직한 성품으로 옳지 않다고 여긴 일도 용서하지 않았다." .
+hist:Event_사마시에합격 rdf:type hist:Event .
+hist:Event_사마시에합격 rdfs:label "사마시에 합격" .
+hist:Event_사마시에합격 hist:hasYear 1627 .
+hist:Event_별시문과에급제 rdf:type hist:Event .
+hist:Event_별시문과에급제 rdfs:label "별시문과에 급제" .
+hist:Event_별시문과에급제 hist:hasYear 1628 .
+hist:Institution_병조정랑 rdf:type hist:Institution .
+hist:Institution_병조정랑 rdfs:label "병조정랑" .
+hist:Institution_병조정랑 hist:hasFunction "병조의 직무를 수행하는 직책" .
+hist:Institution_강원도도사 rdf:type hist:Institution .
+hist:Institution_강원도도사 rdfs:label "강원도도사" .
+hist:Institution_강원도도사 hist:hasFunction "강원도 지역을 다스리는 관직" .
+hist:Person_윤겸 hist:participatesIn hist:Event_사마시에합격 .
+hist:Person_윤겸 hist:participatesIn hist:Event_별시문과에급제 .
+hist:Person_윤겸 hist:affiliatedWith hist:Institution_병조정랑 .
+hist:Person_윤겸 hist:affiliatedWith hist:Institution_강원도도사 .
+
+
+# 윤경교 (인물)
+hist:Person_윤경교 rdf:type hist:Person .
+hist:Person_윤경교 rdfs:label "윤경교" .
+hist:Person_윤경교 hist:hasAchievement "1657년 진사 합격; 1663년 식년문과 을과 급제; 1681년 공청도관찰사 취임; 저서 2책" .
+hist:Institution_지평 rdf:type hist:Institution .
+hist:Institution_지평 rdfs:label "지평" .
+hist:Institution_공청도관찰사 rdf:type hist:Institution .
+hist:Institution_공청도관찰사 rdfs:label "공청도관찰사" .
+hist:Institution_제학 rdf:type hist:Institution .
+hist:Institution_제학 rdfs:label "제학" .
+hist:Person_윤선거 rdf:type hist:Person .
+hist:Person_윤선거 rdfs:label "윤선거" .
+hist:Person_윤경교 hist:affiliatedWith hist:Institution_지평 .
+hist:Person_윤경교 hist:affiliatedWith hist:Institution_공청도관찰사 .
+hist:Person_윤경교 hist:affiliatedWith hist:Institution_제학 .
+hist:Person_윤경교 hist:studentOf hist:Person_윤선거 .
+
+
+# 윤경남 (인물)
+hist:Person_윤경남 rdf:type hist:Person .
+hist:Person_윤경남 rdfs:label "윤경남" .
+hist:Person_윤경남 hist:hasRank "장수현감" .
+hist:Person_윤경남 hist:hasRank "광흥창주부" .
+hist:Person_윤경남 hist:hasRank "개령현감" .
+hist:Person_윤경남 hist:hasRank "운봉현감" .
+hist:Person_윤경남 hist:hasBirthYear 1556 .
+hist:Person_윤경남 hist:hasDeathYear 1614 .
+hist:Person_윤경남 hist:hasAchievement "선무원종공신 3등에 녹훈(1605)" .
+hist:Person_문산두 rdf:type hist:Person .
+hist:Person_문산두 rdfs:label "문산두" .
+hist:Person_김면 rdf:type hist:Person .
+hist:Person_김면 rdfs:label "김면" .
+hist:Event_임진왜란 rdf:type hist:Event .
+hist:Event_임진왜란 rdfs:label "임진왜란" .
+hist:Event_임진왜란 hist:hasStartYear 1592 .
+hist:Event_임진왜란 hist:hasEndYear 1598 .
+hist:Person_문위 rdf:type hist:Person .
+hist:Person_문위 rdfs:label "문위" .
+hist:Person_윤경남 hist:studentOf hist:Person_문산두 .
+hist:Person_윤경남 hist:servedUnder hist:Person_김면 .
+hist:Person_윤경남 hist:participatesIn hist:Event_임진왜란 .
+hist:Person_윤경남 hist:contemporaryWith hist:Person_문위 .
+
+
+# 윤경 (인물)
+hist:Person_윤경 rdf:type hist:Person .
+hist:Person_윤경 rdfs:label "윤경" .
+hist:Person_윤경 hist:hasRank "병조참의, 도총부도총관, 공조참판, 예조좌랑, 지평, 공조정랑, 평양부서윤, 해주목사, 죽주부사, 장례원판결사, 공조판서, 자헌대부, 숭정대부" .
+hist:Institution_병조 rdf:type hist:Institution .
+hist:Institution_병조 rdfs:label "병조" .
+hist:Institution_공조 rdf:type hist:Institution .
+hist:Institution_공조 rdfs:label "공조" .
+hist:Nation_조선 rdf:type hist:Nation .
+hist:Nation_조선 rdfs:label "조선" .
+hist:Event_이괄의난 rdf:type hist:Event .
+hist:Event_이괄의난 rdfs:label "이괄의 난" .
+hist:Event_이괄의난 hist:hasYear 1624 .
+hist:Person_윤경 hist:affiliatedWith hist:Institution_병조 .
+hist:Person_윤경 hist:affiliatedWith hist:Institution_공조 .
+hist:Person_윤경 hist:affiliatedWith hist:Nation_조선 .
+hist:Person_윤경 hist:participatesIn hist:Event_이괄의난 .
+
+
+# 윤경남 선생 유품 (문헌)
+hist:Person_윤경남 rdf:type hist:Person .
+hist:Person_윤경남 rdfs:label "윤경남" .
+hist:Person_윤경남 hist:hasAchievement "의병장" .
+hist:Person_김면 rdf:type hist:Person .
+hist:Person_김면 rdfs:label "김면" .
+hist:Event_임진왜란중의병활동 rdf:type hist:Event .
+hist:Event_임진왜란중의병활동 rdfs:label "임진왜란 중 의병 활동" .
+hist:Event_장수현감제수 rdf:type hist:Event .
+hist:Event_장수현감제수 rdfs:label "장수현감 제수" .
+hist:Event_장수현감제수 hist:hasYear 1599 .
+hist:Person_윤경남 hist:servedUnder hist:Person_김면 .
+hist:Person_윤경남 hist:participatesIn hist:Event_임진왜란중의병활동 .
+hist:Person_윤경남 hist:participatesIn hist:Event_장수현감제수 .
+hist:Person_윤경남 hist:hasMotive "학문추구" .
+
+
+# 윤경룡 (인물)
+hist:Person_윤경룡 rdf:type hist:Person .
+hist:Person_윤경룡 rdfs:label "윤경룡" .
+hist:Person_윤경룡 hist:hasRank "도사; 정시문과 을과 급제; 사간원정언 임명; 홍양현령; 6품 목사를 삼도록 한 특명; 수찬; 보은현감; 의주부윤; 공홍도감사; 승지" .
+hist:Institution_사간원 rdf:type hist:Institution .
+hist:Institution_사간원 rdfs:label "사간원" .
+hist:Institution_사간원 hist:hasYear 1730 .
+hist:Institution_사간원 hist:hasFunction "정언 임명기관" .
+hist:Event_임명:사간원정언 rdf:type hist:Event .
+hist:Event_임명:사간원정언 rdfs:label "임명: 사간원정언" .
+hist:Event_임명:사간원정언 hist:hasYear 1730 .
+hist:Institution_공홍도감사 rdf:type hist:Institution .
+hist:Institution_공홍도감사 rdfs:label "공홍도감사" .
+hist:Institution_공홍도감사 hist:hasYear 1738 .
+hist:Institution_공홍도감사 hist:hasFunction "감사 직위" .
+hist:Event_호남괘서사건처리 rdf:type hist:Event .
+hist:Event_호남괘서사건처리 rdfs:label "호남괘서사건처리" .
+hist:Event_호남괘서사건처리 hist:hasYear 1733 .
+hist:Person_윤경룡 hist:affiliatedWith hist:Institution_사간원 .
+hist:Person_윤경룡 hist:participatesIn hist:Event_임명:사간원정언 .
+hist:Person_윤경룡 hist:affiliatedWith hist:Institution_공홍도감사 .
+hist:Person_윤경룡 hist:participatesIn hist:Event_호남괘서사건처리 .
+
+
+# 윤경립 (인물)
+hist:Person_윤경립 rdf:type hist:Person .
+hist:Person_윤경립 rdfs:label "윤경립" .
+hist:Person_윤경립 hist:hasRank "이조좌랑; 동부승지; 병조참의" .
+hist:Person_윤경립 hist:hasMotive "애민의 행정" .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Institution_홍문관 hist:hasYear 1592 .
+hist:Institution_홍문관 hist:hasFunction "정자; 관량어사; 독운어사 소임" .
+hist:Event_진사 rdf:type hist:Event .
+hist:Event_진사 rdfs:label "진사" .
+hist:Event_진사 hist:hasYear 1585 .
+hist:Event_알성문과로병과급제 rdf:type hist:Event .
+hist:Event_알성문과로병과급제 rdfs:label "알성문과로 병과 급제" .
+hist:Event_알성문과로병과급제 hist:hasYear 1588 .
+hist:Event_임진왜란 rdf:type hist:Event .
+hist:Event_임진왜란 rdfs:label "임진왜란" .
+hist:Event_임진왜란 hist:hasYear 1592 .
+hist:Person_윤경립 hist:participatesIn hist:Event_진사 .
+hist:Person_윤경립 hist:participatesIn hist:Event_알성문과로병과급제 .
+hist:Person_윤경립 hist:participatesIn hist:Event_임진왜란 .
+hist:Person_윤경립 hist:affiliatedWith hist:Institution_홍문관 .
+hist:Person_윤경립 hist:contemporaryWith "정여립" .
+
+
+# 윤경원 (인물)
+hist:Person_윤경원 rdf:type hist:Person .
+hist:Person_윤경원 rdfs:label "윤경원" .
+hist:Person_윤경원 hist:hasRank "양성현감" .
+hist:Person_윤경원 hist:hasDeathYear 1592 .
+hist:Person_윤경원 hist:hasField "문신/정치" .
+hist:Person_윤경원 hist:hasAchievement "임진왜란 중 전사 및 충절" .
+hist:Event_임진왜란 rdf:type hist:Event .
+hist:Event_임진왜란 rdfs:label "임진왜란" .
+hist:Event_임진왜란 hist:hasYear 1592 .
+hist:Event_1593년증직의은전 rdf:type hist:Event .
+hist:Event_1593년증직의은전 rdfs:label "1593년 증직의 은전" .
+hist:Event_1593년증직의은전 hist:hasYear 1593 .
+hist:Institution_양성현감 rdf:type hist:Institution .
+hist:Institution_양성현감 rdfs:label "양성현감" .
+hist:Institution_양성현감 hist:hasFunction "현감" .
+hist:Person_심대 rdf:type hist:Person .
+hist:Person_심대 rdfs:label "심대" .
+hist:Person_윤경원 hist:participatesIn hist:Event_임진왜란 .
+hist:Person_윤경원 hist:servedUnder hist:Person_심대 .
+hist:Person_윤경원 hist:affiliatedWith hist:Institution_양성현감 .
+
+
+# 윤계 (인물)
+hist:Person_윤계 rdf:type hist:Person .
+hist:Person_윤계 rdfs:label "윤계" .
+hist:Person_윤계 hist:hasRank "한성판윤, 좌참찬, 공조판서" .
+hist:Person_윤계 hist:hasField "문신(조선시대 학문)" .
+hist:Person_윤계 hist:hasAchievement "1650년 사마시에 합격, 1662년 증광 문과 급제" .
+hist:Institution_승문원 rdf:type hist:Institution .
+hist:Institution_승문원 rdfs:label "승문원" .
+hist:Institution_승문원 hist:hasYear 1662 .
+hist:Institution_승문원 hist:hasPurpose "문서 처리 및 관리" .
+hist:Institution_승문원 hist:hasFunction "조정의 행정 업무 보좌" .
+hist:Institution_지평 rdf:type hist:Institution .
+hist:Institution_지평 rdfs:label "지평" .
+hist:Institution_지평 hist:hasYear 1670 .
+hist:Institution_지평 hist:hasPurpose "재상 직무 수행 및 학문 활동" .
+hist:Institution_지평 hist:hasFunction "문학·학문 활동 및 재상 보좌" .
+hist:Institution_황해도관찰사 rdf:type hist:Institution .
+hist:Institution_황해도관찰사 rdfs:label "황해도관찰사" .
+hist:Institution_황해도관찰사 hist:hasYear 1675 .
+hist:Institution_황해도관찰사 hist:hasPurpose "관찰사 직무 수행" .
+hist:Institution_황해도관찰사 hist:hasFunction "지역 행정 관리" .
+hist:Institution_한성판윤 rdf:type hist:Institution .
+hist:Institution_한성판윤 rdfs:label "한성판윤" .
+hist:Institution_한성판윤 hist:hasYear 1687 .
+hist:Institution_한성판윤 hist:hasPurpose "한성 도의 최고 행정 직책" .
+hist:Institution_한성판윤 hist:hasFunction "수령 및 비변사 관련 업무" .
+hist:Person_윤계 hist:affiliatedWith hist:Institution_승문원 .
+hist:Person_윤계 hist:affiliatedWith hist:Institution_지평 .
+hist:Person_윤계 hist:affiliatedWith hist:Institution_황해도관찰사 .
+hist:Person_윤계 hist:affiliatedWith hist:Institution_한성판윤 .
+hist:Person_윤계 hist:participatesIn "1650년 사마시에 합격" .
+hist:Person_윤계 hist:participatesIn "1662년 증광 문과에 을과로 급제" .
+
+
+# 윤계 (인물)
+hist:Person_윤계 rdf:type hist:Person .
+hist:Person_윤계 rdfs:label "윤계" .
+hist:Person_윤계 hist:hasRank "홍문관교리" .
+hist:Person_윤계 hist:hasRank "이조좌랑" .
+hist:Person_윤계 hist:hasRank "남양부사" .
+hist:Person_윤계 hist:hasRank "승문원권지부정자" .
+hist:Person_윤계 hist:hasRank "전적" .
+hist:Person_윤계 hist:hasDeathYear 1636 .
+hist:Person_윤계 hist:hasAchievement "1627년 정묘호란 때 상소하여 척화를 주장하였다" .
+hist:Person_윤계 hist:hasMotive "방어 및 충절(척화를 통한 국방)" .
+hist:Event_1624년사마시에합격 rdf:type hist:Event .
+hist:Event_1624년사마시에합격 rdfs:label "1624년 사마시에 합격" .
+hist:Event_1624년사마시에합격 hist:hasYear 1624 .
+hist:Event_1627년정묘호란때상소하여척화를주장 rdf:type hist:Event .
+hist:Event_1627년정묘호란때상소하여척화를주장 rdfs:label "1627년 정묘호란 때 상소하여 척화를 주장" .
+hist:Event_1627년정묘호란때상소하여척화를주장 hist:hasYear 1627 .
+hist:Event_1629년이조좌랑취임 rdf:type hist:Event .
+hist:Event_1629년이조좌랑취임 rdfs:label "1629년 이조좌랑 취임" .
+hist:Event_1629년이조좌랑취임 hist:hasYear 1629 .
+hist:Institution_남양부사 rdf:type hist:Institution .
+hist:Institution_남양부사 rdfs:label "남양부사" .
+hist:Institution_남양부사 hist:hasYear 1636 .
+hist:Institution_남양부사 hist:hasFunction "지방 행정 관리" .
+hist:Person_윤계 hist:participatesIn hist:Event_1624년사마시에합격 .
+hist:Person_윤계 hist:participatesIn hist:Event_1627년정묘호란때상소하여척화를주장 .
+hist:Person_윤계 hist:participatesIn hist:Event_1629년이조좌랑취임 .
+hist:Person_윤계 hist:affiliatedWith hist:Institution_남양부사 .
+
+
+# 윤계 선생 순절비 (유적)
+hist:Document_윤계선생순절비비문 rdf:type hist:Document .
+hist:Document_윤계선생순절비비문 rdfs:label "윤계 선생 순절비 비문" .
+hist:Document_윤계선생순절비비문 hist:hasYear 1668 .
+hist:Person_송시열 rdf:type hist:Person .
+hist:Person_송시열 rdfs:label "송시열" .
+hist:Person_송준길 rdf:type hist:Person .
+hist:Person_송준길 rdfs:label "송준길" .
+hist:Person_민유중 rdf:type hist:Person .
+hist:Person_민유중 rdfs:label "민유중" .
+hist:Person_송시열 hist:authored hist:Document_윤계선생순절비비문 .
+hist:Person_송준길 hist:compiled hist:Document_윤계선생순절비비문 .
+hist:Person_민유중 hist:authored hist:Document_윤계선생순절비비문 .
+
+
+# 윤계겸 (인물)
+hist:Person_윤계겸 rdf:type hist:Person .
+hist:Person_윤계겸 rdfs:label "윤계겸" .
+hist:Person_윤계겸 hist:hasRank "다양한 관직 역임(세자우참군 임명; 호조참판; 공조참판; 이조참판; 형조판서 등)" .
+hist:Person_윤계겸 hist:hasField "문신/정치" .
+hist:Person_윤계겸 hist:hasAchievement "좌리공신 3등 책록; 시호: 공양" .
+hist:Event_임명:세자우참군 rdf:type hist:Event .
+hist:Event_임명:세자우참군 rdfs:label "임명: 세자우참군" .
+hist:Event_임명:세자우참군 hist:hasYear 1457 .
+hist:Event_임명:선전관·동부승지·우부승지(1467) rdf:type hist:Event .
+hist:Event_임명:선전관·동부승지·우부승지(1467) rdfs:label "임명: 선전관·동부승지·우부승지(1467)" .
+hist:Event_임명:선전관·동부승지·우부승지(1467) hist:hasYear 1467 .
+hist:Event_임명:좌부승지(1468) rdf:type hist:Event .
+hist:Event_임명:좌부승지(1468) rdfs:label "임명: 좌부승지(1468)" .
+hist:Event_임명:좌부승지(1468) hist:hasYear 1468 .
+hist:Event_승진:가정대부로호조참판(1470) rdf:type hist:Event .
+hist:Event_승진:가정대부로호조참판(1470) rdfs:label "승진: 가정대부로 호조참판(1470)" .
+hist:Event_승진:가정대부로호조참판(1470) hist:hasYear 1470 .
+hist:Person_윤계겸 hist:participatesIn hist:Event_임명:세자우참군 .
+hist:Person_윤계겸 hist:participatesIn hist:Event_임명:선전관·동부승지·우부승지(1467) .
+hist:Person_윤계겸 hist:participatesIn hist:Event_임명:좌부승지(1468) .
+hist:Person_윤계겸 hist:participatesIn hist:Event_승진:가정대부로호조참판(1470) .
+
+
+# 윤곤 선생 묘 (유적)
+hist:Person_윤곤 rdf:type hist:Person .
+hist:Person_윤곤 rdfs:label "윤곤" .
+hist:Person_윤곤 hist:hasRank "관찰사, 좌명공신 3등" .
+hist:Person_윤곤 hist:hasField "조선전기 문신" .
+hist:Person_윤곤 hist:hasAchievement "문과 급제" .
+hist:Institution_파평윤씨종친회 rdf:type hist:Institution .
+hist:Institution_파평윤씨종친회 rdfs:label "파평윤씨 종친회" .
+hist:Event_제2차왕자의난 rdf:type hist:Event .
+hist:Event_제2차왕자의난 rdfs:label "제2차 왕자의 난" .
+hist:Person_윤곤 hist:affiliatedWith hist:Institution_파평윤씨종친회 .
+hist:Person_윤곤 hist:participatesIn hist:Event_제2차왕자의난 .
+
+
+# 윤계선 (인물)
+hist:Person_윤계선 rdf:type hist:Person .
+hist:Person_윤계선 rdfs:label "윤계선" .
+hist:Person_윤계선 hist:hasRank "홍문관수찬" .
+hist:Person_윤계선 hist:hasRank "경연청검토관" .
+hist:Person_윤계선 hist:hasRank "사헌부지평" .
+hist:Person_윤계선 hist:hasAchievement "사륙변려문 작문 능력" .
+hist:Institution_홍문관 rdf:type hist:Institution .
+hist:Institution_홍문관 rdfs:label "홍문관" .
+hist:Institution_홍문관 hist:hasFunction "문화/학문 관련 업무" .
+hist:Institution_경연청 rdf:type hist:Institution .
+hist:Institution_경연청 rdfs:label "경연청" .
+hist:Institution_경연청 hist:hasFunction "경연 관련 업무" .
+hist:Institution_사헌부지평 rdf:type hist:Institution .
+hist:Institution_사헌부지평 rdfs:label "사헌부지평" .
+hist:Institution_사헌부지평 hist:hasFunction "감찰/사헌부의 지평 직무" .
+hist:Event_알성문과에서장원급제 rdf:type hist:Event .
+hist:Event_알성문과에서장원급제 rdfs:label "알성문과에서 장원급제" .
+hist:Event_알성문과에서장원급제 hist:hasYear 1597 .
+hist:Person_윤계선 hist:affiliatedWith "조선" .
+hist:Person_윤계선 hist:participatesIn hist:Event_알성문과에서장원급제 .
+hist:Person_윤계선 hist:affiliatedWith hist:Institution_홍문관 .
+hist:Person_윤계선 hist:affiliatedWith hist:Institution_경연청 .
+hist:Person_윤계선 hist:affiliatedWith hist:Institution_사헌부지평 .
+hist:Person_윤계선 hist:hasMotive "학문추구 및 청렴" .
+
+
+# 윤곤 (인물)
+hist:Person_윤곤 rdf:type hist:Person .
+hist:Person_윤곤 rdfs:label "윤곤" .
+hist:Person_윤곤 hist:hasRank "평안도관찰사, 이조판서, 우참찬" .
+hist:Person_윤곤 hist:hasField "문학" .
+hist:Person_윤곤 hist:hasAchievement "익대좌명공신 3등에 책록; 파평군에 봉작" .
+hist:Event_난평정및왕위에오르는데협력 rdf:type hist:Event .
+hist:Event_난평정및왕위에오르는데협력 rdfs:label "난 평정 및 왕위에 오르는 데 협력" .
+hist:Event_난평정및왕위에오르는데협력 hist:hasYear 1400 .
+hist:Event_평안도관찰사로기용 rdf:type hist:Event .
+hist:Event_평안도관찰사로기용 rdfs:label "평안도관찰사로 기용" .
+hist:Event_평안도관찰사로기용 hist:hasYear 1418 .
+hist:Person_세종 rdf:type hist:Person .
+hist:Person_세종 rdfs:label "세종" .
+hist:Person_윤향 rdf:type hist:Person .
+hist:Person_윤향 rdfs:label "윤향" .
+hist:Person_윤곤 hist:participatesIn hist:Event_난평정및왕위에오르는데협력 .
+hist:Person_윤곤 hist:participatesIn hist:Event_평안도관찰사로기용 .
+hist:Person_윤곤 hist:servedUnder hist:Person_세종 .
+hist:Person_윤곤 hist:contemporaryWith hist:Person_윤향 .
+
+
+# 윤공단 (유적)
+hist:Place_윤공단 rdf:type hist:Place .
+hist:Place_윤공단 rdfs:label "윤공단" .
+hist:Place_윤공단 hist:hasYear 1765 .
+hist:Place_윤공단 hist:hasLocation "부산광역시 사하구" .
+hist:Place_윤공단 hist:hasFunction "향사(향사를 지내는 제단)" .
+hist:Person_윤흥신 rdf:type hist:Person .
+hist:Person_윤흥신 rdfs:label "윤흥신" .
+hist:Person_윤흥신 hist:hasRank "다대첨사" .
+hist:Person_윤흥신 hist:hasDeathYear 1592 .
+hist:Person_윤흥신 hist:hasAchievement "순절" .
+hist:Event_임진왜란 rdf:type hist:Event .
+hist:Event_임진왜란 rdfs:label "임진왜란" .
+hist:Event_임진왜란 hist:hasStartYear 1592 .
+hist:Event_임진왜란 hist:hasEndYear 1598 .
+hist:Institution_다대첨사 rdf:type hist:Institution .
+hist:Institution_다대첨사 rdfs:label "다대첨사" .
+hist:Institution_다대첨사 hist:hasFunction "군관민 지휘" .
+hist:Person_윤흥신 hist:affiliatedWith hist:Institution_다대첨사 .
+hist:Person_윤흥신 hist:participatesIn hist:Event_임진왜란 .
+
+
+# 윤광계 (인물)
+hist:Person_윤광계 rdf:type hist:Person .
+hist:Person_윤광계 rdfs:label "윤광계" .
+hist:Person_윤광계 hist:hasRank "호조정랑; 예조정랑; 평안도도사; 공조좌랑" .
+hist:Person_윤광계 hist:hasBirthYear 1585 .
+hist:Person_윤광계 hist:hasField "문학/시" .
+hist:Person_윤광계 hist:hasAchievement "참여 역대실록 재간(1603)" .
+hist:Person_조헌 rdf:type hist:Person .
+hist:Person_조헌 rdfs:label "조헌" .
+hist:Event_역대실록재간 rdf:type hist:Event .
+hist:Event_역대실록재간 rdfs:label "역대실록 재간" .
+hist:Event_역대실록재간 hist:hasYear 1603 .
+hist:Event_임진왜란 rdf:type hist:Event .
+hist:Event_임진왜란 rdfs:label "임진왜란" .
+hist:Event_임진왜란 hist:hasStartYear 1592 .
+hist:Event_임진왜란 hist:hasEndYear 1598 .
+hist:Person_윤광계 hist:studentOf hist:Person_조헌 .
+hist:Person_윤광계 hist:participatesIn hist:Event_역대실록재간 .
+hist:Person_윤광계 hist:participatesIn hist:Event_임진왜란 .

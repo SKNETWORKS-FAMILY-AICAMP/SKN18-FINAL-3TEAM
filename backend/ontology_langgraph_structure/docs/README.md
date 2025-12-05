@@ -4,7 +4,10 @@
 
 ```mermaid
 graph TD
-    Start([사용자 질문]) --> Classifier[1/7 Query Classifier<br/>LLM 2회 병렬]
+    Start([사용자 질문]) --> HistCheck{역사 관련<br/>질문?<br/>LLM 1회}
+
+    HistCheck -->|No| Exit([조기 종료<br/>비용 절감])
+    HistCheck -->|Yes| Classifier[1/7 Query Classifier<br/>LLM 2회 병렬]
 
     Classifier --> Thread1[Thread 1: 의도분석<br/>+ 프로퍼티그룹]
     Classifier --> Thread2[Thread 2: 키워드확장<br/>일반명사 → 구체적 인스턴스]
@@ -12,9 +15,7 @@ graph TD
     Thread1 --> Merge1{결과 병합}
     Thread2 --> Merge1
 
-    Merge1 --> HistCheck{역사 관련<br/>질문?}
-    HistCheck -->|No| Exit([조기 종료])
-    HistCheck -->|Yes| Extractor[2/7 Entity Extractor<br/>하이브리드 추출]
+    Merge1 --> Extractor[2/7 Entity Extractor<br/>하이브리드 추출]
 
     Extractor --> TTL[TTL 정확 매칭<br/>캐시 사용]
     Extractor --> PGVector[pgvector 유사도 검색<br/>OpenAI 임베딩]
@@ -60,6 +61,7 @@ graph TD
     Generator --> Answer([최종 답변<br/>입니다 체])
 
     style Start fill:#e1f5ff,stroke:#01579b,stroke-width:3px
+    style HistCheck fill:#fff3e0,stroke:#e65100,stroke-width:3px
     style Classifier fill:#fff9c4,stroke:#f57f17,stroke-width:2px
     style Extractor fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
     style Expander fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
@@ -72,17 +74,22 @@ graph TD
 
 ### 🔑 핵심 체크포인트
 
-| 단계                          | LLM 호출        | SPARQL 호출      | 주요 작업                                                            |
-| ----------------------------- | --------------- | ---------------- | -------------------------------------------------------------------- |
-| **1. Query Classifier**       | ✅ **2회 병렬** | ❌               | 질문 분석, 키워드 확장, 프로퍼티 그룹 선택 (ThreadPoolExecutor 사용) |
-| **2. Entity Extractor**       | ❌              | ✅ 각 엔티티마다 | 엔티티 추출, 연결 노드 기반 스코어링                                 |
+| 단계                           | LLM 호출        | SPARQL 호출      | 주요 작업                                                            |
+| ------------------------------ | --------------- | ---------------- | -------------------------------------------------------------------- |
+| **0. 역사 관련 여부 체크**     | ✅ **1회**      | ❌               | 조선시대 역사 질문 필터링 (비역사 질문 조기 종료)                    |
+| **1. Query Classifier**        | ✅ **2회 병렬** | ❌               | 질문 분석, 키워드 확장, 프로퍼티 그룹 선택 (ThreadPoolExecutor 사용) |
+| **2. Entity Extractor**        | ❌              | ✅ 각 엔티티마다 | 엔티티 추출, 연결 노드 기반 스코어링                                 |
 | **3. Semantic Expander (NEW)** | ❌              | ✅ 4가지 방법    | 시간적/카테고리/인과/벡터 기반 엔티티 확장                           |
-| **4. Parallel Inference**     | ❌              | ✅ 5개 Thread    | 5개 관점 관계 검색 + 양방향 BFS (최대 5-hop)                         |
-| **5. Multi-Path Extractor**   | ❌              | ❌               | 결과 파싱 및 경로 추출                                               |
-| **6. Evidence Aggregator**    | ❌              | ❌               | 근거 통합 + 수렴 노드 감지 (2배 부스트)                              |
-| **7. Story Generator**        | ✅ 1회          | ❌               | 최종 스토리 생성                                                     |
+| **4. Parallel Inference**      | ❌              | ✅ 5개 Thread    | 5개 관점 관계 검색 + 양방향 BFS (최대 5-hop)                         |
+| **5. Multi-Path Extractor**    | ❌              | ❌               | 결과 파싱 및 경로 추출                                               |
+| **6. Evidence Aggregator**     | ❌              | ❌               | 근거 통합 + 수렴 노드 감지 (2배 부스트)                              |
+| **7. Story Generator**         | ✅ 1회          | ❌               | 최종 스토리 생성                                                     |
 
-**총 LLM 호출: 3회** (Query Classifier 2회 병렬 + Story Generator 1회)
+**총 LLM 호출:**
+
+- **역사 질문**: 4회 (역사 체크 1회 + Query Classifier 2회 병렬 + Story Generator 1회)
+- **비역사 질문**: 1회만 (역사 체크 후 즉시 종료) ⚡ 비용 절감
+
 **총 SPARQL 호출: 9 + N회** (Semantic Expander 4회 + 병렬 검색 5회 + 엔티티 스코어링 N회)
 
 ---
@@ -92,6 +99,7 @@ graph TD
 ### **1. Query Classifier (통합 분석 노드) ⚡LLM 2회 병렬 호출**
 
 **역할:** ThreadPoolExecutor로 LLM 2개를 병렬 실행하여 시간 단축
+**전제 조건:** 0단계에서 역사 관련 질문으로 확인된 경우에만 실행
 
 #### **병렬 실행 구조 (ThreadPoolExecutor)**
 
@@ -106,20 +114,19 @@ with ThreadPoolExecutor(max_workers=2) as executor:
     future2 = executor.submit(expand_keywords)
 
     # 결과 대기 (병렬 실행으로 시간 단축)
-    result1 = future1.result()  # is_historical, query_type, intent, property_groups
+    result1 = future1.result()  # query_type, intent, property_groups
     result2 = future2.result()  # expanded_keywords
 ```
 
 #### **Thread 1: 의도 분석 + 프로퍼티 그룹 선택**
 
-1. **역사 관련 여부 판단** (`is_historical`)
-2. 질문 유형 분류 (`causal`/`deep_analysis`)
-3. 핵심 의도 파악 (`intent`)
-4. 프로퍼티 그룹 선택 (`property_groups`: 최대 5개)
+1. 질문 유형 분류 (`causal`/`deep_analysis`)
+2. 핵심 의도 파악 (`intent`)
+3. 프로퍼티 그룹 선택 (`property_groups`: 최대 5개)
 
 #### **Thread 2: 키워드 확장**
 
-5. 키워드 확장 (`expanded_keywords`: 일반명사 → 구체적 인스턴스 5-10개)
+4. 키워드 확장 (`expanded_keywords`: 일반명사 → 구체적 인스턴스 5-10개)
 
 **효과:**
 
@@ -132,12 +139,12 @@ with ThreadPoolExecutor(max_workers=2) as executor:
 - **`causal`**: 인과관계 질문 ("왜 ~했을까?", "어떤 영향을 미쳤나?")
 - **`deep_analysis`**: 심화 분석 ("진짜 이유는?", "숨은 의도는?")
 
-**역사 관련 필터링:**
+**참고: 역사 관련 필터링은 0단계에서 완료**
 
-- `is_historical=false`: 조선시대 한국 역사와 무관한 질문
+- 0단계에서 `is_historical=false` 확인 시 **조기 종료** 완료
   - 예: "파이썬 프로그래밍 방법", "2024년 대선 결과"
-  - → 조기 종료: "답변을 생성할 수 없습니다" 메시지 반환
-- `is_historical=true`: 정상 플로우 진행
+  - → 조기 종료: "답변을 생성할 수 없습니다" 메시지 반환 (LLM 1회만 호출)
+- `is_historical=true`: Query Classifier로 전달되어 정상 플로우 진행
 
 #### **키워드 확장 (일반명사 → 구체적 인스턴스) - Thread 2**
 
@@ -313,6 +320,7 @@ def extract_nouns_with_kiwi(query: str) -> list:
    - 키워드가 엔티티 이름에 포함되면 **+0.5/keyword**
 
 3. **연결 노드 매칭 점수** ⚡ **SPARQL 사용**
+
    - 엔티티와 연결된 노드의 `rdfs:label`에 키워드가 포함되면 **+0.1/connection** (최대 0.3)
 
    > **참고**: pgvector 검색으로 발견된 엔티티도 동일한 스코어링 적용
@@ -432,6 +440,7 @@ def load_ttl_entities():
 **목적:** TTL 정확 매칭으로 찾지 못한 경우 pgvector로 의미적 유사도 검색
 
 **검색 전략:**
+
 ```python
 from backend.db_pipeline.services.postgres_service import PostgresVectorService
 
@@ -463,15 +472,16 @@ for result in results:
 
 **pgvector vs TTL 매칭 비교:**
 
-| 특징 | TTL 정확 매칭 | pgvector 유사도 검색 |
-|------|--------------|---------------------|
-| **속도** | 매우 빠름 (~0ms) | 빠름 (~0.3초) |
-| **정확도** | 100% (정확 일치) | 70-95% (의미적 유사) |
-| **활용** | 우선 검색 | Fallback |
-| **장점** | 캐싱, 네트워크 없음 | 동의어/유사어 발견 |
-| **예시** | "경복궁" → "경복궁" | "명성황후 시해" → "을미사변" |
+| 특징       | TTL 정확 매칭       | pgvector 유사도 검색         |
+| ---------- | ------------------- | ---------------------------- |
+| **속도**   | 매우 빠름 (~0ms)    | 빠름 (~0.3초)                |
+| **정확도** | 100% (정확 일치)    | 70-95% (의미적 유사)         |
+| **활용**   | 우선 검색           | Fallback                     |
+| **장점**   | 캐싱, 네트워크 없음 | 동의어/유사어 발견           |
+| **예시**   | "경복궁" → "경복궁" | "명성황후 시해" → "을미사변" |
 
 **통합 흐름:**
+
 ```
 1. TTL 정확 매칭 (우선)
    ↓
@@ -491,6 +501,7 @@ for result in results:
 **역할:** 추출된 엔티티를 4가지 방법으로 의미론적 확장하여 검색 범위 확대
 
 **문제:**
+
 ```
 질문: "명성황후 시해 사건의 배경은?"
 기존: {명성황후, 시해, 사건} → 직접 관련 엔티티만 검색
@@ -504,6 +515,7 @@ for result in results:
 #### **4가지 확장 방법**
 
 **1. 시간적 맥락 확장 (±10년 이벤트)**
+
 ```python
 def expand_by_temporal_context(entities, ttl_data, window_years=10):
     """
@@ -518,6 +530,7 @@ def expand_by_temporal_context(entities, ttl_data, window_years=10):
 ```
 
 **2. 카테고리 기반 확장 (주제/분류)**
+
 ```python
 def expand_by_category(entities, ttl_data):
     """
@@ -532,6 +545,7 @@ def expand_by_category(entities, ttl_data):
 ```
 
 **3. 인과관계 체인 확장 (leadsTo/causedBy)**
+
 ```python
 def expand_by_causal_chain(entities, ttl_data, max_hops=3):
     """
@@ -549,6 +563,7 @@ def expand_by_causal_chain(entities, ttl_data, max_hops=3):
 ```
 
 **4. 벡터 유사도 확장 (pgvector)**
+
 ```python
 def expand_by_pgvector(entities, query, top_k=15):
     """
@@ -564,14 +579,15 @@ def expand_by_pgvector(entities, query, top_k=15):
 
 #### **확장 효과**
 
-| 확장 방법   | 추가 엔티티 수 | 검색 정확도 | 실행 시간 |
-| ----------- | -------------- | ----------- | --------- |
-| 시간적 맥락 | 평균 5-10개    | ⭐⭐⭐⭐⭐        | ~0.3초    |
-| 카테고리    | 평균 3-7개     | ⭐⭐⭐⭐          | ~0.2초    |
-| 인과관계    | 평균 4-8개     | ⭐⭐⭐⭐⭐        | ~0.4초    |
-| 벡터 유사도 (pgvector) | 최대 15개      | ⭐⭐⭐           | ~0.3초    |
+| 확장 방법              | 추가 엔티티 수 | 검색 정확도 | 실행 시간 |
+| ---------------------- | -------------- | ----------- | --------- |
+| 시간적 맥락            | 평균 5-10개    | ⭐⭐⭐⭐⭐  | ~0.3초    |
+| 카테고리               | 평균 3-7개     | ⭐⭐⭐⭐    | ~0.2초    |
+| 인과관계               | 평균 4-8개     | ⭐⭐⭐⭐⭐  | ~0.4초    |
+| 벡터 유사도 (pgvector) | 최대 15개      | ⭐⭐⭐      | ~0.3초    |
 
 **통합 효과:**
+
 - ✅ 검색 범위 250% 확대 (30개 → 75개 엔티티)
 - ✅ 시대적 맥락 자동 포함
 - ✅ 인과관계 체인 발견
@@ -642,13 +658,13 @@ SELECT ?entity ?predicate ?object WHERE {
 
 #### **5개 Thread 범용 관계 검색 (하드코딩 없음)**
 
-| Thread       | 이름                 | 역할                | 검색 방식 (모두 Fuseki SPARQL)          |
-| ------------ | -------------------- | ------------------- | --------------------------------------- |
-| **Thread 1** | `outgoing_relations` | 나가는 관계         | 엔티티 → ? (모든 프로퍼티, FILTER 적용) |
-| **Thread 2** | `incoming_relations` | 들어오는 관계       | ? → 엔티티 (모든 프로퍼티, FILTER 적용) |
-| **Thread 3** | `entity_properties`  | 속성 정보           | 엔티티의 리터럴 값 (연도, 설명 등)      |
+| Thread       | 이름                 | 역할                | 검색 방식 (모두 Fuseki SPARQL)                       |
+| ------------ | -------------------- | ------------------- | ---------------------------------------------------- |
+| **Thread 1** | `outgoing_relations` | 나가는 관계         | 엔티티 → ? (모든 프로퍼티, FILTER 적용)              |
+| **Thread 2** | `incoming_relations` | 들어오는 관계       | ? → 엔티티 (모든 프로퍼티, FILTER 적용)              |
+| **Thread 3** | `entity_properties`  | 속성 정보           | 엔티티의 리터럴 값 (연도, 설명 등)                   |
 | **Thread 4** | `connected_entities` | 연결된 엔티티 (A-B) | **A ↔ B 양방향 BFS (최대 5-hop)** + SPARQL 직접 연결 |
-| **Thread 5** | `type_and_summary`   | 타입/요약           | 엔티티 타입, 요약, 카테고리, 연도       |
+| **Thread 5** | `type_and_summary`   | 타입/요약           | 엔티티 타입, 요약, 카테고리, 연도                    |
 
 **핵심 개선:**
 
@@ -750,6 +766,7 @@ SELECT DISTINCT ?entity1 ?label1 ?predicate ?entity2 ?label2 WHERE {
 **목적:** 멀리 떨어진 엔티티 간 최단 경로 탐색 (예: 정약용 ↔ 사도세자)
 
 **알고리즘:**
+
 ```python
 def find_bidirectional_paths(entity_a_uri, entity_b_uri, max_depth=5):
     """
@@ -769,6 +786,7 @@ def find_bidirectional_paths(entity_a_uri, entity_b_uri, max_depth=5):
 ```
 
 **실행 예시:**
+
 ```
 질문: "정약용과 사도세자의 관계는?"
 
@@ -790,6 +808,7 @@ def find_bidirectional_paths(entity_a_uri, entity_b_uri, max_depth=5):
 ```
 
 **최적화:**
+
 - ✅ **양방향 탐색**: 단방향 BFS 대비 50% 빠름
 - ✅ **조기 종료**: 첫 경로 발견 시 즉시 반환
 - ✅ **Timeout**: 2초 제한으로 무한 루프 방지
@@ -833,13 +852,14 @@ def detect_convergence_nodes(inference_paths, query_entities):
 ```
 
 **부스트 효과:**
-| 근거 유형         | 기본 가중치 | 수렴 노드 시 | 최종 가중치 |
+| 근거 유형 | 기본 가중치 | 수렴 노드 시 | 최종 가중치 |
 | ----------------- | ----------- | ------------ | ----------- |
-| outgoing_relation | 0.20        | ×2.0         | 0.40        |
-| incoming_relation | 0.25        | ×2.0         | 0.50        |
-| connected_entity  | 0.30        | ×2.0         | 0.60        |
+| outgoing_relation | 0.20 | ×2.0 | 0.40 |
+| incoming_relation | 0.25 | ×2.0 | 0.50 |
+| connected_entity | 0.30 | ×2.0 | 0.60 |
 
 **통합 효과:**
+
 - ✅ 수렴 노드 우선 선택: 여러 엔티티를 연결하는 핵심 노드 강조
 - ✅ 스토리 일관성 향상: 단편적 정보 대신 통합 맥락 제공
 - ✅ 인과관계 발견: 여러 사건/인물을 연결하는 중심 이벤트 자동 감지
@@ -1124,18 +1144,18 @@ def story_enhancer_node(state: GraphState) -> GraphState:
 
 ## 📚 기술 스택
 
-| 컴포넌트                | 기술                              | 역할                                            | 최적화             |
-| ----------------------- | --------------------------------- | ----------------------------------------------- | ------------------ |
-| **Query Classifier**    | LLM (GPT-4o-mini)                 | 통합 분석 (질문 유형/의도/프로퍼티/키워드 확장) | ⚡LLM 1회 통합     |
+| 컴포넌트                | 기술                                | 역할                                            | 최적화             |
+| ----------------------- | ----------------------------------- | ----------------------------------------------- | ------------------ |
+| **Query Classifier**    | LLM (GPT-4o-mini)                   | 통합 분석 (질문 유형/의도/프로퍼티/키워드 확장) | ⚡LLM 1회 통합     |
 | **Entity Extractor**    | kiwipiepy + Fuseki + TTL + pgvector | 하이브리드 엔티티 추출                          | ⚡캐싱+키워드 확장 |
-| **형태소 분석기**       | kiwipiepy                         | 조사/어미 자동 제거                             | 빠름, 무료         |
-| **Knowledge Retrieval** | **Fuseki SPARQL (5개 Thread)**    | **범용 관계 검색 + 프로퍼티 FILTER**            | 템플릿 SPARQL      |
-| **Triple Store**        | Apache Jena Fuseki                | RDF 저장/SPARQL 쿼리                            | -                  |
-| **Vector DB**           | PostgreSQL + pgvector             | 문서 청크 벡터 검색 (OpenAI 임베딩)             | HNSW 인덱스        |
-| **Agent Orchestration** | LangGraph + ThreadPoolExecutor    | 5개 Thread 병렬 실행                            | -                  |
-| **Story Generator**     | LLM (GPT-4o)                      | 스토리 생성 (-입니다 체)                        | -                  |
-| **Story Enhancer**      | LLM + **pgvector 설화 검색**      | 설화/이야기 추가 (선택적)                       | -                  |
-| **Property Groups**     | JSON (70개 그룹)                  | 프로퍼티 의미 그룹 분류                         | 자동 업데이트      |
+| **형태소 분석기**       | kiwipiepy                           | 조사/어미 자동 제거                             | 빠름, 무료         |
+| **Knowledge Retrieval** | **Fuseki SPARQL (5개 Thread)**      | **범용 관계 검색 + 프로퍼티 FILTER**            | 템플릿 SPARQL      |
+| **Triple Store**        | Apache Jena Fuseki                  | RDF 저장/SPARQL 쿼리                            | -                  |
+| **Vector DB**           | PostgreSQL + pgvector               | 문서 청크 벡터 검색 (OpenAI 임베딩)             | HNSW 인덱스        |
+| **Agent Orchestration** | LangGraph + ThreadPoolExecutor      | 5개 Thread 병렬 실행                            | -                  |
+| **Story Generator**     | LLM (GPT-4o)                        | 스토리 생성 (-입니다 체)                        | -                  |
+| **Story Enhancer**      | LLM + **pgvector 설화 검색**        | 설화/이야기 추가 (선택적)                       | -                  |
+| **Property Groups**     | JSON (70개 그룹)                    | 프로퍼티 의미 그룹 분류                         | 자동 업데이트      |
 
 ---
 
@@ -1143,7 +1163,7 @@ def story_enhancer_node(state: GraphState) -> GraphState:
 
 ```bash
 # 1. Docker 컨테이너 시작
-cd Infra
+cd infra
 docker-compose up -d
 
 # 2. Fuseki 데이터 업로드
@@ -1167,6 +1187,7 @@ python main.py
 ### PostgreSQL + pgvector ETL 파이프라인 (신규)
 
 **데이터 흐름:**
+
 ```
 encykorea_cleaned6.csv (10,353개 문서)
   ↓ transform.py
@@ -1176,6 +1197,7 @@ PostgreSQL + pgvector (OpenAI 임베딩)
 ```
 
 **주요 기능:**
+
 - **텍스트 정규화**: 공백/특수문자 제거
 - **청킹**: 500자 단위, 100자 오버랩, 문장 경계 감지
 - **임베딩**: OpenAI text-embedding-3-small (1536차원)
