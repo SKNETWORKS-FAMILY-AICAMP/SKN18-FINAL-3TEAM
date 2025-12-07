@@ -2,7 +2,7 @@
 
 from .transform import preprocess_data, chunk_dataframe
 from ..services.db_connection import prepare_vectordb
-from ..services.vector_stor import create_pgvector_store
+from ..services.vector_store import create_pgvector_store
 from ..config import POSTGRES_CONN_STR, INPUT_CSV, EMBED_MODEL
 import pandas as pd
 from langchain_openai import OpenAIEmbeddings

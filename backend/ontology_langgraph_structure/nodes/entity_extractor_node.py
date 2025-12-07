@@ -5,7 +5,7 @@ Entity Extractor Node
 1. 형태소 분석기(kiwipiepy)로 명사 추출
 2. 키워드 확장 (classify_node에서 처리된 확장된 키워드 사용)
 3. TTL 정확 매칭 (확장된 키워드 + 원본 키워드 모두 사용)
-4. Milvus 유사도 검색 (fallback)
+4. pgvector 제목 임베딩 유사도 검색 (fallback)
 5. LLM 엔티티 추출 (최종 fallback)
 6. 엔티티 URI 반환
 
@@ -45,23 +45,23 @@ load_dotenv(env_path, override=True)
 from state import GraphState
 from ontology_schema import get_schema_summary
 
-# pgvector 서비스 import (선택적)
+# pgvector 제목 임베딩 서비스 import (선택적)
 USE_PGVECTOR = os.getenv("USE_PGVECTOR", "true").lower() == "true"
-_pgvector_service = None
+_title_vector_service = None
 
-def get_pgvector_service():
-    """pgvector 서비스 lazy loading"""
-    global _pgvector_service
-    if _pgvector_service is None and USE_PGVECTOR:
+def get_title_vector_service():
+    """제목 임베딩 pgvector 서비스 lazy loading"""
+    global _title_vector_service
+    if _title_vector_service is None and USE_PGVECTOR:
         try:
-            from db_pipeline.services.postgres_service import PostgresVectorService
-            _pgvector_service = PostgresVectorService()
-            print("✅ pgvector 서비스 초기화 완료")
+            from db_pipeline.services.title_vector_service import TitleVectorService
+            _title_vector_service = TitleVectorService()
+            print("✅ 제목 임베딩 pgvector 서비스 초기화 완료")
         except ImportError:
-            print("⚠️ pgvector 서비스 import 실패 - TTL 매칭만 사용")
+            print("⚠️ 제목 임베딩 pgvector 서비스 import 실패 - TTL 매칭만 사용")
         except Exception as e:
-            print(f"⚠️ pgvector 초기화 실패: {e}")
-    return _pgvector_service
+            print(f"⚠️ 제목 임베딩 pgvector 초기화 실패: {e}")
+    return _title_vector_service
 
 
 # TTL 파일 경로 (normalized 버전 사용 - Fuseki에 업로드된 데이터와 일치)
@@ -648,20 +648,20 @@ JSON 형식으로 출력하세요:
 #     pass
 
 
-def search_entities_with_milvus(keywords: list, ttl_data: dict, top_k: int = 5) -> list:
+def search_entities_with_pgvector(keywords: list, ttl_data: dict, top_k: int = 5) -> list:
     """
-    Milvus 유사도 검색으로 엔티티 찾기
-    
+    pgvector 제목 임베딩 유사도 검색으로 엔티티 찾기
+
     Args:
         keywords: 검색할 키워드 리스트
         ttl_data: TTL 데이터 (URI 매핑용)
         top_k: 키워드당 최대 결과 수
-    
+
     Returns:
         매칭된 엔티티 리스트
     """
-    pgvector = get_pgvector_service()
-    if pgvector is None:
+    title_vector_service = get_title_vector_service()
+    if title_vector_service is None:
         return []
 
     entities = []
@@ -670,7 +670,7 @@ def search_entities_with_milvus(keywords: list, ttl_data: dict, top_k: int = 5) 
     try:
         # 키워드로 벡터 검색
         query_text = " ".join(keywords)
-        results = pgvector.search(query=query_text, top_k=top_k, threshold=0.5)
+        results = title_vector_service.search(query=query_text, top_k=top_k, threshold=0.5)
 
         for result in results:
             title = result["title"]
@@ -706,13 +706,13 @@ def search_entities_with_milvus(keywords: list, ttl_data: dict, top_k: int = 5) 
                 "pgvector_score": result["similarity"],
                 "matched_keyword": query_text
             })
-        
+
         # 점수 순 정렬
         entities.sort(key=lambda x: x.get("pgvector_score", 0), reverse=True)
-        
+
     except Exception as e:
-        print(f"⚠️ pgvector 검색 실패: {e}")
-    
+        print(f"⚠️ 제목 임베딩 pgvector 검색 실패: {e}")
+
     return entities
 
 
@@ -720,11 +720,11 @@ def entity_extractor_node(state: GraphState) -> GraphState:
     """
     질문에서 핵심 엔티티 추출 (하이브리드 방식)
 
-    키워드 추출 + Milvus 유사도 검색을 병렬로 수행
+    키워드 추출 + pgvector 제목 임베딩 유사도 검색을 병렬로 수행
     - 1단계: 키워드 추출 (kiwipiepy)
     - 2단계: 키워드 확장 (classify_node에서 처리된 확장된 키워드 사용)
     - 3단계: TTL 정확 매칭 (확장된 키워드 + 원본 키워드 모두 사용)
-    - 4단계: Milvus 유사도 검색 (fallback)
+    - 4단계: pgvector 제목 임베딩 유사도 검색 (fallback)
     - 5단계: LLM 엔티티 추출 (최종 fallback - 결과 부족 시만)
 
     의도 파악: classify_node에서 이미 처리됨 (query_intent)
@@ -862,7 +862,7 @@ def entity_extractor_node(state: GraphState) -> GraphState:
     # --- TTL 정확 매칭 (확장된 키워드 + 원본 키워드 사용) ---
     print(f"  ├─ TTL 매칭 중...")
     ttl_matched = 0
-    
+
     # 모든 키워드로 TTL 매칭 (확장된 키워드 + 원본 키워드)
     for keyword in all_keywords:
         # 정확한 라벨 매칭
@@ -880,7 +880,7 @@ def entity_extractor_node(state: GraphState) -> GraphState:
                     "match_method": "exact"
                 })
                 ttl_matched += 1
-        
+
         # 부분 매칭 (키워드가 라벨에 포함된 경우) - 최대 3개, 최소 길이 3글자
         # "조선" 같은 일반 키워드 필터링 강화
         if len(keyword) >= 3:  # 3글자 이상만 부분 매칭
@@ -903,22 +903,22 @@ def entity_extractor_node(state: GraphState) -> GraphState:
                         partial_count += 1
                         if partial_count >= 3:  # 키워드당 최대 3개 부분 매칭 (성능 최적화)
                             break
-    
+
     print(f"     └─ TTL 매칭: {ttl_matched}개")
 
-    # --- Milvus 유사도 검색 (규칙 기반 키워드 사용) ---
+    # --- pgvector 제목 임베딩 유사도 검색 (규칙 기반 키워드 사용) ---
     # ⚡ 리팩토링: LLM 대신 규칙 기반 키워드로 벡터 검색
     # - "조선시대/조선" 제외 (모든 데이터가 조선시대라서)
     # - 조사/동사 제거된 명확한 단어만 사용
     pgvector_added = 0
     if USE_PGVECTOR and vector_keywords:
-        print(f"  ├─ pgvector 벡터 검색 중...")
+        print(f"  ├─ pgvector 제목 임베딩 벡터 검색 중...")
 
         # 동적 top_k: 키워드 수에 따라 조절
         dynamic_top_k = max(3, min(10, 15 // max(len(vector_keywords), 1)))
 
         # 규칙 기반으로 추출된 키워드로 pgvector 검색
-        pgvector_entities = search_entities_with_milvus(
+        pgvector_entities = search_entities_with_pgvector(
             vector_keywords,  # 조선시대/조선 제외된 키워드
             ttl_data,
             top_k=dynamic_top_k
@@ -1074,7 +1074,7 @@ def entity_extractor_node(state: GraphState) -> GraphState:
             print(f"      ... 외 {len(matched_entities) - 10}개")
 
     node_elapsed = time.time() - node_start
-    print(f"  └─ 완료: {len(matched_entities)}개 엔티티 추출 (TTL: {ttl_matched}, Milvus: {milvus_added}) ({node_elapsed:.2f}초)")
+    print(f"  └─ 완료: {len(matched_entities)}개 엔티티 추출 (TTL: {ttl_matched}, pgvector: {pgvector_added}) ({node_elapsed:.2f}초)")
     print()
 
     # 노드 실행 시간 기록
