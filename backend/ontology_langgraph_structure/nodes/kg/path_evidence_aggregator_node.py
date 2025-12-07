@@ -1,0 +1,653 @@
+"""
+Path Extractor & Evidence Aggregator Node (통합)
+
+5개 Thread의 추론 결과에서 경로 추출 및 근거 통합을 한 번에 수행
+- Thread별로 서로 다른 경로 추출 로직 적용
+- 개선된 점수 체계로 관련성 평가
+- 상위 15개 근거 선택 (기존 5개에서 확장)
+"""
+
+from state import GraphState
+
+# ========================================
+# 속성/관계 타입별 Relevance Score 가중치 (개선)
+# ========================================
+
+# 관계(Predicate) 타입별 가중치 (공격적 점수 체계 - 편차 확대)
+RELATION_WEIGHTS = {
+    # 인과관계 (가장 중요) - 가중치 대폭 상향
+    "leadsTo": 2.5,
+    "causedBy": 2.5,
+    "causes": 2.5,
+    "ledTo": 2.5,
+    "triggeredBy": 2.2,
+
+    # 직접적 참여/지휘 (높은 관련성, 하지만 왕/사건의 경우 주의 필요)
+    "commands": 2.0,
+    "involved": 1.8,
+    "involves": 1.8,
+    "participatesIn": 1.5,  # 왕이 사건에 "참여"는 부적절하므로 가중치 낮춤
+
+    # 부분 관계 (높은 관련성)
+    "partOf": 1.8,
+
+    # 설립/건설
+    "establishedBy": 1.8,
+    "founded": 1.8,
+    "built": 1.5,
+
+    # 시간적 관계
+    "occursBefore": 1.2,
+    "occursAfter": 1.2,
+    "followedBy": 1.2,
+    "precededBy": 1.2,
+
+    # 연결관계
+    "relatedTo": 1.0,
+    "associatedWith": 1.0,
+    "connectedTo": 1.0,
+
+    # 일반 속성 (낮은 관련성) - 1.0 이상으로 조정 (곱셈 시 감소 방지)
+    "hasYear": 1.0,  # 기본값과 동일 (0.5 → 1.0)
+    "hasCategory": 1.0,  # 기본값과 동일 (0.4 → 1.0)
+    "hasDescription": 1.0,  # 기본값과 동일 (0.3 → 1.0)
+
+    # 기본값 (매칭 안되는 경우)
+    "_default": 1.0
+}
+
+# 속성 이름 패턴별 가중치 (관계가 아닌 속성값)
+PROPERTY_WEIGHTS = {
+    # 핵심 속성
+    "Achievement": 1.3,
+    "Rank": 1.2,
+    "Role": 1.2,
+
+    # 시간 속성 - 1.0 이상으로 조정
+    "Year": 1.0,  # 기본값과 동일 (0.9 → 1.0)
+    "StartYear": 1.0,  # 기본값과 동일 (0.9 → 1.0)
+    "EndYear": 1.0,  # 기본값과 동일 (0.9 → 1.0)
+    "Month": 1.0,  # 기본값과 동일 (0.8 → 1.0)
+
+    # 일반 속성 - 1.0 이상으로 조정
+    "Category": 1.0,  # 기본값과 동일 (0.7 → 1.0)
+    "Type": 1.0,  # 기본값과 동일 (0.7 → 1.0)
+
+    # 기본값
+    "_default": 1.0  # 기본값과 동일 (0.8 → 1.0)
+}
+
+
+def calculate_improved_relevance_score(path_data: dict, query_entities: list = None, thread_type: str = "") -> float:
+    """
+    개선된 경로의 relevance score 계산
+    
+    개선 사항:
+    1. 쿼리 엔티티와의 직접 연결성 강화
+    2. Thread 타입별 가중치 조정
+    3. 관계 타입별 세밀한 가중치 적용
+
+    Args:
+        path_data: 경로 데이터 (binding 정보)
+        query_entities: 쿼리에서 추출된 엔티티 리스트
+        thread_type: Thread 타입 (outgoing_relations, incoming_relations 등)
+
+    Returns:
+        relevance score (0.5 ~ 2.0)
+    """
+    score = 1.0
+
+    # 1. 관계(predicate) 가중치
+    predicate = path_data.get("predicate", {}).get("value", "")
+    if predicate:
+        pred_name = predicate.split("#")[-1]  # hist:leadsTo → leadsTo
+        score *= RELATION_WEIGHTS.get(pred_name, RELATION_WEIGHTS["_default"])
+
+    # 2. 속성명 가중치
+    property_name = path_data.get("property", {}).get("value", "")
+    if property_name:
+        prop_name = property_name.split("#")[-1]
+        # 속성명에서 키워드 추출 (예: hasAchievement → Achievement)
+        for keyword, weight in PROPERTY_WEIGHTS.items():
+            if keyword != "_default" and keyword.lower() in prop_name.lower():
+                score *= weight
+                break
+        else:
+            score *= PROPERTY_WEIGHTS["_default"]
+
+    # 3. 쿼리 엔티티와의 직접 연결 여부 (강화 - 차별화를 위해)
+    query_entity_match_boost = 1.0  # 기본값 (매칭 없음)
+    if query_entities:
+        subject = path_data.get("subject", {}).get("value", "")
+        obj = path_data.get("object", {}).get("value", "")
+        entity_label = path_data.get("entityLabel", {}).get("value", "")
+        subject_label = path_data.get("subjectLabel", {}).get("value", "")
+        object_label = path_data.get("objectLabel", {}).get("value", "")
+
+        # 모든 가능한 엔티티 이름 수집 (정규화)
+        all_entity_names = []
+        all_entity_names_normalized = []
+        
+        def normalize_name(name):
+            """이름 정규화 (공백 제거, 소문자 변환)"""
+            if not name:
+                return ""
+            return name.replace(" ", "").replace("_", "").lower()
+        
+        for name_source in [subject, obj, entity_label, subject_label, object_label]:
+            if name_source:
+                raw_name = name_source.split("#")[-1] if "#" in name_source else name_source
+                all_entity_names.append(raw_name)
+                all_entity_names_normalized.append(normalize_name(raw_name))
+
+        # 쿼리 엔티티와 직접 매칭 확인 (더 정확하게)
+        for entity in query_entities:
+            entity_name = entity.get("name", "") or entity.get("label", "")
+            if not entity_name:
+                continue
+            
+            entity_name_normalized = normalize_name(entity_name)
+            
+            # 정확한 매칭 (매우 높은 부스트) - 차별화 강화
+            if entity_name in all_entity_names or entity_name_normalized in all_entity_names_normalized:
+                query_entity_match_boost = 3.0  # 200% 부스트 (매우 강하게 차별화)
+                break
+            # 부분 매칭 (중간 부스트)
+            elif any(entity_name in name or name in entity_name for name in all_entity_names if name):
+                query_entity_match_boost = 2.0  # 100% 부스트
+                break
+            # 정규화된 부분 매칭
+            elif any(entity_name_normalized in norm_name or norm_name in entity_name_normalized 
+                    for norm_name in all_entity_names_normalized if norm_name):
+                query_entity_match_boost = 1.5  # 50% 부스트
+                break
+    
+    score *= query_entity_match_boost
+
+    # 4. Thread 타입별 추가 가중치 - 편차 확대 (차별화 강화, 모두 1.0 이상)
+    if thread_type == "outgoing_relations":
+        score *= 1.8  # 나가는 관계는 직접적 관련성 (더 강하게)
+    elif thread_type == "incoming_relations":
+        score *= 1.4  # 들어오는 관계는 간접적
+    elif thread_type == "entity_properties":
+        score *= 1.1  # 속성은 약간 높음 (0.7 → 1.1로 변경, 곱셈 시 감소 방지)
+    elif thread_type == "type_and_summary":
+        score *= 1.0  # 요약은 기본값 (0.6 → 1.0로 변경, 곱셈 시 감소 방지)
+    elif thread_type == "connected_entities":
+        score *= 1.2  # 연결 엔티티는 중간 (0.8 → 1.2로 변경)
+
+    # 5. 관계 중요도에 따른 추가 차별화
+    # 쿼리 엔티티와 매칭되지 않은 경우 페널티 적용 (곱셈 대신 비율 조정)
+    if query_entity_match_boost == 1.0 and query_entities:
+        # 매칭되지 않은 경로는 페널티 (곱셈 대신 작은 배수로)
+        score *= 0.8  # 20% 감소 (0.6 → 0.8로 완화, 여전히 감소하지만 덜 심각하게)
+
+    # 6. 범위 제한 (0.2 ~ 5.0) - 범위 대폭 확대 (차별화 강화)
+    return max(0.2, min(5.0, score))
+
+
+def detect_convergence_nodes(inference_paths: dict, query_entities: list) -> dict:
+    """
+    수렴 노드 감지: 여러 쿼리 엔티티를 연결하는 중간 노드 찾기
+
+    Args:
+        inference_paths: 쓰레드별 추론 경로
+        query_entities: 추출된 엔티티 목록
+
+    Returns:
+        {node_uri: {"count": N, "connected_entities": [...], "boost": 2.0}}
+    """
+
+    entity_connections = {}  # node_uri → set of query entities it connects
+
+    # 모든 경로에서 엔티티 간 연결 추출
+    for thread_type, paths in inference_paths.items():
+        for path in paths:
+            raw_data = path.get("raw_data", {})
+
+            # connected_entities 쓰레드에서 수렴 노드 추출
+            if thread_type == "connected_entities":
+                convergence_node = raw_data.get("convergence_node")
+                entity1_label = raw_data.get("label1", "")
+                entity2_label = raw_data.get("label2", "")
+
+                if convergence_node:
+                    if convergence_node not in entity_connections:
+                        entity_connections[convergence_node] = set()
+
+                    entity_connections[convergence_node].add(entity1_label)
+                    entity_connections[convergence_node].add(entity2_label)
+
+            # 일반 경로에서도 중간 노드 추출
+            entities_in_path = raw_data.get("entities", [])
+            if len(entities_in_path) >= 2:
+                # 경로 중간의 모든 노드를 잠재적 수렴 노드로 간주
+                for entity_uri in entities_in_path:
+                    if entity_uri not in entity_connections:
+                        entity_connections[entity_uri] = set()
+
+                    # 이 경로에 포함된 쿼리 엔티티 추가
+                    for query_entity in query_entities:
+                        query_name = query_entity.get("name", "")
+                        if query_name in str(entities_in_path):
+                            entity_connections[entity_uri].add(query_name)
+
+    # 수렴 노드 필터링 (2개 이상의 쿼리 엔티티를 연결)
+    convergence_nodes = {}
+    for node_uri, connected_entities in entity_connections.items():
+        if len(connected_entities) >= 2:
+            convergence_nodes[node_uri] = {
+                "count": len(connected_entities),
+                "connected_entities": list(connected_entities),
+                "boost": 2.0  # 2배 가중치 부스트
+            }
+
+    return convergence_nodes
+
+
+def extract_label_from_uri(uri: str) -> str:
+    """URI에서 라벨 추출 (hist:Person_정약용 → 정약용)"""
+    if "#" in uri:
+        return uri.split("#")[-1]
+    elif "/" in uri:
+        return uri.split("/")[-1]
+    return uri
+
+
+def extract_outgoing_relations(bindings: list, base_weight: float, query_entities: list = None) -> list:
+    """엔티티에서 나가는 모든 관계 추출 (엔티티 → ?)"""
+    paths = []
+    seen = set()
+
+    for binding in bindings:
+        entity_label = binding.get("entityLabel", {}).get("value", "")
+        predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
+        obj = binding.get("object", {}).get("value", "")
+        obj_label = binding.get("objectLabel", {}).get("value", "") or obj.split("#")[-1]
+
+        # 중복 제거
+        key = f"{entity_label}-{predicate}-{obj_label}"
+        if key in seen or not predicate:
+            continue
+        seen.add(key)
+
+        # 개선된 Relevance score 계산
+        relevance_score = calculate_improved_relevance_score(binding, query_entities, "outgoing_relations")
+
+        # 프로퍼티 이름을 읽기 좋게 변환
+        predicate_display = predicate.replace("has", "").replace("_", " ")
+
+        description = f"{entity_label} → [{predicate_display}] → {obj_label}"
+
+        paths.append({
+            "type": "outgoing_relation",
+            "subject": entity_label,
+            "predicate": predicate,
+            "predicate_display": predicate_display,
+            "object": obj_label,
+            "weight": base_weight * relevance_score,
+            "relevance_score": relevance_score,
+            "description": description,
+            "raw_data": binding
+        })
+
+    return paths[:30]
+
+
+def extract_incoming_relations(bindings: list, base_weight: float, query_entities: list = None) -> list:
+    """엔티티로 들어오는 모든 관계 추출 (? → 엔티티)"""
+    paths = []
+    seen = set()
+
+    for binding in bindings:
+        subject = binding.get("subject", {}).get("value", "")
+        subject_label = binding.get("subjectLabel", {}).get("value", "") or subject.split("#")[-1]
+        predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
+        entity_label = binding.get("entityLabel", {}).get("value", "")
+
+        # 중복 제거
+        key = f"{subject_label}-{predicate}-{entity_label}"
+        if key in seen or not predicate:
+            continue
+        seen.add(key)
+
+        # 개선된 Relevance score 계산
+        relevance_score = calculate_improved_relevance_score(binding, query_entities, "incoming_relations")
+
+        # 프로퍼티 이름을 읽기 좋게 변환
+        predicate_display = predicate.replace("has", "").replace("_", " ")
+
+        description = f"{subject_label} → [{predicate_display}] → {entity_label}"
+
+        paths.append({
+            "type": "incoming_relation",
+            "subject": subject_label,
+            "predicate": predicate,
+            "predicate_display": predicate_display,
+            "object": entity_label,
+            "weight": base_weight * relevance_score,  # 기존 1.2 배수 제거
+            "relevance_score": relevance_score,
+            "description": description,
+            "raw_data": binding
+        })
+
+    return paths[:30]
+
+
+def extract_entity_properties(bindings: list, base_weight: float, query_entities: list = None) -> list:
+    """엔티티의 모든 속성 추출 (리터럴 값)"""
+    paths = []
+    seen = set()
+
+    for binding in bindings:
+        entity_label = binding.get("entityLabel", {}).get("value", "")
+        predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
+        value = binding.get("value", {}).get("value", "")
+
+        # 중복 제거
+        key = f"{entity_label}-{predicate}"
+        if key in seen or not predicate or not value:
+            continue
+        seen.add(key)
+
+        # 개선된 Relevance score 계산
+        relevance_score = calculate_improved_relevance_score(binding, query_entities, "entity_properties")
+
+        # 값 정리 (너무 길면 자르기)
+        value_display = value[:100] + "..." if len(value) > 100 else value
+
+        # 프로퍼티 이름을 읽기 좋게 변환
+        predicate_display = predicate.replace("has", "").replace("_", " ")
+
+        description = f"{entity_label}의 {predicate_display}: {value_display}"
+
+        paths.append({
+            "type": "property",
+            "entity": entity_label,
+            "predicate": predicate,
+            "predicate_display": predicate_display,
+            "value": value_display,
+            "weight": base_weight * relevance_score,
+            "relevance_score": relevance_score,
+            "description": description,
+            "raw_data": binding
+        })
+
+    return paths[:30]
+
+
+def extract_connected_entities(bindings: list, base_weight: float) -> list:
+    """연결된 엔티티들 간의 관계 추출 (2-hop)"""
+    paths = []
+    seen = set()
+    
+    for binding in bindings:
+        entity1 = binding.get("label1", {}).get("value", "")
+        predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
+        entity2 = binding.get("label2", {}).get("value", "")
+        
+        # 중복 제거
+        key = f"{entity1}-{predicate}-{entity2}"
+        if key in seen or not predicate:
+            continue
+        seen.add(key)
+        
+        # 프로퍼티 이름을 읽기 좋게 변환
+        predicate_display = predicate.replace("has", "").replace("_", " ")
+        
+        description = f"{entity1} ↔ [{predicate_display}] ↔ {entity2}"
+        
+        # connected_entities는 relevance_score 계산 없이 base_weight만 사용
+        # 차별화를 위해 작은 배수 적용 (1.0 이상으로)
+        paths.append({
+            "type": "connection",
+            "entity1": entity1,
+            "predicate": predicate,
+            "predicate_display": predicate_display,
+            "entity2": entity2,
+            "weight": base_weight * 1.0,  # 기본값 유지 (0.8 → 1.0, 곱셈 시 감소 방지)
+            "description": description,
+            "raw_data": binding
+        })
+    
+    return paths[:20]
+
+
+def extract_type_and_summary(bindings: list, base_weight: float) -> list:
+    """엔티티 타입과 요약 정보 추출"""
+    paths = []
+    seen = set()
+    
+    for binding in bindings:
+        entity_label = binding.get("entityLabel", {}).get("value", "")
+        entity_type = binding.get("type", {}).get("value", "").split("#")[-1] if binding.get("type") else ""
+        summary = binding.get("summary", {}).get("value", "") if binding.get("summary") else ""
+        category = binding.get("category", {}).get("value", "") if binding.get("category") else ""
+        year = binding.get("year", {}).get("value", "") if binding.get("year") else ""
+        
+        if entity_label in seen:
+            continue
+        seen.add(entity_label)
+        
+        # 설명 생성
+        parts = []
+        if entity_type:
+            parts.append(f"[{entity_type}]")
+        if year:
+            parts.append(f"({year}년)")
+        if category:
+            parts.append(f"분류: {category}")
+        if summary:
+            parts.append(summary[:100])
+        
+        description = f"{entity_label} " + " ".join(parts) if parts else entity_label
+        
+        paths.append({
+            "type": "summary",
+            "entity": entity_label,
+            "entity_type": entity_type,
+            "summary": summary,
+            "category": category,
+            "year": year,
+            "weight": base_weight,
+            "description": description,
+            "raw_data": binding
+        })
+    
+    return paths[:20]
+
+
+def path_evidence_aggregator_node(state: GraphState) -> GraphState:
+    """
+    통합 노드: 경로 추출 + 근거 통합
+    
+    1. 5개 Thread의 추론 결과에서 경로 추출
+    2. 개선된 점수 체계로 관련성 평가
+    3. 모든 경로를 통합하여 가중치 기준 정렬
+    4. 상위 15개 근거 선택 (기존 5개에서 확장)
+    """
+
+    import time
+    node_start = time.time()
+
+    parallel_results = state.get("parallel_inference_results", {})
+    thread_weights = state.get("thread_weights", {})
+    query_type = state.get("query_type", "causal")
+    query_entities = state.get("extracted_entities", [])
+
+    print(f"\n{'='*70}")
+    print(f"[4/6] 경로 추출 및 근거 통합 (Path Extractor & Evidence Aggregator)")
+    print(f"{'='*70}")
+
+    # 1. Thread별 경로 추출
+    inference_paths = {}
+
+    for thread_type, result in parallel_results.items():
+        bindings = result.get("bindings", [])
+
+        if not bindings:
+            inference_paths[thread_type] = []
+            continue
+
+        # Thread별 경로 추출 - base_weight를 thread별로 차별화
+        default_weights = {
+            "outgoing_relations": 0.5,  # 나가는 관계는 높게
+            "incoming_relations": 0.4,   # 들어오는 관계는 중간
+            "entity_properties": 0.3,   # 속성은 낮게
+            "connected_entities": 0.3,  # 연결은 낮게
+            "type_and_summary": 0.2     # 요약은 가장 낮게
+        }
+        base_weight = thread_weights.get(thread_type, default_weights.get(thread_type, 0.3))
+
+        if thread_type == "outgoing_relations":
+            paths = extract_outgoing_relations(bindings, base_weight, query_entities)
+        elif thread_type == "incoming_relations":
+            paths = extract_incoming_relations(bindings, base_weight, query_entities)
+        elif thread_type == "entity_properties":
+            paths = extract_entity_properties(bindings, base_weight, query_entities)
+        elif thread_type == "connected_entities":
+            paths = extract_connected_entities(bindings, base_weight)
+        elif thread_type == "type_and_summary":
+            paths = extract_type_and_summary(bindings, base_weight)
+        else:
+            # 알 수 없는 Thread는 빈 리스트
+            paths = []
+
+        inference_paths[thread_type] = paths
+
+    # 총 경로 수 계산
+    total_paths = sum(len(paths) for paths in inference_paths.values())
+    print(f"  ├─ 경로 추출 완료: {total_paths}개 경로")
+
+    # 2. 수렴 노드 감지
+    convergence_nodes = detect_convergence_nodes(inference_paths, query_entities)
+
+    if convergence_nodes:
+        print(f"  ├─ 수렴 노드 감지: {len(convergence_nodes)}개")
+        for i, (node_uri, info) in enumerate(list(convergence_nodes.items())[:3], 1):
+            node_label = extract_label_from_uri(node_uri)
+            connected = ", ".join(info["connected_entities"][:3])
+            print(f"  │  {i}. {node_label} (연결: {connected})")
+
+    # 3. 모든 Thread의 경로를 하나로 병합
+    all_evidences = []
+
+    for thread_type, paths in inference_paths.items():
+        for path in paths:
+            final_weight = path.get("weight", 0.2)
+
+            # 수렴 노드 부스트 적용
+            raw_data = path.get("raw_data", {})
+            convergence_node = raw_data.get("convergence_node")
+
+            if convergence_node and convergence_node in convergence_nodes:
+                boost = convergence_nodes[convergence_node]["boost"]
+                final_weight *= boost
+                path["convergence_boost"] = boost
+
+            evidence = {
+                "type": thread_type,
+                "description": path.get("description", ""),
+                "weight": final_weight,
+                "relevance_score": path.get("relevance_score", 1.0),
+                "source": f"Thread: {thread_type}",
+                "raw_data": path,
+                "is_convergence": convergence_node in convergence_nodes if convergence_node else False
+            }
+
+            all_evidences.append(evidence)
+
+    # 4. 가중치 기준으로 정렬
+    sorted_evidences = sorted(all_evidences, key=lambda x: x["weight"], reverse=True)
+
+    # 쓰레드별 검색 결과 출력
+    print(f"\n      [쓰레드별 검색 결과]")
+    for thread_type, paths in inference_paths.items():
+        if paths:
+            print(f"        - {thread_type}: {len(paths)}개 경로")
+            # 상위 3개만 미리보기
+            for i, path in enumerate(paths[:3], 1):
+                desc = path.get("description", "")[:50]
+                weight = path.get("weight", 0)
+                print(f"          {i}. {desc} (가중치: {weight:.3f})")
+            if len(paths) > 3:
+                print(f"          ... 외 {len(paths) - 3}개")
+
+    # 전체 근거 목록 출력 (정렬 후)
+    print(f"\n      [전체 근거 목록 (총 {len(sorted_evidences)}개, 가중치 순)]")
+    for i, ev in enumerate(sorted_evidences[:25], 1):  # 상위 25개만 출력
+        ev_type = ev.get("type", "unknown")
+        description = ev.get("description", "")
+        weight = ev.get("weight", 0)
+        
+        type_map = {
+            "outgoing_relations": "나가는관계",
+            "incoming_relations": "들어오는관계",
+            "entity_properties": "엔티티속성",
+            "connected_entities": "연결엔티티",
+            "type_and_summary": "타입/요약",
+            "outgoing_relation": "나가는관계",
+            "incoming_relation": "들어오는관계",
+            "property": "속성",
+            "connection": "연결",
+            "summary": "요약"
+        }
+        type_display = type_map.get(ev_type, ev_type)
+        desc_display = description[:60] + "..." if len(description) > 60 else description
+        
+        print(f"        {i:2d}. [{type_display:12s}] {desc_display} (가중치: {weight:.4f})")
+    if len(sorted_evidences) > 25:
+        print(f"        ... 외 {len(sorted_evidences) - 25}개")
+
+    # 5. 상위 15개 선택 (기존 5개에서 확장)
+    top_count = min(15, len(sorted_evidences))
+    top_evidences = sorted_evidences[:top_count]
+
+    # 6. 순위 부여
+    for i, ev in enumerate(top_evidences, 1):
+        ev["rank"] = i
+
+    # 최종 선택된 근거 목록
+    if top_evidences:
+        print(f"\n      [최종 근거 목록 (상위 {len(top_evidences)}개)]")
+        for ev in top_evidences:
+            rank = ev.get("rank", 0)
+            ev_type = ev.get("type", "unknown")
+            description = ev.get("description", "")
+            weight = ev.get("weight", 0)
+
+            # Thread 이름 정규화 (기존 evidence_aggregator_node와 동일)
+            type_map = {
+                "outgoing_relations": "나가는관계",
+                "incoming_relations": "들어오는관계",
+                "entity_properties": "엔티티속성",
+                "connected_entities": "연결엔티티",
+                "type_and_summary": "타입/요약",
+                "outgoing_relation": "나가는관계",
+                "incoming_relation": "들어오는관계",
+                "property": "속성",
+                "connection": "연결",
+                "summary": "요약"
+            }
+            type_display = type_map.get(ev_type, ev_type)
+
+            desc_display = description[:60] + "..." if len(description) > 60 else description
+
+            print(f"      {rank}. [{type_display:12s}] {desc_display} (가중치: {weight:.2%})")
+
+    node_elapsed = time.time() - node_start
+    print(f"  └─ 완료: {len(top_evidences)}개 근거 통합 ({node_elapsed:.2f}초)")
+    print()
+
+    # 노드 실행 시간 기록
+    node_times = state.get("node_execution_times", {})
+    node_times["path_evidence_aggregator"] = node_elapsed
+
+    return {
+        **state,
+        "inference_paths": inference_paths,
+        "evidences": top_evidences,
+        "executed_nodes": state.get("executed_nodes", []) + ["path_evidence_aggregator"],
+        "node_execution_times": node_times
+    }
+

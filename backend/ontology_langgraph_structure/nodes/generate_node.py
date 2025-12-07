@@ -87,8 +87,26 @@ def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
             desc = clean_entity_name(desc)
 
             # 기본 정보 추출 (summary 우선, 없으면 content, 없으면 description에서 추출)
-            summary = raw_data.get('summary', '') or ''
+            # raw_data에서 summary 찾기 (다양한 경로 시도)
+            summary = ''
+            summary_val = raw_data.get('summary', '')
+            if isinstance(summary_val, dict):
+                summary = summary_val.get('value', '')
+            elif isinstance(summary_val, str):
+                summary = summary_val
+            
+            # raw_data 내부의 raw_data에서도 찾기
+            if not summary:
+                inner_raw_data = raw_data.get('raw_data', {})
+                if isinstance(inner_raw_data, dict):
+                    summary_val = inner_raw_data.get('summary', '')
+                    if isinstance(summary_val, dict):
+                        summary = summary_val.get('value', '')
+                    elif isinstance(summary_val, str):
+                        summary = summary_val
+            
             content = raw_data.get('content', '') or ''
+            
             # summary나 content가 없으면 description에서 더 많은 정보 추출 시도
             if not summary and not content:
                 # description에 ":" 가 있으면 그 뒤가 summary일 수 있음
@@ -98,6 +116,7 @@ def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
                         content = parts[1].strip()
             
             # 최종 content 결정 (summary 우선, 없으면 content)
+            # summary가 있으면 LLM에게 더 풍부한 설명을 위해 summary를 명시적으로 포함
             final_content = summary if summary else content
             year = raw_data.get('year', '') or raw_data.get('hasYear', '')
 
@@ -105,6 +124,10 @@ def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
             subject = ""
             predicate = ""
             obj = ""
+            
+            # 엔티티 타입 확인 (raw_data에서)
+            subject_type = raw_data.get('subject_type', '') or raw_data.get('type', '')
+            object_type = raw_data.get('object_type', '') or raw_data.get('obj_type', '')
 
             if "↔" in desc or "→" in desc:
                 parts = desc.split("↔") if "↔" in desc else desc.split("→")
@@ -123,8 +146,25 @@ def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
                 if year and subject:
                     sentence = f"{year}년에 발생한 {subject}"
                     if obj and predicate:
-                        sentence += f"는 {obj}와 관련이 있습니다"
-                    if final_content:
+                        # 사건과 다른 엔티티의 관계 표현
+                        if predicate in ['participatesIn', 'participatedIn']:
+                            # 사건이 다른 사건에 "참여"하는 것은 부적절
+                            sentence += f"는 {obj}와 관련이 있습니다"
+                        elif predicate in ['commands', 'command']:
+                            # 사건이 다른 것을 "지휘"하는 것은 부적절
+                            sentence += f"는 {obj}와 관련이 있습니다"
+                        elif predicate in ['partOf', 'part_of']:
+                            sentence += f"는 {obj}의 일부입니다"
+                        elif predicate in ['leadsTo', 'leads_to']:
+                            sentence += f"는 {obj}로 이어졌습니다"
+                        elif predicate in ['causedBy', 'caused_by']:
+                            sentence += f"는 {obj}로 인해 발생했습니다"
+                        else:
+                            sentence += f"는 {obj}와 관련이 있습니다"
+                    # summary가 있으면 더 상세한 설명 추가
+                    if summary:
+                        sentence += f". {summary}"  # summary를 명시적으로 추가
+                    elif final_content:
                         sentence += f". {final_content}"
                     elif not obj:  # 관계 정보가 없으면 description 사용
                         sentence += f"는 {desc.split('→')[0].strip() if '→' in desc else desc}"
@@ -141,16 +181,39 @@ def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
                     if year:
                         sentence += f"({year}년)"
                     if obj and predicate:
-                        if predicate in ['appointed', 'served']:
+                        # 왕이나 고위 인물이 사건에 "참여"하는 표현 개선
+                        is_king_or_royal = any(keyword in subject.lower() for keyword in ['왕', '군', '대군', '공주', '옹주'])
+                        is_event = object_type == 'Event' or any(keyword in obj for keyword in ['전쟁', '사변', '정변', '왜란', '호란'])
+                        
+                        if predicate in ['participatesIn', 'participatedIn', 'participated']:
+                            if is_king_or_royal and is_event:
+                                # 왕이 사건에 "참여"했다는 표현 대신, 그 시대에 발생한 사건이라고 표현
+                                sentence += f" 재위 시기(또는 생존 시기)에 {obj}가 발생했습니다"
+                            else:
+                                sentence += f"는 {obj}에 참여한 인물입니다"
+                        elif predicate in ['commands', 'command']:
+                            if is_king_or_royal and is_event:
+                                # 왕이 사건을 "지휘"했다는 표현 대신, 그 시대에 발생한 사건이라고 표현
+                                sentence += f" 재위 시기에 {obj}가 발생했습니다"
+                            else:
+                                sentence += f"는 {obj}를 지휘했습니다"
+                        elif predicate in ['appointed', 'served']:
                             sentence += f"는 {obj}의 직책을 역임했습니다"
-                        elif predicate in ['participated', 'participatedIn']:
-                            sentence += f"는 {obj}에 참여한 인물입니다"
                         elif predicate in ['died', 'diedIn']:
                             sentence += f"는 {obj}에서 사망했습니다"
+                        elif predicate in ['contemporaryWith', 'contemporary_with']:
+                            sentence += f"는 {obj}와 동시대 인물입니다"
+                        elif predicate in ['servedUnder', 'served_under']:
+                            sentence += f"는 {obj}의 휘하에서 활동했습니다"
                         else:
                             sentence += f"는 {obj}와 관련된 활동을 했습니다"
-                    if final_content:
+                    # summary가 있으면 더 상세한 설명 추가
+                    if summary:
+                        sentence += f". {summary}"  # summary를 명시적으로 추가
+                    elif final_content:
                         sentence += f". {final_content}"
+                elif summary:
+                    sentence = summary  # summary가 있으면 우선 사용
                 elif final_content:
                     sentence = final_content
                 else:
@@ -170,8 +233,13 @@ def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
                             sentence += "는 폐지되었습니다"
                         else:
                             sentence += f"는 {obj}와 관련이 있습니다"
-                    if final_content:
+                    # summary가 있으면 더 상세한 설명 추가
+                    if summary:
+                        sentence += f". {summary}"  # summary를 명시적으로 추가
+                    elif final_content:
                         sentence += f". {final_content}"
+                elif summary:
+                    sentence = summary  # summary가 있으면 우선 사용
                 elif final_content:
                     sentence = final_content
                 else:
@@ -191,8 +259,13 @@ def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
                             sentence += f"는 {obj}에 위치합니다"
                         else:
                             sentence += f"는 {obj}와 관련이 있습니다"
-                    if final_content:
+                    # summary가 있으면 더 상세한 설명 추가
+                    if summary:
+                        sentence += f". {summary}"  # summary를 명시적으로 추가
+                    elif final_content:
                         sentence += f". {final_content}"
+                elif summary:
+                    sentence = summary  # summary가 있으면 우선 사용
                 elif final_content:
                     sentence = final_content
                 else:
@@ -210,8 +283,13 @@ def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
                             sentence += f"는 {obj}에 사상적 영향을 미쳤습니다"
                         else:
                             sentence += f"는 {obj}와 관련된 사상입니다"
-                    if final_content:
+                    # summary가 있으면 더 상세한 설명 추가
+                    if summary:
+                        sentence += f". {summary}"  # summary를 명시적으로 추가
+                    elif final_content:
                         sentence += f". {final_content}"
+                elif summary:
+                    sentence = summary  # summary가 있으면 우선 사용
                 elif final_content:
                     sentence = final_content
                 else:
@@ -274,7 +352,7 @@ def story_generator_node(state: GraphState) -> GraphState:
     )
 
     print(f"\n{'='*70}")
-    print(f"[6/6] 스토리 생성 (Story Generator)")
+    print(f"[5/6] 스토리 생성 (Story Generator)")
     print(f"{'='*70}")
 
     # 근거가 없는 경우 처리
