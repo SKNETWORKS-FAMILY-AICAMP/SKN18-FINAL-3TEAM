@@ -22,6 +22,18 @@ FUSEKI_URL = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
 USE_PGVECTOR = os.getenv("USE_PGVECTOR", "true").lower() == "true"
 _pgvector_service = None
 
+# ------------------------------------------------------------
+#  관련성 점수 가중치 (Fixed Weights with Boost)
+# ------------------------------------------------------------
+# 기본 점수 0.5에 관계 유형별 가중치(1 이상)를 곱하여 부스트
+RELEVANCE_MULTIPLIERS = {
+    "causal_chain": 1.9,   # 인과관계: 0.5 × 1.9 = 0.95 (가장 높은 관련성)
+    "temporal": 1.7,       # 시간적 맥락: 0.5 × 1.7 = 0.85 (높은 관련성)
+    "category": 1.5,       # 카테고리: 0.5 × 1.5 = 0.75 (중간 관련성)
+    "pgvector": 1.3        # 벡터 유사도: 0.5 × 1.3 = 0.65 (보통 관련성)
+}
+BASE_SCORE = 0.5  # 기본 점수
+
 def get_pgvector_service():
     """pgvector 서비스 lazy loading"""
     global _pgvector_service
@@ -31,8 +43,14 @@ def get_pgvector_service():
             from pathlib import Path
             sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-            from db_pipeline.services.postgres_service import PostgresVectorService
-            _pgvector_service = PostgresVectorService()
+            from db_pipeline.services.custom_pgvector import CustomPGVector
+            from db_pipeline.config import POSTGRES_CONN_STR, get_embedding
+
+            _pgvector_service = CustomPGVector(
+                conn_str=POSTGRES_CONN_STR,
+                embedding_fn=get_embedding(),
+                table="korean_history"
+            )
             print("✅ pgvector 서비스 초기화 완료")
         except Exception as e:
             print(f"⚠️ pgvector 초기화 실패: {e}")
@@ -141,7 +159,7 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
                             "matched": True,
                             "expansion_method": "temporal",
                             "expansion_source": entity.get("name"),
-                            "relevance_score": 0.8  # 시간적 관련성 높음
+                            "relevance_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["temporal"]  # 0.5 × 1.7 = 0.85
                         })
         except:
             pass
@@ -239,7 +257,7 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
                             "expansion_method": "category",
                             "expansion_source": entity.get("name"),
                             "category": category,
-                            "relevance_score": 0.7
+                            "relevance_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["category"]  # 0.5 × 1.5 = 0.75
                         })
         except:
             pass
@@ -321,7 +339,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                             "expansion_method": "causal_chain",
                             "expansion_source": entity.get("name"),
                             "causal_relation": predicate,
-                            "relevance_score": 0.9  # 인과관계는 매우 높은 관련성
+                            "relevance_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["causal_chain"]  # 0.5 × 1.9 = 0.95
                         })
         except:
             pass
@@ -351,12 +369,14 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
 
     try:
         # 1. 원본 질문으로 검색 (가장 관련성 높음)
-        results = pgvector.search(query=query, top_k=top_k, threshold=0.6)
+        # CustomPGVector.similarity_search()는 Document 객체 리스트 반환
+        docs = pgvector.similarity_search(query=query, k=top_k)
 
-        for result in results:
-            title = result.get("title", "")
+        for doc in docs:
+            title = doc.metadata.get("title", "")
             if title and title not in seen:
                 seen.add(title)
+                # CustomPGVector는 score 없이 반환하므로 고정 가중치 사용
                 expanded_entities.append({
                     "type": "Event",  # 기본값
                     "name": title,
@@ -364,8 +384,8 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
                     "matched": False,
                     "expansion_method": "pgvector",
                     "expansion_source": "query",
-                    "pgvector_score": result.get("similarity", 0),
-                    "relevance_score": result.get("similarity", 0) * 0.8  # 벡터 유사도 × 0.8
+                    "pgvector_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["pgvector"],  # 0.5 × 1.3 = 0.65
+                    "relevance_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["pgvector"]  # 0.5 × 1.3 = 0.65
                 })
 
         # 2. 추출된 엔티티 이름으로도 검색
@@ -374,10 +394,10 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
             if not name:
                 continue
 
-            results = pgvector.search(query=name, top_k=5, threshold=0.6)
+            docs = pgvector.similarity_search(query=name, k=5)
 
-            for result in results:
-                title = result.get("title", "")
+            for doc in docs:
+                title = doc.metadata.get("title", "")
                 if title and title not in seen:
                     seen.add(title)
                     expanded_entities.append({
@@ -387,8 +407,8 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
                         "matched": False,
                         "expansion_method": "pgvector",
                         "expansion_source": name,
-                        "pgvector_score": result.get("similarity", 0),
-                        "relevance_score": result.get("similarity", 0) * 0.7
+                        "pgvector_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["pgvector"],  # 0.5 × 1.3 = 0.65
+                        "relevance_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["pgvector"]  # 0.5 × 1.3 = 0.65
                     })
 
     except Exception as e:
@@ -488,7 +508,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
     print(f"  │  ├─ 시간적 맥락: {expansion_stats['temporal']}개")
     print(f"  │  ├─ 카테고리: {expansion_stats['category']}개")
     print(f"  │  ├─ 인과관계: {expansion_stats['causal']}개")
-    print(f"  │  └─ 벡터 유사도: {expansion_stats['milvus']}개")
+    print(f"  │  └─ 벡터 유사도: {expansion_stats['pgvector']}개")
 
     # 상위 5개 샘플 출력
     if len(all_expanded) > len(extracted_entities):
@@ -504,7 +524,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
                 "temporal": "시간",
                 "category": "카테고리",
                 "causal_chain": "인과",
-                "milvus": "벡터"
+                "pgvector": "벡터"
             }.get(method, method)
 
             print(f"      {i}. [{method_display:6s}] {name[:40]} (출처: {source[:20]}, 점수: {score:.2f})")
