@@ -4,9 +4,127 @@ Multi-Path Extractor Node
 5개 Thread의 추론 결과에서 각각 경로 추출
 - Thread별로 서로 다른 경로 추출 로직 적용
 - 각 Thread의 가중치 반영
+- 속성/관계별 relevance score 계산
 """
 
 from state import GraphState
+
+# ========================================
+# 속성/관계 타입별 Relevance Score 가중치
+# ========================================
+
+# 관계(Predicate) 타입별 가중치
+RELATION_WEIGHTS = {
+    # 인과관계 (가장 중요)
+    "leadsTo": 1.5,
+    "causedBy": 1.5,
+    "causes": 1.5,
+    "ledTo": 1.5,
+    "triggeredBy": 1.4,
+
+    # 참여/지휘 (높은 관련성)
+    "participatesIn": 1.3,
+    "commands": 1.3,
+    "involved": 1.3,
+    "involves": 1.3,
+
+    # 부분 관계 (높은 관련성)
+    "partOf": 1.2,
+
+    # 설립/건설
+    "establishedBy": 1.2,
+    "founded": 1.2,
+    "built": 1.2,
+
+    # 시간적 관계
+    "occursBefore": 1.1,
+    "occursAfter": 1.1,
+    "followedBy": 1.1,
+    "precededBy": 1.1,
+
+    # 연결관계
+    "relatedTo": 1.0,
+    "associatedWith": 1.0,
+    "connectedTo": 1.0,
+
+    # 일반 속성 (낮은 관련성)
+    "hasYear": 0.8,
+    "hasCategory": 0.7,
+    "hasDescription": 0.6,
+
+    # 기본값 (매칭 안되는 경우)
+    "_default": 1.0
+}
+
+# 속성 이름 패턴별 가중치 (관계가 아닌 속성값)
+PROPERTY_WEIGHTS = {
+    # 핵심 속성
+    "Achievement": 1.2,
+    "Rank": 1.1,
+    "Role": 1.1,
+
+    # 시간 속성
+    "Year": 0.9,
+    "StartYear": 0.9,
+    "EndYear": 0.9,
+    "Month": 0.8,
+
+    # 일반 속성
+    "Category": 0.7,
+    "Type": 0.7,
+
+    # 기본값
+    "_default": 0.8
+}
+
+def calculate_path_relevance(path_data: dict, query_entities: list = None) -> float:
+    """
+    경로의 relevance score 계산
+
+    Args:
+        path_data: 경로 데이터 (binding 정보)
+        query_entities: 쿼리에서 추출된 엔티티 리스트
+
+    Returns:
+        relevance score (0.5 ~ 1.5)
+    """
+    score = 1.0
+
+    # 1. 관계(predicate) 가중치
+    predicate = path_data.get("predicate", {}).get("value", "")
+    if predicate:
+        pred_name = predicate.split("#")[-1]  # hist:leadsTo → leadsTo
+        score *= RELATION_WEIGHTS.get(pred_name, RELATION_WEIGHTS["_default"])
+
+    # 2. 속성명 가중치
+    property_name = path_data.get("property", {}).get("value", "")
+    if property_name:
+        prop_name = property_name.split("#")[-1]
+        # 속성명에서 키워드 추출 (예: hasAchievement → Achievement)
+        for keyword, weight in PROPERTY_WEIGHTS.items():
+            if keyword != "_default" and keyword.lower() in prop_name.lower():
+                score *= weight
+                break
+        else:
+            score *= PROPERTY_WEIGHTS["_default"]
+
+    # 3. 쿼리 엔티티와의 직접 연결 여부
+    if query_entities:
+        # subject나 object가 쿼리 엔티티와 일치하면 부스트
+        subject = path_data.get("subject", {}).get("value", "")
+        obj = path_data.get("object", {}).get("value", "")
+
+        subject_name = subject.split("#")[-1] if subject else ""
+        obj_name = obj.split("#")[-1] if obj else ""
+
+        for entity in query_entities:
+            entity_name = entity.get("name", "")
+            if entity_name and (entity_name in subject_name or entity_name in obj_name):
+                score *= 1.2  # 20% 부스트
+                break
+
+    # 4. 범위 제한 (0.5 ~ 1.5)
+    return max(0.5, min(1.5, score))
 
 
 def multi_path_extractor_node(state: GraphState) -> GraphState:
@@ -17,6 +135,7 @@ def multi_path_extractor_node(state: GraphState) -> GraphState:
 
     parallel_results = state.get("parallel_inference_results", {})
     thread_weights = state.get("thread_weights", {})
+    query_entities = state.get("extracted_entities", [])  # 쿼리 엔티티 가져오기
 
     print(f"\n{'='*70}")
     print(f"[4/6] 다중 경로 추출 (Multi-Path Extractor)")
@@ -33,13 +152,13 @@ def multi_path_extractor_node(state: GraphState) -> GraphState:
 
         # Thread별 경로 추출 (범용 관계 검색 기반)
         base_weight = thread_weights.get(thread_type, 0.2)
-        
+
         if thread_type == "outgoing_relations":
-            paths = extract_outgoing_relations(bindings, base_weight)
+            paths = extract_outgoing_relations(bindings, base_weight, query_entities)
         elif thread_type == "incoming_relations":
-            paths = extract_incoming_relations(bindings, base_weight)
+            paths = extract_incoming_relations(bindings, base_weight, query_entities)
         elif thread_type == "entity_properties":
-            paths = extract_entity_properties(bindings, base_weight)
+            paths = extract_entity_properties(bindings, base_weight, query_entities)
         elif thread_type == "connected_entities":
             paths = extract_connected_entities(bindings, base_weight)
         elif thread_type == "type_and_summary":
@@ -647,110 +766,125 @@ def extract_background_paths(bindings: list, base_weight: float) -> list:
 # 범용 관계 검색 경로 추출 함수들
 # ========================================
 
-def extract_outgoing_relations(bindings: list, base_weight: float) -> list:
+def extract_outgoing_relations(bindings: list, base_weight: float, query_entities: list = None) -> list:
     """엔티티에서 나가는 모든 관계 추출 (엔티티 → ?)"""
     paths = []
     seen = set()
-    
+
     for binding in bindings:
         entity_label = binding.get("entityLabel", {}).get("value", "")
         predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
         obj = binding.get("object", {}).get("value", "")
         obj_label = binding.get("objectLabel", {}).get("value", "") or obj.split("#")[-1]
-        
+
         # 중복 제거
         key = f"{entity_label}-{predicate}-{obj_label}"
         if key in seen or not predicate:
             continue
         seen.add(key)
-        
+
+        # Relevance score 계산
+        relevance_score = calculate_path_relevance(binding, query_entities)
+
         # 프로퍼티 이름을 읽기 좋게 변환
         predicate_display = predicate.replace("has", "").replace("_", " ")
-        
+
         description = f"{entity_label} → [{predicate_display}] → {obj_label}"
-        
+
         paths.append({
             "type": "outgoing_relation",
             "subject": entity_label,
             "predicate": predicate,
             "predicate_display": predicate_display,
             "object": obj_label,
-            "weight": base_weight,
-            "description": description
+            "weight": base_weight * relevance_score,  # base_weight × relevance_score
+            "relevance_score": relevance_score,
+            "description": description,
+            "raw_data": binding  # 원본 데이터 보관
         })
-    
+
     return paths[:30]
 
 
-def extract_incoming_relations(bindings: list, base_weight: float) -> list:
+def extract_incoming_relations(bindings: list, base_weight: float, query_entities: list = None) -> list:
     """엔티티로 들어오는 모든 관계 추출 (? → 엔티티)"""
     paths = []
     seen = set()
-    
+
     for binding in bindings:
         subject = binding.get("subject", {}).get("value", "")
         subject_label = binding.get("subjectLabel", {}).get("value", "") or subject.split("#")[-1]
         predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
         entity_label = binding.get("entityLabel", {}).get("value", "")
-        
+
         # 중복 제거
         key = f"{subject_label}-{predicate}-{entity_label}"
         if key in seen or not predicate:
             continue
         seen.add(key)
-        
+
+        # Relevance score 계산
+        relevance_score = calculate_path_relevance(binding, query_entities)
+
         # 프로퍼티 이름을 읽기 좋게 변환
         predicate_display = predicate.replace("has", "").replace("_", " ")
-        
+
         description = f"{subject_label} → [{predicate_display}] → {entity_label}"
-        
+
         paths.append({
             "type": "incoming_relation",
             "subject": subject_label,
             "predicate": predicate,
             "predicate_display": predicate_display,
             "object": entity_label,
-            "weight": base_weight * 1.2,  # 들어오는 관계는 더 중요
-            "description": description
+            "weight": base_weight * relevance_score * 1.2,  # 들어오는 관계는 20% 추가 부스트
+            "relevance_score": relevance_score,
+            "description": description,
+            "raw_data": binding
         })
-    
+
     return paths[:30]
 
 
-def extract_entity_properties(bindings: list, base_weight: float) -> list:
+def extract_entity_properties(bindings: list, base_weight: float, query_entities: list = None) -> list:
     """엔티티의 모든 속성 추출 (리터럴 값)"""
     paths = []
     seen = set()
-    
+
     for binding in bindings:
         entity_label = binding.get("entityLabel", {}).get("value", "")
         predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
         value = binding.get("value", {}).get("value", "")
-        
+
         # 중복 제거
         key = f"{entity_label}-{predicate}"
         if key in seen or not predicate or not value:
             continue
         seen.add(key)
-        
+
+        # Relevance score 계산
+        relevance_score = calculate_path_relevance(binding, query_entities)
+
         # 값 정리 (너무 길면 자르기)
         value_display = value[:100] + "..." if len(value) > 100 else value
-        
+
         # 프로퍼티 이름을 읽기 좋게 변환
         predicate_display = predicate.replace("has", "").replace("_", " ")
-        
+
         description = f"{entity_label}의 {predicate_display}: {value_display}"
-        
+
         paths.append({
             "type": "property",
             "entity": entity_label,
             "predicate": predicate,
             "predicate_display": predicate_display,
             "value": value_display,
-            "weight": base_weight,
-            "description": description
+            "weight": base_weight * relevance_score,
+            "relevance_score": relevance_score,
+            "description": description,
+            "raw_data": binding
         })
-    
+
     return paths[:30]
 
 
