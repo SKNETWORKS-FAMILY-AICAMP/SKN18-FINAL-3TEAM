@@ -261,6 +261,7 @@ $RECYCLE.BIN/
 error_log.txt
 */logs/*.log
 backend/ontology_langgraph_structure/inference_results/
+backend/ontology_langgraph_structure/ontology/logs/
 
 # neo4j
 infra/neo4j/
