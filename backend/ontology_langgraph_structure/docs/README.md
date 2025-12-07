@@ -599,25 +599,118 @@ def expand_by_pgvector(entities, query, top_k=15):
 
 **목적:** 확장된 엔티티들에 대해 관련도를 정량화하여 우선순위 정렬
 
-#### **현재 문제점 ⚠️**
+---
 
-현재 코드에서 점수 계산 방식에 논리적 오류가 있습니다:
+#### **📜 점수 책정 방식 발전 과정 (Version History)**
+
+**ver0 (초기 - 문제 발견) ⚠️**
 
 ```python
-# semantic_expander_node.py (현재)
+# semantic_expander_node.py (초기 버전)
 "relevance_score": similarity * 0.8  # ❌ 0.8 곱하면 점수 감소!
-"relevance_score": similarity * 0.7  # ❌ 0.7 곱하면 점수 감소!
+"relevance_score": 0.9 * 0.7        # ❌ 0.9 → 0.63으로 감소
 ```
 
-**문제:**
+**문제점:**
 - 벡터 유사도가 0.9라면 → 0.9 × 0.8 = **0.72** (오히려 감소!)
-- 관련도가 높을수록 점수가 더 낮아지는 모순
-
-#### **점수 매기기 방식 3가지 옵션**
+- 관련도가 높을수록 점수가 더 낮아지는 논리적 모순
+- 0 < x < 1을 곱하면 점수가 감소 (패널티)
 
 ---
 
-##### **옵션 1: 고정 가중치 × 배수 (Fixed Weights with Multiplier) - 추천 ⭐ 현재 적용됨**
+**ver1 (고정 가중치 × 배수 방식) ✅ [2025-12-07 적용]**
+
+기본 점수에 **1 이상의 배수를 곱하여** 점수를 부스트
+
+```python
+# 기본 점수에 관계 유형별 가중치(1 이상)를 곱하여 부스트
+RELEVANCE_MULTIPLIERS = {
+    "causal_chain": 1.9,   # 0.5 × 1.9 = 0.95
+    "temporal": 1.7,       # 0.5 × 1.7 = 0.85
+    "category": 1.5,       # 0.5 × 1.5 = 0.75
+    "pgvector": 1.3        # 0.5 × 1.3 = 0.65
+}
+BASE_SCORE = 0.5
+
+# 적용
+"relevance_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["causal_chain"]  # 0.95
+```
+
+**개선점:**
+- ✅ 1 이상의 배수로 점수 증가 (논리적으로 합리적)
+- ✅ 관련도가 높으면 점수도 높아짐
+- ✅ 단순하고 예측 가능
+
+**한계점:**
+- ❌ 실제 벡터 유사도 무시 (CustomPGVector가 score 미반환)
+- ❌ 모든 pgvector 결과에 동일한 점수 부여
+
+---
+
+**ver2 (하이브리드 방식) ⭐ 현재 적용됨 [2025-12-07]**
+
+**고정 가중치**와 **벡터 유사도**를 가중평균하여 최적 점수 계산
+
+```python
+def calculate_hybrid_score(similarity, expansion_method, alpha=0.6):
+    """
+    하이브리드 점수 = (고정 점수 × α) + (유사도 × (1 - α))
+
+    alpha = 0.6: 고정 점수에 60% 가중치, 유사도에 40% 가중치
+    """
+    FIXED_SCORES = {
+        "causal_chain": 0.95,
+        "temporal": 0.85,
+        "category": 0.75,
+        "pgvector": 0.65
+    }
+
+    fixed_score = FIXED_SCORES.get(expansion_method, 0.5)
+
+    # 유사도가 없으면 고정 점수만 사용
+    if similarity is None:
+        return fixed_score
+
+    # 가중평균
+    return (fixed_score * alpha) + (similarity * (1 - alpha))
+
+# 적용 예시
+similarity = 0.88  # CustomPGVector의 실제 유사도
+method = "pgvector"
+score = calculate_hybrid_score(0.88, "pgvector", alpha=0.6)
+# → (0.65 × 0.6) + (0.88 × 0.4) = 0.39 + 0.352 = 0.742
+```
+
+**개선점:**
+- ✅ **고정 점수의 안정성** + **실제 유사도의 정확성** 결합
+- ✅ alpha 값으로 밸런스 조정 가능
+- ✅ 유사도가 없어도 동작 (fallback to 고정 점수)
+- ✅ similarity_search_with_score() 구현 시 실제 유사도 활용
+
+**적용 케이스:**
+```
+질문: "을미사변의 원인" (alpha=0.6)
+
+1. 갑오개혁 (인과관계, 유사도 0.78)
+   → (0.95 × 0.6) + (0.78 × 0.4) = 0.882
+
+2. 청일전쟁 (시간적 맥락, 유사도 0.82)
+   → (0.85 × 0.6) + (0.82 × 0.4) = 0.838
+
+3. 동학농민운동 (카테고리, 유사도 0.65)
+   → (0.75 × 0.6) + (0.65 × 0.4) = 0.710
+
+4. 명성황후 시해 (pgvector, 유사도 0.88)
+   → (0.65 × 0.6) + (0.88 × 0.4) = 0.742
+```
+
+---
+
+#### **점수 매기기 방식 3가지 옵션 (상세 비교)**
+
+---
+
+##### **옵션 1: 고정 가중치 × 배수 (Fixed Weights with Multiplier) - ver1**
 
 기본 점수에 관계 유형별 **1 이상의 가중치를 곱하여** 점수를 부스트하는 방식
 
@@ -711,7 +804,7 @@ score = calculate_relevance_score(0.75, "causal_chain")
 
 ---
 
-##### **옵션 3: 하이브리드 (Hybrid: Fixed + Similarity)**
+##### **옵션 3: 하이브리드 (Hybrid: Fixed + Similarity) - ⭐ ver2 현재 적용됨**
 
 **고정 점수**와 **유사도**를 가중평균하는 방식
 
@@ -784,14 +877,17 @@ score = calculate_hybrid_score(0.75, "causal_chain", alpha=0.6)
 
 #### **권장 사항**
 
-1. **현재 상황 (CustomPGVector는 score 미반환):**
-   - ✅ **옵션 1 (고정 가중치 × 배수)** 현재 적용됨
-   - `semantic_expander_node.py`에서 사용 중
-   - 단순하고 즉시 적용 가능하며, 1 이상의 배수로 논리적으로 점수 증가
+1. **현재 상황 (ver2 하이브리드 방식 적용) ⭐:**
+   - ✅ **옵션 3 (하이브리드)** 현재 적용됨 [2025-12-07]
+   - `semantic_expander_node.py`의 `calculate_hybrid_score()` 함수 사용
+   - 고정 점수의 안정성 + 실제 유사도의 정확성 결합
+   - pgvector 확장 시 `similarity_search_with_score()` 활용하여 실제 유사도 반영
+   - SPARQL 기반 확장 (temporal, category, causal_chain)은 유사도가 없으므로 고정 점수로 fallback
 
-2. **향후 개선 시 (similarity_search_with_score 구현 후):**
-   - **옵션 2 (유사도+부스트)** 또는 **옵션 3 (하이브리드)** 적용 고려
-   - 실제 벡터 유사도를 활용하여 정확도 향상 가능
+2. **alpha 값 튜닝 가이드:**
+   - `alpha=0.6` (기본): 고정 점수 60%, 실제 유사도 40%
+   - `alpha=0.8`: 고정 점수 우선 (안정성 중시)
+   - `alpha=0.4`: 유사도 우선 (정확도 중시)
 
 ---
 

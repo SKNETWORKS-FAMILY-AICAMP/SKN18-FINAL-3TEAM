@@ -222,7 +222,10 @@ if [ ! -f "$EXTRACT_SCRIPT" ]; then
     exit 1
 fi
 
-echo "프로퍼티 그룹 추출 중..."
+# LLM 사용 환경 변수 설정
+export USE_LLM_FOR_PROPERTY_GROUPS=true
+
+echo "프로퍼티 그룹 추출 중 (LLM 기반 그룹 배치 사용)..."
 python3 "$EXTRACT_SCRIPT" \
     --input "$OUTPUT_TTL" \
     --output "$PROPERTY_GROUPS_JSON"

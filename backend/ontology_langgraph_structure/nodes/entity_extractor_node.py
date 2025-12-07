@@ -1060,7 +1060,7 @@ def entity_extractor_node(state: GraphState) -> GraphState:
             milvus_score = entity.get("milvus_score")
 
             # 매칭 방법 레이블
-            method_label = "[정확]" if method == "exact" else "[부분]" if method == "partial" else "[벡터]" if method == "milvus" else "[LLM]"
+            method_label = "[정확]" if method == "exact" else "[부분]" if method == "partial" else "[벡터]" if method in ["milvus", "pgvector"] else "[LLM]"
 
             # 점수 표시 (연관성 점수 우선, Milvus 점수는 참고용)
             if milvus_score:

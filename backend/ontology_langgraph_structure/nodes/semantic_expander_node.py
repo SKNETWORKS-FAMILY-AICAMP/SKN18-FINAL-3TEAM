@@ -23,16 +23,44 @@ USE_PGVECTOR = os.getenv("USE_PGVECTOR", "true").lower() == "true"
 _pgvector_service = None
 
 # ------------------------------------------------------------
-#  관련성 점수 가중치 (Fixed Weights with Boost)
+#  관련성 점수 가중치 (Hybrid Scoring - ver2)
 # ------------------------------------------------------------
-# 기본 점수 0.5에 관계 유형별 가중치(1 이상)를 곱하여 부스트
-RELEVANCE_MULTIPLIERS = {
-    "causal_chain": 1.9,   # 인과관계: 0.5 × 1.9 = 0.95 (가장 높은 관련성)
-    "temporal": 1.7,       # 시간적 맥락: 0.5 × 1.7 = 0.85 (높은 관련성)
-    "category": 1.5,       # 카테고리: 0.5 × 1.5 = 0.75 (중간 관련성)
-    "pgvector": 1.3        # 벡터 유사도: 0.5 × 1.3 = 0.65 (보통 관련성)
+# 고정 점수: 각 확장 방법별 기준 점수
+FIXED_SCORES = {
+    "causal_chain": 0.95,   # 인과관계 (가장 높은 관련성)
+    "temporal": 0.85,       # 시간적 맥락 (높은 관련성)
+    "category": 0.75,       # 카테고리 (중간 관련성)
+    "pgvector": 0.65        # 벡터 유사도 (보통 관련성)
 }
-BASE_SCORE = 0.5  # 기본 점수
+
+def calculate_hybrid_score(similarity, expansion_method, alpha=0.6):
+    """
+    하이브리드 점수 계산: (고정 점수 × α) + (유사도 × (1 - α))
+
+    Args:
+        similarity: 벡터 유사도 (0-1) 또는 None
+        expansion_method: 확장 방법 ("causal_chain", "temporal", "category", "pgvector")
+        alpha: 고정 점수 가중치 (0-1), 기본값 0.6 = 고정 60%, 유사도 40%
+
+    Returns:
+        하이브리드 점수 (0-1)
+
+    Examples:
+        >>> calculate_hybrid_score(0.88, "pgvector", alpha=0.6)
+        0.742  # (0.65 × 0.6) + (0.88 × 0.4) = 0.39 + 0.352
+
+        >>> calculate_hybrid_score(None, "temporal", alpha=0.6)
+        0.85  # 유사도 없으면 고정 점수만 사용
+    """
+    fixed_score = FIXED_SCORES.get(expansion_method, 0.5)
+
+    # 유사도가 없으면 고정 점수만 사용 (SPARQL 기반 확장)
+    if similarity is None:
+        return fixed_score
+
+    # 가중평균
+    return (fixed_score * alpha) + (similarity * (1 - alpha))
+
 
 def get_pgvector_service():
     """pgvector 서비스 lazy loading"""
@@ -44,11 +72,12 @@ def get_pgvector_service():
             sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
             from db_pipeline.services.custom_pgvector import CustomPGVector
-            from db_pipeline.config import POSTGRES_CONN_STR, get_embedding
+            from db_pipeline.config import POSTGRES_CONN_STR
+            from langchain_openai import OpenAIEmbeddings
 
             _pgvector_service = CustomPGVector(
                 conn_str=POSTGRES_CONN_STR,
-                embedding_fn=get_embedding(),
+                embedding_fn=OpenAIEmbeddings(model="text-embedding-3-small"),
                 table="korean_history"
             )
             print("✅ pgvector 서비스 초기화 완료")
@@ -159,7 +188,7 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
                             "matched": True,
                             "expansion_method": "temporal",
                             "expansion_source": entity.get("name"),
-                            "relevance_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["temporal"]  # 0.5 × 1.7 = 0.85
+                            "relevance_score": calculate_hybrid_score(None, "temporal")  # 유사도 없음 → 0.85
                         })
         except:
             pass
@@ -257,7 +286,7 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
                             "expansion_method": "category",
                             "expansion_source": entity.get("name"),
                             "category": category,
-                            "relevance_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["category"]  # 0.5 × 1.5 = 0.75
+                            "relevance_score": calculate_hybrid_score(None, "category")  # 유사도 없음 → 0.75
                         })
         except:
             pass
@@ -339,7 +368,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                             "expansion_method": "causal_chain",
                             "expansion_source": entity.get("name"),
                             "causal_relation": predicate,
-                            "relevance_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["causal_chain"]  # 0.5 × 1.9 = 0.95
+                            "relevance_score": calculate_hybrid_score(None, "causal_chain")  # 유사도 없음 → 0.95
                         })
         except:
             pass
@@ -369,14 +398,17 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
 
     try:
         # 1. 원본 질문으로 검색 (가장 관련성 높음)
-        # CustomPGVector.similarity_search()는 Document 객체 리스트 반환
-        docs = pgvector.similarity_search(query=query, k=top_k)
+        # CustomPGVector.similarity_search_with_score()는 (Document, similarity) 튜플 리스트 반환
+        # similarity는 이미 코사인 유사도로 변환됨 (1 - cosine_distance)
+        doc_scores = pgvector.similarity_search_with_score(query=query, k=top_k)
 
-        for doc in docs:
+        for doc, similarity in doc_scores:
             title = doc.metadata.get("title", "")
             if title and title not in seen:
                 seen.add(title)
-                # CustomPGVector는 score 없이 반환하므로 고정 가중치 사용
+                # similarity는 이미 0-1 범위의 코사인 유사도 (1에 가까울수록 유사)
+                # 변환 불필요 - CustomPGVector에서 이미 처리됨
+
                 expanded_entities.append({
                     "type": "Event",  # 기본값
                     "name": title,
@@ -384,8 +416,8 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
                     "matched": False,
                     "expansion_method": "pgvector",
                     "expansion_source": "query",
-                    "pgvector_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["pgvector"],  # 0.5 × 1.3 = 0.65
-                    "relevance_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["pgvector"]  # 0.5 × 1.3 = 0.65
+                    "pgvector_similarity": similarity,
+                    "relevance_score": calculate_hybrid_score(similarity, "pgvector")  # 하이브리드 점수
                 })
 
         # 2. 추출된 엔티티 이름으로도 검색
@@ -394,12 +426,13 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
             if not name:
                 continue
 
-            docs = pgvector.similarity_search(query=name, k=5)
+            doc_scores = pgvector.similarity_search_with_score(query=name, k=5)
 
-            for doc in docs:
+            for doc, similarity in doc_scores:
                 title = doc.metadata.get("title", "")
                 if title and title not in seen:
                     seen.add(title)
+
                     expanded_entities.append({
                         "type": "Event",
                         "name": title,
@@ -407,8 +440,8 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
                         "matched": False,
                         "expansion_method": "pgvector",
                         "expansion_source": name,
-                        "pgvector_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["pgvector"],  # 0.5 × 1.3 = 0.65
-                        "relevance_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["pgvector"]  # 0.5 × 1.3 = 0.65
+                        "pgvector_similarity": similarity,
+                        "relevance_score": calculate_hybrid_score(similarity, "pgvector")
                     })
 
     except Exception as e:

@@ -1,4 +1,4 @@
-# backend/db_pipeline/ETL/load.py
+# backend/db_pipeline/ETL/load_to_pgvector.py
 
 from .transform import preprocess_data, chunk_dataframe
 from ..services.db_connection import prepare_vectordb
