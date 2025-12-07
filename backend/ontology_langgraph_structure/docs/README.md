@@ -45,18 +45,16 @@ graph TD
     Parallel --> T4[Thread 4<br/>connected_entities<br/>양방향 BFS]
     Parallel --> T5[Thread 5<br/>type_and_summary]
 
-    T1 --> Merge2[5/7 Multi-Path<br/>Extractor]
-    T2 --> Merge2
-    T3 --> Merge2
-    T4 --> Merge2
-    T5 --> Merge2
+    T1 --> PathAgg[5/6 Path Extractor<br/>& Evidence Aggregator<br/>통합 노드]
+    T2 --> PathAgg
+    T3 --> PathAgg
+    T4 --> PathAgg
+    T5 --> PathAgg
 
-    Merge2 --> Aggregator[6/7 Evidence<br/>Aggregator]
+    PathAgg --> Convergence[수렴 노드 감지<br/>2배 가중치]
+    Convergence --> Top15[상위 15개 근거 선택<br/>기존 5개에서 확장]
 
-    Aggregator --> Convergence[수렴 노드 감지<br/>2배 가중치]
-    Convergence --> Top5[상위 5개 근거 선택]
-
-    Top5 --> Generator[7/7 Story Generator<br/>LLM 1회]
+    Top15 --> Generator[6/6 Story Generator<br/>LLM 1회]
 
     Generator --> Answer([최종 답변<br/>입니다 체])
 
@@ -66,7 +64,7 @@ graph TD
     style Extractor fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
     style Expander fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     style Parallel fill:#ffe0b2,stroke:#e65100,stroke-width:2px
-    style Aggregator fill:#ffccbc,stroke:#bf360c,stroke-width:2px
+    style PathAgg fill:#ffccbc,stroke:#bf360c,stroke-width:2px
     style Generator fill:#b2dfdb,stroke:#00695c,stroke-width:2px
     style Answer fill:#c5e1a5,stroke:#33691e,stroke-width:3px
     style Exit fill:#ffcdd2,stroke:#b71c1c,stroke-width:2px
@@ -74,16 +72,15 @@ graph TD
 
 ### 🔑 핵심 체크포인트
 
-| 단계                           | LLM 호출        | SPARQL 호출      | 주요 작업                                                            |
-| ------------------------------ | --------------- | ---------------- | -------------------------------------------------------------------- |
-| **0. 역사 관련 여부 체크**     | ✅ **1회**      | ❌               | 조선시대 역사 질문 필터링 (비역사 질문 조기 종료)                    |
-| **1. Query Classifier**        | ✅ **2회 병렬** | ❌               | 질문 분석, 키워드 확장, 프로퍼티 그룹 선택 (ThreadPoolExecutor 사용) |
-| **2. Entity Extractor**        | ❌              | ✅ 각 엔티티마다 | 엔티티 추출, 연결 노드 기반 스코어링                                 |
-| **3. Semantic Expander (NEW)** | ❌              | ✅ 4가지 방법    | 시간적/카테고리/인과/벡터 기반 엔티티 확장                           |
-| **4. Parallel Inference**      | ❌              | ✅ 5개 Thread    | 5개 관점 관계 검색 + 양방향 BFS (최대 5-hop)                         |
-| **5. Multi-Path Extractor**    | ❌              | ❌               | 결과 파싱 및 경로 추출                                               |
-| **6. Evidence Aggregator**     | ❌              | ❌               | 근거 통합 + 수렴 노드 감지 (2배 부스트)                              |
-| **7. Story Generator**         | ✅ 1회          | ❌               | 최종 스토리 생성                                                     |
+| 단계                                               | LLM 호출        | SPARQL 호출      | 주요 작업                                                            |
+| -------------------------------------------------- | --------------- | ---------------- | -------------------------------------------------------------------- |
+| **0. 역사 관련 여부 체크**                         | ✅ **1회**      | ❌               | 조선시대 역사 질문 필터링 (비역사 질문 조기 종료)                    |
+| **1. Query Classifier**                            | ✅ **2회 병렬** | ❌               | 질문 분석, 키워드 확장, 프로퍼티 그룹 선택 (ThreadPoolExecutor 사용) |
+| **2. Entity Extractor**                            | ❌              | ✅ 각 엔티티마다 | 엔티티 추출, 연결 노드 기반 스코어링                                 |
+| **3. Semantic Expander (NEW)**                     | ❌              | ✅ 4가지 방법    | 시간적/카테고리/인과/벡터 기반 엔티티 확장                           |
+| **4. Parallel Inference**                          | ❌              | ✅ 5개 Thread    | 5개 관점 관계 검색 + 양방향 BFS (최대 5-hop)                         |
+| **5. Path Extractor & Evidence Aggregator (통합)** | ❌              | ❌               | 경로 추출 + 근거 통합 + 수렴 노드 감지 (2배 부스트) + 상위 15개 선택 |
+| **6. Story Generator**                             | ✅ 1회          | ❌               | 최종 스토리 생성                                                     |
 
 **총 LLM 호출:**
 
@@ -612,6 +609,7 @@ def expand_by_pgvector(entities, query, top_k=15):
 ```
 
 **문제점:**
+
 - 벡터 유사도가 0.9라면 → 0.9 × 0.8 = **0.72** (오히려 감소!)
 - 관련도가 높을수록 점수가 더 낮아지는 논리적 모순
 - 0 < x < 1을 곱하면 점수가 감소 (패널티)
@@ -637,11 +635,13 @@ BASE_SCORE = 0.5
 ```
 
 **개선점:**
+
 - ✅ 1 이상의 배수로 점수 증가 (논리적으로 합리적)
 - ✅ 관련도가 높으면 점수도 높아짐
 - ✅ 단순하고 예측 가능
 
 **한계점:**
+
 - ❌ 실제 벡터 유사도 무시 (CustomPGVector가 score 미반환)
 - ❌ 모든 pgvector 결과에 동일한 점수 부여
 
@@ -682,12 +682,14 @@ score = calculate_hybrid_score(0.88, "pgvector", alpha=0.6)
 ```
 
 **개선점:**
+
 - ✅ **고정 점수의 안정성** + **실제 유사도의 정확성** 결합
 - ✅ alpha 값으로 밸런스 조정 가능
 - ✅ 유사도가 없어도 동작 (fallback to 고정 점수)
 - ✅ similarity_search_with_score() 구현 시 실제 유사도 활용
 
 **적용 케이스:**
+
 ```
 질문: "을미사변의 원인" (alpha=0.6)
 
@@ -733,16 +735,19 @@ expanded_entities.append({
 ```
 
 **장점:**
+
 - ✅ 단순하고 이해하기 쉬움
 - ✅ 일관성 있는 결과
 - ✅ 디버깅 용이
 - ✅ 1 이상의 배수로 점수 증가 (논리적으로 합리적)
 
 **단점:**
+
 - ❌ 실제 유사도 무시
 - ❌ 세밀한 조정 불가
 
 **적용 예시:**
+
 ```
 질문: "을미사변의 원인"
 엔티티 확장:
@@ -784,15 +789,18 @@ score = calculate_relevance_score(0.75, "causal_chain")
 ```
 
 **장점:**
+
 - ✅ 실제 유사도 반영
 - ✅ 관계 유형별 가중치 적용
 - ✅ 세밀한 조정 가능
 
 **단점:**
+
 - ❌ pgvector 유사도가 필요 (CustomPGVector는 score 반환 안 함)
 - ❌ similarity_search_with_score() 구현 필요
 
 **적용 예시:**
+
 ```
 질문: "을미사변의 원인"
 엔티티 확장:
@@ -838,15 +846,18 @@ score = calculate_hybrid_score(0.75, "causal_chain", alpha=0.6)
 ```
 
 **장점:**
+
 - ✅ 고정 점수의 안정성 + 유사도의 정확성
 - ✅ alpha 값으로 밸런스 조정 가능
 - ✅ 유사도 없어도 동작
 
 **단점:**
+
 - ❌ 복잡도 증가
 - ❌ alpha 값 튜닝 필요
 
 **적용 예시:**
+
 ```
 질문: "을미사변의 원인" (alpha=0.6)
 엔티티 확장:
@@ -864,20 +875,21 @@ score = calculate_hybrid_score(0.75, "causal_chain", alpha=0.6)
 
 #### **옵션 비교표**
 
-| 특징           | 옵션 1: 고정 가중치  | 옵션 2: 유사도+부스트 | 옵션 3: 하이브리드   |
-| -------------- | -------------------- | --------------------- | -------------------- |
-| **구현 난이도** | ⭐ 쉬움              | ⭐⭐ 보통             | ⭐⭐⭐ 어려움        |
-| **유사도 활용** | ❌ 무시              | ✅ 완전 활용          | ✅ 부분 활용         |
-| **안정성**     | ⭐⭐⭐ 높음          | ⭐⭐ 보통             | ⭐⭐⭐ 높음          |
-| **정확도**     | ⭐⭐ 보통            | ⭐⭐⭐ 높음           | ⭐⭐⭐ 매우 높음     |
-| **튜닝 필요**  | ✅ 불필요            | ✅ 부스트 값 조정     | ❌ alpha 값 조정     |
-| **추가 구현**  | ✅ 없음              | ❌ score 반환 필요    | ❌ score 반환 필요   |
+| 특징            | 옵션 1: 고정 가중치 | 옵션 2: 유사도+부스트 | 옵션 3: 하이브리드 |
+| --------------- | ------------------- | --------------------- | ------------------ |
+| **구현 난이도** | ⭐ 쉬움             | ⭐⭐ 보통             | ⭐⭐⭐ 어려움      |
+| **유사도 활용** | ❌ 무시             | ✅ 완전 활용          | ✅ 부분 활용       |
+| **안정성**      | ⭐⭐⭐ 높음         | ⭐⭐ 보통             | ⭐⭐⭐ 높음        |
+| **정확도**      | ⭐⭐ 보통           | ⭐⭐⭐ 높음           | ⭐⭐⭐ 매우 높음   |
+| **튜닝 필요**   | ✅ 불필요           | ✅ 부스트 값 조정     | ❌ alpha 값 조정   |
+| **추가 구현**   | ✅ 없음             | ❌ score 반환 필요    | ❌ score 반환 필요 |
 
 ---
 
 #### **권장 사항**
 
 1. **현재 상황 (ver2 하이브리드 방식 적용) ⭐:**
+
    - ✅ **옵션 3 (하이브리드)** 현재 적용됨 [2025-12-07]
    - `semantic_expander_node.py`의 `calculate_hybrid_score()` 함수 사용
    - 고정 점수의 안정성 + 실제 유사도의 정확성 결합
@@ -893,15 +905,16 @@ score = calculate_hybrid_score(0.75, "causal_chain", alpha=0.6)
 
 #### **참고: 점수 연산 원칙**
 
-| 연산 방식       | 수식               | 효과                     | 적용 케이스              |
-| --------------- | ------------------ | ------------------------ | ------------------------ |
-| **곱하기 (×)**  | `score × 0.8`      | 점수 **감소** ❌         | 페널티 적용 시           |
-| **곱하기 (×)**  | `score × 1.2`      | 점수 **증가** ✅         | 부스트 적용 시           |
-| **더하기 (+)**  | `score + 0.2`      | 점수 **증가** ✅         | 가산점 적용 시           |
-| **가중평균**    | `s1×0.6 + s2×0.4`  | 두 점수 **혼합** ✅      | 하이브리드 방식          |
-| **최소값 제한** | `min(1.0, score)`  | 1.0 초과 방지 ✅         | 부스트 후 상한선 적용 시 |
+| 연산 방식       | 수식              | 효과                | 적용 케이스              |
+| --------------- | ----------------- | ------------------- | ------------------------ |
+| **곱하기 (×)**  | `score × 0.8`     | 점수 **감소** ❌    | 페널티 적용 시           |
+| **곱하기 (×)**  | `score × 1.2`     | 점수 **증가** ✅    | 부스트 적용 시           |
+| **더하기 (+)**  | `score + 0.2`     | 점수 **증가** ✅    | 가산점 적용 시           |
+| **가중평균**    | `s1×0.6 + s2×0.4` | 두 점수 **혼합** ✅ | 하이브리드 방식          |
+| **최소값 제한** | `min(1.0, score)` | 1.0 초과 방지 ✅    | 부스트 후 상한선 적용 시 |
 
 **핵심:**
+
 - 0 < x < 1을 곱하면 → 점수 **감소** (패널티)
 - x > 1을 곱하면 → 점수 **증가** (부스트)
 - 양수를 더하면 → 점수 **증가** (가산점)
@@ -1137,11 +1150,31 @@ def find_bidirectional_paths(entity_a_uri, entity_b_uri, max_depth=5):
 
 ---
 
-### **5. Evidence Aggregator (근거 통합 + 수렴 노드 감지) ⚡개선**
+### **5. Path Extractor & Evidence Aggregator (통합 노드) ⚡개선**
 
-**역할:** 5가지 관점의 근거 통합 + **수렴 노드 2배 가중치 부스트**
+**역할:** 경로 추출과 근거 통합을 한 노드에서 수행 + **개선된 점수 체계** + **상위 15개 근거 선택**
 
-#### **수렴 노드 감지 (NEW)**
+#### **통합 노드의 주요 기능**
+
+**1. 경로 추출 (Path Extraction)**
+
+- 5개 Thread의 추론 결과에서 각각 경로 추출
+- Thread별로 서로 다른 경로 추출 로직 적용
+- 각 Thread의 가중치 반영
+- 속성/관계별 relevance score 계산
+
+**2. 개선된 점수 체계 (Improved Scoring)**
+
+- 쿼리 엔티티와의 직접 연결성 강화 (정확 매칭: 50% 부스트, 부분 매칭: 20% 부스트)
+- 관계 타입별 가중치 재조정:
+  - `leadsTo`, `causedBy`: 1.6 (인과관계 강화)
+  - `commands`: 1.4 (지휘 관계 강화)
+  - `participatesIn`: 1.2 (왕/사건의 부적절한 표현 방지)
+- Thread 타입별 가중치 조정:
+  - `outgoing_relations`: 1.1배 부스트
+  - `incoming_relations`: 1.05배 부스트 (기존 1.2배에서 조정)
+
+**3. 수렴 노드 감지 (Convergence Node Detection)**
 
 **목적:** 여러 쿼리 엔티티를 연결하는 중간 노드에 높은 가중치 부여
 
@@ -1171,37 +1204,79 @@ def detect_convergence_nodes(inference_paths, query_entities):
 | incoming_relation | 0.25 | ×2.0 | 0.50 |
 | connected_entity | 0.30 | ×2.0 | 0.60 |
 
+**4. 근거 통합 및 정렬**
+
+- 모든 Thread의 경로를 하나로 병합
+- 가중치 기준으로 정렬
+- 상위 15개 근거 선택 (기존 5개에서 확장)
+- 각 근거에 rank 필드 추가
+
+**5. 상세 출력**
+
+- 쓰레드별 검색 결과 출력
+- 전체 근거 목록 출력 (상위 25개)
+- 최종 근거 목록 출력 (상위 15개)
+- 수렴 노드 라벨 및 연결된 엔티티 목록 출력
+
 **통합 효과:**
 
-- ✅ 수렴 노드 우선 선택: 여러 엔티티를 연결하는 핵심 노드 강조
-- ✅ 스토리 일관성 향상: 단편적 정보 대신 통합 맥락 제공
-- ✅ 인과관계 발견: 여러 사건/인물을 연결하는 중심 이벤트 자동 감지
+- ✅ **코드 단순화**: 경로 추출과 근거 통합을 한 노드에서 처리
+- ✅ **점수 체계 개선**: 쿼리 엔티티와의 직접 연결성 강화
+- ✅ **근거 확장**: 5개 → 15개로 확장하여 더 풍부한 답변 생성
+- ✅ **수렴 노드 우선 선택**: 여러 엔티티를 연결하는 핵심 노드 강조
+- ✅ **스토리 일관성 향상**: 단편적 정보 대신 통합 맥락 제공
+- ✅ **인과관계 발견**: 여러 사건/인물을 연결하는 중심 이벤트 자동 감지
 
----
+#### **포함된 기능 목록**
 
-### **6. Multi-Path Extractor (관계 경로 추출)**
+1. **수렴 노드 감지 (`detect_convergence_nodes`)**
 
-**역할:** 관계 확장 결과에서 경로 추출 및 가중치 부여
+   - `connected_entities` Thread에서 수렴 노드 추출
+   - 일반 경로에서 중간 노드 추출
+   - 2개 이상의 쿼리 엔티티를 연결하는 노드 필터링
 
-```python
-# 관계 정보에 높은 가중치 부여
-def extract_event_context_paths(bindings, base_weight):
-    for binding in bindings:
-        # 기본 엔티티 정보
-        paths.append({
-            "type": "event_context",
-            "weight": base_weight,
-            "description": f"{label}: {summary}"
-        })
+2. **`extract_label_from_uri` 함수**
 
-        # 관계 확장 결과 (1.2배 가중치)
-        if related_label:
-            paths.append({
-                "type": "event_context",
-                "weight": base_weight * 1.2,
-                "description": f"{label} → [{relation}] → {related_label}"
-            })
-```
+   - URI에서 라벨 추출 (hist:Person\_정약용 → 정약용)
+
+3. **수렴 노드 상세 출력**
+
+   - 수렴 노드 라벨 및 연결된 엔티티 목록 출력
+
+4. **모든 Thread 경로 병합**
+
+   - Thread별 경로를 하나의 evidence 리스트로 통합
+
+5. **수렴 노드 부스트 적용**
+
+   - 수렴 노드가 포함된 경로에 2.0배 가중치 부스트
+
+6. **가중치 기준 정렬**
+
+   - 모든 근거를 가중치 내림차순으로 정렬
+
+7. **쓰레드별 검색 결과 출력**
+
+   - 각 Thread별 경로 수 및 상위 경로 미리보기
+
+8. **전체 근거 목록 출력**
+
+   - 정렬된 모든 근거 중 상위 25개 출력 (기존 20개에서 확장)
+
+9. **최종 근거 목록 출력**
+
+   - 상위 15개 근거 선택 및 출력 (기존 5개에서 확장)
+
+10. **순위 부여**
+
+    - 각 근거에 rank 필드 추가
+
+11. **Type Map 확장**
+
+    - 모든 Thread 타입에 대한 한글 매핑 포함
+
+12. **`inference_paths` 반환**
+    - 경로 추출 결과를 state에 포함 (통합 노드 특성)
 
 ---
 
@@ -1384,18 +1459,15 @@ def story_enhancer_node(state: GraphState) -> GraphState:
    - Thread 4: connected_entities → 태조 ↔ 경복궁 (직접 연결)
    - Thread 5: type_and_summary → 경복궁 타입/요약
    ↓
-6. Multi-Path Extractor:
-   - 경로 1: 태조 → [built] → 경복궁 (가중치 0.30)
-   - 경로 2: 경복궁 → [builtBy] → 태조 (가중치 0.36, 관계 확장)
-   - 경로 3: 경복궁.hasYear = 1395 (가중치 0.20)
+5. Path Extractor & Evidence Aggregator (통합):
+   - 경로 추출: 태조 → [built] → 경복궁 (가중치 0.30)
+   - 경로 추출: 경복궁 → [builtBy] → 태조 (가중치 0.36, 관계 확장)
+   - 경로 추출: 경복궁.hasYear = 1395 (가중치 0.20)
+   - 근거 통합: 가중치 기준 정렬
+   - 수렴 노드 감지: (해당 없음)
+   - 상위 15개 근거 선택
    ↓
-7. Evidence Aggregator:
-   - 근거 1: 태조가 1395년 경복궁 창건 (0.36)
-   - 근거 2: 경복궁은 태조가 건설 (0.30)
-   - 근거 3: 경복궁 연도 정보 (0.20)
-   - 상위 5개 근거 선택
-   ↓
-8. Story Generator (LLM 1회):
+6. Story Generator (LLM 1회):
    → "1395년 태조 이성계가 경복궁을 창건하였습니다.[1][2]"
 ```
 
@@ -1437,12 +1509,14 @@ def story_enhancer_node(state: GraphState) -> GraphState:
    - 각 사건의 인과관계 프로퍼티 우선 검색
    - causedBy/leadsTo 관계에 높은 가중치
    ↓
-6. Evidence Aggregator:
+5. Path Extractor & Evidence Aggregator (통합):
+   - 경로 추출 및 근거 통합
    - 인과관계 프로퍼티: 가중치 0.50 (기존 0.20의 2.5배)
    - 시간적 연관: 가중치 0.35
    - 일반 관계: 가중치 0.15
+   - 상위 15개 근거 선택
    ↓
-7. Story Generator:
+6. Story Generator:
    → "을미사변(1895)은 청일전쟁과 갑오개혁의 결과로 발생했습니다.
       이후 고종의 아관파천으로 이어졌습니다..."
 ```
@@ -1838,10 +1912,9 @@ backend/ontology_langgraph_structure/
 │   ├── classify_node.py       # 질문 분류 + 프로퍼티 그룹 선택
 │   ├── entity_extractor_node.py  # 하이브리드 엔티티 추출 (⚡캐싱+LLM통합)
 │   ├── generate_node.py       # 스토리 생성
-│   ├── evidence_aggregator_node.py  # 근거 통합
 │   └── kg/
 │       ├── parallel_inference_executor_node.py  # 5개 Thread 범용 관계 검색
-│       └── multi_path_extractor_node.py  # 범용 관계 경로 추출
+│       └── path_evidence_aggregator_node.py  # 경로 추출 및 근거 통합 (통합 노드)
 ├── ontology/
 │   ├── korean_history.owl     # 온톨로지 스키마
 │   ├── instances/
