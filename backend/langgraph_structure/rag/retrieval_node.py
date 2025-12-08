@@ -33,9 +33,17 @@ def retrieval_node(state: GraphState) -> GraphState:
 
 
     filtered_docs = []
+    
     for doc, score in results:
-        if score >= MIN_SIMILARITY:  # similarity일 때
-            filtered_docs.append(doc)
+        if score >= MIN_SIMILARITY:
+            filtered_docs.append({
+                "source": "vector",
+                "score": float(score),
+                "payload": {
+                    "content": doc.page_content,
+                    "metadata": doc.metadata,
+                }
+            })
     
     return {
         **state,

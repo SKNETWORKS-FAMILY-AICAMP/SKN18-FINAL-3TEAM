@@ -1,6 +1,27 @@
 from backend.langgraph_structure.state import GraphState
+from backend.langgraph_structure.state_type import Evidence
+from backend.db_pipeline.services.embedding_model import get_embedding
 from typing import List, Dict, Any
+from numpy import dot
+from numpy.linalg import norm
 
+def neo4j_row_to_text(row: dict) -> str:
+    """
+    Neo4j 결과 한 개(row)를 임베딩 입력용 문자열로 변환.
+    """
+    parts = [f"{k}: {v}" for k, v in row.items()]
+    return ", ".join(parts)
+
+def cosine_similarity(a, b):
+    return dot(a, b) / (norm(a) * norm(b))
+
+embed = get_embedding()
+
+def compute_neo4j_similarity(query_text, row):
+    row_text = neo4j_row_to_text(row)
+    q_emb = embed.embed_query(query_text)
+    r_emb = embed.embed_query(row_text)
+    return cosine_similarity(q_emb, r_emb)
 
 def generate_node(state: GraphState) -> GraphState:
     """
@@ -12,26 +33,39 @@ def generate_node(state: GraphState) -> GraphState:
     나중에 이 안의 로직을 LLM 호출로 교체하면 됨.
     """
 
-    search_chunks: List[Dict[str, Any]] = state.get("search_chunks", [])
+    vector_evidences: List[Evidence] = state.get("vector_evidences", [])
     neo4j_results: List[Dict[str, Any]] = state.get("neo4j_results", [])
     num: int = state.get("num", 0)
 
     # 1) 유사도 점수로 sorting 후 상위 정보 활용
-    if neo4j_results or search_chunks:
-        # Neo4j 결과 요약
-        first_row: Dict[str, Any] = neo4j_results[0]
-        kv_parts = []
-        for k, v in first_row.items():
-            kv_parts.append(f"{k}: {v}")
-        kv_text = ", ".join(kv_parts)
+    if neo4j_results or vector_evidences:
+        question = state["query"]
+        
+        # Neo4j 결과로 유사도 점수 매기기
+        neo4j_evidences = []
+        for row in neo4j_results:
+            score = compute_neo4j_similarity(question, row)
+            neo4j_evidences.append({
+                "source": "graph",
+                "score": float(score),
+                "payload": row
+            })
+        
 
-        # RAG 청크 요약
-        top_chunk = search_chunks[0]
+        # VectorDB 청크 요약
+        top_chunk = vector_evidences[0]
         content_preview = str(top_chunk.get("content", ""))[:150]  # 앞 150자만
 
         # 유사도 점수로 정렬
+        all_evidences = vector_evidences + neo4j_evidences
+        all_evidences.sort(key=lambda e: e["score"], reverse=True)
 
+        top_evidences = all_evidences[:3]
 
+        # 취합된 상위 정보로 요약 텍스트 생성
+        # openai 호출
+
+        
         final_answer = (
             "질문과 관련된 정보를 지식그래프(Neo4j)와 문서에서 모두 찾았습니다.\n\n"
             f"- 지식그래프 주요 결과: {kv_text}\n\n"
