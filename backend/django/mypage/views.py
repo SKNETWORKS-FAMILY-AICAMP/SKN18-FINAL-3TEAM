@@ -1,6 +1,3 @@
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
-
-@login_required
-def mypage_main(request):
-    return render(request, "mypage/mypage.html")
+# MyPage app - API endpoints
+# React frontend handles mypage UI
+# Add API views here for user profile functionality
