@@ -68,12 +68,10 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
 
     # 우리 앱들
-
-    'home',
-    'login',
+    'accounts',
     'search',
     'video',
-    'mypage',
+    'users',
 ]
 
 SITE_ID = 1
@@ -229,8 +227,8 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 # AllAuth 커스텀 어댑터 설정
-SOCIALACCOUNT_ADAPTER = 'login.adapters.CustomSocialAccountAdapter'
-ACCOUNT_ADAPTER = 'login.adapters.CustomAccountAdapter'
+SOCIALACCOUNT_ADAPTER = 'accounts.adapters.CustomSocialAccountAdapter'
+ACCOUNT_ADAPTER = 'accounts.adapters.CustomAccountAdapter'
 
 # 소셜 토큰을 DB에 저장 (socialaccount_socialtoken)
 SOCIALACCOUNT_STORE_TOKENS = True
