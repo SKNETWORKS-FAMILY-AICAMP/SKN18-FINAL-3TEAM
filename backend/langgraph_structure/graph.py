@@ -8,7 +8,7 @@ from langgraph_structure.graphdb.neo4j_query_node import neo4j_query_node, route
 from langgraph_structure.nodes.generate_node import generate_node
 from langgraph_structure.nodes.tone_adjust_node import tone_adjust_node
 from langgraph_structure.nodes.scene_split_node import scene_split_node
-
+from langgraph_structure.rag.hybrid_node import hybrid_retrieval_node
 
 
 def create_graph_flow():
@@ -25,16 +25,18 @@ def create_graph_flow():
     workflow.add_node("tone_adjust_node",tone_adjust_node)
     workflow.add_node("scene_split_node",scene_split_node)
 
+    # 하이브리드 노드 추가
+    workflow.add_node("hybrid_retrieval_node", hybrid_retrieval_node)
+
     # 노드 연결(엣지 추가)
     workflow.set_entry_point("classify_node")
 
-    # classify_node → route_classify 로 분기
-    # route_classify(state) 가 "retrieval_node" 또는 END를 리턴
+    # classify_node → hybrid_node 또는 END 로 분기
     workflow.add_conditional_edges(
         "classify_node",
         route_classify,
-        {  # 분기 후보를 명시
-            "retrieval_node": "retrieval_node",
+        { 
+            "hybrid_retrieval_node": "hybrid_retrieval_node",
             END: END,
         },
     )
