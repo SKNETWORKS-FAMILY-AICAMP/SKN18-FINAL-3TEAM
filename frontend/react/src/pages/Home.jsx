@@ -44,6 +44,53 @@ function Home() {
       });
   };
 
+  const handleDeleteAccount = () => {
+    // 회원탈퇴 확인
+    const confirmed = window.confirm(
+      '정말로 회원탈퇴 하시겠습니까?\n\n' +
+      '탈퇴 시 다음 사항이 처리됩니다:\n' +
+      '- Google 계정 연동 해제\n' +
+      '- 모든 사용자 데이터 삭제\n' +
+      '- 복구 불가능\n\n' +
+      '계속 하시겠습니까?'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    // 재확인
+    const doubleConfirm = window.confirm(
+      '마지막 확인입니다.\n정말로 탈퇴하시겠습니까?'
+    );
+
+    if (!doubleConfirm) {
+      return;
+    }
+
+    // 회원탈퇴 API 호출
+    api.delete('/api/delete-account/')
+      .then(response => {
+        console.log('✅ 회원탈퇴 성공:', response.data.message);
+        alert('회원탈퇴가 완료되었습니다.\nGoogle 연동도 해제되었습니다.');
+
+        // localStorage에서 토큰 삭제
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+
+        // 로그인 페이지로 이동
+        navigate('/login');
+      })
+      .catch(error => {
+        console.error('❌ 회원탈퇴 실패:', error);
+        if (error.response?.data?.error) {
+          alert(`회원탈퇴 실패: ${error.response.data.error}`);
+        } else {
+          alert('회원탈퇴 처리 중 오류가 발생했습니다.');
+        }
+      });
+  };
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', marginTop: '100px' }}>
@@ -66,21 +113,39 @@ function Home() {
           {user.first_name && <p><strong>이름:</strong> {user.first_name}</p>}
           {user.last_name && <p><strong>성:</strong> {user.last_name}</p>}
           <p><strong>사용자 ID:</strong> {user.id}</p>
-          <button
-            onClick={handleLogout}
-            style={{
-              padding: '10px 20px',
-              fontSize: '14px',
-              backgroundColor: '#dc3545',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-              marginTop: '20px',
-            }}
-          >
-            로그아웃
-          </button>
+
+          <div style={{ marginTop: '20px' }}>
+            <button
+              onClick={handleLogout}
+              style={{
+                padding: '10px 20px',
+                fontSize: '14px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                marginRight: '10px',
+              }}
+            >
+              로그아웃
+            </button>
+
+            <button
+              onClick={handleDeleteAccount}
+              style={{
+                padding: '10px 20px',
+                fontSize: '14px',
+                backgroundColor: '#dc3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+              }}
+            >
+              회원탈퇴
+            </button>
+          </div>
         </div>
       )}
     </div>
