@@ -12,6 +12,7 @@ CSV 데이터를 읽어서 LLM을 사용하여 온톨로지 트리플(TTL)로 �
 
 import os
 import csv
+import sys
 import json
 from pathlib import Path
 from typing import List, Dict, Any
@@ -20,6 +21,9 @@ from dotenv import load_dotenv
 
 # .env 파일 로드
 load_dotenv()
+
+# CSV 필드 크기 제한 증가 (기본값 131072 바이트를 초과하는 필드 처리)
+csv.field_size_limit(sys.maxsize)
 
 
 class LLMTTLGenerator:
@@ -372,62 +376,108 @@ JSON 구조:
         batch_triples = []
         processed_count = 0
         error_count = 0
+        current_index = start_index  # 현재 처리 중인 행 인덱스 추적
 
-        # CSV 읽기 (BOM 처리)
-        with open(self.csv_path, 'r', encoding='utf-8-sig') as csv_file:
-            reader = csv.DictReader(csv_file)
-
-            for i, row in enumerate(reader):
-                # 시작 위치 이전은 건너뛰기
-                if i < start_index:
-                    continue
-
-                if limit and i >= limit:
-                    break
-
-                print(f"  처리 중: {i+1}. {row['title']}")
-
+        def save_batch_and_checkpoint(index: int):
+            """배치 저장 및 체크포인트 업데이트"""
+            nonlocal batch_triples
+            if batch_triples:
                 try:
-                    # 트리플 생성
-                    triples = self.process_csv_row(row)
-
-                    # 배치에 추가
-                    if triples:
-                        batch_triples.append(f"\n# {row['title']} ({row['category']})")
-                        batch_triples.extend(triples)
-                        batch_triples.append("")
-
-                    processed_count += 1
-
-                except Exception as e:
-                    error_count += 1
-                    print(f"    ❌ 에러: {e}")
-                    # 에러 로그 기록
-                    with open(error_log_path, 'a', encoding='utf-8') as f:
-                        f.write(f"{i+1}. {row['title']}: {e}\n")
-
-                # 배치 저장 (batch_size마다)
-                if processed_count > 0 and processed_count % batch_size == 0:
                     with open(output_path, 'a', encoding='utf-8') as f:
                         f.write("\n".join(batch_triples))
                     batch_triples = []
-
+                    
                     # 체크포인트 저장
                     with open(checkpoint_path, 'w') as f:
-                        f.write(str(i + 1))
+                        f.write(str(index))
+                    print(f"    💾 저장 완료 ({index}개 처리됨, 체크포인트 업데이트)")
+                    return True
+                except Exception as e:
+                    print(f"    ⚠️ 저장 중 오류: {e}")
+                    return False
+            return False
 
-                    print(f"    💾 저장 완료 ({i+1}개 처리됨)")
+        try:
+            # CSV 읽기 (BOM 처리)
+            with open(self.csv_path, 'r', encoding='utf-8-sig') as csv_file:
+                reader = csv.DictReader(csv_file)
 
-        # 남은 배치 저장
-        if batch_triples:
-            with open(output_path, 'a', encoding='utf-8') as f:
-                f.write("\n".join(batch_triples))
+                for i, row in enumerate(reader):
+                    # 시작 위치 이전은 건너뛰기
+                    if i < start_index:
+                        continue
 
-        # 체크포인트 삭제 (완료 시)
+                    if limit and i >= limit:
+                        break
+
+                    current_index = i + 1  # 현재 처리 중인 행 번호 (1-based)
+                    print(f"  처리 중: {current_index}. {row['title']}")
+
+                    try:
+                        # 트리플 생성
+                        triples = self.process_csv_row(row)
+
+                        # 배치에 추가
+                        if triples:
+                            batch_triples.append(f"\n# {row['title']} ({row['category']})")
+                            batch_triples.extend(triples)
+                            batch_triples.append("")
+
+                        processed_count += 1
+
+                    except Exception as e:
+                        error_count += 1
+                        print(f"    ❌ 에러: {e}")
+                        # 에러 로그 기록
+                        try:
+                            with open(error_log_path, 'a', encoding='utf-8') as f:
+                                f.write(f"{current_index}. {row['title']}: {e}\n")
+                        except:
+                            pass
+                        # 오류 발생 시에도 저장 (데이터 손실 방지)
+                        if batch_triples:
+                            save_batch_and_checkpoint(current_index)
+
+                    # 배치 저장 (batch_size마다)
+                    if processed_count > 0 and processed_count % batch_size == 0:
+                        save_batch_and_checkpoint(current_index)
+
+        except KeyboardInterrupt:
+            print("\n⚠️ 사용자에 의해 중단됨 (Ctrl+C)")
+            # 진행된 내용 저장
+            if batch_triples:
+                save_batch_and_checkpoint(current_index)
+            print(f"💾 중단 전까지의 진행 상황이 저장되었습니다 (체크포인트: {current_index})")
+            raise
+        except Exception as e:
+            print(f"\n❌ 치명적 오류 발생: {e}")
+            # 진행된 내용 저장
+            if batch_triples:
+                save_batch_and_checkpoint(current_index)
+            print(f"💾 오류 발생 전까지의 진행 상황이 저장되었습니다 (체크포인트: {current_index})")
+            raise
+        finally:
+            # 남은 배치 저장 (정상 종료 또는 오류 발생 시)
+            if batch_triples:
+                save_batch_and_checkpoint(current_index)
+
+        # 체크포인트 삭제 (완료 시에만)
         if os.path.exists(checkpoint_path):
-            os.remove(checkpoint_path)
+            # 모든 행을 처리했는지 확인
+            try:
+                with open(self.csv_path, 'r', encoding='utf-8-sig') as csv_file:
+                    reader = csv.DictReader(csv_file)
+                    total_rows = sum(1 for _ in reader)
+                
+                if current_index >= total_rows:
+                    os.remove(checkpoint_path)
+                    print(f"\n✅ TTL 생성 완료: {output_path}")
+                else:
+                    print(f"\n⚠️ 부분 완료: {output_path}")
+                    print(f"   진행률: {current_index}/{total_rows} ({current_index*100//total_rows}%)")
+            except:
+                pass
 
-        print(f"\n✅ TTL 생성 완료: {output_path}")
         print(f"   총 처리: {processed_count}개")
         print(f"   에러: {error_count}개")
         if error_count > 0:

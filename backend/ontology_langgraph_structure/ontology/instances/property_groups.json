@@ -1,19 +1,43 @@
 {
-  "total_properties": 201,
-  "total_groups": 49,
+  "total_properties": 187,
+  "total_groups": 48,
   "groups": {
+    "연결관계": [
+      "affiliatedWith",
+      "aliasOf",
+      "contrastsWith",
+      "has",
+      "hasAlias",
+      "initiatedBy",
+      "involvesPerson",
+      "isA",
+      "isTypeOf",
+      "lists",
+      "paired",
+      "pairedWith",
+      "relatedToInstitution",
+      "requiresReportTo",
+      "sentBy",
+      "sentTo",
+      "supervisedBy",
+      "supervises",
+      "typeOf",
+      "typicallyClassifiedAs",
+      "used",
+      "usedAsReferenceFor",
+      "usedBy",
+      "usedIn",
+      "usedOn"
+    ],
     "문서": [
-      "addressedIssue",
-      "awardsTitle",
-      "bottomVolumeHasCriminalCases",
-      "bottomVolumeHasInvestigationReports",
-      "compiled",
+      "containsTopic",
       "description",
       "documentedIn",
       "documents",
       "documentsEvent",
       "documentsTopic",
       "examples",
+      "examplesRegularizedLater",
       "hasDefinition",
       "hasDescription",
       "hasFormat",
@@ -21,9 +45,9 @@
       "hasVolumes",
       "note",
       "notedProblems",
+      "notes",
       "records",
       "registeredThrough",
-      "sentBy",
       "topVolumeHasAutopsyCases",
       "topVolumeHasGeneralCases",
       "wellDocumentedIn"
@@ -31,81 +55,30 @@
     "속성": [
       "category",
       "definedAs",
-      "hasAchievement",
-      "hasAlias",
-      "hasCategory",
-      "hasCharacteristics",
-      "hasDecoration",
+      "distinguishedByUniform",
+      "distinguishingUniform",
       "hasDimension",
       "hasDimensions",
-      "hasPrivileges",
       "hasRoofColor",
       "hasSignificance",
       "hasWeight",
       "madeOf",
       "material",
-      "mayAlsoBeLongCultivated",
       "oftenClassifiedAs",
       "roofColor",
-      "status",
       "typicalUsage",
       "usage",
-      "used",
       "wears"
-    ],
-    "연결관계": [
-      "affiliatedWith",
-      "aliasOf",
-      "distinguishedByUniform",
-      "distinguishingUniform",
-      "has",
-      "identifies",
-      "implementedInContextOf",
-      "involves",
-      "isA",
-      "isTypeOf",
-      "paired",
-      "pairedWith",
-      "punishedBy",
-      "sameAs",
-      "sentTo",
-      "typeOf",
-      "typicallyClassifiedAs",
-      "usedAsReferenceFor",
-      "usedBy",
-      "usedIn",
-      "usedOn"
-    ],
-    "인과관계": [
-      "awardedInResponseTo",
-      "caused",
-      "causes",
-      "derivedFrom",
-      "hasMotive",
-      "initiatedBy",
-      "leadsTo",
-      "ledTo",
-      "originatedFrom",
-      "requires"
-    ],
-    "부분": [
-      "contains",
-      "containsTopic",
-      "hasPart",
-      "hasQuota",
-      "partOf",
-      "parts",
-      "restrictedTo",
-      "subtypeOf"
     ],
     "기간중": [
       "adoptedDuring",
       "documentedDuring",
-      "duringReignOf",
-      "establishedDuringReign",
       "hasCompilationPeriod",
-      "isTemporaryPosition",
-      "practicedDuring"
+      "includesRange",
+      "mayAlsoBeLongCultivated",
+      "period",
+      "practicedDuring",
+      "term"
     ],
     "연도": [
       "establishedInYear",
@@ -114,109 +87,118 @@
       "hasEndYear",
       "hasStartYear",
       "hasYear",
-      "occurredInYear"
+      "occurredInYear",
+      "occursEveryYears"
+    ],
+    "직위": [
+      "hasPrivileges",
+      "hasStaffCountFor",
+      "hasStaffCountFora",
+      "hasStaffCountForfbf",
+      "heldOffice",
+      "includesPositions",
+      "isTemporaryPosition",
+      "occupation"
+    ],
+    "인과관계": [
+      "caused",
+      "causes",
+      "derivedFrom",
+      "hasMotive",
+      "leadsTo",
+      "ledTo",
+      "originatedFrom"
+    ],
+    "재위": [
+      "duringReignOf",
+      "establishedDuringReign",
+      "hasReignEnd",
+      "hasReignStart",
+      "reignedDuring"
+    ],
+    "역할": [
+      "hasFunction",
+      "hasPurpose",
+      "responsibleFor",
+      "role",
+      "servantRoleName"
+    ],
+    "조사": [
+      "addressedIssue",
+      "bottomVolumeHasInvestigationReports",
+      "contributesToResearchOn",
+      "investigatedBy"
     ],
     "소속": [
       "affiliatedNation",
       "forPerson",
-      "relatedToInstitution",
-      "servedUnder",
-      "servesUnder",
+      "hasCategory",
       "wasMostlyAffiliatedWith"
     ],
     "참여": [
       "appearanceFor",
       "attendedBy",
       "involved",
-      "involvesPerson",
       "participatesIn"
-    ],
-    "시기": [
-      "began",
-      "hasMonth",
-      "implementedAt",
-      "term",
-      "usedSince"
     ],
     "지휘": [
       "commands",
       "directs",
-      "requiresReportTo",
-      "supervisedBy",
-      "supervises"
+      "servedUnder",
+      "servesUnder"
     ],
-    "시대": [
-      "contemporaryWith",
-      "hasEra",
-      "originPeriod",
+    "위치": [
+      "hasCurrentLocation",
+      "heldAt",
+      "isStoredAt",
+      "location"
+    ],
+    "장소": [
+      "hasLocation",
+      "occursAt",
       "originatedIn",
-      "period"
+      "wasAnnouncedAt"
     ],
-    "역할": [
-      "hasFunction",
-      "hasPurpose",
-      "performedBy",
-      "responsibleFor",
-      "role"
+    "부분": [
+      "hasPart",
+      "partOf",
+      "parts",
+      "restrictedTo"
+    ],
+    "법률": [
+      "prohibitedFor",
+      "prohibition",
+      "regulated",
+      "status"
     ],
     "교체": [
       "alternativeTo",
       "experiencedOfficeChangeRelatedTo",
       "usedAsTemporaryReplacementIn"
     ],
-    "저술": [
-      "authored",
-      "describes",
-      "hasFocusTopics"
-    ],
     "설립": [
       "commonInstitutions",
       "establishedBy",
       "founded"
     ],
-    "조사": [
-      "contributesToResearchOn",
-      "inspects",
-      "investigatedBy"
+    "시기": [
+      "hasFocusTopics",
+      "startedIn",
+      "usedSince"
     ],
-    "포함": [
-      "doesNotInclude",
-      "includesRange",
-      "lists"
-    ],
-    "위치": [
-      "hasCurrentLocation",
-      "isStoredAt",
-      "location"
-    ],
-    "작위": [
-      "hasDesignations",
-      "hasRank",
-      "servantRoleName"
-    ],
-    "교육": [
-      "hasField",
-      "studentOf",
-      "teacherOf"
-    ],
-    "장소": [
-      "hasLocation",
-      "heldAt",
-      "occursAt"
-    ],
-    "구성원": [
-      "hasStaffCountFor",
-      "hasStaffCountFora",
-      "hasStaffCountForfbf"
+    "세금": [
+      "hasQuota",
+      "taxTreatmentSummary",
+      "taxedTogetherWith"
     ],
     "변경": [
       "hasVariant",
-      "renamedTo",
-      "revisedDimension"
+      "renamedInYear",
+      "renamedTo"
     ],
     "시행": [
       "appliedIn",
-      "regulated"
+      "occasionallyRegularizedInto"
     ],
     "협력": [
       "assisted",
@@ -224,82 +206,84 @@
     ],
     "시간순서": [
       "becameWidespreadAfter",
-      "occursEveryYears"
+      "began"
     ],
-    "반대": [
-      "contrastsWith",
-      "wasSubjectToDebate"
+    "제작": [
+      "compiled",
+      "performedBy"
     ],
-    "개혁": [
-      "examplesRegularizedLater",
-      "reformed"
+    "포함": [
+      "contains",
+      "doesNotInclude"
     ],
-    "직위": [
+    "시대": [
+      "contemporaryWith",
+      "originPeriod"
+    ],
+    "출생": [
+      "hasBirthYear",
+      "origin"
+    ],
+    "품계": [
+      "hasDecoration",
+      "hasRank"
+    ],
+    "작위": [
       "hasDesignation",
-      "includesPositions"
+      "hasDesignations"
     ],
-    "재위": [
-      "hasReignEnd",
-      "reignedDuring"
+    "교육": [
+      "hasField",
+      "teacherOf"
     ],
-    "관직": [
-      "heldOffice",
-      "occupation"
+    "승진": [
+      "promotesTo",
+      "promotionCondition"
     ],
-    "법률": [
-      "permitted",
-      "prohibitedFor"
+    "저술": [
+      "authored"
     ],
-    "정지": [
-      "prohibition",
-      "restrictsMovementTo"
+    "재판": [
+      "bottomVolumeHasCriminalCases"
     ],
-    "날짜": [
-      "startedIn",
-      "wasAnnouncedAt"
-    ],
-    "세금": [
-      "taxTreatmentSummary",
-      "taxedTogetherWith"
-    ],
-    "자녀": [
+    "임명": [
       "designatesWornPrisonerAs"
     ],
     "처형": [
       "executedInYear"
     ],
-    "출생": [
-      "hasBirthYear"
+    "승리": [
+      "hasAchievement"
     ],
     "사망": [
       "hasDeathYear"
     ],
-    "설계": [
-      "hasForm"
-    ],
-    "즉위": [
-      "hasReignStart"
-    ],
-    "전환": [
-      "occasionallyRegularizedInto"
+    "날짜": [
+      "hasMonth"
     ],
     "건설": [
       "oftenNewlyReclaimed"
     ],
-    "조상": [
-      "origin"
-    ],
-    "승진": [
-      "promotesTo"
-    ],
     "정책": [
-      "promotionCondition"
+      "permitted"
+    ],
+    "개혁": [
+      "reformed"
     ],
     "복원": [
       "restoredPowerTo"
     ],
-    "해임": [
+    "설계": [
+      "revisedDimension"
+    ],
+    "학습": [
+      "studentOf"
+    ],
+    "정지": [
       "suspendedFrom"
+    ],
+    "반대": [
+      "wasSubjectToDebate"
     ]
   },
   "group_definitions": {
