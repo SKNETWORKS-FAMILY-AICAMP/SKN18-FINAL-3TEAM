@@ -56,6 +56,8 @@ urlpatterns = [
     path('login/', include('login.urls')), # 로그인 페이지(UI)
     path('search/', include('search.urls')),
     path('video/', include('video.urls')),
+    # 유니티가 /api/generate 로 보내면 -> video 앱의 urls.py로 보냄
+    path('api/', include('video.urls')),
     path('mypage/', include('mypage.urls')),
 
     path('accounts/', include('allauth.urls')),  # Google OAuth
