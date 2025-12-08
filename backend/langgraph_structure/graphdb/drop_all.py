@@ -2,7 +2,6 @@
 from neo4j import GraphDatabase
 
 # ===== Neo4j 접속정보 =====
-
 URI = "neo4j://localhost:7687"   # bolt:// 도 OK
 USER = "neo4j"
 PASSWORD = "skn183final"            # 너의 실제 비번으로 변경
