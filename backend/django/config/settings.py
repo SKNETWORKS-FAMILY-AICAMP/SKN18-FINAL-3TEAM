@@ -193,6 +193,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # django-allauth 설정
 SOCIALACCOUNT_LOGIN_ON_GET = True  # 중간 확인 페이지 없이 바로 Google 로그인으로 이동
+ACCOUNT_EMAIL_VERIFICATION = 'none'  # 이메일 인증 건너뛰기 (소셜 로그인이므로 불필요)
+SOCIALACCOUNT_AUTO_SIGNUP = True  # 소셜 로그인 시 자동 가입
+
+# 소셜 로그인만 사용하므로 일반 회원가입 필드 설정 불필요
+# (ACCOUNT_EMAIL_REQUIRED는 deprecated되어 제거)
 
 # CORS 설정
 CORS_ALLOWED_ORIGINS = [
