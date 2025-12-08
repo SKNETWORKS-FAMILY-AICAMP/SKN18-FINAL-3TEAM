@@ -35,11 +35,19 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
 
     def get_login_redirect_url(self, request):
         """
-        Called after successful login (first time)
+        Called after successful login (existing user)
         """
         if request.user.is_authenticated:
             return self._generate_token_redirect_url(request.user)
         return super().get_login_redirect_url(request)
+
+    def get_signup_redirect_url(self, request):
+        """
+        Called after successful signup (new user - 처음 소셜 로그인)
+        """
+        if request.user.is_authenticated:
+            return self._generate_token_redirect_url(request.user)
+        return super().get_signup_redirect_url(request)
 
     def get_connect_redirect_url(self, request, socialaccount):
         """
@@ -55,15 +63,26 @@ class CustomAccountAdapter(DefaultAccountAdapter):
     Ensures /accounts/profile/ 404가 아니라 프런트엔드로 토큰을 실어 보냄.
     """
 
+    def _generate_token_redirect_url(self, user):
+        """
+        Helper method to generate JWT tokens and create redirect URL
+        """
+        refresh = RefreshToken.for_user(user)
+        params = urlencode(
+            {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+            }
+        )
+        frontend_url = "http://localhost:3000/"
+        return f"{frontend_url}?{params}"
+
     def get_login_redirect_url(self, request):
         if request.user.is_authenticated:
-            refresh = RefreshToken.for_user(request.user)
-            params = urlencode(
-                {
-                    "access": str(refresh.access_token),
-                    "refresh": str(refresh),
-                }
-            )
-            frontend_url = "http://localhost:3000/"
-            return f"{frontend_url}?{params}"
+            return self._generate_token_redirect_url(request.user)
         return super().get_login_redirect_url(request)
+
+    def get_signup_redirect_url(self, request):
+        if request.user.is_authenticated:
+            return self._generate_token_redirect_url(request.user)
+        return super().get_signup_redirect_url(request)
