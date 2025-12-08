@@ -150,19 +150,28 @@ def delete_account(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    # API 엔드포인트
+    # ============================================
+    # Authentication API Endpoints
+    # ============================================
     path('api/check-auth/', check_auth, name='check_auth'),
     path('api/logout/', logout_view, name='logout'),
-    path('api/delete-account/', delete_account, name='delete_account'),  # 회원탈퇴
+    path('api/delete-account/', delete_account, name='delete_account'),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
 
-    path('', include('home.urls')),        # 메인 홈
-    path('login/', include('login.urls')), # 로그인 페이지(UI)
-    path('search/', include('search.urls')),
-    path('video/', include('video.urls')),
-    path('mypage/', include('mypage.urls')),
+    # ============================================
+    # Google OAuth (django-allauth)
+    # ============================================
+    path('accounts/', include('allauth.urls')),
 
-    path('accounts/', include('allauth.urls')),  # Google OAuth
+    # ============================================
+    # App API Routes (currently empty, add API endpoints in each app)
+    # Note: React frontend handles all UI routing
+    # ============================================
+    path('api/home/', include('home.urls')),
+    path('api/search/', include('search.urls')),
+    path('api/video/', include('video.urls')),
+    path('api/mypage/', include('mypage.urls')),
+    # login APIs are handled above in Authentication section
 ]

@@ -1,6 +1,9 @@
 from django.urls import path
-from . import views
+
+# MyPage app URLs
+# React frontend handles the mypage UI
+# Add API endpoints here for user profile functionality
 
 urlpatterns = [
-    path('', views.mypage_main, name='mypage'),
+    # API endpoints will be added here
 ]

@@ -1,6 +1,9 @@
 from django.urls import path
-from . import views
+
+# Home app URLs
+# React frontend handles the home page UI
+# Add API endpoints here if needed
 
 urlpatterns = [
-    path('', views.home_page, name='home'),
+    # API endpoints will be added here
 ]
