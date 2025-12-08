@@ -1,7 +1,7 @@
 """
 Path Extractor & Evidence Aggregator Node (통합)
 
-5개 Thread의 추론 결과에서 경로 추출 및 근거 통합을 한 번에 수행
+Parallel Knowledge Retrieval의 5개 Thread 결과에서 경로 추출 및 근거 통합을 한 번에 수행
 - Thread별로 서로 다른 경로 추출 로직 적용
 - 개선된 점수 체계로 관련성 평가
 - 하이브리드 방식: 점수 기반 선별 → LLM 기반 최종 선택 (15개)
@@ -562,7 +562,7 @@ def select_top_evidences_with_llm(
         return selected_evidences[:top_k]
         
     except Exception as e:
-        print(f"        ⚠️ LLM 기반 선택 실패: {e}, 점수 기반으로 대체")
+        print(f"        └─ LLM 기반 선택 실패: {e}, 점수 기반으로 대체")
         # 실패 시 점수 기반으로 대체
         return candidate_evidences[:top_k]
 
@@ -571,7 +571,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     """
     통합 노드: 경로 추출 + 근거 통합
     
-    1. 5개 Thread의 추론 결과에서 경로 추출
+    1. Parallel Knowledge Retrieval의 5개 Thread 결과에서 경로 추출
     2. 개선된 점수 체계로 관련성 평가
     3. 모든 경로를 통합하여 가중치 기준 정렬
     4. 하이브리드 방식으로 상위 15개 근거 선택:

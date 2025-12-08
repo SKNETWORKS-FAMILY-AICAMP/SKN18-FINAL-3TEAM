@@ -17,15 +17,15 @@ graph TD
 
     Merge1 --> Extractor[2/7 Entity Extractor<br/>하이브리드 추출]
 
-    Extractor --> TTL[TTL 정확 매칭<br/>캐시 사용]
-    Extractor --> PGVector[pgvector 유사도 검색<br/>OpenAI 임베딩]
+    Extractor --> TTL[2-1: 입력 데이터 수신<br/>키워드 + 프로퍼티 그룹]
+    TTL --> Exact[2-2: TTL 정확 매칭<br/>캐시 사용]
+    Exact --> PGVector[2-3: pgvector 검색<br/>Fallback]
 
-    TTL --> Scoring[SPARQL 기반 스코어링<br/>연결 노드 분석]
-    PGVector --> Scoring
+    PGVector --> Scoring[2-4: SPARQL 스코어링<br/>연결 노드 분석]
 
-    Scoring --> Top30[상위 30개 선택<br/>관련성 점수 기준]
+    Scoring --> Top30[2-5: 상위 30개 선택<br/>관련성 점수 기준]
 
-    Top30 --> Expander[3/7 Semantic Expander<br/>4가지 확장]
+    Top30 --> Expander[2.5/7 Semantic Expander<br/>4가지 확장]
 
     Expander --> Temporal[시간적 맥락<br/>±10년]
     Expander --> Category[카테고리 기반<br/>동일 유형]
@@ -37,7 +37,7 @@ graph TD
     Causal --> Expanded
     Vector --> Expanded
 
-    Expanded --> Parallel[4/7 Parallel Inference<br/>5개 Thread 병렬]
+    Expanded --> Parallel[3/7 Parallel Knowledge Retrieval<br/>5개 Thread 병렬]
 
     Parallel --> T1[Thread 1<br/>outgoing_relations]
     Parallel --> T2[Thread 2<br/>incoming_relations]
@@ -45,7 +45,7 @@ graph TD
     Parallel --> T4[Thread 4<br/>connected_entities<br/>양방향 BFS]
     Parallel --> T5[Thread 5<br/>type_and_summary]
 
-    T1 --> PathAgg[5/6 Path Extractor<br/>& Evidence Aggregator<br/>통합 노드]
+    T1 --> PathAgg[4/7 Path Extractor<br/>& Evidence Aggregator<br/>통합 노드]
     T2 --> PathAgg
     T3 --> PathAgg
     T4 --> PathAgg
@@ -54,7 +54,7 @@ graph TD
     PathAgg --> Convergence[수렴 노드 감지<br/>2배 가중치]
     Convergence --> Top15[상위 15개 근거 선택<br/>기존 5개에서 확장]
 
-    Top15 --> Generator[6/6 Story Generator<br/>LLM 1회]
+    Top15 --> Generator[5/7 Story Generator<br/>LLM 1회]
 
     Generator --> Answer([최종 답변<br/>입니다 체])
 
@@ -72,15 +72,16 @@ graph TD
 
 ### 🔑 핵심 체크포인트
 
-| 단계                                               | LLM 호출        | SPARQL 호출      | 주요 작업                                                            |
-| -------------------------------------------------- | --------------- | ---------------- | -------------------------------------------------------------------- |
-| **0. 역사 관련 여부 체크**                         | ✅ **1회**      | ❌               | 조선시대 역사 질문 필터링 (비역사 질문 조기 종료)                    |
-| **1. Query Classifier**                            | ✅ **2회 병렬** | ❌               | 질문 분석, 키워드 확장, 프로퍼티 그룹 선택 (ThreadPoolExecutor 사용) |
-| **2. Entity Extractor**                            | ❌              | ✅ 각 엔티티마다 | 엔티티 추출, 연결 노드 기반 스코어링                                 |
-| **3. Semantic Expander (NEW)**                     | ❌              | ✅ 4가지 방법    | 시간적/카테고리/인과/벡터 기반 엔티티 확장                           |
-| **4. Parallel Inference**                          | ❌              | ✅ 5개 Thread    | 5개 관점 관계 검색 + 양방향 BFS (최대 5-hop)                         |
-| **5. Path Extractor & Evidence Aggregator (통합)** | ❌              | ❌               | 경로 추출 + 근거 통합 + 수렴 노드 감지 (2배 부스트) + 상위 15개 선택 |
-| **6. Story Generator**                             | ✅ 1회          | ❌               | 최종 스토리 생성                                                     |
+| 단계                                               | LLM 호출       | SPARQL 호출      | 주요 작업                                                                               |
+| -------------------------------------------------- | -------------- | ---------------- | --------------------------------------------------------------------------------------- |
+| **0. 역사 관련 여부 체크**                         | ✅**1회**      | ❌               | 조선시대 역사 질문 필터링 (비역사 질문 조기 종료)                                       |
+| **1. Query Classifier**                            | ✅**2회 병렬** | ❌               | 질문 분석, 키워드 확장, 프로퍼티 그룹 선택 (ThreadPoolExecutor 사용)                    |
+| **2. Entity Extractor**                            | ❌             | ✅ 각 엔티티마다 | 2-1: 입력 수신, 2-2: TTL 매칭, 2-3: pgvector, 2-4: SPARQL 스코어링, 2-5: 상위 30개 선택 |
+| **2.5 Semantic Expander**                          | ❌             | ✅ 4가지 방법    | 시간적/카테고리/인과/벡터 기반 엔티티 확장 (30개 → 75개)                                |
+| **3. Parallel Knowledge Retrieval**                | ❌             | ✅ 5개 Thread    | 5개 관점 관계 검색 + 양방향 BFS (최대 5-hop) + 프로퍼티 FILTER                          |
+| **4. Path Extractor & Evidence Aggregator (통합)** | ❌             | ❌               | 경로 추출 + 근거 통합 + 수렴 노드 감지 (2배 부스트) + 상위 15개 선택                    |
+| **5. Story Generator**                             | ✅ 1회         | ❌               | 최종 스토리 생성 (-입니다 체)                                                           |
+| **6. Story Enhancer (선택적)**                     | ✅ 1회         | ❌               | 설화/이야기 추가 (pgvector 설화 컬렉션 검색)                                            |
 
 **총 LLM 호출:**
 
@@ -98,7 +99,23 @@ graph TD
 **역할:** ThreadPoolExecutor로 LLM 2개를 병렬 실행하여 시간 단축
 **전제 조건:** 0단계에서 역사 관련 질문으로 확인된 경우에만 실행
 
-#### **병렬 실행 구조 (ThreadPoolExecutor)**
+#### **1-1. kiwipiepy 키워드 추출 (전처리)**
+
+먼저 형태소 분석기로 질문에서 명사를 추출합니다:
+
+```python
+from kiwipiepy import Kiwi
+kiwi = Kiwi()
+
+# 질문 예시: "궁궐을 건축한 왕들은 누가 있는지?"
+tokens = kiwi.tokenize(query)
+keywords = [t.form for t in tokens if t.tag in ('NNG', 'NNP') and len(t.form) >= 1]
+# 결과: ['궁궐', '건축', '왕']  # 조사/어미 자동 제거, 1글자 명사도 포함
+```
+
+#### **1-2. 병렬 실행 구조 (ThreadPoolExecutor)**
+
+추출된 키워드를 사용하여 2개 Thread를 병렬 실행:
 
 ```python
 from concurrent.futures import ThreadPoolExecutor
@@ -117,85 +134,30 @@ with ThreadPoolExecutor(max_workers=2) as executor:
 
 #### **Thread 1: 의도 분석 + 프로퍼티 그룹 선택**
 
+**작업 내용:**
+
 1. 질문 유형 분류 (`causal`/`deep_analysis`)
 2. 핵심 의도 파악 (`intent`)
 3. 프로퍼티 그룹 선택 (`property_groups`: 최대 5개)
 
-#### **Thread 2: 키워드 확장**
+**프로퍼티 그룹 선택 로직:**
 
-4. 키워드 확장 (`expanded_keywords`: 일반명사 → 구체적 인스턴스 5-10개)
-
-**효과:**
-
-- ✅ **시간 단축**: 2개 작업을 병렬 실행하여 약 40-50% 시간 절약
-- ✅ **독립성 보장**: 각 Thread는 독립적으로 실행 가능 (의존성 없음)
-- ✅ **병렬 처리**: Parallel Inference Executor와 동일한 방식 (ThreadPoolExecutor 사용)
-
-**분류 유형:**
-
-- **`causal`**: 인과관계 질문 ("왜 ~했을까?", "어떤 영향을 미쳤나?")
-- **`deep_analysis`**: 심화 분석 ("진짜 이유는?", "숨은 의도는?")
-
-**참고: 역사 관련 필터링은 0단계에서 완료**
-
-- 0단계에서 `is_historical=false` 확인 시 **조기 종료** 완료
-  - 예: "파이썬 프로그래밍 방법", "2024년 대선 결과"
-  - → 조기 종료: "답변을 생성할 수 없습니다" 메시지 반환 (LLM 1회만 호출)
-- `is_historical=true`: Query Classifier로 전달되어 정상 플로우 진행
-
-#### **키워드 확장 (일반명사 → 구체적 인스턴스) - Thread 2**
-
-**문제:** "궁궐", "환국", "왕" 같은 일반명사로는 구체적인 엔티티를 찾을 수 없음
-
-**해결:** LLM으로 일반명사를 구체적 인스턴스로 확장 (Thread 1과 **병렬 실행**)
-
-```
-질문: "궁궐을 건축한 왕들은 누가 있는지?"
-         ↓
-1. 키워드 추출 (kiwipiepy) - 메인 Thread
-   → ["궁궐", "건축", "왕"]
-         ↓
-2. ThreadPoolExecutor로 병렬 실행
-   ├─ Thread 1: 의도분석 + 프로퍼티그룹 (analyze_intent_and_properties)
-   └─ Thread 2: 키워드 확장 (expand_keywords) ⬅️ 이 작업
-         ↓
-3. Thread 2 결과 (키워드 확장)
-   → {"궁궐": ["경복궁", "창덕궁", "경덕궁", "창경궁"],
-       "왕": ["태조", "세종", "숙종"]}
-         ↓
-4. 확장된 키워드 + 원본 키워드로 TTL 정확 매칭
-   → 경복궁, 창덕궁, 태조, 세종 등 엔티티 발견
-```
-
-**병렬 실행 효과:**
-
-- ✅ **시간 단축**: Thread 1과 동시에 실행되어 대기 시간 없음
-- ✅ **독립적 실행**: 키워드 확장은 의도분석과 독립적으로 수행 가능
-
-#### **프로퍼티 그룹 선택 - Thread 1**
-
-**문제:** TTL에 4,056개의 프로퍼티가 있어서 하드코딩 불가능
-
-**해결:** 프로퍼티를 **70개 의미 그룹**으로 분류 → LLM이 관련 그룹 선택 (Thread 2와 **병렬 실행**)
+프로퍼티를 **40개 의미 그룹으로 분류 → LLM이 관련 그룹 선택**
 
 ```
 질문: "궁궐을 지은 왕"
          ↓
-1. ThreadPoolExecutor로 병렬 실행
-   ├─ Thread 1: 의도분석 + 프로퍼티그룹 (analyze_intent_and_properties) ⬅️ 이 작업
-   └─ Thread 2: 키워드 확장 (expand_keywords)
-         ↓
-2. Thread 1: 프로퍼티 그룹 목록 제공 (명확한 행위 그룹만)
+1. 프로퍼티 그룹 목록 제공 (명확한 행위 그룹만)
    - 건설, 설립, 통치, 임명, 사망, 처벌, 유배, 전쟁, 반란...
    - 제외: "속성"(623개), "기타"(1783개) 등 범용 그룹
          ↓
-3. Thread 1 결과: LLM이 관련 그룹 선택 (최대 5개)
+2. LLM이 관련 그룹 선택 (최대 5개)
    → ["건설", "설립", "통치"]
          ↓
-4. 선택된 그룹에서 실제 프로퍼티 추출
+3. 선택된 그룹에서 실제 프로퍼티 추출
    → ["built", "builtBy", "constructed", "founded", "established", ...]
          ↓
-5. SPARQL FILTER 적용 (Parallel Inference Executor에서 사용)
+4. SPARQL FILTER 적용 (Parallel Knowledge Retrieval에서 사용)
    FILTER(?predicate IN (hist:built, hist:builtBy, hist:founded, ...))
 ```
 
@@ -226,78 +188,193 @@ with ThreadPoolExecutor(max_workers=2) as executor:
 - "속성"(623개), "기타"(1783개) 등은 **범용 검색**에서 자동 포함
 - 명확한 행위가 없는 질문은 모든 프로퍼티 검색 (FILTER 없음)
 
+#### **Thread 2: 키워드 확장**
+
+**작업 내용:**
+
+4. 키워드 확장 (`expanded_keywords`: 일반명사 → 구체적 인스턴스 5-10개)
+
+**효과:**
+
+- ✅ **시간 단축**: 2개 작업을 병렬 실행하여 약 40-50% 시간 절약
+- ✅ **독립성 보장**: 각 Thread는 독립적으로 실행 가능 (의존성 없음)
+- ✅ **병렬 처리**: Parallel Knowledge Retrieval와 동일한 방식 (ThreadPoolExecutor 사용)
+
+**분류 유형:**
+
+- **`causal`**: 인과관계 질문 ("왜 ~했을까?", "어떤 영향을 미쳤나?")
+- **`deep_analysis`**: 심화 분석 ("진짜 이유는?", "숨은 의도는?")
+
+**참고: 역사 관련 필터링은 0단계에서 완료**
+
+- 0단계에서 `is_historical=false` 확인 시 **조기 종료** 완료
+  - 예: "파이썬 프로그래밍 방법", "2024년 대선 결과"
+  - → 조기 종료: "답변을 생성할 수 없습니다" 메시지 반환 (LLM 1회만 호출)
+- `is_historical=true`: Query Classifier로 전달되어 정상 플로우 진행
+
+#### **Thread 2 상세 - 키워드 확장 (일반명사 → 구체적 인스턴스)**
+
+**문제:** "궁궐", "환국", "왕" 같은 일반명사로는 구체적인 엔티티를 찾을 수 없음
+
+**해결:** LLM으로 일반명사를 구체적 인스턴스로 확장
+
+```
+질문: "궁궐을 건축한 왕들은 누가 있는지?"
+         ↓
+1. kiwipiepy로 키워드 추출 (전처리 단계)
+   → ["궁궐", "건축", "왕"]
+         ↓
+2. LLM으로 키워드 확장 (Thread 2)
+   → {"궁궐": ["경복궁", "창덕궁", "경덕궁", "창경궁"],
+       "왕": ["태조", "세종", "숙종"]}
+         ↓
+3. 확장된 키워드 + 원본 키워드로 Entity Extractor에서 TTL 매칭
+   → 경복궁, 창덕궁, 태조, 세종 등 엔티티 발견
+```
+
+**병렬 실행 효과:**
+
+- ✅ **시간 단축**: Thread 1과 동시에 실행되어 대기 시간 없음
+- ✅ **독립적 실행**: 키워드 확장은 의도분석과 독립적으로 수행 가능
+
 ---
 
 ### **2. Entity Extractor (하이브리드 엔티티 추출 + SPARQL 스코어링) ⚡최적화**
 
-**역할:** 확장된 키워드 + TTL 정확 매칭 + pgvector 유사도 검색 + **SPARQL 기반 관련성 스코어링**
+**역할:** Query Classifier에서 받은 확장된 키워드와 프로퍼티 그룹을 활용하여 관련 엔티티 추출
+**전제 조건:** 1단계(Query Classifier)에서 키워드 확장 및 프로퍼티 그룹 선택 완료
 
-**최적화 포인트:**
+**입력 데이터 (Query Classifier로부터 전달):**
 
-- ✅ **키워드 확장 활용**: classify_node에서 확장된 키워드 사용 (LLM 호출 없음)
-- ✅ **TTL 정확 매칭**: 확장된 키워드 + 원본 키워드 모두 사용하여 TTL 파일에서 직접 매칭
-- ✅ **kiwipiepy 형태소 분석**: 조사/어미 자동 제거 (빠름, 정확)
-- ✅ **TTL 캐싱**: 파일 수정 시만 재로드 (연속 질문 시 ~0.5초 절약)
-- ✅ **pgvector fallback**: TTL 매칭 실패 시 벡터 유사도 검색으로 보완
-- ✅ **SPARQL 기반 스코어링**: 각 엔티티의 연결 노드를 SPARQL로 조회하여 키워드 관련성 점수 계산
-- ✅ **엔티티 우선순위 정렬**: 관련성 점수 기준으로 상위 30개 선택
-- ✅ **의도 파악**: classify_node에서 이미 처리됨 (query_intent)
+- ✅ **원본 키워드**: kiwipiepy로 추출된 명사 (예: `['궁궐', '건축', '왕']`)
+- ✅ **확장된 키워드**: LLM으로 확장된 구체적 인스턴스 (예: `{"궁궐": ["경복궁", "창덕궁"], "왕": ["태조", "세종"]}`)
+- ✅ **프로퍼티 그룹**: 의도분석으로 선택된 관련 프로퍼티 그룹 (예: `["건설", "설립", "통치"]`)
 
-#### **2-1. 키워드 확장 활용 (classify_node에서 처리)**
+#### **2-1. 입력 데이터 수신 및 통합**
+
+Query Classifier(1단계)에서 전달받은 데이터를 통합하여 엔티티 검색에 활용:
 
 ```python
-# classify_node에서 이미 확장된 키워드 사용
+# classify_node에서 전달받은 데이터
 expanded_keywords = state.get("expanded_keywords", [])
 # 예: ["경복궁", "창덕궁", "태조", "세종"]
 
+query_keywords = state.get("query_keywords", [])
+# 예: ["궁궐", "건축", "왕"]
+
+property_groups = state.get("property_groups", [])
+# 예: ["건설", "설립", "통치"]
+
 # 원본 키워드와 확장된 키워드 병합
 all_keywords = list(set(query_keywords + expanded_keywords))
-
-# TTL 파일에서 직접 매칭
-for keyword in all_keywords:
-    if keyword in ttl_data["label_to_uri"]:
-        # 엔티티 발견
+# 결과: ["궁궐", "건축", "왕", "경복궁", "창덕궁", "태조", "세종"]
 ```
 
-#### **2-2. TTL 정확 매칭 (Fuseki 검색 제거됨)**
+**효과:**
 
-**변경사항:** Fuseki 검색을 제거하고 TTL 파일에서 직접 매칭합니다.
+- ✅ **LLM 호출 없음**: Query Classifier에서 이미 처리 완료
+- ✅ **정확도 향상**: 원본 + 확장 키워드로 포괄적 검색
+- ✅ **시간 절약**: 중복 처리 없음
+
+#### **2-2. TTL 정확 매칭 (캐시 활용)**
+
+확장된 키워드 + 원본 키워드로 TTL 파일에서 직접 엔티티 매칭:
 
 ```python
-# 확장된 키워드 + 원본 키워드 모두 사용하여 TTL 매칭
+# ⚡ 캐싱: 파일 변경 없으면 메모리에서 즉시 반환
+_ttl_cache = None
+_ttl_cache_mtime = None
+
+def load_ttl_entities():
+    if _ttl_cache and _ttl_cache_mtime == current_mtime:
+        return _ttl_cache  # 즉시 반환 (~0ms)
+    # 파일 읽기는 변경 시에만
+
+# TTL 매칭 로직
 for keyword in all_keywords:  # 확장된 키워드 + 원본 키워드
-    # 정확한 라벨 매칭
+    # 1. 정확한 라벨 매칭
     if keyword in ttl_data["label_to_uri"]:
         uri = ttl_data["label_to_uri"][keyword]
-        # 엔티티 추가
+        entities.append({
+            "uri": uri,
+            "name": keyword,
+            "match_method": "exact"  # 정확 매칭
+        })
 
-    # 부분 매칭 (키워드가 라벨에 포함된 경우)
+    # 2. 부분 매칭 (키워드가 라벨에 포함된 경우)
     for label, uri in ttl_data["label_to_uri"].items():
         if keyword in label:
-            # 엔티티 추가
+            entities.append({
+                "uri": uri,
+                "name": label,
+                "match_method": "partial"  # 부분 매칭
+            })
 ```
 
 **장점:**
 
-- ✅ 네트워크 통신 없음 (매우 빠름)
-- ✅ TTL 파일과 직접 동기화 (업로드 불필요)
-- ✅ 캐싱으로 파일 I/O 최소화
+- ✅ **속도**: 네트워크 통신 없음 (매우 빠름 ~0ms)
+- ✅ **동기화**: TTL 파일과 직접 동기화 (업로드 불필요)
+- ✅ **캐싱**: 파일 I/O 최소화 (연속 질문 시 ~0.5초 절약)
 
-#### **2-3. kiwipiepy 형태소 분석 (키워드 추출용)**
+#### **2-3. pgvector 유사도 검색 (Fallback)**
+
+**목적:** TTL 정확 매칭으로 찾지 못한 경우 pgvector로 의미적 유사도 검색
+
+**검색 전략:**
 
 ```python
-from kiwipiepy import Kiwi
-kiwi = Kiwi()
+from backend.db_pipeline.services.postgres_service import PostgresVectorService
 
-def extract_nouns_with_kiwi(query: str) -> list:
-    """
-    입력: "궁궐을 건축한 왕들은 누가 있는지?"
-    토큰: [('궁궐', 'NNG'), ('을', 'JKO'), ('건축', 'NNG'), ('한', 'ETM'), ...]
-    출력: ['궁궐', '건축', '왕']  # 명사만 추출 (조사/어미 자동 제거!)
-    """
-    tokens = kiwi.tokenize(query)
-    return [t.form for t in tokens if t.tag in ('NNG', 'NNP')]  # 일반명사 + 고유명사
+pgvector_service = PostgresVectorService()
+
+# 1. 확장된 키워드로 벡터 검색
+query_text = " ".join(expanded_keywords)  # "경복궁 창덕궁 태조 세종"
+results = pgvector_service.search(
+    query=query_text,
+    top_k=15,
+    threshold=0.7  # 높은 유사도만 선택
+)
+
+# 2. 결과에서 title 추출 (엔티티 이름)
+for result in results:
+    entity_name = result["title"]
+    similarity = result["similarity"]
+
+    # 3. TTL에서 해당 엔티티 URI 찾기
+    if entity_name in ttl_data["label_to_uri"]:
+        uri = ttl_data["label_to_uri"][entity_name]
+        entities.append({
+            "uri": uri,
+            "name": entity_name,
+            "match_method": "pgvector",
+            "similarity": similarity
+        })
 ```
+
+**통합 흐름:**
+
+```
+1. TTL 정확 매칭 (우선)
+   ↓
+2. 충분한 엔티티 발견?
+   ↓ No (< 10개)
+3. pgvector 유사도 검색 (보완)
+   ↓
+4. 중복 제거 후 병합
+   ↓
+5. SPARQL 스코어링 (모든 엔티티)
+```
+
+**pgvector vs TTL 매칭 비교:**
+
+| 특징       | TTL 정확 매칭       | pgvector 유사도 검색         |
+| ---------- | ------------------- | ---------------------------- |
+| **속도**   | 매우 빠름 (~0ms)    | 빠름 (~0.3초)                |
+| **정확도** | 100% (정확 일치)    | 70-95% (의미적 유사)         |
+| **활용**   | 우선 검색           | Fallback                     |
+| **장점**   | 캐싱, 네트워크 없음 | 동의어/유사어 발견           |
+| **예시**   | "경복궁" → "경복궁" | "명성황후 시해" → "을미사변" |
 
 #### **2-4. SPARQL 기반 엔티티 스코어링 (연결 노드 분석) 🔍**
 
@@ -419,83 +496,63 @@ matched_entities.sort(key=lambda x: x.get("relevance_score", 0), reverse=True)
 matched_entities = matched_entities[:30]
 ```
 
-#### **2-5. TTL 정확 매칭 (캐시 사용)**
+#### **2-5. 엔티티 우선순위 정렬 및 상위 30개 선택**
+
+**목적:** 추출된 모든 엔티티에 대해 관련성 점수를 계산하여 우선순위 정렬
+
+**정렬 과정:**
 
 ```python
-# ⚡ 캐싱: 파일 변경 없으면 메모리에서 즉시 반환
-_ttl_cache = None
-_ttl_cache_mtime = None
+# 1. 모든 엔티티에 대해 점수 계산 (TTL + pgvector 모두)
+for entity in matched_entities:
+    score = calculate_entity_score_with_connections(
+        entity,
+        all_keywords,
+        ttl_data
+    )
+    entity["relevance_score"] = score
 
-def load_ttl_entities():
-    if _ttl_cache and _ttl_cache_mtime == current_mtime:
-        return _ttl_cache  # 즉시 반환 (~0ms)
-    # 파일 읽기는 변경 시에만
-```
-
-#### **2-6. pgvector 유사도 검색 (TTL 매칭 실패 시)**
-
-**목적:** TTL 정확 매칭으로 찾지 못한 경우 pgvector로 의미적 유사도 검색
-
-**검색 전략:**
-
-```python
-from backend.db_pipeline.services.postgres_service import PostgresVectorService
-
-pgvector_service = PostgresVectorService()
-
-# 1. 확장된 키워드로 벡터 검색
-query_text = " ".join(expanded_keywords)  # "경복궁 태조"
-results = pgvector_service.search(
-    query=query_text,
-    top_k=15,
-    threshold=0.7  # 높은 유사도만 선택
+# 2. 점수 기준으로 내림차순 정렬 (높은 점수 우선)
+matched_entities.sort(
+    key=lambda x: x.get("relevance_score", 0),
+    reverse=True
 )
 
-# 2. 결과에서 title 추출 (엔티티 이름)
-for result in results:
-    entity_name = result["title"]
-    similarity = result["similarity"]
+# 3. 상위 30개만 선택 (성능 최적화)
+matched_entities = matched_entities[:30]
 
-    # 3. TTL에서 해당 엔티티 URI 찾기
-    if entity_name in ttl_data["label_to_uri"]:
-        uri = ttl_data["label_to_uri"][entity_name]
-        entities.append({
-            "uri": uri,
-            "name": entity_name,
-            "match_method": "pgvector",
-            "similarity": similarity
-        })
+# 4. Semantic Expander로 전달
+state["matched_entities"] = matched_entities
 ```
 
-**pgvector vs TTL 매칭 비교:**
-
-| 특징       | TTL 정확 매칭       | pgvector 유사도 검색         |
-| ---------- | ------------------- | ---------------------------- |
-| **속도**   | 매우 빠름 (~0ms)    | 빠름 (~0.3초)                |
-| **정확도** | 100% (정확 일치)    | 70-95% (의미적 유사)         |
-| **활용**   | 우선 검색           | Fallback                     |
-| **장점**   | 캐싱, 네트워크 없음 | 동의어/유사어 발견           |
-| **예시**   | "경복궁" → "경복궁" | "명성황후 시해" → "을미사변" |
-
-**통합 흐름:**
+**출력 예시:**
 
 ```
-1. TTL 정확 매칭 (우선)
-   ↓
-2. 충분한 엔티티 발견?
-   ↓ No (< 10개)
-3. pgvector 유사도 검색 (보완)
-   ↓
-4. 중복 제거 후 병합
-   ↓
-5. SPARQL 스코어링 (모든 엔티티)
+질문: "궁궐을 건축한 왕들은?"
+
+추출된 엔티티 (상위 5개):
+1. 경복궁 (점수: 1.7) - 정확 매칭 + 키워드 "궁궐" + 연결 노드 "태조"
+2. 태조 (점수: 1.5) - 정확 매칭 + 키워드 "왕" + 연결 노드 "경복궁"
+3. 창덕궁 (점수: 1.6) - 정확 매칭 + 키워드 "궁궐"
+4. 세종 (점수: 1.4) - 확장 키워드 매칭 + 키워드 "왕"
+5. 창경궁 (점수: 1.3) - pgvector 유사도 + 키워드 "궁궐"
+...
+총 30개 엔티티 선택 → Semantic Expander로 전달
 ```
+
+**효과:**
+
+- ✅ **관련성 우선**: 질문과 가장 관련 있는 엔티티부터 처리
+- ✅ **성능 최적화**: 30개로 제한하여 후속 처리 속도 향상
+- ✅ **정확도 향상**: 연결 노드 분석으로 실제 관계 반영
+- ✅ **노이즈 감소**: 낮은 점수의 무관한 엔티티 제거
 
 ---
 
-### **3. Semantic Expander (의미론적 엔티티 확장) ⚡NEW**
+### **2.5 Semantic Expander (의미론적 엔티티 확장)**
 
-**역할:** 추출된 엔티티를 4가지 방법으로 의미론적 확장하여 검색 범위 확대
+**역할:** Entity Extractor에서 추출된 엔티티(30개)를 4가지 방법으로 의미론적 확장하여 검색 범위 확대
+**전제 조건:** 2단계(Entity Extractor)에서 상위 30개 엔티티 선택 완료
 
 **문제:**
 
@@ -592,7 +649,7 @@ def expand_by_pgvector(entities, query, top_k=15):
 
 ---
 
-### **3.5 엔티티 관련성 점수 매기기 방식 (Relevance Scoring) 🎯**
+### **2.6 엔티티 관련성 점수 매기기 방식 (Relevance Scoring) 🎯**
 
 **목적:** 확장된 엔티티들에 대해 관련도를 정량화하여 우선순위 정렬
 
@@ -897,6 +954,7 @@ score = calculate_hybrid_score(0.75, "causal_chain", alpha=0.6)
    - SPARQL 기반 확장 (temporal, category, causal_chain)은 유사도가 없으므로 고정 점수로 fallback
 
 2. **alpha 값 튜닝 가이드:**
+
    - `alpha=0.6` (기본): 고정 점수 60%, 실제 유사도 40%
    - `alpha=0.8`: 고정 점수 우선 (안정성 중시)
    - `alpha=0.4`: 유사도 우선 (정확도 중시)
@@ -905,13 +963,13 @@ score = calculate_hybrid_score(0.75, "causal_chain", alpha=0.6)
 
 #### **참고: 점수 연산 원칙**
 
-| 연산 방식       | 수식              | 효과                | 적용 케이스              |
-| --------------- | ----------------- | ------------------- | ------------------------ |
-| **곱하기 (×)**  | `score × 0.8`     | 점수 **감소** ❌    | 페널티 적용 시           |
-| **곱하기 (×)**  | `score × 1.2`     | 점수 **증가** ✅    | 부스트 적용 시           |
-| **더하기 (+)**  | `score + 0.2`     | 점수 **증가** ✅    | 가산점 적용 시           |
-| **가중평균**    | `s1×0.6 + s2×0.4` | 두 점수 **혼합** ✅ | 하이브리드 방식          |
-| **최소값 제한** | `min(1.0, score)` | 1.0 초과 방지 ✅    | 부스트 후 상한선 적용 시 |
+| 연산 방식       | 수식              | 효과               | 적용 케이스              |
+| --------------- | ----------------- | ------------------ | ------------------------ |
+| **곱하기 (×)**  | `score × 0.8`     | 점수**감소** ❌    | 페널티 적용 시           |
+| **곱하기 (×)**  | `score × 1.2`     | 점수**증가** ✅    | 부스트 적용 시           |
+| **더하기 (+)**  | `score + 0.2`     | 점수**증가** ✅    | 가산점 적용 시           |
+| **가중평균**    | `s1×0.6 + s2×0.4` | 두 점수**혼합** ✅ | 하이브리드 방식          |
+| **최소값 제한** | `min(1.0, score)` | 1.0 초과 방지 ✅   | 부스트 후 상한선 적용 시 |
 
 **핵심:**
 
@@ -921,14 +979,14 @@ score = calculate_hybrid_score(0.75, "causal_chain", alpha=0.6)
 
 ---
 
-### **4. Parallel Knowledge Retrieval (`parallel_inference_executor_node`) ⚡개선**
+### **3. Parallel Knowledge Retrieval ⚡개선**
 
 **역할:** 5가지 관점에서 **관계 확장** 지식 검색 + **양방향 BFS 경로 탐색** (프로퍼티 필터링 적용)
 
 **동작 방식:**
 
 ```
-parallel_inference_executor_node 내부:
+Parallel Knowledge Retrieval 내부:
 ├── ThreadPoolExecutor(max_workers=5) 생성
 │
 ├── 각 Thread에서 수행하는 작업:
@@ -996,7 +1054,7 @@ SELECT ?entity ?predicate ?object WHERE {
 
 - ✅ **하드코딩 없음**: 특정 프로퍼티가 아닌 **모든 관계** 검색
 - ✅ **프로퍼티 FILTER**: classify_node에서 선택된 프로퍼티만 우선 검색
-- ✅ **양방향 BFS (NEW)**: `connected_entities` Thread에서 최대 5-hop 경로 탐색 + 수렴 노드 감지
+- ✅ **양방향 BFS**: `connected_entities` Thread에서 최대 5-hop 경로 탐색 + 수렴 노드 감지
 - ✅ **범용성**: 데이터 추가 시 자동으로 새 프로퍼티도 검색됨
 
 #### **범용 관계 검색 SPARQL 예시**
@@ -1150,7 +1208,7 @@ def find_bidirectional_paths(entity_a_uri, entity_b_uri, max_depth=5):
 
 ---
 
-### **5. Path Extractor & Evidence Aggregator (통합 노드) ⚡개선**
+### **4. Path Extractor & Evidence Aggregator (통합 노드) ⚡개선**
 
 **역할:** 경로 추출과 근거 통합을 한 노드에서 수행 + **개선된 점수 체계** + **상위 15개 근거 선택**
 
@@ -1198,11 +1256,12 @@ def detect_convergence_nodes(inference_paths, query_entities):
 ```
 
 **부스트 효과:**
-| 근거 유형 | 기본 가중치 | 수렴 노드 시 | 최종 가중치 |
+
+| 근거 유형         | 기본 가중치 | 수렴 노드 시 | 최종 가중치 |
 | ----------------- | ----------- | ------------ | ----------- |
-| outgoing_relation | 0.20 | ×2.0 | 0.40 |
-| incoming_relation | 0.25 | ×2.0 | 0.50 |
-| connected_entity | 0.30 | ×2.0 | 0.60 |
+| outgoing_relation | 0.20        | ×2.0         | 0.40        |
+| incoming_relation | 0.25        | ×2.0         | 0.50        |
+| connected_entity  | 0.30        | ×2.0         | 0.60        |
 
 **4. 근거 통합 및 정렬**
 
@@ -1276,11 +1335,12 @@ def detect_convergence_nodes(inference_paths, query_entities):
     - 모든 Thread 타입에 대한 한글 매핑 포함
 
 12. **`inference_paths` 반환**
+
     - 경로 추출 결과를 state에 포함 (통합 노드 특성)
 
 ---
 
-### **7. Story Generator (스토리 생성)**
+### **5. Story Generator (스토리 생성)**
 
 **역할:** 근거 기반 자연스러운 스토리 생성
 
@@ -1307,7 +1367,7 @@ def detect_convergence_nodes(inference_paths, query_entities):
 
 ---
 
-### **6. Story Enhancer (설화/이야기 추가) - 선택적**
+### **6. Story Enhancer (설화/이야기 추가) - 선택적 기능**
 
 **역할:** 기존 스토리에 설화/이야기를 추가하여 풍성한 콘텐츠 생성
 
@@ -1431,35 +1491,41 @@ def story_enhancer_node(state: GraphState) -> GraphState:
    - kiwipiepy: ["궁궐", "지은", "왕"]
    - 키워드 확장: {"궁궐": ["경복궁", "창덕궁", "경덕궁"], "왕": ["태조", "세종"]}
    ↓
-3. Entity Extractor (하이브리드):
-   Step 1: TTL 정확 매칭 (우선)
+2. Entity Extractor (하이브리드):
+   Step 2-1: 입력 데이터 수신 및 통합
+   - Query Classifier로부터 원본 + 확장 키워드 병합
+
+   Step 2-2: TTL 정확 매칭 (우선)
    - 확장된 키워드로 검색: ["경복궁", "창덕궁", "태조", "세종"]
    - 결과: 경복궁, 창덕궁, 태조, 세종 (4개)
 
-   Step 2: pgvector 유사도 검색 (< 10개이므로 추가 검색)
+   Step 2-3: pgvector 유사도 검색 (< 10개이므로 추가 검색)
    - Query: "경복궁 창덕궁 태조 세종"
    - 결과: 경운궁(덕수궁), 정조 등 유사 엔티티 (6개 추가)
 
-   Step 3: SPARQL 스코어링
-   - 각 엔티티의 연결 노드 분석
+   Step 2-4: SPARQL 스코어링 (연결 노드 분석)
+   - 각 엔티티의 연결 노드를 SPARQL로 조회
    - 키워드 관련성 점수 계산
-   - 상위 30개 선택
+
+   Step 2-5: 상위 30개 선택
+   - 관련성 점수 기준으로 정렬
+   - 상위 30개 엔티티만 선택
    ↓
-4. Semantic Expander (4가지 확장):
+2.5 Semantic Expander (4가지 확장):
    - 시간적 맥락: 1392-1402년 사건 (태조 재위 기간)
    - 카테고리: 건축/건설 관련 사건
    - 인과관계: (해당 없음)
    - 벡터 유사도: "궁궐 건설" 관련 문서 검색
    → 총 75개 엔티티로 확장
    ↓
-5. Parallel Inference (5개 Thread):
+3. Parallel Knowledge Retrieval (5개 Thread):
    - Thread 1: outgoing_relations → 태조 → [built] → 경복궁
    - Thread 2: incoming_relations → 경복궁 ← [builtBy] ← 태조
    - Thread 3: entity_properties → 경복궁.hasYear = 1395
    - Thread 4: connected_entities → 태조 ↔ 경복궁 (직접 연결)
    - Thread 5: type_and_summary → 경복궁 타입/요약
    ↓
-5. Path Extractor & Evidence Aggregator (통합):
+4. Path Extractor & Evidence Aggregator (통합):
    - 경로 추출: 태조 → [built] → 경복궁 (가중치 0.30)
    - 경로 추출: 경복궁 → [builtBy] → 태조 (가중치 0.36, 관계 확장)
    - 경로 추출: 경복궁.hasYear = 1395 (가중치 0.20)
@@ -1467,7 +1533,7 @@ def story_enhancer_node(state: GraphState) -> GraphState:
    - 수렴 노드 감지: (해당 없음)
    - 상위 15개 근거 선택
    ↓
-6. Story Generator (LLM 1회):
+5. Story Generator (LLM 1회):
    → "1395년 태조 이성계가 경복궁을 창건하였습니다.[1][2]"
 ```
 
@@ -1485,12 +1551,12 @@ def story_enhancer_node(state: GraphState) -> GraphState:
    - kiwipiepy: ["명성황후", "시해", "사건", "원인"]
    - 키워드 확장: {"명성황후": ["민비", "명성황후"], "시해": ["을미사변", "살해"]}
    ↓
-3. Entity Extractor:
+2. Entity Extractor:
    - TTL 매칭: 을미사변, 명성황후 (2개)
    - pgvector: "명성황후 시해" → 을미사변, 경복궁 점령 등 (8개 추가)
    - SPARQL 스코어링 → 상위 30개
    ↓
-4. Semantic Expander (인과관계 중심 확장) ⭐:
+2.5 Semantic Expander (인과관계 중심 확장) ⭐:
    인과관계 체인 (causedBy, leadsTo):
    - 을미사변 ← [causedBy] ← 갑오개혁
    - 을미사변 ← [causedBy] ← 청일전쟁
@@ -1505,18 +1571,18 @@ def story_enhancer_node(state: GraphState) -> GraphState:
 
    결과: [을미사변, 갑오개혁, 청일전쟁, 동학농민운동, 삼국간섭, 아관파천]
    ↓
-5. Parallel Inference:
+3. Parallel Knowledge Retrieval:
    - 각 사건의 인과관계 프로퍼티 우선 검색
    - causedBy/leadsTo 관계에 높은 가중치
    ↓
-5. Path Extractor & Evidence Aggregator (통합):
+4. Path Extractor & Evidence Aggregator (통합):
    - 경로 추출 및 근거 통합
-   - 인과관계 프로퍼티: 가중치 0.50 (기존 0.20의 2.5배)
-   - 시간적 연관: 가중치 0.35
-   - 일반 관계: 가중치 0.15
+   - 인과관계 프로퍼티: 가중치 1.6 (leadsTo, causedBy)
+   - 시간적 연관: 가중치 1.1 (outgoing_relations)
+   - 일반 관계: 가중치 1.0
    - 상위 15개 근거 선택
    ↓
-6. Story Generator:
+5. Story Generator:
    → "을미사변(1895)은 청일전쟁과 갑오개혁의 결과로 발생했습니다.
       이후 고종의 아관파천으로 이어졌습니다..."
 ```
@@ -1541,7 +1607,7 @@ def story_enhancer_node(state: GraphState) -> GraphState:
 | **Vector DB**           | PostgreSQL + pgvector               | 문서 청크 벡터 검색 (OpenAI 임베딩)             | HNSW 인덱스        |
 | **Agent Orchestration** | LangGraph + ThreadPoolExecutor      | 5개 Thread 병렬 실행                            | -                  |
 | **Story Generator**     | LLM (GPT-4o)                        | 스토리 생성 (-입니다 체)                        | -                  |
-| **Story Enhancer**      | LLM + **pgvector 설화 검색**        | 설화/이야기 추가 (선택적)                       | -                  |
+| **Story Enhancer**      | LLM +**pgvector 설화 검색**         | 설화/이야기 추가 (선택적)                       | -                  |
 | **Property Groups**     | JSON (70개 그룹)                    | 프로퍼티 의미 그룹 분류                         | 자동 업데이트      |
 
 ---
@@ -1658,7 +1724,7 @@ Fuseki 직접 검색:
 **수정된 노드:**
 
 - `classify_node.py`: 프로퍼티 그룹 선택 기능 추가
-- `parallel_inference_executor_node.py`: 범용 관계 검색 + 프로퍼티 FILTER 적용
+- `parallel_inference_executor_node.py` (Parallel Knowledge Retrieval): 범용 관계 검색 + 프로퍼티 FILTER 적용
 - `multi_path_extractor_node.py`: 범용 관계 결과 파싱 로직 추가
 - `ontology/scripts/extract_property_groups.py`: 프로퍼티 그룹 추출 스크립트
 
@@ -1740,7 +1806,7 @@ classify_node에서 조기 필터링:
 
 ## 🔥 아키텍처 상세
 
-### 5개 Thread 동작 흐름 (parallel_inference_executor_node 내부)
+### 5개 Thread 동작 흐름 (Parallel Knowledge Retrieval 내부)
 
 ```mermaid
 graph LR
@@ -1913,7 +1979,7 @@ backend/ontology_langgraph_structure/
 │   ├── entity_extractor_node.py  # 하이브리드 엔티티 추출 (⚡캐싱+LLM통합)
 │   ├── generate_node.py       # 스토리 생성
 │   └── kg/
-│       ├── parallel_inference_executor_node.py  # 5개 Thread 범용 관계 검색
+│       ├── parallel_inference_executor_node.py  # Parallel Knowledge Retrieval: 5개 Thread 범용 관계 검색
 │       └── path_evidence_aggregator_node.py  # 경로 추출 및 근거 통합 (통합 노드)
 ├── ontology/
 │   ├── korean_history.owl     # 온톨로지 스키마

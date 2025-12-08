@@ -790,6 +790,8 @@ def entity_extractor_node(state: GraphState) -> GraphState:
         # 3. 연결된 노드에 키워드 포함 점수 (SPARQL 기반)
         connected_score = 0.0
         uri = entity.get("uri")
+        sparql_executed = False
+        connection_count = 0
 
         if uri and uri in ttl_data.get("uri_to_type", {}):
             # SPARQL로 이 엔티티와 연결된 모든 엔티티의 label 조회
@@ -828,25 +830,43 @@ def entity_extractor_node(state: GraphState) -> GraphState:
                 )
 
                 if response.status_code == 200:
+                    sparql_executed = True
                     results = response.json()
                     bindings = results.get("results", {}).get("bindings", [])
+                    connection_count = len(bindings)
 
                     # 연결된 엔티티의 label에 키워드가 있는지 확인
+                    matched_connections = []
+                    has_keyword_match = False  # 키워드 매칭 여부 플래그
                     for binding in bindings:
                         connected_label = binding.get("connectedLabel", {}).get("value", "")
                         if connected_label:
                             for kw in keywords:
                                 if kw.lower() in connected_label.lower():
                                     connected_score += 0.1
+                                    matched_connections.append(connected_label)
+                                    has_keyword_match = True  # 키워드 매칭 발견
                                     if connected_score >= 0.3:  # 최대값 도달
                                         break
 
                         if connected_score >= 0.3:
                             break
 
+                    # 연결 노드 분석 결과 저장
+                    entity["sparql_connections"] = connection_count
+                    entity["matched_connections"] = len(matched_connections)
+                    entity["has_keyword_in_connections"] = has_keyword_match  # 우선순위 정렬용 플래그
+
             except Exception as e:
                 # SPARQL 실패 시 조용히 무시 (점수만 0으로 유지)
                 pass
+
+        # 디버깅 정보 저장
+        entity["sparql_executed"] = sparql_executed
+        
+        # 연결된 노드에 키워드가 없는 경우 플래그 설정
+        if "has_keyword_in_connections" not in entity:
+            entity["has_keyword_in_connections"] = False
 
         total_score = base_score + name_match_score + min(connected_score, 0.3)
         entity["relevance_score"] = total_score
@@ -1034,12 +1054,36 @@ def entity_extractor_node(state: GraphState) -> GraphState:
     # ========================================
     # 엔티티 점수 계산 및 정렬
     # ========================================
+    print(f"  ├─ SPARQL 기반 스코어링 중...")
+
     # 모든 엔티티에 대해 점수 계산
+    sparql_count = 0
+    total_connections = 0
+    total_matched_connections = 0
+
     for entity in matched_entities:
         calculate_entity_score_with_connections(entity, all_keywords, ttl_data)
+        if entity.get("sparql_executed"):
+            sparql_count += 1
+            total_connections += entity.get("sparql_connections", 0)
+            total_matched_connections += entity.get("matched_connections", 0)
 
-    # 점수 기준으로 정렬 (높은 점수 우선)
-    matched_entities.sort(key=lambda x: x.get("relevance_score", 0), reverse=True)
+    # SPARQL 스코어링 통계 출력
+    if sparql_count > 0:
+        avg_connections = total_connections / sparql_count if sparql_count > 0 else 0
+        print(f"     └─ SPARQL 스코어링: {sparql_count}개 엔티티, 평균 연결노드 {avg_connections:.1f}개, 키워드 매칭 {total_matched_connections}개")
+    else:
+        print(f"     └─ SPARQL 스코어링: 실행되지 않음")
+
+    # 정렬: 키워드가 연결된 노드에 있는 엔티티를 우선적으로, 그 다음 점수 기준
+    # 1순위: has_keyword_in_connections (True가 먼저)
+    # 2순위: relevance_score (높은 점수 우선)
+    matched_entities.sort(
+        key=lambda x: (
+            not x.get("has_keyword_in_connections", False),  # False가 먼저 오도록 (True를 우선)
+            -x.get("relevance_score", 0)  # 내림차순 정렬을 위해 음수
+        )
+    )
 
     # 상위 30개만 선택 (너무 많으면 성능 저하)
     matched_entities = matched_entities[:30]
