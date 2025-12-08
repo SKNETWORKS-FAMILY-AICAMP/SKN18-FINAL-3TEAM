@@ -94,23 +94,6 @@ services:
       - ./neo4j/logs:/logs
       - ./neo4j/import:/import
 
-volumes:
-  fuseki-data:
-    driver: local
-  etcd-data:
-    driver: local
-  minio-data:
-    driver: local
-  milvus-data:
-    driver: local
-
-networks:
-  default:
-    name: milvus
-
-  ############################################################
-  # PostgreSQL + pgvector
-  ############################################################
   postgres:
     image: pgvector/pgvector:pg16       # PostgreSQL 16 + pgvector 확장 기능 포함 이미지
     container_name: postgres_pgvector   # 컨테이너 이름
@@ -140,22 +123,16 @@ networks:
       timeout: 5s      # 응답이 5초 안에 없으면 실패로 간주
       retries: 5       # 5회 시도 후에도 실패하면 unhealthy 상태로 표시
 
-############################################################
-# 디렉토리 구조 예시
-# ├── docker-compose.yml
-# ├── database/                # PostgreSQL 데이터 저장 디렉토리
-# └── init.sql                  # 초기화 SQL 스크립트
-#
-# init.sql 내용 예시:
-# -------------------------------------
-# -- pgvector 확장 기능 활성화
-# CREATE EXTENSION IF NOT EXISTS vector;
-#
-# -- 예제 테이블 생성
-# CREATE TABLE documents (
-#   id SERIAL PRIMARY KEY,
-#   content TEXT,
-#   embedding VECTOR(1536) -- OpenAI 등 1536차원 임베딩
-# );
-# -------------------------------------
-############################################################
+volumes:
+  fuseki-data:
+    driver: local
+  etcd-data:
+    driver: local
+  minio-data:
+    driver: local
+  milvus-data:
+    driver: local
+
+networks:
+  default:
+    name: milvus
