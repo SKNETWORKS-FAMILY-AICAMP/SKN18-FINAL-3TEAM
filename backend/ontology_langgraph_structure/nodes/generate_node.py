@@ -45,6 +45,65 @@ def clean_entity_name(name: str) -> str:
     return name
 
 
+def deduplicate_and_select_top_evidences(evidences: list, top_k: int = 5) -> list:
+    """근거 중복 제거 및 주요 top_k개 선택
+    
+    중복 기준:
+    1. 같은 description
+    2. 같은 URI (raw_data에서 추출)
+    3. 같은 subject-predicate-object 조합
+    
+    Args:
+        evidences: 근거 리스트
+        top_k: 선택할 상위 개수 (기본 5개)
+    
+    Returns:
+        중복 제거 후 weight 기준 상위 top_k개 근거
+    """
+    if not evidences:
+        return []
+    
+    seen = set()
+    unique_evidences = []
+    
+    for ev in evidences:
+        # 중복 판단을 위한 키 생성
+        description = ev.get('description', '').strip()
+        raw_data = ev.get('raw_data', {})
+        
+        # URI 추출 (여러 경로 시도)
+        uri = ''
+        if isinstance(raw_data, dict):
+            uri = raw_data.get('uri', '') or raw_data.get('subject_uri', '') or raw_data.get('object_uri', '')
+        
+        # subject-predicate-object 추출
+        subject = raw_data.get('subject', '') or raw_data.get('subject_label', '')
+        predicate = raw_data.get('predicate', '') or raw_data.get('relation', '')
+        obj = raw_data.get('object', '') or raw_data.get('object_label', '')
+        
+        # 중복 키 생성 (우선순위: description > URI > subject-predicate-object)
+        if description:
+            key = f"desc:{description}"
+        elif uri:
+            key = f"uri:{uri}"
+        elif subject and predicate and obj:
+            key = f"triple:{subject}|{predicate}|{obj}"
+        else:
+            # 키를 만들 수 없으면 그냥 추가 (중복 가능하지만 최소한)
+            key = f"fallback:{len(unique_evidences)}"
+        
+        # 중복 체크
+        if key not in seen:
+            seen.add(key)
+            unique_evidences.append(ev)
+    
+    # weight 기준으로 정렬 (내림차순)
+    sorted_evidences = sorted(unique_evidences, key=lambda x: x.get('weight', 0), reverse=True)
+    
+    # 상위 top_k개 선택
+    return sorted_evidences[:top_k]
+
+
 def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
     """근거를 학술적 서적 스타일로 포맷팅
 
@@ -429,9 +488,19 @@ def story_generator_node(state: GraphState) -> GraphState:
 - 시간 순서대로 전개합니다
 - 각 사건의 영향 관계를 설명합니다"""
 
-    # 참고 근거를 학술적 스타일로 포맷팅 (format_evidence_for_prompt 함수 사용)
-    evidence_list, evidence_footnotes = format_evidence_for_prompt(evidences, query)
-    evidence_details = "\n".join(evidence_footnotes)
+    # 중복 제거 (전체 근거)
+    print(f"  ├─ 전체 근거: {len(evidences)}개")
+    deduplicated_evidences = deduplicate_and_select_top_evidences(evidences, top_k=len(evidences))
+    print(f"  ├─ 중복 제거 후: {len(deduplicated_evidences)}개")
+    
+    # 본문 생성용: 전체 근거 포맷팅 (15개 모두, 중복 제거된 것)
+    evidence_list_all, _ = format_evidence_for_prompt(deduplicated_evidences, query)
+    
+    # 참고 근거 섹션용: 주요 5개만 선택 및 포맷팅
+    top_evidences = deduplicated_evidences[:5] if len(deduplicated_evidences) > 5 else deduplicated_evidences
+    print(f"  ├─ 참고 근거 섹션용: {len(top_evidences)}개 선택")
+    _, evidence_footnotes_top = format_evidence_for_prompt(top_evidences, query)
+    evidence_details = "\n".join(evidence_footnotes_top)
 
     # 의도 정보 추가
     intent_info = ""
@@ -454,10 +523,10 @@ def story_generator_node(state: GraphState) -> GraphState:
 - 질문이 횟수를 묻는 경우 (예: "몇 번", "몇 차례"), 구체적인 숫자와 함께 답변하세요.
 - 질문에 대한 답변을 회피하거나 모호하게 표현하지 마세요.
 
-## 참고 근거 (총 {len(evidences)}개)
-아래 근거를 참고하여 답변을 작성하세요:
+## 참고 근거 (전체 {len(deduplicated_evidences)}개)
+아래 근거들을 모두 참고하여 답변을 작성하세요.
 
-{evidence_list}
+{evidence_list_all}
 
 ## 작성 지침
 {instruction}
@@ -517,7 +586,13 @@ def story_generator_node(state: GraphState) -> GraphState:
 한 문장으로 핵심 정리 ("-입니다" 체, 한국어만 사용)
 
 [참고 근거]
-위의 참고 근거 목록을 기반으로 학술적 서적 스타일로 서술형으로 작성하세요.
+위의 참고 근거 목록(전체 {len(deduplicated_evidences)}개) 중에서 질문과 가장 관련성이 높은 **주요 5개만** 선택하여 학술적 서적 스타일로 서술형으로 작성하세요.
+
+**중요: 주요 근거만 나열하세요.**
+- 질문과 가장 관련성이 높은 주요 사건/인물/제도만 선택하여 나열하세요.
+- 중복되거나 덜 중요한 근거는 제외하세요.
+- 반드시 **최대 5개의 주요 근거만** 나열하세요.
+- 위의 전체 근거 목록을 참고하여 가장 중요한 5개를 선별하세요.
 
 **작성 형식:**
 - 각 근거를 [번호] 형식으로 시작하세요.
@@ -537,7 +612,7 @@ def story_generator_node(state: GraphState) -> GraphState:
 - 각 근거를 완전한 문장으로 서술하세요. 한 글자씩 줄바꿈하지 마세요.
 - 각 근거는 반드시 한 줄로 작성하세요.
 - 영어 단어나 영어 문장 절대 사용 금지
-- 위의 참고 근거 목록에 있는 모든 근거를 포함하세요.
+- 주요 근거만 선택하여 최대 5개만 나열하세요.
 
 **중요: [본문], [요약], [참고 근거] 세 섹션을 모두 출력하세요. 각 섹션은 명확하게 구분하여 작성하세요.**"""
 
@@ -551,12 +626,13 @@ def story_generator_node(state: GraphState) -> GraphState:
         print(f"  └─ 완료: {len(llm_answer)}자 생성 (근거 {len(evidences)}개 사용)")
         print()
 
-        # 근거 포함 답변 구성
+        # 근거 포함 답변 구성 (주요 5개만 포함)
         answer_with_sources = {
             "story": final_answer,
-            "sources": evidences,
+            "sources": top_evidences,  # 주요 5개만 포함
             "query_type": query_type,
-            "evidence_count": len(evidences)
+            "evidence_count": len(top_evidences),  # 주요 근거 개수
+            "total_evidence_count": len(evidences)  # 전체 근거 개수 (참고용)
         }
 
     except Exception as e:
