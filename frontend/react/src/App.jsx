@@ -1,10 +1,11 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import Login from './pages/Login';
 import Home from './pages/Home';
 
-function App() {
-  // URL 파라미터에서 JWT 토큰 추출 및 localStorage에 저장
+function TokenHandler() {
+  const navigate = useNavigate();
+
   useEffect(() => {
     // 현재 URL에서 쿼리 파라미터 읽기
     const params = new URLSearchParams(window.location.search);
@@ -19,19 +20,20 @@ function App() {
       localStorage.setItem('access_token', accessToken);
       localStorage.setItem('refresh_token', refreshToken);
 
-      // URL에서 토큰 파라미터 제거 (보안)
-      // 예: http://localhost:3000/?access=xxx&refresh=yyy
-      // → http://localhost:3000/
-      window.history.replaceState({}, document.title, '/');
+      console.log('✅ 토큰 저장 완료! 홈으로 이동...');
 
-      // 페이지 새로고침하여 홈으로 이동
-      console.log('✅ 토큰 저장 완료! 페이지 리로드...');
-      window.location.href = '/';
+      // URL에서 토큰 파라미터 제거하고 홈으로 이동 (새로고침 없이)
+      navigate('/', { replace: true });
     }
-  }, []);
+  }, [navigate]);
 
+  return null;
+}
+
+function App() {
   return (
     <BrowserRouter>
+      <TokenHandler />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
