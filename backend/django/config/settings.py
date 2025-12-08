@@ -11,21 +11,34 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+from datetime import timedelta
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def env_required(key: str) -> str:
+    """Read required environment variable or raise to avoid leaking defaults."""
+    value = os.getenv(key)
+    if value is None:
+        raise RuntimeError(f"Environment variable {key} is required but not set.")
+    return value
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-^(y!in_zzm#qzjwgk-*a8t*$c^i!$ldk)p7b6b6e*2p@z@n_q2'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-^(y!in_zzm#qzjwgk-*a8t*$c^i!$ldk)p7b6b6e*2p@z@n_q2')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', '1') == '1'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [h for h in os.getenv('ALLOWED_HOSTS', '').split(',') if h] or []
 
 
 # Application definition
@@ -38,7 +51,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+# rest framework 및 corsheaders
+
     'corsheaders',
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
 
 
     # allauth
@@ -106,9 +124,29 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': env_required('POSTGRES_DB'),
+        'USER': env_required('POSTGRES_USER'),
+        'PASSWORD': env_required('POSTGRES_PASSWORD'),
+        'HOST': env_required('POSTGRES_HOST'),
+        'PORT': env_required('POSTGRES_PORT'),
     }
+}
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
 
@@ -155,6 +193,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # django-allauth 설정
 SOCIALACCOUNT_LOGIN_ON_GET = True  # 중간 확인 페이지 없이 바로 Google 로그인으로 이동
+ACCOUNT_EMAIL_VERIFICATION = 'none'  # 이메일 인증 건너뛰기 (소셜 로그인이므로 불필요)
+SOCIALACCOUNT_AUTO_SIGNUP = True  # 소셜 로그인 시 자동 가입
+
+# 소셜 로그인만 사용하므로 일반 회원가입 필드 설정 불필요
+# (ACCOUNT_EMAIL_REQUIRED는 deprecated되어 제거)
 
 # CORS 설정
 CORS_ALLOWED_ORIGINS = [
@@ -163,3 +206,31 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+# Google OAuth 스코프 설정
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': os.getenv('GOOGLE_OAUTH_CLIENT_ID', ''),
+            'secret': os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', ''),
+            'key': ''
+        },
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            # offline + consent: refresh_token을 받을 가능성을 높임
+            'access_type': 'offline',
+            'prompt': 'consent',
+        },
+    }
+}
+
+# AllAuth 커스텀 어댑터 설정
+SOCIALACCOUNT_ADAPTER = 'login.adapters.CustomSocialAccountAdapter'
+ACCOUNT_ADAPTER = 'login.adapters.CustomAccountAdapter'
+
+# 소셜 토큰을 DB에 저장 (socialaccount_socialtoken)
+SOCIALACCOUNT_STORE_TOKENS = True
