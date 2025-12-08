@@ -96,7 +96,8 @@ def extract_keywords_with_kiwi(query: str) -> list:
     try:
         tokens = _kiwi.tokenize(query)
         # 명사만 추출 (NNG: 일반명사, NNP: 고유명사)
-        nouns = [t.form for t in tokens if t.tag in ('NNG', 'NNP') and len(t.form) >= 2]
+        # 1글자 명사도 포함 (왕, 신, 법 등 중요한 키워드)
+        nouns = [t.form for t in tokens if t.tag in ('NNG', 'NNP') and len(t.form) >= 1]
         return nouns
     except Exception as e:
         print(f"⚠️ kiwipiepy 키워드 추출 실패: {e}")

@@ -38,10 +38,11 @@ class LLMTTLGenerator:
         self.csv_path = csv_path
         self.output_dir = output_dir
 
-        # LLM 초기화
+        # LLM 초기화 (타임아웃 설정)
         self.llm = ChatOpenAI(
             model=os.getenv("OPENAI_MODEL"),
-            temperature=0
+            temperature=0,
+            timeout=120  # 60초 타임아웃 (LLM 호출이 너무 오래 걸리면 중단)
         )
 
         # URI 카운터 (중복 방지)
@@ -167,6 +168,7 @@ JSON 구조:
 """
 
         try:
+            # LLM 호출 (타임아웃 60초)
             response = self.llm.invoke(prompt)
             content = response.content.strip()
 
@@ -338,7 +340,8 @@ JSON 구조:
         """
         print(f"📖 CSV 읽기: {self.csv_path}")
 
-        output_path = os.path.join(self.output_dir, "korean_history_instances.ttl")
+        # ttl_2로 저장 (기존 파일 보존)
+        output_path = os.path.join(self.output_dir, "korean_history_instances_2.ttl")
         checkpoint_path = os.path.join(self.output_dir, ".checkpoint")
         error_log_path = os.path.join(self.output_dir, "error_log.txt")
 
@@ -349,7 +352,7 @@ JSON 구조:
                 start_index = int(f.read().strip())
             print(f"🔄 체크포인트에서 재개: {start_index}번째부터")
 
-        # 첫 시작인 경우 기존 파일 백업
+        # 첫 시작인 경우 기존 파일 백업 (ttl_2 파일이 있는 경우)
         if start_index == 0 and os.path.exists(output_path):
             backup_path = output_path + ".backup"
             if os.path.exists(backup_path):
@@ -357,8 +360,8 @@ JSON 구조:
             os.rename(output_path, backup_path)
             print(f"📦 기존 파일 백업: {os.path.basename(backup_path)}")
 
-        # TTL 헤더 (첫 시작인 경우에만)
-        if start_index == 0:
+        # TTL 헤더 작성 (파일이 없거나 첫 시작인 경우)
+        if not os.path.exists(output_path) or start_index == 0:
             header = [
                 "@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .",
                 "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .",
@@ -371,6 +374,8 @@ JSON 구조:
             ]
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write("\n".join(header))
+            if start_index > 0:
+                print(f"📝 TTL 파일 생성: {os.path.basename(output_path)} (체크포인트에서 재개)")
 
         # 배치 저장용 버퍼
         batch_triples = []
@@ -465,17 +470,23 @@ JSON 구조:
         if os.path.exists(checkpoint_path):
             # 모든 행을 처리했는지 확인
             try:
+                # CSV 필드 크기 제한 증가
+                csv.field_size_limit(sys.maxsize)
                 with open(self.csv_path, 'r', encoding='utf-8-sig') as csv_file:
                     reader = csv.DictReader(csv_file)
                     total_rows = sum(1 for _ in reader)
                 
-                if current_index >= total_rows:
+                # current_index는 1-based이므로, total_rows와 비교할 때 주의
+                # enumerate는 0부터 시작하므로 마지막 행의 인덱스는 total_rows-1
+                # current_index = i + 1이므로, 마지막 행 처리 시 current_index = total_rows
+                if current_index > total_rows:
                     os.remove(checkpoint_path)
                     print(f"\n✅ TTL 생성 완료: {output_path}")
                 else:
                     print(f"\n⚠️ 부분 완료: {output_path}")
-                    print(f"   진행률: {current_index}/{total_rows} ({current_index*100//total_rows}%)")
-            except:
+                    print(f"   진행률: {current_index}/{total_rows} ({current_index*100//total_rows if total_rows > 0 else 0}%)")
+            except Exception as e:
+                print(f"\n⚠️ 완료 확인 실패: {e}")
                 pass
 
         print(f"   총 처리: {processed_count}개")

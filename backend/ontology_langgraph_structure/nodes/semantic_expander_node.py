@@ -80,9 +80,9 @@ def get_pgvector_service():
                 embedding_fn=OpenAIEmbeddings(model="text-embedding-3-small"),
                 table="korean_history"
             )
-            print("✅ pgvector 서비스 초기화 완료")
+            print("  │  └─ pgvector 서비스 초기화 완료")
         except Exception as e:
-            print(f"⚠️ pgvector 초기화 실패: {e}")
+            print(f"  │  └─ pgvector 초기화 실패: {e}")
     return _pgvector_service
 
 
@@ -102,22 +102,44 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
     expanded_entities = []
     seen = set()
 
-    # 엔티티에서 연도 추출
+    # 엔티티에서 연도 추출 (Person: BirthYear/DeathYear, Event: hasYear)
     entity_years = []
+
     for entity in entities[:10]:  # 상위 10개만
         uri = entity.get("uri")
+        entity_type = entity.get("type", "")
+        entity_name = entity.get("name", "")
         if not uri:
             continue
 
-        # SPARQL로 연도 조회
-        sparql = f"""
-            PREFIX hist: <http://www.example.org/korean-history#>
-            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        # SPARQL로 연도 조회 (타입별 다른 프로퍼티 사용)
+        # URI는 hist:Person_xxx 형식이므로 그대로 사용
+        if entity_type == "Person":
+            # Person: hasBirthYear 또는 hasDeathYear 사용
+            sparql = f"""
+                PREFIX hist: <http://www.example.org/korean-history#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-            SELECT ?year WHERE {{
-                <{uri}> hist:hasYear ?year .
-            }} LIMIT 1
-        """
+                SELECT ?year WHERE {{
+                    {{
+                        {uri} hist:hasBirthYear ?year .
+                    }}
+                    UNION
+                    {{
+                        {uri} hist:hasDeathYear ?year .
+                    }}
+                }} LIMIT 1
+            """
+        else:
+            # Event, Battle 등: hasYear 사용
+            sparql = f"""
+                PREFIX hist: <http://www.example.org/korean-history#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+                SELECT ?year WHERE {{
+                    {uri} hist:hasYear ?year .
+                }} LIMIT 1
+            """
 
         try:
             response = requests.post(
@@ -134,7 +156,8 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
                     year = bindings[0].get("year", {}).get("value")
                     if year:
                         try:
-                            entity_years.append((entity, int(year)))
+                            year_int = int(year)
+                            entity_years.append((entity, year_int))
                         except ValueError:
                             pass
         except:
@@ -213,16 +236,18 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
 
     for entity in entities[:8]:  # 상위 8개만
         uri = entity.get("uri")
+        entity_name = entity.get("name", "")
         if not uri:
             continue
 
         # 1. 엔티티의 카테고리 조회
+        # URI는 hist:Person_xxx 형식이므로 그대로 사용
         sparql_category = f"""
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
             SELECT ?category WHERE {{
-                <{uri}> hist:hasCategory ?category .
+                {uri} hist:hasCategory ?category .
             }} LIMIT 1
         """
 
@@ -235,16 +260,21 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
             )
 
             if response.status_code != 200:
+                print(f"  │  │  └─ [{entity_name}] 카테고리 조회 실패 (HTTP {response.status_code})")
                 continue
 
             results = response.json()
             bindings = results.get("results", {}).get("bindings", [])
             if not bindings:
+                print(f"  │  │  └─ [{entity_name}] 카테고리 없음")
                 continue
 
             category = bindings[0].get("category", {}).get("value")
             if not category:
+                print(f"  │  │  └─ [{entity_name}] 카테고리 값 없음")
                 continue
+
+            print(f"  │  ├─ [{entity_name}] 카테고리: {category}, 동일 카테고리 검색 중...")
 
             # 2. 동일 카테고리의 다른 엔티티 검색
             sparql_similar = f"""
@@ -256,7 +286,7 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
                     ?entity hist:hasCategory "{category}" .
                     ?entity rdfs:label ?label .
                     ?entity rdf:type ?type .
-                    FILTER(?entity != <{uri}>)
+                    FILTER(?entity != {uri})
                 }} LIMIT 8
             """
 
@@ -270,6 +300,7 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
             if response2.status_code == 200:
                 results2 = response2.json()
                 bindings2 = results2.get("results", {}).get("bindings", [])
+                print(f"  │  │  └─ SPARQL 결과: {len(bindings2)}개 발견")
 
                 for binding in bindings2:
                     uri_new = binding.get("entity", {}).get("value", "")
@@ -288,8 +319,10 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
                             "category": category,
                             "relevance_score": calculate_hybrid_score(None, "category")  # 유사도 없음 → 0.75
                         })
-        except:
-            pass
+            else:
+                print(f"  │  │  └─ 동일 카테고리 검색 실패 (HTTP {response2.status_code})")
+        except Exception as e:
+            print(f"  │  │  └─ [{entity_name}] 예외 발생 - {str(e)[:60]}")
 
     return expanded_entities
 
@@ -310,12 +343,18 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
     expanded_entities = []
     seen = set()
 
+    print(f"  │  ├─ [인과관계 확장] {len(entities[:5])}개 엔티티 대상")
+
     for entity in entities[:5]:  # 상위 5개만
         uri = entity.get("uri")
+        entity_name = entity.get("name", "")
         if not uri:
             continue
 
+        print(f"  │  ├─ [{entity_name}] 인과관계 체인 검색 중...")
+
         # 인과관계 체인 탐색 (leadsTo, causedBy)
+        # URI는 hist:Person_xxx 형식이므로 그대로 사용
         sparql = f"""
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -324,7 +363,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
             SELECT DISTINCT ?related ?label ?type ?predicate WHERE {{
                 {{
                     # 나가는 인과관계: entity → related
-                    <{uri}> ?predicate ?related .
+                    {uri} ?predicate ?related .
                     ?related rdfs:label ?label .
                     ?related rdf:type ?type .
                     FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
@@ -332,7 +371,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                 UNION
                 {{
                     # 들어오는 인과관계: related → entity
-                    ?related ?predicate <{uri}> .
+                    ?related ?predicate {uri} .
                     ?related rdfs:label ?label .
                     ?related rdf:type ?type .
                     FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
@@ -351,6 +390,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
             if response.status_code == 200:
                 results = response.json()
                 bindings = results.get("results", {}).get("bindings", [])
+                print(f"  │  │  └─ SPARQL 결과: {len(bindings)}개 발견")
 
                 for binding in bindings:
                     uri_related = binding.get("related", {}).get("value", "")
@@ -370,8 +410,10 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                             "causal_relation": predicate,
                             "relevance_score": calculate_hybrid_score(None, "causal_chain")  # 유사도 없음 → 0.95
                         })
-        except:
-            pass
+            else:
+                print(f"  │  │  └─ SPARQL 실패 (HTTP {response.status_code})")
+        except Exception as e:
+            print(f"  │  │  └─ 예외 발생 - {str(e)[:60]}")
 
     return expanded_entities
 
@@ -445,7 +487,7 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
                     })
 
     except Exception as e:
-        print(f"⚠️ pgvector 확장 실패: {e}")
+        print(f"  │  └─ pgvector 확장 실패: {e}")
 
     return expanded_entities
 
@@ -522,11 +564,98 @@ def semantic_expander_node(state: GraphState) -> GraphState:
                 entity["matched"] = True
                 entity["type"] = uri_to_type.get(uri, entity.get("type", "Event"))
 
+    # SPARQL 기반 스코어링: 연결된 노드에 키워드가 있는지 확인
+    # 질문에서 핵심 키워드 추출
+    try:
+        from kiwipiepy import Kiwi
+        kiwi = Kiwi()
+        tokens = kiwi.tokenize(query)
+        core_keywords = [t.form for t in tokens if t.tag in ('NNG', 'NNP') and len(t.form) >= 2]
+    except:
+        import re
+        core_keywords = re.findall(r'[가-힣]{2,}', query)
+    
+    print(f"  ├─ SPARQL 스코어링 시작 (키워드: {', '.join(core_keywords[:5])})")
+    
+    def calculate_sparql_score_with_connections(entity, keywords):
+        """연결된 노드에 키워드가 있는지 SPARQL로 확인하여 점수 보정"""
+        uri = entity.get("uri")
+        if not uri or uri not in uri_to_type:
+            return 0.0
+        
+        connected_score = 0.0
+        has_keyword_match = False
+        
+        sparql_query = f"""
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+            SELECT DISTINCT ?connectedLabel WHERE {{
+                {{
+                    <{uri}> ?p ?connected .
+                    ?connected rdfs:label ?connectedLabel .
+                    FILTER(?p != rdf:type)
+                    FILTER(?p != rdfs:label)
+                }}
+                UNION
+                {{
+                    ?connected ?p <{uri}> .
+                    ?connected rdfs:label ?connectedLabel .
+                    FILTER(?p != rdf:type)
+                    FILTER(?p != rdfs:label)
+                }}
+            }} LIMIT 50
+        """
+        
+        try:
+            response = requests.post(
+                f"{FUSEKI_URL}/sparql",
+                data={"query": sparql_query},
+                headers={"Accept": "application/sparql-results+json"},
+                timeout=2
+            )
+            
+            if response.status_code == 200:
+                results = response.json()
+                bindings = results.get("results", {}).get("bindings", [])
+                
+                for binding in bindings:
+                    connected_label = binding.get("connectedLabel", {}).get("value", "")
+                    if connected_label:
+                        for kw in keywords:
+                            if kw.lower() in connected_label.lower():
+                                connected_score += 0.1
+                                has_keyword_match = True
+                                if connected_score >= 0.3:
+                                    break
+                        if connected_score >= 0.3:
+                            break
+        except:
+            pass
+        
+        entity["has_keyword_in_connections"] = has_keyword_match
+        return min(connected_score, 0.3)
+    
+    # 각 엔티티에 대해 SPARQL 스코어링 적용
+    sparql_scored_count = 0
+    for entity in all_expanded:
+        if entity.get("uri"):
+            bonus = calculate_sparql_score_with_connections(entity, core_keywords)
+            if bonus > 0:
+                entity["relevance_score"] = entity.get("relevance_score", 0.5) + bonus
+                sparql_scored_count += 1
+    
+    print(f"  │  └─ SPARQL 스코어링 완료: {sparql_scored_count}개 엔티티에 키워드 매칭 발견")
+
     # 상위 40개로 제한 (성능 최적화)
+    # 키워드가 연결된 노드에 있는 엔티티를 우선적으로 정렬
     all_expanded = sorted(
         all_expanded,
-        key=lambda x: x.get("relevance_score", 0.5),
-        reverse=True
+        key=lambda x: (
+            not x.get("has_keyword_in_connections", False),  # 키워드 매칭 우선
+            -x.get("relevance_score", 0.5)  # 점수 내림차순
+        )
     )[:40]
 
     # 통계 출력

@@ -1,7 +1,7 @@
 """
 Multi-Path Extractor Node
 
-5개 Thread의 추론 결과에서 각각 경로 추출
+Parallel Knowledge Retrieval의 5개 Thread 결과에서 각각 경로 추출
 - Thread별로 서로 다른 경로 추출 로직 적용
 - 각 Thread의 가중치 반영
 - 속성/관계별 relevance score 계산
@@ -128,7 +128,7 @@ def calculate_path_relevance(path_data: dict, query_entities: list = None) -> fl
 
 
 def multi_path_extractor_node(state: GraphState) -> GraphState:
-    """5개 Thread별 추론 경로 추출"""
+    """Parallel Knowledge Retrieval의 5개 Thread별 지식 검색 경로 추출"""
 
     import time
     node_start = time.time()
