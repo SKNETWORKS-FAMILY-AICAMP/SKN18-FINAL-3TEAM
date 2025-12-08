@@ -4,10 +4,13 @@ Path Extractor & Evidence Aggregator Node (통합)
 5개 Thread의 추론 결과에서 경로 추출 및 근거 통합을 한 번에 수행
 - Thread별로 서로 다른 경로 추출 로직 적용
 - 개선된 점수 체계로 관련성 평가
-- 상위 15개 근거 선택 (기존 5개에서 확장)
+- 하이브리드 방식: 점수 기반 선별 → LLM 기반 최종 선택 (15개)
 """
 
+import os
+import json
 from state import GraphState
+from langchain_openai import ChatOpenAI
 
 # ========================================
 # 속성/관계 타입별 Relevance Score 가중치 (개선)
@@ -457,6 +460,113 @@ def extract_type_and_summary(bindings: list, base_weight: float) -> list:
     return paths[:20]
 
 
+def select_top_evidences_with_llm(
+    candidate_evidences: list,
+    query: str,
+    query_intent: str = "",
+    query_type: str = "causal",
+    top_k: int = 15
+) -> list:
+    """
+    LLM을 사용하여 질문 의도에 맞는 상위 근거 선택
+    
+    Args:
+        candidate_evidences: 점수 기반으로 선별된 후보 근거 리스트
+        query: 사용자 질문
+        query_intent: 질문의 핵심 의도
+        query_type: 질문 유형 (causal, deep_analysis 등)
+        top_k: 선택할 근거 개수
+    
+    Returns:
+        LLM이 선택한 상위 top_k개 근거
+    """
+    if len(candidate_evidences) <= top_k:
+        return candidate_evidences
+    
+    try:
+        llm = ChatOpenAI(
+            model=os.getenv("OPENAI_MODEL"),
+            temperature=0  # 일관성을 위해 temperature=0
+        )
+        
+        # 근거 목록 포맷팅 (간결하게)
+        evidence_list = []
+        for i, ev in enumerate(candidate_evidences, 1):
+            desc = ev.get("description", "")
+            ev_type = ev.get("type", "unknown")
+            weight = ev.get("weight", 0)
+            
+            # 간결한 설명 (최대 100자)
+            desc_short = desc[:100] + "..." if len(desc) > 100 else desc
+            
+            evidence_list.append(f"[{i}] {desc_short} (타입: {ev_type}, 점수: {weight:.3f})")
+        
+        evidence_text = "\n".join(evidence_list)
+        
+        intent_info = f"\n질문의 핵심 의도: {query_intent}\n" if query_intent else ""
+        
+        prompt = f"""당신은 역사 질문에 가장 적합한 근거를 선택하는 전문가입니다.
+
+## 질문
+{query}
+{intent_info}질문 유형: {query_type}
+
+## 후보 근거 목록 (총 {len(candidate_evidences)}개)
+아래 근거들은 점수 기반으로 선별된 후보입니다. 질문의 의도와 가장 관련성이 높은 **상위 {top_k}개**를 선택하세요.
+
+{evidence_text}
+
+## 선택 기준
+1. **질문 의도와의 관련성**: 질문에 직접적으로 답변할 수 있는 근거 우선
+2. **정보의 중요성**: 핵심 사건, 주요 인물, 중요한 제도 등
+3. **다양성**: 중복을 피하고 다양한 관점의 근거 포함
+4. **시간적/인과적 연결**: 질문과 시간적/인과적으로 연결된 근거 우선
+
+## 출력 형식 (JSON만)
+선택한 근거의 번호를 리스트로 출력하세요:
+{{"selected_indices": [1, 3, 5, 7, 9, 12, 15, 18, 20, 22, 25, 28, 30, 33, 35]}}
+
+**중요:**
+- 정확히 {top_k}개를 선택하세요.
+- 번호는 1부터 시작합니다 (위 목록의 [1], [2], ...).
+- JSON 형식만 출력하세요."""
+        
+        response = llm.invoke(prompt)
+        content = response.content.strip()
+        
+        # JSON 파싱
+        if "```" in content:
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        
+        result = json.loads(content)
+        selected_indices = result.get("selected_indices", [])
+        
+        # 인덱스를 0-based로 변환하고 근거 선택
+        selected_evidences = []
+        for idx in selected_indices:
+            if 1 <= idx <= len(candidate_evidences):
+                selected_evidences.append(candidate_evidences[idx - 1])
+        
+        # 선택된 개수가 top_k보다 적으면 나머지는 점수 순으로 채움
+        if len(selected_evidences) < top_k:
+            remaining_count = top_k - len(selected_evidences)
+            selected_set = {id(ev) for ev in selected_evidences}
+            for ev in candidate_evidences:
+                if len(selected_evidences) >= top_k:
+                    break
+                if id(ev) not in selected_set:
+                    selected_evidences.append(ev)
+        
+        return selected_evidences[:top_k]
+        
+    except Exception as e:
+        print(f"        ⚠️ LLM 기반 선택 실패: {e}, 점수 기반으로 대체")
+        # 실패 시 점수 기반으로 대체
+        return candidate_evidences[:top_k]
+
+
 def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     """
     통합 노드: 경로 추출 + 근거 통합
@@ -464,7 +574,9 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     1. 5개 Thread의 추론 결과에서 경로 추출
     2. 개선된 점수 체계로 관련성 평가
     3. 모든 경로를 통합하여 가중치 기준 정렬
-    4. 상위 15개 근거 선택 (기존 5개에서 확장)
+    4. 하이브리드 방식으로 상위 15개 근거 선택:
+       - 점수 기반으로 상위 30-50개 후보 선별
+       - LLM이 질문 의도에 맞는 최종 15개 선택
     """
 
     import time
@@ -599,9 +711,33 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     if len(sorted_evidences) > 25:
         print(f"        ... 외 {len(sorted_evidences) - 25}개")
 
-    # 5. 상위 15개 선택 (기존 5개에서 확장)
-    top_count = min(15, len(sorted_evidences))
-    top_evidences = sorted_evidences[:top_count]
+    # 5. 하이브리드 방식: 점수 기반 선별 → LLM 기반 최종 선택
+    # 5-1. 점수 기반으로 상위 후보 선별 (30-50개)
+    candidate_count = min(max(30, len(sorted_evidences) // 2), len(sorted_evidences))
+    candidate_evidences = sorted_evidences[:candidate_count]
+    
+    print(f"\n      [LLM 기반 근거 선택]")
+    print(f"        - 후보 근거: {len(candidate_evidences)}개 (점수 기반 선별)")
+    
+    # 5-2. LLM이 질문 의도에 맞는 상위 15개 선택
+    query = state.get("query", "")
+    query_intent = state.get("query_intent", "")
+    query_type = state.get("query_type", "causal")
+    
+    if len(candidate_evidences) <= 15:
+        # 후보가 15개 이하면 그대로 사용
+        top_evidences = candidate_evidences
+        print(f"        - 최종 선택: {len(top_evidences)}개 (후보가 15개 이하)")
+    else:
+        # LLM으로 최종 선택
+        top_evidences = select_top_evidences_with_llm(
+            candidate_evidences, 
+            query, 
+            query_intent, 
+            query_type,
+            top_k=15
+        )
+        print(f"        - 최종 선택: {len(top_evidences)}개 (LLM 판단)")
 
     # 6. 순위 부여
     for i, ev in enumerate(top_evidences, 1):
