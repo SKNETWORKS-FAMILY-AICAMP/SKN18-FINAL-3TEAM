@@ -104,8 +104,8 @@ ROOT_URLCONF = 'config.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / "templates"],
-        'APP_DIRS': True,
+        'DIRS': [],  # No custom templates - React handles all UI
+        'APP_DIRS': True,  # Keep True for Django admin templates
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
