@@ -1,5 +1,5 @@
 # scene 분리(장면/대사 분리)
-from langgraph_structure.state import GraphState
+from backend.langgraph_structure.state import GraphState
 from typing import Dict, Any, List
 
 def scene_split_node(state: GraphState) -> GraphState:

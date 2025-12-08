@@ -1,7 +1,8 @@
 # hybrid retrieval node: vector db와 graph db를 동시에 검색
-from langgraph_structure.state import GraphState
-from langgraph_structure.rag.retrieval_node import retrieval_node
-from langgraph_structure.graphdb.generate_cypher_node import generate_cypher_node
+from backend.langgraph_structure.state import GraphState
+from backend.langgraph_structure.rag.retrieval_node import retrieval_node
+from backend.langgraph_structure.graphdb.generate_cypher_node import generate_cypher_node
+from backend.langgraph_structure.graphdb.neo4j_query_node import main
 
 import asyncio
 
@@ -14,9 +15,13 @@ async def _run_vector(state: GraphState) -> GraphState:
 async def _run_graph(state: GraphState) -> GraphState:
     # 1) Cypher 생성
     cypher_state: GraphState = await asyncio.to_thread(generate_cypher_node, state)
-    # 2) Neo4j 검색
-    graph_state: GraphState = await asyncio.to_thread(neo4j_node, cypher_state)
-    return graph_state
+    # 2) Neo4j 검색 (TODO: 실제 쿼리 구현 예정)
+    # 현재 main()은 인자를 받지 않으므로 그대로 호출하면 TypeError가 발생.
+    # 일단 Cypher 결과만 유지하고 neo4j_results는 빈 리스트로 반환.
+    return {
+        **cypher_state,
+        "neo4j_results": [],
+    }
 
 # 실제 Hybrid 노드
 async def hybrid_node(state: GraphState) -> GraphState:

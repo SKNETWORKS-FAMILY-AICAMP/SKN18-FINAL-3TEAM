@@ -1,5 +1,5 @@
 # Generate된 답변의 말투 교정하는 노드
-from langgraph_structure.state import GraphState
+from backend.langgraph_structure.state import GraphState
 
 def tone_adjust_node(state: GraphState) -> GraphState:
     """

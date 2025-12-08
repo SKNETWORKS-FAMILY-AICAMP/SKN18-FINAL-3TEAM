@@ -13,9 +13,9 @@
 환경변수(.env):
     OPENAI_API_KEY=...
 """
-from langgraph_structure.state import GraphState
+from backend.langgraph_structure.state import GraphState
 from langgraph.graph import END
-from langgraph_structure.utils import create_model
+from backend.langgraph_structure.utils import create_model
 
 def classify_node(state: GraphState) -> GraphState:
 
@@ -98,7 +98,7 @@ def route_classify(state: GraphState) -> str:
     #     return "generate_cypher_node"
     if query_type=="hybrid":
         # 둘 다 동시에 사용
-        return "hybrid_retrieval_node"
+        return "hybrid_node"
     elif query_type=="no_related":
         return END
     else:
