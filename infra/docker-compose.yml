@@ -1,11 +1,14 @@
 services:
+  # Fuseki
   fuseki:
     image: stain/jena-fuseki:latest
     platform: linux/amd64 # Windows/Mac (Intel/Apple Silicon) 호환
     container_name: fuseki
     restart: unless-stopped
+    env_file:
+      - ../.env # 프로젝트 루트의 .env 파일 사용
     environment:
-      - ADMIN_PASSWORD=${FUSEKI_ADMIN_PASSWORD:-admin}
+      - ADMIN_PASSWORD=${FUSEKI_ADMIN_PASSWORD:-fuseki1234}
       - JVM_ARGS=-Xmx2g -Xms1g # 메모리 설정 (선택 사항)
     ports:
       - "3030:3030"
@@ -19,74 +22,15 @@ services:
       retries: 3
       start_period: 40s
 
-  # Milvus 벡터 데이터베이스 (Standalone 모드)
-  etcd:
-    container_name: milvus-etcd
-    image: quay.io/coreos/etcd:v3.5.5
-    environment:
-      - ETCD_AUTO_COMPACTION_MODE=revision
-      - ETCD_AUTO_COMPACTION_RETENTION=1000
-      - ETCD_QUOTA_BACKEND_BYTES=4294967296
-      - ETCD_SNAPSHOT_COUNT=50000
-    volumes:
-      - etcd-data:/etcd
-    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
-    healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-
-  minio:
-    container_name: milvus-minio
-    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
-    environment:
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-    ports:
-      - "9001:9001"
-      - "9000:9000"
-    volumes:
-      - minio-data:/minio_data
-    command: minio server /minio_data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-
-  standalone:
-    container_name: milvus-standalone
-    image: milvusdb/milvus:v2.3.3
-    command: ["milvus", "run", "standalone"]
-    security_opt:
-      - seccomp:unconfined
-    environment:
-      ETCD_ENDPOINTS: etcd:2379
-      MINIO_ADDRESS: minio:9000
-    volumes:
-      - milvus-data:/var/lib/milvus
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
-      interval: 30s
-      start_period: 90s
-      timeout: 20s
-      retries: 3
-    ports:
-      - "19530:19530"
-      - "9091:9091"
-    depends_on:
-      - "etcd"
-      - "minio"
-
+  # Neo4j
   neo4j:
     image: neo4j:5.18
     container_name: neo4j-joseon_ver1.2
     ports:
-      - "7474:7474"   # 웹 UI
-      - "7687:7687"   # Bolt
+      - "7474:7474" # 웹 UI
+      - "7687:7687" # Bolt
     environment:
-      - NEO4J_AUTH=neo4j/skn183final   # 비번은 알아서 바꿔도 됨
+      - NEO4J_AUTH=neo4j/skn183final # 비번은 알아서 바꿔도 됨
       - NEO4J_server_memory_heap_initial__size=1G
       - NEO4J_server_memory_heap_max__size=2G
     volumes:
@@ -94,16 +38,37 @@ services:
       - ./neo4j/logs:/logs
       - ./neo4j/import:/import
 
+  # PostgreSQL
+  postgres:
+    image: pgvector/pgvector:pg16 # PostgreSQL 16 + pgvector 확장 기능 포함 이미지
+    platform: linux/amd64 # Windows/Mac (Intel/Apple Silicon) 호환
+    container_name: postgres_pgvector # 컨테이너 이름
+    restart: always # 컨테이너 비정상 종료 시 항상 재시작
+
+    environment:
+      # PostgreSQL 기본 계정 정보 (.env 파일의 환경변수 사용)
+      POSTGRES_USER: ${POSTGRES_USER:-root} # PostgreSQL 접속 사용자 이름
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-root1234} # PostgreSQL 접속 비밀번호
+      POSTGRES_DB: ${POSTGRES_DB:-skn18final} # 기본으로 생성할 데이터베이스 이름
+
+    ports:
+      - "5432:5432" # 호스트 포트:컨테이너 포트 (기본 PostgreSQL 포트 5432)
+
+    volumes:
+      # PostgreSQL 데이터 영속화 (named volume 사용으로 권한 문제 해결)
+      - postgres-data:/var/lib/postgresql/data
+      # 초기화 SQL 스크립트 실행
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d skn18final"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   fuseki-data:
     driver: local
-  etcd-data:
+  postgres-data:
+    name: sknfinal_postgres-data
     driver: local
-  minio-data:
-    driver: local
-  milvus-data:
-    driver: local
-
-networks:
-  default:
-    name: milvus

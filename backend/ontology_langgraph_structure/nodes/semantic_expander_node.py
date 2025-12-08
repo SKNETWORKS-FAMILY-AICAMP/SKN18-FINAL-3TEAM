@@ -1,0 +1,526 @@
+"""
+Semantic Expander Node
+
+엔티티 추출 후, 의미론적으로 관련된 엔티티를 확장하는 노드:
+1. 시간적 맥락 확장 (±10년 이내 이벤트)
+2. 카테고리 기반 주제 확장 (동일 카테고리 이벤트)
+3. 벡터 유사도 확장 (pgvector)
+4. 인과관계 체인 확장 (leadsTo, causedBy)
+
+이 노드는 entity_extractor 이후, parallel_knowledge_retrieval 이전에 실행됩니다.
+"""
+
+import os
+import requests
+from pathlib import Path
+from state import GraphState
+
+# Fuseki 설정
+FUSEKI_URL = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
+
+# pgvector 서비스 lazy loading
+USE_PGVECTOR = os.getenv("USE_PGVECTOR", "true").lower() == "true"
+_pgvector_service = None
+
+def get_pgvector_service():
+    """pgvector 서비스 lazy loading"""
+    global _pgvector_service
+    if _pgvector_service is None and USE_PGVECTOR:
+        try:
+            import sys
+            from pathlib import Path
+            sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+            from db_pipeline.services.postgres_service import PostgresVectorService
+            _pgvector_service = PostgresVectorService()
+            print("✅ pgvector 서비스 초기화 완료")
+        except Exception as e:
+            print(f"⚠️ pgvector 초기화 실패: {e}")
+    return _pgvector_service
+
+
+def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int = 10) -> list:
+    """
+    시간적 맥락 확장: 엔티티와 동일 시대 (±window_years) 이벤트 찾기
+
+    Args:
+        entities: 추출된 엔티티 리스트
+        ttl_data: TTL 데이터 (label_to_uri, uri_to_type)
+        window_years: 시간 윈도우 (±N년)
+
+    Returns:
+        시간적으로 관련된 엔티티 리스트
+    """
+
+    expanded_entities = []
+    seen = set()
+
+    # 엔티티에서 연도 추출
+    entity_years = []
+    for entity in entities[:10]:  # 상위 10개만
+        uri = entity.get("uri")
+        if not uri:
+            continue
+
+        # SPARQL로 연도 조회
+        sparql = f"""
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+            SELECT ?year WHERE {{
+                <{uri}> hist:hasYear ?year .
+            }} LIMIT 1
+        """
+
+        try:
+            response = requests.post(
+                f"{FUSEKI_URL}/sparql",
+                data={"query": sparql},
+                headers={"Accept": "application/sparql-results+json"},
+                timeout=2
+            )
+
+            if response.status_code == 200:
+                results = response.json()
+                bindings = results.get("results", {}).get("bindings", [])
+                if bindings:
+                    year = bindings[0].get("year", {}).get("value")
+                    if year:
+                        try:
+                            entity_years.append((entity, int(year)))
+                        except ValueError:
+                            pass
+        except:
+            pass
+
+    if not entity_years:
+        return []
+
+    # 각 연도에 대해 ±window_years 이내 이벤트 검색
+    for entity, year in entity_years[:5]:  # 최대 5개 엔티티
+        min_year = year - window_years
+        max_year = year + window_years
+
+        sparql = f"""
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+            SELECT DISTINCT ?entity ?label ?type ?year WHERE {{
+                ?entity rdf:type ?type .
+                ?entity rdfs:label ?label .
+                ?entity hist:hasYear ?year .
+                FILTER(?year >= {min_year} && ?year <= {max_year})
+                FILTER(?type IN (hist:Event, hist:Battle))
+            }} LIMIT 10
+        """
+
+        try:
+            response = requests.post(
+                f"{FUSEKI_URL}/sparql",
+                data={"query": sparql},
+                headers={"Accept": "application/sparql-results+json"},
+                timeout=3
+            )
+
+            if response.status_code == 200:
+                results = response.json()
+                bindings = results.get("results", {}).get("bindings", [])
+
+                for binding in bindings:
+                    uri = binding.get("entity", {}).get("value", "")
+                    label = binding.get("label", {}).get("value", "")
+                    entity_type = binding.get("type", {}).get("value", "").split("#")[-1]
+
+                    if uri not in seen and label:
+                        seen.add(uri)
+                        expanded_entities.append({
+                            "type": entity_type,
+                            "name": label,
+                            "uri": uri,
+                            "matched": True,
+                            "expansion_method": "temporal",
+                            "expansion_source": entity.get("name"),
+                            "relevance_score": 0.8  # 시간적 관련성 높음
+                        })
+        except:
+            pass
+
+    return expanded_entities
+
+
+def expand_by_category(entities: list, ttl_data: dict) -> list:
+    """
+    카테고리 기반 주제 확장: 동일 카테고리의 다른 엔티티 찾기
+
+    Args:
+        entities: 추출된 엔티티 리스트
+        ttl_data: TTL 데이터
+
+    Returns:
+        카테고리가 동일한 엔티티 리스트
+    """
+
+    expanded_entities = []
+    seen = set()
+
+    for entity in entities[:8]:  # 상위 8개만
+        uri = entity.get("uri")
+        if not uri:
+            continue
+
+        # 1. 엔티티의 카테고리 조회
+        sparql_category = f"""
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+            SELECT ?category WHERE {{
+                <{uri}> hist:hasCategory ?category .
+            }} LIMIT 1
+        """
+
+        try:
+            response = requests.post(
+                f"{FUSEKI_URL}/sparql",
+                data={"query": sparql_category},
+                headers={"Accept": "application/sparql-results+json"},
+                timeout=2
+            )
+
+            if response.status_code != 200:
+                continue
+
+            results = response.json()
+            bindings = results.get("results", {}).get("bindings", [])
+            if not bindings:
+                continue
+
+            category = bindings[0].get("category", {}).get("value")
+            if not category:
+                continue
+
+            # 2. 동일 카테고리의 다른 엔티티 검색
+            sparql_similar = f"""
+                PREFIX hist: <http://www.example.org/korean-history#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+                SELECT DISTINCT ?entity ?label ?type WHERE {{
+                    ?entity hist:hasCategory "{category}" .
+                    ?entity rdfs:label ?label .
+                    ?entity rdf:type ?type .
+                    FILTER(?entity != <{uri}>)
+                }} LIMIT 8
+            """
+
+            response2 = requests.post(
+                f"{FUSEKI_URL}/sparql",
+                data={"query": sparql_similar},
+                headers={"Accept": "application/sparql-results+json"},
+                timeout=3
+            )
+
+            if response2.status_code == 200:
+                results2 = response2.json()
+                bindings2 = results2.get("results", {}).get("bindings", [])
+
+                for binding in bindings2:
+                    uri_new = binding.get("entity", {}).get("value", "")
+                    label = binding.get("label", {}).get("value", "")
+                    entity_type = binding.get("type", {}).get("value", "").split("#")[-1]
+
+                    if uri_new not in seen and label:
+                        seen.add(uri_new)
+                        expanded_entities.append({
+                            "type": entity_type,
+                            "name": label,
+                            "uri": uri_new,
+                            "matched": True,
+                            "expansion_method": "category",
+                            "expansion_source": entity.get("name"),
+                            "category": category,
+                            "relevance_score": 0.7
+                        })
+        except:
+            pass
+
+    return expanded_entities
+
+
+def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) -> list:
+    """
+    인과관계 체인 확장: leadsTo, causedBy 관계를 따라 확장
+
+    Args:
+        entities: 추출된 엔티티 리스트
+        ttl_data: TTL 데이터
+        max_hops: 최대 hop 수 (기본 3)
+
+    Returns:
+        인과관계로 연결된 엔티티 리스트
+    """
+
+    expanded_entities = []
+    seen = set()
+
+    for entity in entities[:5]:  # 상위 5개만
+        uri = entity.get("uri")
+        if not uri:
+            continue
+
+        # 인과관계 체인 탐색 (leadsTo, causedBy)
+        sparql = f"""
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+            SELECT DISTINCT ?related ?label ?type ?predicate WHERE {{
+                {{
+                    # 나가는 인과관계: entity → related
+                    <{uri}> ?predicate ?related .
+                    ?related rdfs:label ?label .
+                    ?related rdf:type ?type .
+                    FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
+                }}
+                UNION
+                {{
+                    # 들어오는 인과관계: related → entity
+                    ?related ?predicate <{uri}> .
+                    ?related rdfs:label ?label .
+                    ?related rdf:type ?type .
+                    FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
+                }}
+            }} LIMIT 10
+        """
+
+        try:
+            response = requests.post(
+                f"{FUSEKI_URL}/sparql",
+                data={"query": sparql},
+                headers={"Accept": "application/sparql-results+json"},
+                timeout=3
+            )
+
+            if response.status_code == 200:
+                results = response.json()
+                bindings = results.get("results", {}).get("bindings", [])
+
+                for binding in bindings:
+                    uri_related = binding.get("related", {}).get("value", "")
+                    label = binding.get("label", {}).get("value", "")
+                    entity_type = binding.get("type", {}).get("value", "").split("#")[-1]
+                    predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
+
+                    if uri_related not in seen and label:
+                        seen.add(uri_related)
+                        expanded_entities.append({
+                            "type": entity_type,
+                            "name": label,
+                            "uri": uri_related,
+                            "matched": True,
+                            "expansion_method": "causal_chain",
+                            "expansion_source": entity.get("name"),
+                            "causal_relation": predicate,
+                            "relevance_score": 0.9  # 인과관계는 매우 높은 관련성
+                        })
+        except:
+            pass
+
+    return expanded_entities
+
+
+def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
+    """
+    벡터 유사도 기반 확장 (pgvector)
+
+    Args:
+        entities: 추출된 엔티티 리스트
+        query: 원본 질문 (맥락 제공)
+        top_k: 최대 결과 수
+
+    Returns:
+        벡터 유사도가 높은 엔티티 리스트
+    """
+
+    pgvector = get_pgvector_service()
+    if pgvector is None:
+        return []
+
+    expanded_entities = []
+    seen = set()
+
+    try:
+        # 1. 원본 질문으로 검색 (가장 관련성 높음)
+        results = pgvector.search(query=query, top_k=top_k, threshold=0.6)
+
+        for result in results:
+            title = result.get("title", "")
+            if title and title not in seen:
+                seen.add(title)
+                expanded_entities.append({
+                    "type": "Event",  # 기본값
+                    "name": title,
+                    "uri": None,  # pgvector에서는 URI 없음 (나중에 TTL 매칭)
+                    "matched": False,
+                    "expansion_method": "pgvector",
+                    "expansion_source": "query",
+                    "pgvector_score": result.get("similarity", 0),
+                    "relevance_score": result.get("similarity", 0) * 0.8  # 벡터 유사도 × 0.8
+                })
+
+        # 2. 추출된 엔티티 이름으로도 검색
+        for entity in entities[:5]:
+            name = entity.get("name", "")
+            if not name:
+                continue
+
+            results = pgvector.search(query=name, top_k=5, threshold=0.6)
+
+            for result in results:
+                title = result.get("title", "")
+                if title and title not in seen:
+                    seen.add(title)
+                    expanded_entities.append({
+                        "type": "Event",
+                        "name": title,
+                        "uri": None,
+                        "matched": False,
+                        "expansion_method": "pgvector",
+                        "expansion_source": name,
+                        "pgvector_score": result.get("similarity", 0),
+                        "relevance_score": result.get("similarity", 0) * 0.7
+                    })
+
+    except Exception as e:
+        print(f"⚠️ pgvector 확장 실패: {e}")
+
+    return expanded_entities
+
+
+def semantic_expander_node(state: GraphState) -> GraphState:
+    """
+    의미론적 엔티티 확장 노드
+
+    entity_extractor 이후, parallel_knowledge_retrieval 이전에 실행.
+    추출된 엔티티를 4가지 방법으로 확장:
+    1. 시간적 맥락 (±10년)
+    2. 카테고리/주제
+    3. 인과관계 체인
+    4. 벡터 유사도 (pgvector)
+    """
+
+    import time
+    node_start = time.time()
+
+    query = state.get("query", "")
+    extracted_entities = state.get("extracted_entities", [])
+    ttl_data = state.get("ttl_data", {})
+
+    print(f"\n{'='*70}")
+    print(f"[2.5/6] 의미론적 확장 (Semantic Expander)")
+    print(f"{'='*70}")
+    print(f"  ├─ 입력 엔티티: {len(extracted_entities)}개")
+
+    if not extracted_entities:
+        print(f"  └─ 확장할 엔티티 없음 (skip)")
+        return {**state}
+
+    # 4가지 확장 방법 실행
+    temporal_expanded = expand_by_temporal_context(extracted_entities, ttl_data, window_years=10)
+    category_expanded = expand_by_category(extracted_entities, ttl_data)
+    causal_expanded = expand_by_causal_chain(extracted_entities, ttl_data, max_hops=3)
+    pgvector_expanded = expand_by_pgvector(extracted_entities, query, top_k=15)
+
+    # 결과 병합 (중복 제거)
+    all_expanded = []
+    seen_uris = set()
+    seen_names = set()
+
+    # 원본 엔티티 먼저 추가 (우선순위 highest)
+    for entity in extracted_entities:
+        uri = entity.get("uri") or entity.get("name")
+        if uri:
+            seen_uris.add(uri)
+            seen_names.add(entity.get("name", ""))
+            all_expanded.append(entity)
+
+    # 확장된 엔티티 추가 (관련도 순)
+    for expanded_list in [causal_expanded, temporal_expanded, category_expanded, pgvector_expanded]:
+        for entity in expanded_list:
+            uri = entity.get("uri") or entity.get("name")
+            name = entity.get("name", "")
+
+            if uri not in seen_uris and name not in seen_names:
+                seen_uris.add(uri)
+                if name:
+                    seen_names.add(name)
+                all_expanded.append(entity)
+
+    # TTL 매칭 (Milvus에서 온 엔티티는 URI 없음)
+    label_to_uri = ttl_data.get("label_to_uri", {})
+    uri_to_type = ttl_data.get("uri_to_type", {})
+
+    for entity in all_expanded:
+        if not entity.get("uri") and entity.get("name"):
+            name = entity["name"]
+            if name in label_to_uri:
+                uri = label_to_uri[name]
+                entity["uri"] = uri
+                entity["matched"] = True
+                entity["type"] = uri_to_type.get(uri, entity.get("type", "Event"))
+
+    # 상위 40개로 제한 (성능 최적화)
+    all_expanded = sorted(
+        all_expanded,
+        key=lambda x: x.get("relevance_score", 0.5),
+        reverse=True
+    )[:40]
+
+    # 통계 출력
+    expansion_stats = {
+        "temporal": len(temporal_expanded),
+        "category": len(category_expanded),
+        "causal": len(causal_expanded),
+        "pgvector": len(pgvector_expanded)
+    }
+
+    print(f"  ├─ 확장 결과:")
+    print(f"  │  ├─ 시간적 맥락: {expansion_stats['temporal']}개")
+    print(f"  │  ├─ 카테고리: {expansion_stats['category']}개")
+    print(f"  │  ├─ 인과관계: {expansion_stats['causal']}개")
+    print(f"  │  └─ 벡터 유사도: {expansion_stats['milvus']}개")
+
+    # 상위 5개 샘플 출력
+    if len(all_expanded) > len(extracted_entities):
+        print(f"\n      [확장된 엔티티 샘플 (상위 5개)]")
+        new_entities = [e for e in all_expanded if e.get("expansion_method")]
+        for i, entity in enumerate(new_entities[:5], 1):
+            name = entity.get("name", "")
+            method = entity.get("expansion_method", "")
+            source = entity.get("expansion_source", "")
+            score = entity.get("relevance_score", 0)
+
+            method_display = {
+                "temporal": "시간",
+                "category": "카테고리",
+                "causal_chain": "인과",
+                "milvus": "벡터"
+            }.get(method, method)
+
+            print(f"      {i}. [{method_display:6s}] {name[:40]} (출처: {source[:20]}, 점수: {score:.2f})")
+
+    node_elapsed = time.time() - node_start
+    print(f"  └─ 완료: {len(extracted_entities)}개 → {len(all_expanded)}개 (확장 +{len(all_expanded) - len(extracted_entities)}개) ({node_elapsed:.2f}초)")
+    print()
+
+    # 노드 실행 시간 기록
+    node_times = state.get("node_execution_times", {})
+    node_times["semantic_expander"] = node_elapsed
+
+    return {
+        **state,
+        "extracted_entities": all_expanded,
+        "expansion_stats": expansion_stats,
+        "executed_nodes": state.get("executed_nodes", []) + ["semantic_expander"],
+        "node_execution_times": node_times
+    }
