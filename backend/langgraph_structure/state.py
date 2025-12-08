@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, TypedDict
+from backend.langgraph_structure.state_type import Evidence
 
 class GraphState(TypedDict):
     # 사용자 질문
@@ -8,7 +9,7 @@ class GraphState(TypedDict):
     query_type : str
 
     # retrieval results
-    search_chunks: List[Dict[str, Any]]
+    vector_evidences: List[Evidence]
 
     # # retrieval된 chunk 평가  집계 결과
     # related_num : int
