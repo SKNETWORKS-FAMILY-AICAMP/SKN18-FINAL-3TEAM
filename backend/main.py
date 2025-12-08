@@ -1,5 +1,5 @@
 # Langgraph 테스트 코드
-from langgraph_structure.graph import create_graph_flow
+from backend.langgraph_structure.graph import create_graph_flow
 
 def main():
     # LangGraph 앱 생성
