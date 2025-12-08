@@ -2,7 +2,7 @@
 import pandas as pd
 import os
 
-PATH = "data/encykorea_cleaned.csv"
+PATH = "backend/db_pipeline/data/encykorea_cleaned.csv"
 
 def load_raw_data(path: str = PATH):
     if not os.path.exists(path):
