@@ -1,6 +1,9 @@
 from django.urls import path
-from . import views
+
+# Video app URLs
+# React frontend handles the video page UI
+# Add API endpoints here for video functionality
 
 urlpatterns = [
-    path('<int:video_id>/', views.video_page, name='video_page'),
+    # API endpoints will be added here
 ]
