@@ -1,6 +1,9 @@
 from django.urls import path
-from . import views
+
+# Search app URLs
+# React frontend handles the search page UI
+# Add API endpoints here for search functionality
 
 urlpatterns = [
-    path('', views.search_page, name='search'),
+    # API endpoints will be added here
 ]
