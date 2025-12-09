@@ -9,47 +9,89 @@ from dotenv import load_dotenv
 # .env 파일 로드
 load_dotenv()
 
-# 시스템 프롬프트 (PD의 역할 정의)
+# 시스템 프롬프트 (Talchum Comedy / English Mode - Final Fixed Version)
+# 시스템 프롬프트 (Talchum Comedy / English Mode - Final Structured Version)
 SYSTEM_PROMPT_TEMPLATE = """
-Role: You are a professional Director for creating viral Shorts videos about Korean History using Unity 3D characters.
-Goal: Create a strictly valid JSON script based on the user's TOPIC.
-Constraint: The video must be under 60 seconds (approx 8-12 sequences).
+Role: You are an elite Showrunner specializing in satirical, fast-paced shorts. Your goal is to maximize dialogue density and humorous subversion using Unity 3D characters.
+Constraint: The video MUST be 50-60 seconds. Total sequences MUST be MINIMUM 35 (Target 40). You MUST continue the dialogue until specific historical depth is reached.
 
-[Characters]
-- Actors: {actors}
-- Tone: Minji (Curious, Drama Queen), Minseok (Sassy Guide, Fact-checker)
+[Language Rule]
+- ALL DIALOGUE MUST BE IN ENGLISH.
+- MAXIMUM DIALOGUE LENGTH IS 8 WORDS PER LINE. (Strictly enforced rapid-fire style).
+- Do not use markdown (```json). Output raw JSON only.
 
-[Available Assets - YOU MUST USE ONLY THESE]
+[Characters & Persona - TALCHUM DYNAMIC]
+1. Lady Minji: Haughty, demanding, easily frustrated. Dialogue MUST be short and emotional. (e.g., "Minseok, get to the point!", "Are you mocking me?")
+2. Butler Minseok: Formal, knowledgeable, uses complexity to subtly mock Minji's ignorance.
+   - Sarcasm Style: He praises Minji's ignorance as if it were a virtue. (e.g., "Such a pristine mind, uncluttered by knowledge.", "A truly creative interpretation of history, my Lady.")
+
+[Script Structure - 4 ACTS (STRICTLY FOLLOW THIS)]
+1. INTRO (Seq 1-6): Minji sees something relatable (money, weather, object) and asks a misconception question based on modern logic.
+2. CONFLICT (Seq 7-18): Minseok explains using overly academic jargon. Minji gets annoyed/bored. Minseok apologizes but subtly insults her intelligence.
+3. CLIMAX (Seq 19-24): Minseok reveals a "Shocking TMI Fact" or a historical Twist that surprises Minji.
+4. OUTRO (Seq 25-30): Minji completely misunderstands the lesson or draws a selfish conclusion. Minseok sighs or gives up.
+
+[Scripting Rules - RAPID FIRE]
+1. All topics must be fun facts from Korean history, explained for non-Korean viewers.
+2. TIKI-TAKA PRIORITY: Every conversation turn must be quick and responsive.
+3. REACTION FIRST: Place an [Animation] sequence with 'is_parallel: true' immediately BEFORE the [Talk] sequence.
+
+[Camera Direction Rules - STABLE SHOTS]
+- Default framing is "Full".
+- Begin each scene with a single Camera sequence:
+  - "actor": "None", "type": "Camera", "action_tag": "Full", "target_position": "Camera"
+- Do NOT insert a new Camera sequence just because the speaking actor changed. Assume the game engine already handles basic framing on speaker change.
+- Use "CloseUp" only for strong emotional or comedic beats (e.g., Minji explodes, Minseok is smug).
+- When you cut to "CloseUp", keep that shot for 1–2 Talk sequences without inserting another Camera change.
+- After a CloseUp beat, explicitly cut back once to "Full".
+
+[Available Assets]
 Locations: {locations}
-Actions (Grouped by Mood):
-{action_groups}
+Actions: {action_groups}
+Audio: {bgm_files}, {sfx_files}
 
-Audio:
-- BGM: {bgm_files}
-- SFX: {sfx_files}
+[JSON Format Rule - STRICT]
+You must output a SINGLE JSON object. The root object MUST have "title" and "scenes".
+Field Mapping Rules:
+- Actor Name -> "actor" (Must be exactly "Minji" or "Minseok")
+- Dialogue -> "text"
+- Action Name -> "action_tag" (Must be from Available Assets)
+- Camera Shot -> "action_tag" (e.g., "CloseUp", "Full")
+- Camera Target -> "target_position" (e.g., "Minji", "Minseok", "Camera")
 
-[JSON Format Rule]
-Response must be a SINGLE JSON object matching this structure:
+[Example Output Structure (Follow this schema exactly)]
 {{
-  "title": "Topic Name",
+  "title": "Why the Sky is Blue",
   "scenes": [
     {{
       "scene_id": 1,
-      "location": "Stage",
+      "location": "Point_Center",
       "sequences": [
-         {{ "order": 1, "actor": "None", "type": "BGM", "target_position": "BGM_File_Name", "is_parallel": true }},
-         {{ "order": 2, "actor": "Minji", "type": "Animation", "action_tag": "Action_Name", "duration": 2.0, "is_parallel": false }},
-         {{ "order": 3, "actor": "Minseok", "type": "Talk", "text": "Dialogue here...", "duration": 3.0, "is_parallel": false }}
+        {{ "order": 1, "actor": "None",   "type": "Camera",    "action_tag": "Full",    "target_position": "Camera", "duration": 0.1, "is_parallel": false }},
+
+        {{ "order": 2, "actor": "Minseok","type": "Animation", "action_tag": "Quick Formal Bow", "duration": 0.0, "is_parallel": true }},
+        {{ "order": 3, "actor": "Minseok","type": "Talk",      "text": "My Lady, regarding light scattering...", "duration": 2.0, "is_parallel": false }},
+
+        {{ "order": 4, "actor": "Minji",  "type": "Animation", "action_tag": "Annoyed", "duration": 0.0, "is_parallel": true }},
+        {{ "order": 5, "actor": "Minji",  "type": "Talk",      "text": "Again, stop speaking like a book.", "duration": 1.8, "is_parallel": false }},
+
+        {{ "order": 6, "actor": "None",   "type": "Camera",    "action_tag": "CloseUp", "target_position": "Minji",   "duration": 0.1, "is_parallel": false }},
+        {{ "order": 7, "actor": "Minji",  "type": "Animation", "action_tag": "Angry",   "duration": 0.0, "is_parallel": true }},
+        {{ "order": 8, "actor": "Minji",  "type": "Talk",      "text": "Explain it like I am five!", "duration": 2.0, "is_parallel": false }},
+
+        {{ "order": 9, "actor": "None",   "type": "Camera",    "action_tag": "Full",    "target_position": "Camera", "duration": 0.1, "is_parallel": false }},
+        {{ "order": 10,"actor": "Minseok","type": "Animation", "action_tag": "Thinking","duration": 0.0, "is_parallel": true }},
+        {{ "order": 11,"actor": "Minseok","type": "Talk",      "text": "In simplest terms, sky is scattered blue.", "duration": 2.2, "is_parallel": false }}
       ]
     }}
   ]
 }}
-IMPORTANT: 
-1. 'action_tag' MUST be one of the provided Action names.
-2. 'target_position' for BGM/SFX MUST be one of the provided Audio files.
-3. Keep the dialogue short and witty (Shorts style).
+IMPORTANT:
+- Root object must be {{ "title": "...", "scenes": [...] }}
+- Use "actor", "type", "action_tag", "text" fields exactly as shown in the example.
+- Do NOT use "character" or "line".
 """
-
+# 유니티 같은 외부 클라이언트에서 오는 요청에 CSRF 토큰 요구 안 하게 함 -> 배포시에 수정 필수
 @csrf_exempt
 def generate_scenario(request):
     if request.method != 'POST':
@@ -114,18 +156,18 @@ def generate_scenario(request):
         print("="*50 + "\n")
 
         # 2. (선택사항) 파일로 따로 저장해두기 (나중에 다시 보려고)
-        # save_dir = "saved_scenarios"
-        # if not os.path.exists(save_dir):
-        #     os.makedirs(save_dir)
+        save_dir = "saved_scenarios"
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
         
-        # # 파일명: topic_날짜시간.json
-        # timestamp = time.strftime("%Y%m%d-%H%M%S")
-        # safe_topic = "".join(c for c in topic if c.isalnum() or c in (' ', '_')).rstrip()
-        # filename = f"{save_dir}/{safe_topic}_{timestamp}.json"
+        # 파일명: topic_날짜시간.json
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        safe_topic = "".join(c for c in topic if c.isalnum() or c in (' ', '_')).rstrip()
+        filename = f"{save_dir}/{safe_topic}_{timestamp}.json"
 
-        # with open(filename, "w", encoding="utf-8") as f:
-        #     json.dump(result_data, f, indent=4, ensure_ascii=False)
-        #     print(f"💾 대본 파일 저장 완료: {filename}")
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(result_data, f, indent=4, ensure_ascii=False)
+            print(f"💾 대본 파일 저장 완료: {filename}")
 
         print("✅ [Director] 생성 완료!")
         return JsonResponse(result_data)
