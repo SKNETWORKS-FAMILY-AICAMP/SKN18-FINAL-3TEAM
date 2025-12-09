@@ -30,8 +30,7 @@ from nodes.classify_node import query_classifier_node
 from nodes.entity_extractor_node import entity_extractor_node
 from nodes.semantic_expander_node import semantic_expander_node
 from nodes.kg.parallel_inference_executor_node import parallel_inference_executor_node
-from nodes.kg.multi_path_extractor_node import multi_path_extractor_node
-from nodes.evidence_aggregator_node import evidence_aggregator_node
+from nodes.kg.path_evidence_aggregator_node import path_evidence_aggregator_node
 from nodes.generate_node import story_generator_node
 
 
@@ -56,9 +55,10 @@ def create_graph_flow():
        ├─ Thread 3: entity_properties (엔티티 속성)
        ├─ Thread 4: connected_entities (연결 엔티티 + 양방향 BFS) (NEW)
        └─ Thread 5: type_and_summary (타입/요약)
-    5. Multi-Path Extractor → 각 Thread별 경로 추출
-    6. Evidence Aggregator → 5가지 근거 통합 + 수렴 노드 감지 (NEW)
-    7. Story Generator → 풍부한 스토리 생성
+    5. Path Extractor & Evidence Aggregator → 경로 추출 및 근거 통합 (통합) (NEW)
+       ├─ 개선된 점수 체계로 관련성 평가
+       └─ 상위 15개 근거 선택 (기존 5개에서 확장)
+    6. Story Generator → 풍부한 스토리 생성
     """
 
     workflow = StateGraph(GraphState)
@@ -69,8 +69,7 @@ def create_graph_flow():
     workflow.add_node("entity_extractor", entity_extractor_node)
     workflow.add_node("semantic_expander", semantic_expander_node)  # NEW
     workflow.add_node("parallel_knowledge_retrieval", parallel_inference_executor_node)
-    workflow.add_node("multi_path_extractor", multi_path_extractor_node)
-    workflow.add_node("evidence_aggregator", evidence_aggregator_node)
+    workflow.add_node("path_evidence_aggregator", path_evidence_aggregator_node)  # 통합 노드
     workflow.add_node("story_generator", story_generator_node)
 
     # ========== 플로우 정의 ==========
@@ -108,14 +107,11 @@ def create_graph_flow():
     # 5. 병렬 지식 검색 (5개 Thread)
     workflow.add_edge("semantic_expander", "parallel_knowledge_retrieval")
 
-    # 6. 다중 경로 추출 (각 Thread별)
-    workflow.add_edge("parallel_knowledge_retrieval", "multi_path_extractor")
+    # 6. 경로 추출 및 근거 통합 (통합 노드)
+    workflow.add_edge("parallel_knowledge_retrieval", "path_evidence_aggregator")
 
-    # 7. 근거 통합 (5가지 관점 병합 + 수렴 노드 감지)
-    workflow.add_edge("multi_path_extractor", "evidence_aggregator")
-
-    # 8. 스토리 생성
-    workflow.add_edge("evidence_aggregator", "story_generator")
+    # 7. 스토리 생성
+    workflow.add_edge("path_evidence_aggregator", "story_generator")
 
     # 9. 종료
     workflow.add_edge("story_generator", END)
