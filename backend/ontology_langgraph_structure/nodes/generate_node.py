@@ -585,7 +585,7 @@ def story_generator_node(state: GraphState) -> GraphState:
 [요약]
 한 문장으로 핵심 정리 ("-입니다" 체, 한국어만 사용)
 
-[참고 근거]
+[주석]
 위의 참고 근거 목록(전체 {len(deduplicated_evidences)}개) 중에서 질문과 가장 관련성이 높은 **주요 5개만** 선택하여 학술적 서적 스타일로 서술형으로 작성하세요.
 
 **중요: 주요 근거만 나열하세요.**
@@ -614,7 +614,7 @@ def story_generator_node(state: GraphState) -> GraphState:
 - 영어 단어나 영어 문장 절대 사용 금지
 - 주요 근거만 선택하여 최대 5개만 나열하세요.
 
-**중요: [본문], [요약], [참고 근거] 세 섹션을 모두 출력하세요. 각 섹션은 명확하게 구분하여 작성하세요.**"""
+**중요: [본문], [요약], [주석] 세 섹션을 모두 출력하세요. 각 섹션은 명확하게 구분하여 작성하세요.**"""
 
     try:
         response = llm.invoke(story_prompt)

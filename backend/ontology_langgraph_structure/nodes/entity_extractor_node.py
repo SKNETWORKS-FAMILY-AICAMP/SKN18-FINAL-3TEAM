@@ -603,6 +603,7 @@ def expand_keywords_with_llm(keywords: list, query: str) -> list:
 - "환국" → 갑술환국, 기사환국, 경신환국, 갑인환국 등
 - "왕" → 태조, 세종, 숙종, 정조 등 (질문 맥락에 맞는 왕들)
 - "사건" → 질문 맥락에 맞는 구체적 사건명
+- **중요: "조선", "조선시대", "조선왕조"는 확장하지 마세요. 모든 데이터가 조선 데이터이므로 의미가 없습니다.**
 
 ## 출력 형식
 JSON 형식으로 출력하세요:
@@ -622,14 +623,22 @@ JSON 형식으로 출력하세요:
         result = json.loads(content)
         expanded_dict = result.get("expanded", {})
         
+        # "조선" 관련 키워드는 제외 (모든 데이터가 조선 데이터이므로)
+        joseon_keywords = {'조선', '조선시대', '조선왕조', '한국', '우리나라'}
+        
         # 확장된 키워드 추가
         expanded_keywords = list(keywords)  # 원본 유지
         
         for general_noun, instances in expanded_dict.items():
-            if general_noun in expanded_keywords:
-                # 일반명사 제거하고 구체적 인스턴스 추가
-                expanded_keywords.remove(general_noun)
-                expanded_keywords.extend(instances)
+            # "조선" 관련 키워드는 확장하지 않음
+            if general_noun not in joseon_keywords:
+                # 확장된 인스턴스에서도 "조선" 관련 항목 제거
+                filtered_instances = [inst for inst in instances if inst not in joseon_keywords]
+                if filtered_instances:
+                    if general_noun in expanded_keywords:
+                        # 일반명사 제거하고 구체적 인스턴스 추가
+                        expanded_keywords.remove(general_noun)
+                    expanded_keywords.extend(filtered_instances)
         
         print(f"   🔄 키워드 확장: {general_nouns} → {sum(len(v) for v in expanded_dict.values())}개 인스턴스")
         return expanded_keywords
