@@ -1,10 +1,10 @@
 """
-Parallel Inference Executor Node (통합 버전)
+Parallel Knowledge Retrieval Node (통합 버전)
 
-5개의 Thread에서 쿼리 생성 + 추론 실행을 병렬로 수행
+5개의 Thread에서 쿼리 생성 + 지식 검색을 병렬로 수행
 - ThreadPoolExecutor로 병렬 처리
-- 각 Thread마다: LLM 쿼리 생성 → Jena Reasoner API 호출
-- 추론 결과를 TTL 형식으로 저장
+- 각 Thread마다: LLM 쿼리 생성 → Jena Reasoner API 호출 (또는 Fuseki 직접 쿼리)
+- 지식 검색 결과를 TTL 형식으로 저장
 
 경량 모드 (INFERENCE_MODE=light):
 - Java Reasoner 없이 Fuseki 직접 쿼리
@@ -183,7 +183,7 @@ INFERENCE_PROPERTIES_BY_STAGE = DATA_THREADS
 
 def parallel_inference_executor_node(state: GraphState) -> GraphState:
     """
-    5개 Thread에서 쿼리 생성 + 추론 실행을 병렬로 수행
+    Parallel Knowledge Retrieval: 5개 Thread에서 쿼리 생성 + 추론 실행을 병렬로 수행
 
     기존 multi_query_generator_node를 통합하여 효율성 향상:
     - 기존: 쿼리 5개 순차 생성(~10초) → 추론 5개 병렬 실행(~3초) = ~13초
@@ -347,7 +347,7 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
     print(f"  └─ 완료: {total_bindings}개 결과 ({node_elapsed:.2f}초)")
     print()
 
-    # 추론 결과를 TTL로 저장 (옵션)
+    # 지식 검색 결과를 TTL로 저장 (옵션)
     inference_ttl_path = None
     if SAVE_INFERENCE_TRIPLES and total_bindings > 0:
         try:
@@ -358,9 +358,9 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
                 session_id=session_id,
                 execution_time=elapsed
             )
-            # 추론 결과 저장 완료 (로그 간소화)
+            # 지식 검색 결과 저장 완료 (로그 간소화)
         except Exception as e:
-            print(f"   경고: 추론 결과 저장 실패: {e}")
+            print(f"   경고: 지식 검색 결과 저장 실패: {e}")
 
     # 노드 실행 시간 기록
     node_times = state.get("node_execution_times", {})
@@ -373,7 +373,7 @@ def parallel_inference_executor_node(state: GraphState) -> GraphState:
         "parallel_inference_results": results,
         "execution_time": elapsed,
         "inference_ttl_path": inference_ttl_path,
-        "executed_nodes": state.get("executed_nodes", []) + ["parallel_inference_executor"],
+        "executed_nodes": state.get("executed_nodes", []) + ["parallel_knowledge_retrieval"],
         "node_execution_times": node_times
     }
 
@@ -417,8 +417,11 @@ def execute_unified_thread(
 
     # connected_entities는 양방향 BFS 추가 실행
     if use_bidirectional_bfs and thread_type == "connected_entities" and len(entities) >= 2:
+        print(f"    ├─ 양방향 BFS 경로 탐색 시작 (엔티티 {len(entities)}개)")
+        
         # 양방향 BFS로 엔티티 간 경로 탐색
         bfs_paths = execute_bidirectional_path_search(entities)
+        print(f"    │  └─ BFS 경로 발견: {len(bfs_paths)}개")
 
         # SPARQL 쿼리도 실행 (직접 연결 찾기)
         if sparql_template and QUERY_MODE == "template":
@@ -434,7 +437,10 @@ def execute_unified_thread(
         )
 
         # BFS 경로와 SPARQL 결과 병합
-        combined_bindings = sparql_result.get("bindings", []) + bfs_paths
+        sparql_bindings = sparql_result.get("bindings", [])
+        combined_bindings = sparql_bindings + bfs_paths
+        
+        print(f"    └─ SPARQL 직접 연결: {len(sparql_bindings)}개, BFS 경로: {len(bfs_paths)}개, 합계: {len(combined_bindings)}개")
 
         sparql_result["bindings"] = combined_bindings
         sparql_result["sparql"] = sparql
@@ -483,10 +489,15 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
     entities_with_uri = [e for e in entities if e.get("uri")]
 
     if len(entities_with_uri) < 2:
+        print(f"      └─ URI가 있는 엔티티가 2개 미만 ({len(entities_with_uri)}개)")
         return []
+
+    print(f"      ├─ 엔티티 쌍 탐색: {len(entities_with_uri)}개 엔티티 중 최대 {max_pairs}개 쌍")
 
     # 모든 쌍 시도 (최대 max_pairs)
     pairs_tried = 0
+    paths_found = 0
+    
     for i in range(len(entities_with_uri)):
         for j in range(i + 1, len(entities_with_uri)):
             if pairs_tried >= max_pairs:
@@ -497,9 +508,19 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
 
             uri_a = entity_a.get("uri")
             uri_b = entity_b.get("uri")
+            
+            name_a = entity_a.get("name", "")
+            name_b = entity_b.get("name", "")
+
+            if not uri_a or not uri_b:
+                continue
 
             # 양방향 BFS 실행
             paths = find_bidirectional_paths(uri_a, uri_b, max_depth=5)
+            
+            if paths:
+                paths_found += len(paths)
+                print(f"      │  ├─ [{name_a} ↔ {name_b}]: {len(paths)}개 경로 발견")
 
             # 경로를 Fuseki binding 형식으로 변환
             for path_info in paths:
@@ -509,16 +530,26 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
 
                 if len(path_uris) >= 2:
                     # 경로 정보를 binding으로 변환
-                    path_str = " → ".join([uri.split("#")[-1] for uri in path_uris])
+                    # URI에서 네임스페이스 제거 (hist:Person_xxx 형식 유지)
+                    path_labels = []
+                    for uri in path_uris:
+                        if "#" in uri:
+                            path_labels.append(uri.split("#")[-1])
+                        elif ":" in uri:
+                            path_labels.append(uri.split(":")[-1])
+                        else:
+                            path_labels.append(uri)
+                    
+                    path_str = " → ".join(path_labels)
 
                     bindings.append({
                         "entity1": {"value": uri_a},
-                        "label1": {"value": entity_a.get("name", "")},
+                        "label1": {"value": name_a},
                         "entity2": {"value": uri_b},
-                        "label2": {"value": entity_b.get("name", "")},
+                        "label2": {"value": name_b},
                         "path": {"value": path_str},
                         "path_length": {"value": str(len(path_uris))},
-                        "convergence_node": {"value": convergence.split("#")[-1] if convergence else ""},
+                        "convergence_node": {"value": convergence.split("#")[-1] if convergence and "#" in convergence else (convergence.split(":")[-1] if convergence and ":" in convergence else convergence)},
                         "method": {"value": "bidirectional_bfs"}
                     })
 
@@ -527,6 +558,7 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
         if pairs_tried >= max_pairs:
             break
 
+    print(f"      └─ 총 {pairs_tried}개 쌍 탐색, {paths_found}개 경로 발견")
     return bindings
 
 
@@ -555,7 +587,7 @@ def find_bidirectional_paths(entity_a_uri: str, entity_b_uri: str, max_depth: in
 
     found_paths = []
 
-    for depth in range(max_depth // 2 + 1):
+    for depth in range(max_depth):
         # A에서 확장
         if queue_a:
             new_queue_a = []
@@ -566,9 +598,12 @@ def find_bidirectional_paths(entity_a_uri: str, entity_b_uri: str, max_depth: in
                     # B측에서 이미 방문했는지 확인 (수렴점 발견)
                     if neighbor_uri in visited_b:
                         path_b, preds_b = visited_b[neighbor_uri]
-                        # 전체 경로 = path_a + path_b (역순)
-                        full_path = path + [neighbor_uri] + path_b[1:][::-1]
-                        full_preds = predicates + [predicate] + preds_b[::-1]
+                        # 전체 경로 = path_a + path_b (역순, 중복 제거)
+                        # path_b[:-1]로 수렴점을 제외하고 역순으로 합침
+                        # path_b = [B, Y, neighbor_uri] → path_b[:-1] = [B, Y] → [::-1] = [Y, B]
+                        # full_path = [A, X, neighbor_uri] + [Y, B] = [A, X, neighbor_uri, Y, B]
+                        full_path = path + path_b[:-1][::-1]
+                        full_preds = predicates + preds_b[::-1]
 
                         found_paths.append({
                             "path": full_path,
@@ -577,6 +612,7 @@ def find_bidirectional_paths(entity_a_uri: str, entity_b_uri: str, max_depth: in
                             "convergence_node": neighbor_uri
                         })
 
+                    # 방문하지 않은 노드만 큐에 추가
                     if neighbor_uri not in visited_a:
                         new_path = path + [neighbor_uri]
                         new_preds = predicates + [predicate]
@@ -595,7 +631,10 @@ def find_bidirectional_paths(entity_a_uri: str, entity_b_uri: str, max_depth: in
                     # A측에서 이미 방문했는지 확인
                     if neighbor_uri in visited_a:
                         path_a, preds_a = visited_a[neighbor_uri]
-                        full_path = path_a + path[1:][::-1]
+                        # 전체 경로 = path_a + path (역순, 중복 제거)
+                        # path = [B, Y, neighbor_uri] → path[:-1] = [B, Y] → [::-1] = [Y, B]
+                        # full_path = [A, X, neighbor_uri] + [Y, B] = [A, X, neighbor_uri, Y, B]
+                        full_path = path_a + path[:-1][::-1]
                         full_preds = preds_a + predicates[::-1]
 
                         found_paths.append({
@@ -605,6 +644,7 @@ def find_bidirectional_paths(entity_a_uri: str, entity_b_uri: str, max_depth: in
                             "convergence_node": neighbor_uri
                         })
 
+                    # 방문하지 않은 노드만 큐에 추가
                     if neighbor_uri not in visited_b:
                         new_path = path + [neighbor_uri]
                         new_preds = predicates + [predicate]
@@ -613,7 +653,7 @@ def find_bidirectional_paths(entity_a_uri: str, entity_b_uri: str, max_depth: in
 
             queue_b = new_queue_b
 
-        # 경로를 찾았으면 조기 종료
+        # 경로를 찾았으면 조기 종료 (최단 경로 우선)
         if found_paths:
             break
 
@@ -1157,7 +1197,7 @@ def save_inference_results_as_ttl(
     session_id: str,
     execution_time: float
 ) -> str:
-    """추론 결과를 TTL 파일로 저장"""
+    """Parallel Knowledge Retrieval의 지식 검색 결과를 TTL 파일로 저장"""
     
     try:
         from utils.inference_triple_generator import InferenceTripleGenerator
