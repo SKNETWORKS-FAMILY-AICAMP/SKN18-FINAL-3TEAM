@@ -16,7 +16,7 @@ from langchain_openai import ChatOpenAI
 # 속성/관계 타입별 Relevance Score 가중치 (개선)
 # ========================================
 
-# 관계(Predicate) 타입별 가중치 (공격적 점수 체계 - 편차 확대)
+# 관계(Predicate) 타입별 가중치 (공격적 점수 체계 - 편차 확대) -> 1.00 ~ 1.10로 가중치 부여
 RELATION_WEIGHTS = {
     # 인과관계 (가장 중요) - 가중치 대폭 상향
     "leadsTo": 2.5,
@@ -210,7 +210,7 @@ def detect_convergence_nodes(inference_paths: dict, query_entities: list) -> dic
 
             # connected_entities 쓰레드에서 수렴 노드 추출
             if thread_type == "connected_entities":
-                convergence_node = raw_data.get("convergence_node")
+                convergence_node = raw_data.get("convergence_node")# ==========(,default)인지 체크해볼것 ============
                 entity1_label = raw_data.get("label1", "")
                 entity2_label = raw_data.get("label2", "")
 
@@ -242,7 +242,7 @@ def detect_convergence_nodes(inference_paths: dict, query_entities: list) -> dic
             convergence_nodes[node_uri] = {
                 "count": len(connected_entities),
                 "connected_entities": list(connected_entities),
-                "boost": 2.0  # 2배 가중치 부스트
+                "boost": 1.1  # 1.1배 가중치 부스트
             }
 
     return convergence_nodes
@@ -380,7 +380,11 @@ def extract_entity_properties(bindings: list, base_weight: float, query_entities
 
 
 def extract_connected_entities(bindings: list, base_weight: float) -> list:
-    """연결된 엔티티들 간의 관계 추출 (2-hop)"""
+    """
+    연결된 엔티티들 간의 관계 추출 (2-hop)
+    category가 다를 경우, 가중치 positive (1.02)
+    같을 경우, neutral(1.00)
+    """
     paths = []
     seen = set()
     
@@ -601,7 +605,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
             inference_paths[thread_type] = []
             continue
 
-        # Thread별 경로 추출 - base_weight를 thread별로 차별화
+        # Thread별 경로 추출 - base_weight를 thread별로 차별화() / 1.00 ~ 1.05
         default_weights = {
             "outgoing_relations": 0.5,  # 나가는 관계는 높게
             "incoming_relations": 0.4,   # 들어오는 관계는 중간
@@ -698,8 +702,6 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
             "entity_properties": "엔티티속성",
             "connected_entities": "연결엔티티",
             "type_and_summary": "타입/요약",
-            "outgoing_relation": "나가는관계",
-            "incoming_relation": "들어오는관계",
             "property": "속성",
             "connection": "연결",
             "summary": "요약"
@@ -759,8 +761,6 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
                 "entity_properties": "엔티티속성",
                 "connected_entities": "연결엔티티",
                 "type_and_summary": "타입/요약",
-                "outgoing_relation": "나가는관계",
-                "incoming_relation": "들어오는관계",
                 "property": "속성",
                 "connection": "연결",
                 "summary": "요약"

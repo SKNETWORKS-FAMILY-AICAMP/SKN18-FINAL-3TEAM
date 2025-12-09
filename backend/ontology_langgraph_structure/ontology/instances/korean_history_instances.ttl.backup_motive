@@ -182777,7 +182777,7 @@ hist:Document_징비록 rdfs:label "징비록" .
 hist:Document_징비록 hist:hasYear "1592-1598" .
 hist:Person_유성룡 rdf:type hist:Person .
 hist:Person_유성룡 rdfs:label "유성룡" .
-hist:Person_유성룡 hist:hasMotive "방어" .
+hist:Person_유성룡 hist:hasMotiv e "방어" .
 hist:Person_조수익 rdf:type hist:Person .
 hist:Person_조수익 rdfs:label "조수익" .
 hist:Institution_경상도관찰사 rdf:type hist:Institution .

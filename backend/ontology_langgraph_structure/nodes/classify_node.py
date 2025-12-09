@@ -132,7 +132,11 @@ def query_classifier_node(state: GraphState) -> GraphState:
     keywords = extract_keywords_with_kiwi(query)
 
     # 불용어 제거
-    stopwords = {'무엇', '누구', '어디', '언제', '무슨', '어떤', '것', '수', '등', '때', '중', '후', '전'}
+    # 모든 데이터가 조선 데이터이므로 "조선" 관련 키워드는 제외
+    stopwords = {
+        '무엇', '누구', '어디', '언제', '무슨', '어떤', '것', '수', '등', '때', '중', '후', '전',
+        '조선', '조선시대', '조선왕조', '한국', '우리나라'  # 모든 데이터가 조선 데이터이므로 제외
+    }
     keywords = [kw for kw in keywords if kw not in stopwords]
 
     keywords_text = ", ".join(keywords) if keywords else "없음"
@@ -210,6 +214,7 @@ def query_classifier_node(state: GraphState) -> GraphState:
 - 질문의 의도와 맥락을 고려하여 관련성 높은 인스턴스 선택
 - 최대 5-10개의 구체적 인스턴스로 확장
 - 집합 개념의 경우, 관련 인물과 사건을 모두 포함
+- **중요: "조선", "조선시대", "조선왕조"는 확장하지 마세요. 모든 데이터가 조선 데이터이므로 의미가 없습니다.**
 
 **키워드 확장 예시 (참고용):**
 - "궁궐" → ["경복궁", "창덕궁", "경덕궁", "창경궁", "경희궁"]
@@ -277,9 +282,22 @@ def query_classifier_node(state: GraphState) -> GraphState:
                 selected_properties.extend(all_groups[group_name][:10])  # 그룹당 최대 10개
         
         # 키워드 확장 결과 처리
+        # "조선" 관련 키워드는 제외 (모든 데이터가 조선 데이터이므로)
+        joseon_keywords = {'조선', '조선시대', '조선왕조', '한국', '우리나라'}
         expanded_keywords = []
+        filtered_expanded_keywords_dict = {}
+        
         for general_noun, instances in expanded_keywords_dict.items():
-            expanded_keywords.extend(instances)
+            # "조선" 관련 키워드는 확장하지 않음
+            if general_noun not in joseon_keywords:
+                # 확장된 인스턴스에서도 "조선" 관련 항목 제거
+                filtered_instances = [inst for inst in instances if inst not in joseon_keywords]
+                if filtered_instances:
+                    filtered_expanded_keywords_dict[general_noun] = filtered_instances
+                    expanded_keywords.extend(filtered_instances)
+        
+        # 필터링된 결과로 업데이트
+        expanded_keywords_dict = filtered_expanded_keywords_dict
         
         if expanded_keywords:
             print(f"📌 확장된 키워드: {expanded_keywords_dict}")

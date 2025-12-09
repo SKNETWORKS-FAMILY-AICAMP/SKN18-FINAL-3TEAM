@@ -566,14 +566,20 @@ def semantic_expander_node(state: GraphState) -> GraphState:
 
     # SPARQL 기반 스코어링: 연결된 노드에 키워드가 있는지 확인
     # 질문에서 핵심 키워드 추출
+    # 모든 데이터가 조선 데이터이므로 "조선" 관련 키워드는 제외
+    joseon_keywords = {'조선', '조선시대', '조선왕조', '한국', '우리나라'}
     try:
         from kiwipiepy import Kiwi
         kiwi = Kiwi()
         tokens = kiwi.tokenize(query)
         core_keywords = [t.form for t in tokens if t.tag in ('NNG', 'NNP') and len(t.form) >= 2]
+        # "조선" 관련 키워드 제거
+        core_keywords = [kw for kw in core_keywords if kw not in joseon_keywords]
     except:
         import re
         core_keywords = re.findall(r'[가-힣]{2,}', query)
+        # "조선" 관련 키워드 제거
+        core_keywords = [kw for kw in core_keywords if kw not in joseon_keywords]
     
     print(f"  ├─ SPARQL 스코어링 시작 (키워드: {', '.join(core_keywords[:5])})")
     
