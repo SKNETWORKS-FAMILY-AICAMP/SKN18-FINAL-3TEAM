@@ -1,10 +1,17 @@
 import csv
 import re
 from neo4j import GraphDatabase
-from pathlib import Path   # ✅ 추가
+from pathlib import Path
+
+from dotenv import load_dotenv            # ✅ 추가
+from openai import OpenAI                # ✅ 추가
 
 import sys
 csv.field_size_limit(2_147_483_647)
+
+# ===== 환경변수 로드 & OpenAI 클라이언트 =====
+load_dotenv()                             # OPENAI_API_KEY 읽어옴
+client = OpenAI()                         # 임베딩용
 
 # 프로젝트 루트 기준 경로 계산 (backend/langgraph_structure/graphdb/ 기준 3단계 위)
 BASE_DIR = Path(__file__).resolve().parents[3]
@@ -91,6 +98,22 @@ def create_constraints(driver):
             """)
 
 
+def generate_summary_embedding(summary: str) -> list[float] | None:
+    """
+    summary 텍스트만 임베딩.
+    summary가 비어있으면 None.
+    """
+    summary = (summary or "").strip()
+    if not summary:
+        return None
+
+    resp = client.embeddings.create(
+        model="text-embedding-3-small",
+        input=summary,
+    )
+    return resp.data[0].embedding
+
+
 def create_nodes(driver):
     with driver.session() as session:
         for row in load_rows():
@@ -109,7 +132,7 @@ def create_nodes(driver):
             period_text = extract_period_text(text_for_extract)
             main_year = years[0] if years else None
 
-            # 공통 필드
+            # 공통 필드 (contents는 Neo4j에 저장하지 않음)
             props: dict = {
                 "article_id": int(row["_article_id"]),
                 "category": category,
@@ -175,13 +198,19 @@ def create_nodes(driver):
                 if len(years) >= 2:
                     props["exist_end_year"] = years[1]
 
+            # 🔹 summary 임베딩 생성
+            embedding = generate_summary_embedding(summary)
+
+            # Neo4j에 저장
             session.run(
                 f"""
                 MERGE (n:{label} {{article_id: $article_id}})
                 SET n += $props
+                SET n.embedding = $embedding
                 """,
                 article_id=props["article_id"],
                 props=props,
+                embedding=embedding,   # None이면 속성 저장 안 됨
             )
 
 
@@ -190,7 +219,7 @@ def main():
     try:
         create_constraints(driver)
         create_nodes(driver)
-        print("노드 생성 완료.")
+        print("노드 생성 + summary 임베딩 완료.")
     finally:
         driver.close()
 
