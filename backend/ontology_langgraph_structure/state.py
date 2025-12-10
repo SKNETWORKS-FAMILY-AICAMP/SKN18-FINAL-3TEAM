@@ -2,7 +2,7 @@ from typing import Any, Dict, List, NotRequired, TypedDict, Literal
 
 
 class GraphState(TypedDict):
-    """창작 모드용 상태 - Jena Rules 기반 병렬 추론"""
+    """창작 모드용 상태 - Parallel Knowledge Retrieval 기반 병렬 지식 검색"""
 
     # ========== 입력 ==========
     query: str  # 사용자 질문
@@ -44,8 +44,8 @@ class GraphState(TypedDict):
     hypothetical_triples: NotRequired[List[str]]  # What-if용 가상 트리플
     # ["hist:Wongyun hist:wonBattle hist:GadeokdoSea .", ...]
 
-    # ========== 4단계: 병렬 추론 실행 ==========
-    parallel_inference_results: NotRequired[Dict[str, Any]]  # 5개 Thread 추론 결과
+    # ========== 4단계: Parallel Knowledge Retrieval (병렬 지식 검색) ==========
+    parallel_inference_results: NotRequired[Dict[str, Any]]  # 5개 Thread 지식 검색 결과
     # {
     #     "causal": {"bindings": [...], "status": "success"},
     #     "person": {"bindings": [...], "status": "success"},
