@@ -31,27 +31,33 @@ def build_llm_prompt(question: str, evidences: List[Evidence]) -> str:
 
     evidence_block = "\n\n".join(parts)
 
-    prompt = (
-        "아래에는 질문과 근거 자료들이 제공됩니다.\n"
-        "당신의 임무는 이 근거들에서 확인할 수 있는 사실만을 사용하여, "
-        "**최종 자연어 답변이 아니라 구조화된 '중간 답변(ANSWER_DRAFT)'** 을 만드는 것입니다.\n\n"
+    prompt = f"""
+    당신은 한국사를 설명하는 교사입니다.
 
-        "출력 형식은 반드시 다음과 동일하게 해주세요:\n"
-        "[ANSWER_DRAFT]\n"
-        "background: | 리스트\n"
-        "causes: | 리스트\n"
-        "events: | 리스트\n"
-        "results: | 리스트\n"
-        "limitations: | 리스트\n"
-        "[/ANSWER_DRAFT]\n\n"
+    아래에는 학생의 질문과, 그 질문과 직접적으로 관련된 근거 자료들이 주어집니다.
+    이 근거들을 바탕으로, 학생이 읽으면 한 단원 설명처럼 느껴질 정도로 **충분히 자세한** 설명 글을 작성해 주세요.
 
-        "각 섹션은 bullet 리스트 형태로 작성하며, 자연어 문장 스타일로 꾸미지 마세요.\n"
-        "요약형도 아니고, 최종 문장도 아니며, **단지 사실의 정리 목록**만 제공하면 됩니다.\n\n"
+    [질문]
+    {question}
 
-        f"[QUESTION]\n{question}\n\n"
-        f"[EVIDENCES]\n{evidence_block}\n\n"
-        "위 형식에 맞는 ANSWER_DRAFT 만 출력하세요."
-    )
+    [근거 자료]
+    {evidence_block}
+
+    지침:
+    - 답변은 반드시 한국어로 작성합니다.
+    - 한두 줄짜리 요약이 아니라, 배경 → 전개 → 결과·의의가 드러나는 **완성된 설명문**을 작성합니다.
+    - 전체 분량은 3~5단락 정도로 작성합니다.
+    - 각 단락은 서로 다른 초점을 가지게 합니다.
+    - 1단락: 사건의 배경과 원인
+    - 2단락: 주요 전개 과정과 핵심 인물
+    - 3단락: 결과와 역사적 의의
+    - 필요하면 4단락 정도까지는 허용하되, 같은 내용을 다시 반복해서 설명하지 않습니다.
+    - 같은 사실(연도, 전쟁 기간, 주요 인물의 역할, 원인·결과 등)은 한 번만 명확히 설명하고, 이후에 다시 반복하거나 비슷한 문장을 다시 쓰지 않습니다.
+    - 근거 자료에 있는 정보들을 중심으로 서술하고, 근거에 전혀 없는 사실은 새로 지어내지 않습니다.
+    - 서로 다른 근거의 내용을 자연스럽게 이어 붙여, 시간 순서 또는 인과 관계가 드러나게 구성합니다.
+    - 목록, 불릿, 번호 매기기를 사용하지 말고, 연속된 문단 형태로만 작성합니다.
+    - 최종 출력에는 위의 [질문], [근거 자료], '지침'이라는 말은 포함하지 말고, 설명 본문만 출력합니다.
+    """
     return prompt
 
 
@@ -63,6 +69,8 @@ def generate_node(state: GraphState) -> GraphState:
     """
     question = state["query"]
     vector_evidences: List[Evidence] = state.get("vector_evidences", [])
+    if vector_evidences:
+        print("⭐있음!\n")
     neo4j_results: List[Dict[str, Any]] = state.get("neo4j_results", [])
 
     # 1) Neo4j 결과를 Evidence 형식으로 변환
@@ -122,14 +130,9 @@ def generate_node(state: GraphState) -> GraphState:
         return {
             **state,
             "final_answer": (
-                "[ANSWER_DRAFT]\n"
-                "background:\n- 근거 부족\n\n"
-                "causes:\n- 근거 부족\n\n"
-                "events:\n- 근거 부족\n\n"
-                "results:\n- 근거 부족\n\n"
-                "limitations:\n- 관련 근거 자료를 찾지 못함\n"
-                "[/ANSWER_DRAFT]"
-            ),
+                "주어진 자료에서는 해당 질문에 대한 관련 정보를 찾을 수 없습니다. "
+                "더 구체적인 질문이나 추가 자료가 필요합니다."
+            )
         }
 
 
