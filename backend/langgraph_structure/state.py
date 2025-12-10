@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, TypedDict
+from backend.langgraph_structure.state_type import Evidence
 
 class GraphState(TypedDict):
     # 사용자 질문
@@ -8,12 +9,11 @@ class GraphState(TypedDict):
     query_type : str
 
     # retrieval results
-    search_chunks: List[Dict[str, Any]]
-    similarity_stats: Dict[str, float] # 선택된 청크 개수/ max, min 유사도
+    vector_evidences: List[Evidence]
 
-    # retrieval된 chunk 평가  집계 결과
-    related_num : int
-    context_chunks: List[Dict[str, Any]]
+    # # retrieval된 chunk 평가  집계 결과
+    # related_num : int
+    # context_chunks: List[Dict[str, Any]]
 
     # cypher 생성된 키워드
     cypher_keywords: List[str]

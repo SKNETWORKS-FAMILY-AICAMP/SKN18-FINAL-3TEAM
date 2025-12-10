@@ -1,5 +1,5 @@
 # main.py - 창작 모드 테스트
-from langgraph_structure.graph import graph
+from backend.langgraph_structure.graph import graph
 
 
 def print_result(result):

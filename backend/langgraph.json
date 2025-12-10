@@ -3,5 +3,5 @@
   "graphs": {
     "agent": "langgraph_structure/graph.py:graph"
   },
-  "env": ".env"
+  "env": "../.env"
 }
