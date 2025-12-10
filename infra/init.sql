@@ -13,13 +13,13 @@ CREATE TABLE IF NOT EXISTS korean_history (
 
 -- 회원 정보 관리 테이블 생성
 -- "user"는 PostgreSQL 예약어이므로 큰따옴표 필요
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE IF NOT EXISTS "user" (
     id SERIAL PRIMARY KEY,
     nickname VARCHAR(30) UNIQUE,
     profile_image VARCHAR(100) NULL,
     sign_up_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     email TEXT UNIQUE NOT NULL,
-    permission VARCHAR(50) NOT NULL DEFAULT users,
+    permission VARCHAR(50) NOT NULL DEFAULT 'user',
     gender BOOLEAN NULL,
     age INT NULL,
     -- Django 인증 시스템 필수 필드
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS video (
 CREATE TABLE IF NOT EXISTS watching_history (
     id SERIAL PRIMARY KEY,
     video_id INT NOT NULL REFERENCES video(id) ON DELETE CASCADE,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
     tags TEXT[] NULL,
     watched_seconds INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS watching_history (
 -- 댓글 관리 테이블 생성
 CREATE TABLE IF NOT EXISTS comment (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
     video_id INT NOT NULL REFERENCES video(id) ON DELETE CASCADE,
     comment_content TEXT NOT NULL,
     comment_likes_count INT NOT NULL DEFAULT 0,
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS comment (
 CREATE TABLE IF NOT EXISTS reply (
     id SERIAL PRIMARY KEY,
     comment_id INT NOT NULL REFERENCES comment(id) ON DELETE CASCADE,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
     reply_content TEXT NOT NULL,
     parent_reply_id INT NULL REFERENCES reply(id) ON DELETE CASCADE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS reply (
 -- 좋아요 관리 테이블 생성
 CREATE TABLE IF NOT EXISTS likes (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
     video_id INT NULL REFERENCES video(id) ON DELETE CASCADE,
     comment_id INT NULL REFERENCES comment(id) ON DELETE CASCADE,
     reply_id INT NULL REFERENCES reply(id) ON DELETE CASCADE,
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS likes (
 -- 검색 기록 테이블 생성
 CREATE TABLE IF NOT EXISTS search_history (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
     search_query TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
