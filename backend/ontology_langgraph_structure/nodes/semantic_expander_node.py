@@ -22,6 +22,46 @@ FUSEKI_URL = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
 USE_PGVECTOR = os.getenv("USE_PGVECTOR", "true").lower() == "true"
 _pgvector_service = None
 
+# ------------------------------------------------------------
+#  관련성 점수 가중치 (Hybrid Scoring - ver2)
+# ------------------------------------------------------------
+# 고정 점수: 각 확장 방법별 기준 점수
+FIXED_SCORES = {
+    "causal_chain": 0.95,   # 인과관계 (가장 높은 관련성)
+    "temporal": 0.85,       # 시간적 맥락 (높은 관련성)
+    "category": 0.75,       # 카테고리 (중간 관련성)
+    "pgvector": 0.65        # 벡터 유사도 (보통 관련성)
+}
+
+def calculate_hybrid_score(similarity, expansion_method, alpha=0.6):
+    """
+    하이브리드 점수 계산: (고정 점수 × α) + (유사도 × (1 - α))
+
+    Args:
+        similarity: 벡터 유사도 (0-1) 또는 None
+        expansion_method: 확장 방법 ("causal_chain", "temporal", "category", "pgvector")
+        alpha: 고정 점수 가중치 (0-1), 기본값 0.6 = 고정 60%, 유사도 40%
+
+    Returns:
+        하이브리드 점수 (0-1)
+
+    Examples:
+        >>> calculate_hybrid_score(0.88, "pgvector", alpha=0.6)
+        0.742  # (0.65 × 0.6) + (0.88 × 0.4) = 0.39 + 0.352
+
+        >>> calculate_hybrid_score(None, "temporal", alpha=0.6)
+        0.85  # 유사도 없으면 고정 점수만 사용
+    """
+    fixed_score = FIXED_SCORES.get(expansion_method, 0.5)
+
+    # 유사도가 없으면 고정 점수만 사용 (SPARQL 기반 확장)
+    if similarity is None:
+        return fixed_score
+
+    # 가중평균
+    return (fixed_score * alpha) + (similarity * (1 - alpha))
+
+
 def get_pgvector_service():
     """pgvector 서비스 lazy loading"""
     global _pgvector_service
@@ -31,11 +71,18 @@ def get_pgvector_service():
             from pathlib import Path
             sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-            from db_pipeline.services.postgres_service import PostgresVectorService
-            _pgvector_service = PostgresVectorService()
-            print("✅ pgvector 서비스 초기화 완료")
+            from db_pipeline.services.custom_pgvector import CustomPGVector
+            from db_pipeline.config import POSTGRES_CONN_STR
+            from langchain_openai import OpenAIEmbeddings
+
+            _pgvector_service = CustomPGVector(
+                conn_str=POSTGRES_CONN_STR,
+                embedding_fn=OpenAIEmbeddings(model="text-embedding-3-small"),
+                table="korean_history"
+            )
+            print("  │  └─ pgvector 서비스 초기화 완료")
         except Exception as e:
-            print(f"⚠️ pgvector 초기화 실패: {e}")
+            print(f"  │  └─ pgvector 초기화 실패: {e}")
     return _pgvector_service
 
 
@@ -55,22 +102,44 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
     expanded_entities = []
     seen = set()
 
-    # 엔티티에서 연도 추출
+    # 엔티티에서 연도 추출 (Person: BirthYear/DeathYear, Event: hasYear)
     entity_years = []
+
     for entity in entities[:10]:  # 상위 10개만
         uri = entity.get("uri")
+        entity_type = entity.get("type", "")
+        entity_name = entity.get("name", "")
         if not uri:
             continue
 
-        # SPARQL로 연도 조회
-        sparql = f"""
-            PREFIX hist: <http://www.example.org/korean-history#>
-            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+        # SPARQL로 연도 조회 (타입별 다른 프로퍼티 사용)
+        # URI는 hist:Person_xxx 형식이므로 그대로 사용
+        if entity_type == "Person":
+            # Person: hasBirthYear 또는 hasDeathYear 사용
+            sparql = f"""
+                PREFIX hist: <http://www.example.org/korean-history#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-            SELECT ?year WHERE {{
-                <{uri}> hist:hasYear ?year .
-            }} LIMIT 1
-        """
+                SELECT ?year WHERE {{
+                    {{
+                        {uri} hist:hasBirthYear ?year .
+                    }}
+                    UNION
+                    {{
+                        {uri} hist:hasDeathYear ?year .
+                    }}
+                }} LIMIT 1
+            """
+        else:
+            # Event, Battle 등: hasYear 사용
+            sparql = f"""
+                PREFIX hist: <http://www.example.org/korean-history#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+                SELECT ?year WHERE {{
+                    {uri} hist:hasYear ?year .
+                }} LIMIT 1
+            """
 
         try:
             response = requests.post(
@@ -87,7 +156,8 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
                     year = bindings[0].get("year", {}).get("value")
                     if year:
                         try:
-                            entity_years.append((entity, int(year)))
+                            year_int = int(year)
+                            entity_years.append((entity, year_int))
                         except ValueError:
                             pass
         except:
@@ -141,7 +211,7 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
                             "matched": True,
                             "expansion_method": "temporal",
                             "expansion_source": entity.get("name"),
-                            "relevance_score": 0.8  # 시간적 관련성 높음
+                            "relevance_score": calculate_hybrid_score(None, "temporal")  # 유사도 없음 → 0.85
                         })
         except:
             pass
@@ -166,16 +236,18 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
 
     for entity in entities[:8]:  # 상위 8개만
         uri = entity.get("uri")
+        entity_name = entity.get("name", "")
         if not uri:
             continue
 
         # 1. 엔티티의 카테고리 조회
+        # URI는 hist:Person_xxx 형식이므로 그대로 사용
         sparql_category = f"""
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
             SELECT ?category WHERE {{
-                <{uri}> hist:hasCategory ?category .
+                {uri} hist:hasCategory ?category .
             }} LIMIT 1
         """
 
@@ -188,16 +260,21 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
             )
 
             if response.status_code != 200:
+                print(f"  │  │  └─ [{entity_name}] 카테고리 조회 실패 (HTTP {response.status_code})")
                 continue
 
             results = response.json()
             bindings = results.get("results", {}).get("bindings", [])
             if not bindings:
+                print(f"  │  │  └─ [{entity_name}] 카테고리 없음")
                 continue
 
             category = bindings[0].get("category", {}).get("value")
             if not category:
+                print(f"  │  │  └─ [{entity_name}] 카테고리 값 없음")
                 continue
+
+            print(f"  │  ├─ [{entity_name}] 카테고리: {category}, 동일 카테고리 검색 중...")
 
             # 2. 동일 카테고리의 다른 엔티티 검색
             sparql_similar = f"""
@@ -209,7 +286,7 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
                     ?entity hist:hasCategory "{category}" .
                     ?entity rdfs:label ?label .
                     ?entity rdf:type ?type .
-                    FILTER(?entity != <{uri}>)
+                    FILTER(?entity != {uri})
                 }} LIMIT 8
             """
 
@@ -223,6 +300,7 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
             if response2.status_code == 200:
                 results2 = response2.json()
                 bindings2 = results2.get("results", {}).get("bindings", [])
+                print(f"  │  │  └─ SPARQL 결과: {len(bindings2)}개 발견")
 
                 for binding in bindings2:
                     uri_new = binding.get("entity", {}).get("value", "")
@@ -239,10 +317,12 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
                             "expansion_method": "category",
                             "expansion_source": entity.get("name"),
                             "category": category,
-                            "relevance_score": 0.7
+                            "relevance_score": calculate_hybrid_score(None, "category")  # 유사도 없음 → 0.75
                         })
-        except:
-            pass
+            else:
+                print(f"  │  │  └─ 동일 카테고리 검색 실패 (HTTP {response2.status_code})")
+        except Exception as e:
+            print(f"  │  │  └─ [{entity_name}] 예외 발생 - {str(e)[:60]}")
 
     return expanded_entities
 
@@ -263,12 +343,18 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
     expanded_entities = []
     seen = set()
 
+    print(f"  │  ├─ [인과관계 확장] {len(entities[:5])}개 엔티티 대상")
+
     for entity in entities[:5]:  # 상위 5개만
         uri = entity.get("uri")
+        entity_name = entity.get("name", "")
         if not uri:
             continue
 
+        print(f"  │  ├─ [{entity_name}] 인과관계 체인 검색 중...")
+
         # 인과관계 체인 탐색 (leadsTo, causedBy)
+        # URI는 hist:Person_xxx 형식이므로 그대로 사용
         sparql = f"""
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -277,7 +363,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
             SELECT DISTINCT ?related ?label ?type ?predicate WHERE {{
                 {{
                     # 나가는 인과관계: entity → related
-                    <{uri}> ?predicate ?related .
+                    {uri} ?predicate ?related .
                     ?related rdfs:label ?label .
                     ?related rdf:type ?type .
                     FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
@@ -285,7 +371,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                 UNION
                 {{
                     # 들어오는 인과관계: related → entity
-                    ?related ?predicate <{uri}> .
+                    ?related ?predicate {uri} .
                     ?related rdfs:label ?label .
                     ?related rdf:type ?type .
                     FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
@@ -304,6 +390,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
             if response.status_code == 200:
                 results = response.json()
                 bindings = results.get("results", {}).get("bindings", [])
+                print(f"  │  │  └─ SPARQL 결과: {len(bindings)}개 발견")
 
                 for binding in bindings:
                     uri_related = binding.get("related", {}).get("value", "")
@@ -321,10 +408,12 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                             "expansion_method": "causal_chain",
                             "expansion_source": entity.get("name"),
                             "causal_relation": predicate,
-                            "relevance_score": 0.9  # 인과관계는 매우 높은 관련성
+                            "relevance_score": calculate_hybrid_score(None, "causal_chain")  # 유사도 없음 → 0.95
                         })
-        except:
-            pass
+            else:
+                print(f"  │  │  └─ SPARQL 실패 (HTTP {response.status_code})")
+        except Exception as e:
+            print(f"  │  │  └─ 예외 발생 - {str(e)[:60]}")
 
     return expanded_entities
 
@@ -351,12 +440,17 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
 
     try:
         # 1. 원본 질문으로 검색 (가장 관련성 높음)
-        results = pgvector.search(query=query, top_k=top_k, threshold=0.6)
+        # CustomPGVector.similarity_search_with_score()는 (Document, similarity) 튜플 리스트 반환
+        # similarity는 이미 코사인 유사도로 변환됨 (1 - cosine_distance)
+        doc_scores = pgvector.similarity_search_with_score(query=query, k=top_k)
 
-        for result in results:
-            title = result.get("title", "")
+        for doc, similarity in doc_scores:
+            title = doc.metadata.get("title", "")
             if title and title not in seen:
                 seen.add(title)
+                # similarity는 이미 0-1 범위의 코사인 유사도 (1에 가까울수록 유사)
+                # 변환 불필요 - CustomPGVector에서 이미 처리됨
+
                 expanded_entities.append({
                     "type": "Event",  # 기본값
                     "name": title,
@@ -364,8 +458,8 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
                     "matched": False,
                     "expansion_method": "pgvector",
                     "expansion_source": "query",
-                    "pgvector_score": result.get("similarity", 0),
-                    "relevance_score": result.get("similarity", 0) * 0.8  # 벡터 유사도 × 0.8
+                    "pgvector_similarity": similarity,
+                    "relevance_score": calculate_hybrid_score(similarity, "pgvector")  # 하이브리드 점수
                 })
 
         # 2. 추출된 엔티티 이름으로도 검색
@@ -374,12 +468,13 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
             if not name:
                 continue
 
-            results = pgvector.search(query=name, top_k=5, threshold=0.6)
+            doc_scores = pgvector.similarity_search_with_score(query=name, k=5)
 
-            for result in results:
-                title = result.get("title", "")
+            for doc, similarity in doc_scores:
+                title = doc.metadata.get("title", "")
                 if title and title not in seen:
                     seen.add(title)
+
                     expanded_entities.append({
                         "type": "Event",
                         "name": title,
@@ -387,12 +482,12 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
                         "matched": False,
                         "expansion_method": "pgvector",
                         "expansion_source": name,
-                        "pgvector_score": result.get("similarity", 0),
-                        "relevance_score": result.get("similarity", 0) * 0.7
+                        "pgvector_similarity": similarity,
+                        "relevance_score": calculate_hybrid_score(similarity, "pgvector")
                     })
 
     except Exception as e:
-        print(f"⚠️ pgvector 확장 실패: {e}")
+        print(f"  │  └─ pgvector 확장 실패: {e}")
 
     return expanded_entities
 
@@ -469,11 +564,104 @@ def semantic_expander_node(state: GraphState) -> GraphState:
                 entity["matched"] = True
                 entity["type"] = uri_to_type.get(uri, entity.get("type", "Event"))
 
+    # SPARQL 기반 스코어링: 연결된 노드에 키워드가 있는지 확인
+    # 질문에서 핵심 키워드 추출
+    # 모든 데이터가 조선 데이터이므로 "조선" 관련 키워드는 제외
+    joseon_keywords = {'조선', '조선시대', '조선왕조', '한국', '우리나라'}
+    try:
+        from kiwipiepy import Kiwi
+        kiwi = Kiwi()
+        tokens = kiwi.tokenize(query)
+        core_keywords = [t.form for t in tokens if t.tag in ('NNG', 'NNP') and len(t.form) >= 2]
+        # "조선" 관련 키워드 제거
+        core_keywords = [kw for kw in core_keywords if kw not in joseon_keywords]
+    except:
+        import re
+        core_keywords = re.findall(r'[가-힣]{2,}', query)
+        # "조선" 관련 키워드 제거
+        core_keywords = [kw for kw in core_keywords if kw not in joseon_keywords]
+    
+    print(f"  ├─ SPARQL 스코어링 시작 (키워드: {', '.join(core_keywords[:5])})")
+    
+    def calculate_sparql_score_with_connections(entity, keywords):
+        """연결된 노드에 키워드가 있는지 SPARQL로 확인하여 점수 보정"""
+        uri = entity.get("uri")
+        if not uri or uri not in uri_to_type:
+            return 0.0
+        
+        connected_score = 0.0
+        has_keyword_match = False
+        
+        sparql_query = f"""
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+            SELECT DISTINCT ?connectedLabel WHERE {{
+                {{
+                    <{uri}> ?p ?connected .
+                    ?connected rdfs:label ?connectedLabel .
+                    FILTER(?p != rdf:type)
+                    FILTER(?p != rdfs:label)
+                }}
+                UNION
+                {{
+                    ?connected ?p <{uri}> .
+                    ?connected rdfs:label ?connectedLabel .
+                    FILTER(?p != rdf:type)
+                    FILTER(?p != rdfs:label)
+                }}
+            }} LIMIT 50
+        """
+        
+        try:
+            response = requests.post(
+                f"{FUSEKI_URL}/sparql",
+                data={"query": sparql_query},
+                headers={"Accept": "application/sparql-results+json"},
+                timeout=2
+            )
+            
+            if response.status_code == 200:
+                results = response.json()
+                bindings = results.get("results", {}).get("bindings", [])
+                
+                for binding in bindings:
+                    connected_label = binding.get("connectedLabel", {}).get("value", "")
+                    if connected_label:
+                        for kw in keywords:
+                            if kw.lower() in connected_label.lower():
+                                connected_score += 0.1
+                                has_keyword_match = True
+                                if connected_score >= 0.3:
+                                    break
+                        if connected_score >= 0.3:
+                            break
+        except:
+            pass
+        
+        entity["has_keyword_in_connections"] = has_keyword_match
+        return min(connected_score, 0.3)
+    
+    # 각 엔티티에 대해 SPARQL 스코어링 적용
+    sparql_scored_count = 0
+    for entity in all_expanded:
+        if entity.get("uri"):
+            bonus = calculate_sparql_score_with_connections(entity, core_keywords)
+            if bonus > 0:
+                entity["relevance_score"] = entity.get("relevance_score", 0.5) + bonus
+                sparql_scored_count += 1
+    
+    print(f"  │  └─ SPARQL 스코어링 완료: {sparql_scored_count}개 엔티티에 키워드 매칭 발견")
+
     # 상위 40개로 제한 (성능 최적화)
+    # 키워드가 연결된 노드에 있는 엔티티를 우선적으로 정렬
     all_expanded = sorted(
         all_expanded,
-        key=lambda x: x.get("relevance_score", 0.5),
-        reverse=True
+        key=lambda x: (
+            not x.get("has_keyword_in_connections", False),  # 키워드 매칭 우선
+            -x.get("relevance_score", 0.5)  # 점수 내림차순
+        )
     )[:40]
 
     # 통계 출력
@@ -488,7 +676,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
     print(f"  │  ├─ 시간적 맥락: {expansion_stats['temporal']}개")
     print(f"  │  ├─ 카테고리: {expansion_stats['category']}개")
     print(f"  │  ├─ 인과관계: {expansion_stats['causal']}개")
-    print(f"  │  └─ 벡터 유사도: {expansion_stats['milvus']}개")
+    print(f"  │  └─ 벡터 유사도: {expansion_stats['pgvector']}개")
 
     # 상위 5개 샘플 출력
     if len(all_expanded) > len(extracted_entities):
@@ -504,7 +692,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
                 "temporal": "시간",
                 "category": "카테고리",
                 "causal_chain": "인과",
-                "milvus": "벡터"
+                "pgvector": "벡터"
             }.get(method, method)
 
             print(f"      {i}. [{method_display:6s}] {name[:40]} (출처: {source[:20]}, 점수: {score:.2f})")

@@ -146,14 +146,19 @@ HTTP_CODE=$(curl -X POST "$FUSEKI_URL/$DATASET/data" \
     -u "$FUSEKI_USER:$FUSEKI_PASSWORD" \
     -H "Content-Type: text/turtle" \
     --data-binary "@$OUTPUT_TTL" \
-    -s -o /dev/null \
+    -s -o /tmp/fuseki_upload_error.txt \
     -w "%{http_code}" \
-    --max-time 60)
+    --max-time 300)
 
 echo "HTTP Status: $HTTP_CODE"
 
 if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
     echo -e "${GREEN}SUCCESS: TTL 업로드 완료${NC}"
+elif [ "$HTTP_CODE" = "400" ]; then
+    echo -e "${RED}ERROR: TTL 파일 구문 오류 (400)${NC}"
+    echo "오류 상세:"
+    cat /tmp/fuseki_upload_error.txt 2>/dev/null | head -10
+    exit 1
 elif [ "$HTTP_CODE" = "401" ]; then
     echo -e "${RED}ERROR: 인증 실패 (401) - Fuseki 사용자명/비밀번호를 확인하세요${NC}"
     exit 1
@@ -162,6 +167,7 @@ elif [ "$HTTP_CODE" = "404" ]; then
     exit 1
 else
     echo -e "${YELLOW}WARNING: HTTP $HTTP_CODE - 업로드 상태 불명확${NC}"
+    cat /tmp/fuseki_upload_error.txt 2>/dev/null | head -10
 fi
 
 echo ""
@@ -222,7 +228,10 @@ if [ ! -f "$EXTRACT_SCRIPT" ]; then
     exit 1
 fi
 
-echo "프로퍼티 그룹 추출 중..."
+# LLM 사용 환경 변수 설정
+export USE_LLM_FOR_PROPERTY_GROUPS=true
+
+echo "프로퍼티 그룹 추출 중 (LLM 기반 그룹 배치 사용)..."
 python3 "$EXTRACT_SCRIPT" \
     --input "$OUTPUT_TTL" \
     --output "$PROPERTY_GROUPS_JSON"

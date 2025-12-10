@@ -1,57 +1,62 @@
 # vector db에서 문서 검색 노드
 # neo4j를 타기 위해서는 해당 노드에서 조정 필요!
 from typing import Any, Dict, List
-from langgraph_structure.state import GraphState
+# 상위 절대 경로
+
+from backend.langgraph_structure.state import GraphState
+from backend.db_pipeline.services.embedding_model import get_embedding
+from backend.db_pipeline.services.custom_pgvector import CustomPGVector
+from backend.db_pipeline.config import POSTGRES_CONN_STR
 
 def retrieval_node(state: GraphState) -> GraphState:
-    query = state.get("query")
-    if not query:
+    question = state.get("query")
+    if not question:
         raise ValueError("retrieval_node: 'query' 값이 state에 없습니다.")
+    
+    search_chunks=[]
+    MIN_SIMILARITY = 0.6
 
-    # 여기에 실제 vector DB 검색 로직이 들어가야 합니다.
+    embed = get_embedding()
 
-    # # -----------------------------------
-    # # vector DB에서 검색된 경우 - evaluate 노드로 라우팅
-    # # -----------------------------------
-    # # 예시로 더미 데이터를 반환합니다.
-    # # 0.7 이하 시 cypher 노드로 라우팅
-    # dummy_search_chunks: List[Dict[str, Any]] = [
-    #     {
-    #         "content": "이순신 장군은 임진왜란 당시 한산도 대첩을 비롯한 여러 해전에서 뛰어난 전략으로 조선을 지켜냈습니다.",
-    #         "id": "doc1",
-    #         "similarity": 0.83,
-    #     },
-    #     {
-    #         "content": "이순신의 기록은 난중일기에 잘 남아있습니다.",
-    #         "id": "doc2",
-    #         "similarity": 0.78,
-    #     },
-    #     {
-    #         "content": "오늘은 날씨가 맑아서 산책하기 좋습니다.",
-    #         "id": "doc3",
-    #         "similarity": 0.28,
-    #     },
-    # ]
+    # Postgres(pgvector) 연결 설정
+    vectorstore = CustomPGVector(
+        conn_str=POSTGRES_CONN_STR,
+        embedding_fn=embed,
+        table="korean_history",  # 실제 테이블명
+    )
+    
+    # 유사도 기반 검색
+    results = vectorstore.similarity_search_with_score(
+            query=question,
+            k=2
+        )
 
-    # -----------------------------------
-    # vector DB에서 검색되지 않은 경우 - neo4j로 라우팅
-    # -----------------------------------
-    dummy_search_chunks = []
 
-    # 유사도 점수 기반 필터링
-    filtered_chunks = [chunk for chunk in dummy_search_chunks if chunk["similarity"] >= 0.7]    
+    filtered_docs = []
+    
+    for doc, score in results:
+        if score >= MIN_SIMILARITY:
+            filtered_docs.append({
+                "source": "vector",
+                "score": float(score),
+                "payload": {
+                    "content": doc.page_content,
+                    "metadata": doc.metadata,
+                }
+            })
     
     return {
         **state,
-        "search_chunks": filtered_chunks,
+        "search_chunks": filtered_docs,
     }
 
-def route_retrieval(state: GraphState) -> str:
-    """
-    뽑힌 청크가 일정 개수(임시:1개) 미만이면 cypher 노드로 라우팅
-    """
-    search_chunks = state.get("search_chunks",[])
-    if len(search_chunks) < 1:
-        return "generate_cypher_node"
-    else:
-        return "evaluate_node"
+# 미사용 분기
+# def route_retrieval(state: GraphState) -> str:
+#     """
+#     뽑힌 청크가 일정 개수(임시:1개) 미만이면 cypher 노드로 라우팅
+#     """
+#     search_chunks = state.get("search_chunks",[])
+#     if len(search_chunks) < 1:
+#         return "generate_cypher_node"
+#     else:
+#         return "evaluate_node"

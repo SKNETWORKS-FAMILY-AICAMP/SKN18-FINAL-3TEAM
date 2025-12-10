@@ -1,5 +1,5 @@
 # 질문과 답변이 연관성 있는지 평가하는 노드
-from langgraph_structure.state import GraphState
+from backend.langgraph_structure.state import GraphState
 from typing import Dict, Any, List
 
 def evaluate_node(state: GraphState) -> GraphState:
