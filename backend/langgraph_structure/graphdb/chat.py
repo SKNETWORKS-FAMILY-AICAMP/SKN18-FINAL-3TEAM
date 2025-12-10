@@ -2,7 +2,7 @@
 """
 Neo4j 그래프DB + 검색 + 코사인 유사도 + LLM 요약
 """
-
+ 
 import os
 import re
 import math
@@ -122,6 +122,47 @@ def add_similarity(records, query_emb):
 
 
 # =====================================================
+# Language Helper (English → Korean for Cypher/Search)
+# =====================================================
+
+def translate_to_korean_if_english(text: str):
+    """
+    - 한글이 이미 들어 있으면 그대로 사용
+    - 한글은 없고 알파벳만 있으면 '영어 질문'이라고 보고 한국어로 번역
+    - 그 외(숫자/기호만)는 그대로 사용
+    return: (한국어_질문, 번역여부_bool)
+    """
+    # 한글이 하나라도 있으면 그대로 사용
+    if re.search(r"[가-힣]", text):
+        return text, False
+
+    # 알파벳이 있으면 영어라고 가정하고 번역
+    if re.search(r"[A-Za-z]", text):
+        system = (
+            "You are a translator who converts English questions about Korean history "
+            "into natural Korean. Answer ONLY with the translated Korean sentence."
+        )
+        user = (
+            "다음 문장을 자연스러운 한국어 '질문' 형태로 번역해줘. "
+            "불필요한 설명은 쓰지 말고 번역문만 출력해.\n\n"
+            f"{text}"
+        )
+        r = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            temperature=0.0,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        )
+        ko = r.choices[0].message.content.strip()
+        return ko, True
+
+    # 한글/영어 둘 다 없으면(숫자나 특수문자 위주) 그대로 사용
+    return text, False
+
+
+# =====================================================
 # Cypher Generator
 # =====================================================
 
@@ -184,9 +225,13 @@ def generate_llm_answer(question, nodes):
     ]
     """
     system = """
-너는 외국인과 어린아이에게 한국 역사를 쉽게 설명해주는 선생님이다.
-아래 제공된 summary 정보를 이용하여 질문에 대한 답변을 한국어로 설명하라.
-JSON 구조를 그대로 나열하지 말고 자연어로만 설명해라.
+너는 외국인과 어린아이에게 한국 역사를 설명하는 선생님이다.
+하지만 지금 대답할 때는 내가 제공하는 JSON 데이터 안의 정보만 사용해야 한다.
+
+- 너의 일반적인 세계 지식이나 역사 지식은 사용하지 마라.
+- 추측하거나 지어내지 마라.
+- JSON 내용을 그대로 나열하지 말고, 거기 있는 정보만 이용해 자연어로 정리해서 설명해라.
+- 제공된 정보에 대해서 ***절대로 언급하지 마라***(예: "제공된 정보에 따르면", "제공된 정보에는" 등).
 """
 
     user = f"""
@@ -215,13 +260,20 @@ JSON 구조를 그대로 나열하지 말고 자연어로만 설명해라.
 # =====================================================
 
 def answer_question(question, driver):
-    print(f"\n[질문] {question}\n")
+    print(f"\n[원본 질문] {question}\n")
 
-    # 1) embedding
-    q_emb = get_query_embedding(question)
+    # 0) 영어 → 한국어 변환 (Cypher/검색용)
+    ko_question, translated = translate_to_korean_if_english(question)
+    if translated:
+        print(f"[번역된 한국어 질문] {ko_question}\n")
+    else:
+        print("[번역 불필요] 한국어 또는 혼합 질의로 판단\n")
 
-    # 2) generate cypher
-    cypher = generate_cypher(question)
+    # 1) embedding (한국어 질의 기준으로)
+    q_emb = get_query_embedding(ko_question)
+
+    # 2) generate cypher (한국어 질의 기준으로)
+    cypher = generate_cypher(ko_question)
     print("[생성된 Cypher]")
     print(cypher)
     print("-" * 60)
@@ -264,8 +316,8 @@ def answer_question(question, driver):
     print(json.dumps(summary_nodes, ensure_ascii=False, indent=2))
     print("-" * 60)
 
-    # 6) LLM 최종 답변
-    answer = generate_llm_answer(question, summary_nodes)
+    # 6) LLM 최종 답변 (질문도 한국어 버전으로 넘김)
+    answer = generate_llm_answer(ko_question, summary_nodes)
 
     print("[최종 답변]")
     print(answer)

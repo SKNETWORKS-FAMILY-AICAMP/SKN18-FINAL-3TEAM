@@ -87,6 +87,86 @@ def get_group_list() -> str:
     return ", ".join(sorted(main_groups))
 
 
+def detect_korean_content(text: str) -> bool:
+    """
+    텍스트에 한국어가 포함되어 있는지 확인
+    
+    Args:
+        text: 확인할 텍스트
+    
+    Returns:
+        한국어 포함 여부
+    """
+    # 한글 유니코드 범위: AC00-D7A3
+    for char in text:
+        if '\uAC00' <= char <= '\uD7A3':
+            return True
+    return False
+
+
+def translate_english_query_to_korean(query: str, llm: ChatOpenAI) -> str:
+    """
+    영어 질문을 한글로 번역 (TTL 데이터에 맞는 단어 선택)
+    
+    Args:
+        query: 영어 질문
+        llm: LLM 인스턴스
+    
+    Returns:
+        번역된 한글 질문
+    """
+    translation_prompt = f"""당신은 조선시대 한국 역사 데이터에 특화된 번역 전문가입니다.
+
+## 영어 질문
+{query}
+
+## 번역 규칙 (반드시 준수)
+
+### 1. 역사 데이터에 맞는 전문 용어 사용
+- "kill" → "살해" (절대 "살인" 사용 금지)
+- "murder" → "살해" 또는 "시해" (맥락에 따라)
+- "assassinate" → "시해"
+- "timeline" → "연대기"가 아니라 "연대순으로" 또는 "시기별로" 등 자연스러운 표현
+- "show me" → "보여주세요"가 아니라 "알려주세요" 또는 "설명해주세요" 등 자연스러운 표현
+- "who" → "누가"
+- "what" → "무엇" 또는 "어떤"
+- "when" → "언제"
+- "where" → "어디"
+- "why" → "왜"
+- "how" → "어떻게"
+
+### 2. 조선시대 역사 데이터에 맞는 어투
+- 현대적 표현보다는 역사적 맥락에 맞는 표현 사용
+- 예: "Who killed the king?" → "누가 왕을 살해하였나?" (절대 "살인" 사용 금지)
+- 예: "Show me the timeline" → "연대순으로 알려주세요" 또는 "시기별로 설명해주세요"
+- 예: "What happened in 1592?" → "1592년에 무슨 일이 일어났나?"
+
+### 3. 자연스러운 한국어 표현
+- 직역보다는 자연스러운 한국어로 번역
+- 질문의 의도와 맥락을 정확히 전달
+- 조선시대 역사 데이터에 적합한 어투 사용
+
+## 출력 형식
+번역된 한글 질문만 출력하세요. 다른 설명이나 주석은 포함하지 마세요.
+
+번역 결과:"""
+    
+    try:
+        response = llm.invoke(translation_prompt)
+        translated = response.content.strip()
+        
+        # 마크다운 코드 블록 제거
+        if "```" in translated:
+            translated = translated.split("```")[1]
+            if translated.startswith("한국어") or translated.startswith("korean"):
+                translated = translated.split("\n", 1)[1] if "\n" in translated else translated
+        
+        return translated.strip()
+    except Exception as e:
+        print(f"    번역 실패: {e}")
+        return query  # 번역 실패 시 원본 반환
+
+
 def extract_keywords_with_kiwi(query: str) -> list:
     """kiwipiepy로 키워드 추출"""
     if not USE_KIWI or _kiwi is None:
@@ -96,10 +176,11 @@ def extract_keywords_with_kiwi(query: str) -> list:
     try:
         tokens = _kiwi.tokenize(query)
         # 명사만 추출 (NNG: 일반명사, NNP: 고유명사)
-        nouns = [t.form for t in tokens if t.tag in ('NNG', 'NNP') and len(t.form) >= 2]
+        # 1글자 명사도 포함 (왕, 신, 법 등 중요한 키워드)
+        nouns = [t.form for t in tokens if t.tag in ('NNG', 'NNP') and len(t.form) >= 1]
         return nouns
     except Exception as e:
-        print(f"⚠️ kiwipiepy 키워드 추출 실패: {e}")
+        print(f"    kiwipiepy 키워드 추출 실패: {e}")
         return re.findall(r'[가-힣]{2,}', query)
 
 
@@ -126,12 +207,30 @@ def query_classifier_node(state: GraphState) -> GraphState:
         temperature=0
     )
 
+    # ========== 0단계: 영어 질문 번역 (가장 먼저 진행) ==========
+    original_query = query
+    is_english = not detect_korean_content(query)
+    
+    if is_english:
+        translated_query = translate_english_query_to_korean(query, llm)
+        query = translated_query
+        print(f"\n{'='*70}")
+        print(f"[0/6] 질문 번역 (Query Translation)")
+        print(f"{'='*70}")
+        print(f"  ├─ 원문: {original_query}")
+        print(f"  └─ 번역: {query}")
+        print()
+
     # ========== 1단계: 의도 파악 (사용자 질문만 사용) ==========
     # ========== 2단계: kiwipiepy로 키워드 추출 ==========
     keywords = extract_keywords_with_kiwi(query)
 
     # 불용어 제거
-    stopwords = {'무엇', '누구', '어디', '언제', '무슨', '어떤', '것', '수', '등', '때', '중', '후', '전'}
+    # 모든 데이터가 조선 데이터이므로 "조선" 관련 키워드는 제외
+    stopwords = {
+        '무엇', '누구', '어디', '언제', '무슨', '어떤', '것', '수', '등', '때', '중', '후', '전',
+        '조선', '조선시대', '조선왕조', '한국', '우리나라'  # 모든 데이터가 조선 데이터이므로 제외
+    }
     keywords = [kw for kw in keywords if kw not in stopwords]
 
     keywords_text = ", ".join(keywords) if keywords else "없음"
@@ -208,16 +307,22 @@ def query_classifier_node(state: GraphState) -> GraphState:
 - 추출된 키워드 중 일반명사나 추상적 개념이 있으면 구체적인 인스턴스로 확장
 - 질문의 의도와 맥락을 고려하여 관련성 높은 인스턴스 선택
 - 최대 5-10개의 구체적 인스턴스로 확장
+- 집합 개념의 경우, 관련 인물과 사건을 모두 포함
+- **중요: "조선", "조선시대", "조선왕조"는 확장하지 마세요. 모든 데이터가 조선 데이터이므로 의미가 없습니다.**
 
 **키워드 확장 예시 (참고용):**
 - "궁궐" → ["경복궁", "창덕궁", "경덕궁", "창경궁", "경희궁"]
 - "환국" → ["갑술환국", "기사환국", "경신환국", "갑인환국"]
+- "남인" → ["윤선도", "채제공", "기사환국", "남인 집권", "남인 분열"]
+- "서인" → ["송시열", "이이", "갑술환국", "서인 재집권", "1575년 동인과 서인으로 분열"]
 - "왕" → 질문 맥락에 맞는 구체적 왕명 (예: ["태조", "세종", "숙종"])
 - "사건" → 질문 맥락에 맞는 구체적 사건명 (예: ["갑자사화", "임진왜란"])
 - "정치" → 정치 관련 사건/제도 (예: ["환국", "사화", "당쟁"])
 - "제도" → 구체적 제도명 (예: ["의금부", "비변사", "경국대전"])
 
-**중요:** 위 예시는 참고���이며, 실제로는 질문의 맥락에 맞는 키워드만 확장하세요.
+**중요:** 
+- 위 예시는 참고용이며, 실제로는 질문의 맥락에 맞는 키워드만 확장하세요.
+- "연관", "주요" 같은 추상적 단어는 확장하지 마세요.예시이며, 실제로는 질문의 맥락에 맞는 키워드만 확장하세요.
 확장할 키워드가 없으면 빈 객체를 출력하세요.
 
 ## 출력 형식 (JSON만)
@@ -271,15 +376,28 @@ def query_classifier_node(state: GraphState) -> GraphState:
                 selected_properties.extend(all_groups[group_name][:10])  # 그룹당 최대 10개
         
         # 키워드 확장 결과 처리
+        # "조선" 관련 키워드는 제외 (모든 데이터가 조선 데이터이므로)
+        joseon_keywords = {'조선', '조선시대', '조선왕조', '한국', '우리나라'}
         expanded_keywords = []
+        filtered_expanded_keywords_dict = {}
+        
         for general_noun, instances in expanded_keywords_dict.items():
-            expanded_keywords.extend(instances)
+            # "조선" 관련 키워드는 확장하지 않음
+            if general_noun not in joseon_keywords:
+                # 확장된 인스턴스에서도 "조선" 관련 항목 제거
+                filtered_instances = [inst for inst in instances if inst not in joseon_keywords]
+                if filtered_instances:
+                    filtered_expanded_keywords_dict[general_noun] = filtered_instances
+                    expanded_keywords.extend(filtered_instances)
+        
+        # 필터링된 결과로 업데이트
+        expanded_keywords_dict = filtered_expanded_keywords_dict
         
         if expanded_keywords:
-            print(f"📌 확장된 키워드: {expanded_keywords_dict}")
+            print(f"    확장된 키워드: {expanded_keywords_dict}")
 
     except Exception as e:
-        print(f"⚠️ 질문 분석 실패: {e}")
+        print(f"    질문 분석 실패: {e}")
         # 분석 실패 시 기본값으로 진행 (안전하게)
         query_type = "causal"
         selected_groups = []
@@ -311,7 +429,8 @@ def query_classifier_node(state: GraphState) -> GraphState:
     node_times = state.get("node_execution_times", {})
     node_times["query_classifier"] = node_elapsed
 
-    return {
+    # 번역된 query를 state에 반영
+    updated_state = {
         **state,
         "is_historical": True,  # 역사 관련 질문임을 명시
         "query_type": query_type,
@@ -323,3 +442,10 @@ def query_classifier_node(state: GraphState) -> GraphState:
         "executed_nodes": state.get("executed_nodes", []) + ["query_classifier"],
         "node_execution_times": node_times
     }
+    
+    # 영어 질문이 번역된 경우, 번역된 query를 state에 반영
+    if is_english and query != original_query:
+        updated_state["query"] = query
+        updated_state["original_query"] = original_query
+    
+    return updated_state
