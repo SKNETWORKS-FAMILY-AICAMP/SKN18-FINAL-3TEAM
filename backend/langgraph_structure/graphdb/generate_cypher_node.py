@@ -1,5 +1,5 @@
 # LLM 이 Cypher 쿼리를 생성하는 노드
-from langgraph_structure.state import GraphState
+from backend.langgraph_structure.state import GraphState
 
 def generate_cypher_node(state: GraphState) -> GraphState:
     """

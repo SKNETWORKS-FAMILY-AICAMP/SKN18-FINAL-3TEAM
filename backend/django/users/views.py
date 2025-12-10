@@ -1,6 +1,7 @@
 import os
 import uuid
 from django.conf import settings
+from django.core.cache import cache
 from django.db import models
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, parser_classes
@@ -41,39 +42,79 @@ class IsAdminUser(BasePermission):
 class ProfileView(APIView):
     """
     내 프로필 조회/수정 API
-    
+
     GET /api/users/profile/
     - 내 프로필 정보 조회
-    
+    - Redis 캐싱 적용 (5분 TTL)
+
     PATCH /api/users/profile/
     - 프로필 수정 (nickname, profile_image, gender, age)
+    - 수정 시 캐시 무효화
     """
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
-        """내 프로필 조회"""
+        """
+        내 프로필 조회 (Redis 캐싱)
+
+        1. Redis에서 캐시 조회 (cache_key: user_profile:{user_id})
+        2. 캐시 HIT: Redis에서 반환 (DB 쿼리 생략)
+        3. 캐시 MISS: DB 조회 후 Redis에 저장 (5분 TTL)
+        """
+        # 캐시 키 생성 (user_id 기반으로 개별 사용자 캐시)
+        cache_key = f'user_profile:{request.user.id}'
+
+        # 1. 캐시 조회
+        cached_data = cache.get(cache_key)
+
+        if cached_data:
+            # 캐시 HIT - Redis에서 바로 반환 (DB 쿼리 안함)
+            return Response({
+                'data': cached_data,
+                'message': 'ok',
+                'cached': True  # 디버깅용 (프로덕션에서는 제거 가능)
+            })
+
+        # 2. 캐시 MISS - DB에서 조회
         serializer = ProfileSerializer(request.user)
+        profile_data = serializer.data
+
+        # 3. Redis에 저장 (TTL 5분 = 300초)
+        cache.set(cache_key, profile_data, 300)
+
         return Response({
-            'data': serializer.data,
-            'message': 'ok'
+            'data': profile_data,
+            'message': 'ok',
+            'cached': False  # 디버깅용 (프로덕션에서는 제거 가능)
         })
-    
+
     def patch(self, request):
-        """프로필 수정"""
+        """
+        프로필 수정
+
+        수정 후 캐시 무효화 (cache invalidation)
+        - 다음 조회 시 최신 데이터를 다시 캐싱함
+        """
         serializer = ProfileUpdateSerializer(
             request.user,
             data=request.data,
             partial=True,
             context={'request': request}
         )
-        
+
         if serializer.is_valid():
             serializer.save()
+
+            # ★ 캐시 무효화 (중요!)
+            # 프로필이 수정되었으므로 기존 캐시 삭제
+            cache_key = f'user_profile:{request.user.id}'
+            cache.delete(cache_key)
+
             return Response({
                 'data': ProfileSerializer(request.user).data,
                 'message': '프로필이 수정되었습니다.'
             })
-        
+
         return Response({
             'error': {
                 'code': 'VALIDATION_ERROR',
@@ -125,12 +166,16 @@ class ProfileImageUploadView(APIView):
             # DB에 경로 저장
             request.user.profile_image = f"profiles/{filename}"
             request.user.save(update_fields=['profile_image'])
-            
+
+            # ★ 캐시 무효화 (프로필 이미지 변경됨)
+            cache_key = f'user_profile:{request.user.id}'
+            cache.delete(cache_key)
+
             # 전체 URL 반환
             image_url = request.build_absolute_uri(
                 f"{settings.MEDIA_URL}profiles/{filename}"
             )
-            
+
             return Response({
                 'data': {
                     'profile_image': request.user.profile_image,
@@ -154,11 +199,15 @@ class ProfileImageUploadView(APIView):
             filepath = os.path.join(settings.MEDIA_ROOT, request.user.profile_image)
             if os.path.exists(filepath):
                 os.remove(filepath)
-            
+
             # DB 업데이트
             request.user.profile_image = None
             request.user.save(update_fields=['profile_image'])
-            
+
+            # ★ 캐시 무효화 (프로필 이미지 삭제됨)
+            cache_key = f'user_profile:{request.user.id}'
+            cache.delete(cache_key)
+
             return Response({
                 'data': None,
                 'message': '프로필 이미지가 삭제되었습니다.'

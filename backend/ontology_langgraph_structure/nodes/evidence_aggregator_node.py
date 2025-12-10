@@ -107,11 +107,10 @@ def evidence_aggregator_node(state: GraphState) -> GraphState:
     all_evidences = []
 
     for thread_type, paths in inference_paths.items():
-        base_weight = thread_weights.get(thread_type, 0.2)
-
         for path in paths:
-            # Thread 가중치 적용
-            final_weight = path.get("weight", base_weight) * base_weight
+            # path.get("weight")는 이미 base_weight × relevance_score가 적용된 값
+            # 중복 곱셈 방지: path["weight"]를 그대로 사용
+            final_weight = path.get("weight", 0.2)
 
             # 수렴 노드 부스트 적용
             raw_data = path.get("raw_data", {})
@@ -126,6 +125,7 @@ def evidence_aggregator_node(state: GraphState) -> GraphState:
                 "type": thread_type,
                 "description": path.get("description", ""),
                 "weight": final_weight,
+                "relevance_score": path.get("relevance_score", 1.0),  # relevance score 보존
                 "source": f"Thread: {thread_type}",
                 "raw_data": path,
                 "is_convergence": convergence_node in convergence_nodes if convergence_node else False
@@ -137,9 +137,9 @@ def evidence_aggregator_node(state: GraphState) -> GraphState:
     sorted_evidences = sorted(all_evidences, key=lambda x: x["weight"], reverse=True)
 
     # ========================================
-    # [테스트용] 쓰레드별 검색 결과 출력 (나중에 원복 가능하도록 주석 처리)
+    # 쓰레드별 검색 결과 출력
     # ========================================
-    print(f"\n      [테스트용] 쓰레드별 검색 결과:")
+    print(f"\n      [쓰레드별 검색 결과]")
     for thread_type, paths in inference_paths.items():
         print(f"        - {thread_type}: {len(paths)}개 경로")
         # 상위 5개만 미리보기
@@ -149,9 +149,9 @@ def evidence_aggregator_node(state: GraphState) -> GraphState:
             print(f"          {i}. {desc} (가중치: {weight:.3f})")
         if len(paths) > 5:
             print(f"          ... 외 {len(paths) - 5}개")
-    
-    # [테스트용] 전체 근거 목록 출력 (정렬 후)
-    print(f"\n      [테스트용] 전체 근거 목록 (총 {len(sorted_evidences)}개, 가중치 순):")
+
+    # 전체 근거 목록 출력 (정렬 후)
+    print(f"\n      [전체 근거 목록 (총 {len(sorted_evidences)}개, 가중치 순)]")
     for i, ev in enumerate(sorted_evidences[:20], 1):  # 상위 20개만 출력
         ev_type = ev.get("type", "unknown")
         description = ev.get("description", "")
@@ -170,9 +170,6 @@ def evidence_aggregator_node(state: GraphState) -> GraphState:
         print(f"        {i:2d}. [{type_display:12s}] {desc_display} (가중치: {weight:.4f})")
     if len(sorted_evidences) > 20:
         print(f"        ... 외 {len(sorted_evidences) - 20}개")
-    # ========================================
-    # [테스트용] 끝
-    # ========================================
 
     # 3. 상위 5개 선택 (generate_node 성능 최적화)
     top_evidences = sorted_evidences[:5]
