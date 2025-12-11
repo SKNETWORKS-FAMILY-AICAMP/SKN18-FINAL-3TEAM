@@ -1,6 +1,8 @@
 # chat.py
 """
 Neo4j 그래프DB + 검색 + 코사인 유사도 + LLM 요약
+graphdb 단독 테스트를 위해 작성된 스크립트
+!!!삭제하지 마세요!!!
 """
  
 import os
