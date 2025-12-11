@@ -181,7 +181,7 @@ DATA_THREADS = {
 INFERENCE_PROPERTIES_BY_STAGE = DATA_THREADS
 
 
-def parallel_inference_executor_node(state: GraphState) -> GraphState:
+def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
     """
     Parallel Knowledge Retrieval: 5개 Thread에서 쿼리 생성 + 추론 실행을 병렬로 수행
 
