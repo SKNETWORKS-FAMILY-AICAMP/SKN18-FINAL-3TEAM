@@ -331,3 +331,5 @@ sketch
 infra/database/
 
 0001_initial.py
+
+.bak
