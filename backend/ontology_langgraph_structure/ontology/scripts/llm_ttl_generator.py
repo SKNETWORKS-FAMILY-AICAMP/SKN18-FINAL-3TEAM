@@ -38,11 +38,10 @@ class LLMTTLGenerator:
         self.csv_path = csv_path
         self.output_dir = output_dir
 
-        # LLM 초기화 (타임아웃 설정)
+        # LLM 초기화 (타임아웃 없음 - 긴 텍스트 처리 시 시간이 오래 걸릴 수 있음)
         self.llm = ChatOpenAI(
             model=os.getenv("OPENAI_MODEL"),
-            temperature=0,
-            timeout=120  # 60초 타임아웃 (LLM 호출이 너무 오래 걸리면 중단)
+            temperature=0
         )
 
         # URI 카운터 (중복 방지)
@@ -89,9 +88,9 @@ class LLMTTLGenerator:
         category = row['category']
         title = row['title']
         summary = row['summary']
-        contents = row['contents'][:700]
+        contents = row['contents'][:2000]
 
-        # 5가지 추론 + 이전 데이터 분석 결과 기반 최적화 프롬프트
+        # ONTOLOGY_SCHEMA.md 기반 최적화 프롬프트
         prompt = f"""조선시대 역사 데이터에서 **명시적 관계**만 추출하세요.
 
 [입력]
@@ -99,76 +98,117 @@ class LLMTTLGenerator:
 요약: {summary}
 내용: {contents}
 
-[허용된 타입] Person, Event, Battle, Place, Nation, Policy, Institution, Document
+[허용된 타입 - 11개]
+Person, Event, Battle, Policy, Institution, Document, Nation, Place, Object, Role, SocialClass
 
-[허용된 속성 - 이것만 사용]
-Person: hasRank(관직), hasBirthYear, hasDeathYear, hasAchievement, hasField(학문분야)
-Event/Battle: hasYear, hasStartYear, hasEndYear
-Institution: hasYear, hasPurpose, hasFunction
-Document: hasYear
-Place: hasYear, hasLocation
+[허용된 속성 - 타입별]
+Person: hasRank(관직), hasBirthYear, hasDeathYear, hasAchievement, hasField(학문분야), hasMotive, hasAlias, hasTitle, hasSummary, hasReignStart, hasReignEnd
+Event: hasYear, hasStartYear, hasEndYear, hasSummary
+Battle: hasYear, hasStartYear, hasEndYear, hasSummary
+Policy: hasYear, hasStartYear, hasEndYear, hasPurpose, hasSummary
+Institution: hasYear, hasFunction, hasPurpose, hasFocusTopics, hasStaffCountFor, hasSummary
+Document: hasYear, hasCreationYear, hasFormat, hasDimensions, hasDesignation, description, hasSummary, notes
+Nation: hasYear, hasStartYear, hasEndYear, hasSummary
+Place: hasYear, hasLocation, hasSummary
+Object: hasYear, hasCreationYear, hasDimensions, hasDesignation, hasSummary
+Role: hasFunction, hasSummary
+SocialClass: hasSummary
 
-[허용된 관계 - 명시적으로 언급된 경우만]
-- Person→Event: participatesIn, commands (전투 지휘)
-- Person→Person: teacherOf, studentOf, servedUnder (군주), contemporaryWith
-- Person→Nation: affiliatedWith
-- Person→Institution: affiliatedWith, founded, reformed
-- Person→Document: authored, compiled
-- Event→Event: leadsTo, causes, partOf
-- Institution→Person: establishedBy
-- Policy→Person: initiatedBy
-- hasMotive: Person의 행동 동기 (학문추구/개혁/충절/방어/민생안정)
+[허용된 관계 - Object Properties]
+참여/관계:
+- Person→Event: participatesIn (참여)
+- Person→Person: servedUnder (군주 섬김), contemporaryWith (동시대인)
+- Person/Institution→Nation/Institution: affiliatedWith (소속)
+- Event→Person: attendedBy (참석)
+
+학문/교육:
+- Person→Document: authored (저술), compiled (편찬)
+- Person→Person: teacherOf (스승), studentOf (제자)
+
+인과관계:
+- Event→Event: leadsTo (이어짐), causes (원인), partOf (일부)
+- Any→Any: derivedFrom (유래)
+
+설립/제도:
+- Person→Institution: founded (설립), reformed (개혁)
+- Institution/Policy→Person: establishedBy (설립됨), initiatedBy (시작됨)
+
+전투/지휘:
+- Person→Battle: commands (지휘)
+- Person→Any: supervises (감독)
+
+부분/포함:
+- Any→Any: partOf (부분), hasPart (포함), contains (포함)
+- Institution→Role: includesPositions (직위 포함)
+
+장소/위치:
+- Any→Place: hasLocation (위치), storedAt (보관), heldAt (개최)
+- Any→Place/Nation: originatedIn (유래)
+
+문서/기록:
+- Document→Event: documents, documentsEvent (기록)
+- Document→Any: records, lists (목록)
 
 [카테고리별 JSON 예시]
 
 인물 예시:
 {{
-  "main_entity": {{"type": "Person", "name": "강거효", "properties": {{"hasRank": "병조정랑", "hasAchievement": "학문과 절의로 명성"}}}},
-  "related_entities": [{{"type": "Institution", "name": "사헌부"}}, {{"type": "Event", "name": "무오사화"}}],
+  "main_entity": {{"type": "Person", "name": "정조", "properties": {{"hasReignStart": 1776, "hasReignEnd": 1800, "hasAchievement": "탕평책 실시", "hasField": "성리학", "hasSummary": "조선 제22대 왕으로 문예부흥을 이끈 성군"}}}},
+  "related_entities": [{{"type": "Institution", "name": "규장각"}}, {{"type": "Policy", "name": "탕평책"}}],
   "relations": [
-    {{"subject": "강거효", "predicate": "affiliatedWith", "object": "사헌부"}},
-    {{"subject": "강거효", "predicate": "participatesIn", "object": "무오사화"}}
+    {{"subject": "정조", "predicate": "founded", "object": "규장각"}},
+    {{"subject": "탕평책", "predicate": "initiatedBy", "object": "정조"}}
+  ]
+}}
+
+사건 예시:
+{{
+  "main_entity": {{"type": "Event", "name": "갑술환국", "properties": {{"hasYear": 1694, "hasSummary": "숙종 20년 서인이 재집권한 정치적 변동"}}}},
+  "related_entities": [{{"type": "Institution", "name": "서인"}}, {{"type": "Event", "name": "기사환국"}}],
+  "relations": [
+    {{"subject": "기사환국", "predicate": "leadsTo", "object": "갑술환국"}}
   ]
 }}
 
 제도 예시:
 {{
-  "main_entity": {{"type": "Institution", "name": "선공감", "properties": {{"hasYear": 1392, "hasFunction": "토목공사 감독"}}}},
-  "related_entities": [{{"type": "Nation", "name": "조선"}}],
-  "relations": [{{"subject": "선공감", "predicate": "affiliatedWith", "object": "조선"}}]
+  "main_entity": {{"type": "Institution", "name": "집현전", "properties": {{"hasYear": 1420, "hasFunction": "학술 연구", "hasPurpose": "인재 양성", "hasSummary": "세종대에 설립된 학술 연구 기관"}}}},
+  "related_entities": [{{"type": "Person", "name": "세종"}}],
+  "relations": [{{"subject": "집현전", "predicate": "establishedBy", "object": "세종"}}]
 }}
 
 문헌 예시:
 {{
-  "main_entity": {{"type": "Document", "name": "목민심서", "properties": {{"hasYear": 1818}}}},
-  "related_entities": [{{"type": "Person", "name": "정약용"}}],
-  "relations": [{{"subject": "정약용", "predicate": "authored", "object": "목민심서"}}]
+  "main_entity": {{"type": "Document", "name": "조선왕조실록", "properties": {{"hasCreationYear": 1413, "hasDesignation": "국보", "hasSummary": "조선 태조~철종까지의 역사를 기록한 연대기"}}}},
+  "related_entities": [{{"type": "Institution", "name": "춘추관"}}],
+  "relations": [{{"subject": "춘추관", "predicate": "compiled", "object": "조선왕조실록"}}]
+}}
+
+전투 예시:
+{{
+  "main_entity": {{"type": "Battle", "name": "명량해전", "properties": {{"hasYear": 1597, "hasSummary": "이순신이 13척으로 133척을 격파한 해전"}}}},
+  "related_entities": [{{"type": "Person", "name": "이순신"}}, {{"type": "Event", "name": "정유재란"}}],
+  "relations": [
+    {{"subject": "이순신", "predicate": "commands", "object": "명량해전"}},
+    {{"subject": "명량해전", "predicate": "partOf", "object": "정유재란"}}
+  ]
 }}
 
 [금지 규칙]
 ❌ 단순 언급만으로 관계 생성 금지 (내용에 "정종이 언급됨" → 관계 생성 X)
-❌ Person→Place 직접 관계 금지 (leadsTo, influences, causes)
-❌ Event→Place 직접 관계 금지 (방향 오류)
-❌ Person resultsIn Person 금지 (출산 관계 추출 X)
 ❌ 허용되지 않은 속성 생성 금지 (hasClan, hasFather, hasCourtesyName 등)
+❌ Person resultsIn Person 금지 (출산 관계 추출 X)
 
 [출력 규칙]
-JSON 구조:
-{{
-  "main_entity": {{"type": "...", "name": "...", "properties": {{...}}}}  // 1개 (필수)
-  "related_entities": [{{...}}, {{...}}]  // 최대 4개 (배열)
-  "relations": [{{...}}, {{...}}]  // 최대 6개 (배열)
-}}
-
-- main_entity: 1개 (필수, properties 개수 제한 없음)
-- related_entities: 최대 4개 (명시적 관계가 있는 엔티티만)
-- relations: 최대 6개 (허용된 predicate만 사용)
-- properties: 개수 제한 없음 (허용된 속성만 사용, 내용에 있는 만큼 추출)
+- main_entity: 1개 (필수, properties에 hasSummary 필수 포함)
+- related_entities: 내용에 명시적으로 언급된 다른 엔티티들
+- relations: 허용된 관계만 사용
+- properties: 허용된 속성만 사용, hasSummary는 반드시 포함
 - 반드시 유효한 JSON만 출력
 """
 
         try:
-            # LLM 호출 (타임아웃 60초)
+            # LLM 호출 (타임아웃 없음 - 긴 텍스트 처리 지원)
             response = self.llm.invoke(prompt)
             content = response.content.strip()
 

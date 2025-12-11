@@ -655,13 +655,13 @@ SKN18-FINAL-3TEAM/
         ├── state.py             # GraphState 정의
         ├── nodes/               # 노드 구현
         │   ├── classify_node.py
-        │   ├── entity_extractor_node.py
+        │   ├── entity_expander_node.py
         │   ├── multi_query_generator_node.py
         │   ├── evidence_aggregator_node.py
         │   ├── generate_node.py
         │   └── kg/
         │       ├── hypothetical_triple_node.py
-        │       ├── parallel_inference_executor_node.py
+        │       ├── parallel_knowledge_retrieval_node.py
         │       └── multi_path_extractor_node.py
         └── ontology/
             ├── korean_history.owl           # OWL 온톨로지 스키마

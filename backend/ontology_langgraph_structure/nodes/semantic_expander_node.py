@@ -7,7 +7,7 @@ Semantic Expander Node
 3. 벡터 유사도 확장 (pgvector)
 4. 인과관계 체인 확장 (leadsTo, causedBy)
 
-이 노드는 entity_extractor 이후, parallel_knowledge_retrieval 이전에 실행됩니다.
+이 노드는 entity_expander 이후, parallel_knowledge_retrieval 이전에 실행됩니다.
 """
 
 import os
@@ -496,7 +496,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
     """
     의미론적 엔티티 확장 노드
 
-    entity_extractor 이후, parallel_knowledge_retrieval 이전에 실행.
+    entity_expander 이후, parallel_knowledge_retrieval 이전에 실행.
     추출된 엔티티를 4가지 방법으로 확장:
     1. 시간적 맥락 (±10년)
     2. 카테고리/주제

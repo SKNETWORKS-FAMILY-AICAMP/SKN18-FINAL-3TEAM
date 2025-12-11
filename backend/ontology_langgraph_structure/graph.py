@@ -27,9 +27,9 @@ from state import GraphState
 # 노드 import
 from nodes.history_check_node import history_check_node
 from nodes.classify_node import query_classifier_node
-from nodes.entity_extractor_node import entity_extractor_node
+from nodes.entity_expander_node import entity_expander_node
 from nodes.semantic_expander_node import semantic_expander_node
-from nodes.kg.parallel_inference_executor_node import parallel_inference_executor_node
+from nodes.kg.parallel_knowledge_retrieval_node import parallel_knowledge_retrieval_node
 from nodes.kg.path_evidence_aggregator_node import path_evidence_aggregator_node
 from nodes.generate_node import story_generator_node
 
@@ -66,9 +66,9 @@ def create_graph_flow():
     # ========== 노드 등록 ==========
     workflow.add_node("history_check", history_check_node)  # NEW: 0단계
     workflow.add_node("query_classifier", query_classifier_node)
-    workflow.add_node("entity_extractor", entity_extractor_node)
+    workflow.add_node("entity_expander", entity_expander_node)
     workflow.add_node("semantic_expander", semantic_expander_node)  # NEW
-    workflow.add_node("parallel_knowledge_retrieval", parallel_inference_executor_node)
+    workflow.add_node("parallel_knowledge_retrieval", parallel_knowledge_retrieval_node)
     workflow.add_node("path_evidence_aggregator", path_evidence_aggregator_node)  # 통합 노드
     workflow.add_node("story_generator", story_generator_node)
 
@@ -97,12 +97,12 @@ def create_graph_flow():
         }
     )
 
-    # 2. Query Classifier → Entity Extractor
-    workflow.add_edge("query_classifier", "entity_extractor")
+    # 2. Query Classifier → Entity Expander
+    workflow.add_edge("query_classifier", "entity_expander")
 
     # 3. 엔티티 추출 (하이브리드: TTL + pgvector)
     # 4. 의미론적 확장 (NEW)
-    workflow.add_edge("entity_extractor", "semantic_expander")
+    workflow.add_edge("entity_expander", "semantic_expander")
 
     # 5. 병렬 지식 검색 (5개 Thread)
     workflow.add_edge("semantic_expander", "parallel_knowledge_retrieval")
