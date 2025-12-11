@@ -329,3 +329,7 @@ sketch
 
 # neo4j
 infra/database/
+
+0001_initial.py
+
+.bak

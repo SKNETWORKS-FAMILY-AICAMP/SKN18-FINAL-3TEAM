@@ -10,6 +10,16 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
     Generates JWT tokens and redirects to React frontend with tokens as URL parameters.
     """
 
+    def populate_user(self, request, sociallogin, data):
+        """
+        소셜 로그인 시 사용자 정보 채우기
+        - username 필드를 사용하지 않으므로 email만 설정
+        """
+        user = super().populate_user(request, sociallogin, data)
+        # email은 Google에서 자동으로 가져옴
+        # username은 우리 모델에 없으므로 설정하지 않음
+        return user
+
     def _generate_token_redirect_url(self, user):
         """
         Helper method to generate JWT tokens and create redirect URL
@@ -62,6 +72,21 @@ class CustomAccountAdapter(DefaultAccountAdapter):
     Redirect after login (including social login) with JWT tokens in querystring.
     Ensures /accounts/profile/ 404가 아니라 프런트엔드로 토큰을 실어 보냄.
     """
+
+    def clean_username(self, username, shallow=False):
+        """
+        username 검증 건너뛰기
+        - 우리 User 모델은 username 필드가 없음
+        - email을 사용하므로 username 검증 불필요
+        """
+        return username  # 검증 없이 그대로 반환
+
+    def populate_username(self, request, user):
+        """
+        username 생성 건너뛰기
+        - 우리 User 모델은 username 필드가 없음
+        """
+        pass  # 아무것도 하지 않음
 
     def _generate_token_redirect_url(self, user):
         """
