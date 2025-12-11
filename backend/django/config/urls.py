@@ -42,6 +42,11 @@ urlpatterns = [
 
     # 영상 API
     path('api/video/', include('video.urls')),
+
+    # API 문서화
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
 
 # 개발 환경에서 media 파일 서빙
