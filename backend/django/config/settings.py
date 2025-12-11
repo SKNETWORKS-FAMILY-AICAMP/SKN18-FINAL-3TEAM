@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
 
 # spectacular
-    'drf-spectacular',
+    'drf_spectacular',
 
 
     # allauth
