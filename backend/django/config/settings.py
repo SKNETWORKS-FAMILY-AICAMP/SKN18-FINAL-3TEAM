@@ -58,6 +58,9 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
 
+# spectacular
+    'drf_spectacular',
+
 
     # allauth
 
@@ -75,6 +78,9 @@ INSTALLED_APPS = [
 ]
 
 SITE_ID = 1
+
+# 커스텀 User 모델 사용 (auth_user 대체)
+AUTH_USER_MODEL = 'users.User'
 
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
@@ -139,6 +145,19 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),
 }
 
+# Redis 캐시 설정 (최소 사용 - 프로필 조회만 캐싱)
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': f'redis://{os.getenv("REDIS_HOST", "localhost")}:{os.getenv("REDIS_PORT", "6379")}/{os.getenv("REDIS_DB", "0")}',
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        },
+        'KEY_PREFIX': 'skn18',  # 프로젝트별 키 prefix
+        'TIMEOUT': 300,  # 기본 TTL 5분
+    }
+}
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -184,6 +203,10 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Media files (User uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -194,8 +217,16 @@ SOCIALACCOUNT_LOGIN_ON_GET = True  # 중간 확인 페이지 없이 바로 Googl
 ACCOUNT_EMAIL_VERIFICATION = 'none'  # 이메일 인증 건너뛰기 (소셜 로그인이므로 불필요)
 SOCIALACCOUNT_AUTO_SIGNUP = True  # 소셜 로그인 시 자동 가입
 
-# 소셜 로그인만 사용하므로 일반 회원가입 필드 설정 불필요
-# (ACCOUNT_EMAIL_REQUIRED는 deprecated되어 제거)
+# ============================================
+# 커스텀 User 모델 (email 기반) 설정
+# ============================================
+# username 필드를 사용하지 않음 (우리 User 모델에는 username이 없음)
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_USERNAME_REQUIRED = False
+
+# email을 인증 방식으로 사용
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_REQUIRED = True
 
 # CORS 설정
 CORS_ALLOWED_ORIGINS = [

@@ -115,6 +115,24 @@ function Home() {
           <p><strong>사용자 ID:</strong> {user.id}</p>
 
           <div style={{ marginTop: '20px' }}>
+            {/* 마이페이지 버튼 */}
+            <button
+              onClick={() => navigate('/profile')}
+              style={{
+                padding: '10px 20px',
+                fontSize: '14px',
+                backgroundColor: '#667eea',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                marginRight: '10px',
+              }}
+            >
+              마이페이지
+            </button>
+            
+            {/* 로그아웃 버튼 */}
             <button
               onClick={handleLogout}
               style={{
@@ -131,6 +149,7 @@ function Home() {
               로그아웃
             </button>
 
+            {/* 회원탈퇴 버튼 */}
             <button
               onClick={handleDeleteAccount}
               style={{

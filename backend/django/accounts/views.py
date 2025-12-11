@@ -17,6 +17,13 @@ def check_auth(request):
     인증 상태 확인 API
     - JWT 토큰 또는 세션으로 사용자 인증 확인
     - 인증된 경우 사용자 정보 반환
+    
+    커스텀 User 모델 사용:
+    - user.user_id (PK)
+    - user.email
+    - user.nickname (또는 display_name)
+    - user.permission ('user' / 'admin')
+    - user.profile_image
     """
     # JWT 토큰이 있으면 수동으로 검증
     jwt_auth = JWTAuthentication()
@@ -25,48 +32,35 @@ def check_auth(request):
         user_auth = jwt_auth.authenticate(request)
         if user_auth is not None:
             user, token = user_auth
-            # username이 없으면 email 사용
-            display_name = user.username if user.username else user.email
-
-            # UserProfile이 있으면 permission 가져오기
-            permission = 'user'
-            if hasattr(user, 'profile'):
-                permission = user.profile.permission
-
+            
             return Response({
                 'isAuthenticated': True,
                 'user': {
-                    'id': user.id,
+                    'id': user.id,  # Django 기본 pk
                     'email': user.email,
-                    'username': display_name,
-                    'first_name': user.first_name,
-                    'last_name': user.last_name,
-                    'permission': permission,
+                    'nickname': user.nickname,
+                    'display_name': user.display_name,  # nickname 또는 email 앞부분
+                    'permission': user.permission,  # 직접 접근 (profile 없음)
+                    'profile_image': user.profile_image,
                 }
             })
     except Exception:
         # JWT 토큰이 없거나 유효하지 않은 경우
         pass
 
-    # 세션 기반 인증도 확인 (fallback)
+    # 세션 기반 인증도 확인 (fallback - OAuth 과정에서 사용)
     if request.user.is_authenticated:
         user = request.user
-        display_name = user.username if user.username else user.email
-
-        # UserProfile이 있으면 permission 가져오기
-        permission = 'user'
-        if hasattr(user, 'profile'):
-            permission = user.profile.permission
-
+        
         return Response({
             'isAuthenticated': True,
             'user': {
-                'id': user.id,
+                'id': user.id,  # Django 기본 pk
                 'email': user.email,
-                'username': display_name,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'permission': permission,
+                'nickname': user.nickname,
+                'display_name': user.display_name,
+                'permission': user.permission,
+                'profile_image': user.profile_image,
             }
         })
 
@@ -92,7 +86,13 @@ def delete_account(request):
     """
     회원탈퇴 API
     - Google OAuth 토큰 revoke (권한 해제)
-    - 사용자 계정 삭제 (UserProfile도 CASCADE로 자동 삭제)
+    - 사용자 계정 삭제
+    
+    커스텀 User 모델 사용:
+    - user 테이블 삭제 시 CASCADE로 연관 데이터 자동 삭제
+      - socialaccount_socialaccount
+      - socialaccount_socialtoken
+      - (향후) comment, reply, likes, watching_history 등
     """
     # JWT 토큰으로 사용자 인증
     jwt_auth = JWTAuthentication()
@@ -135,17 +135,26 @@ def delete_account(request):
         # 오류가 발생해도 계정 삭제는 진행
         pass
 
-    # 2. 사용자 계정 삭제 (연결된 SocialAccount, SocialToken, UserProfile도 CASCADE로 자동 삭제됨)
+    # 2. 사용자 계정 삭제
     try:
         # Django의 CASCADE 삭제:
-        # - auth_user 삭제
+        # - user 테이블 삭제
         # - socialaccount_socialaccount 자동 삭제 (ForeignKey on_delete=CASCADE)
         # - socialaccount_socialtoken 자동 삭제 (ForeignKey on_delete=CASCADE)
-        # - UserProfile 자동 삭제 (OneToOneField on_delete=CASCADE)
+        # - (향후) comment, reply, likes 등 자동 삭제
+        
+        # 먼저 SocialAccount 관련 데이터 삭제 (CASCADE가 작동하지 않는 경우 대비)
+        from allauth.socialaccount.models import SocialAccount
+        SocialAccount.objects.filter(user=user).delete()
+        
+        # 그 다음 사용자 삭제
         user.delete()
 
         return Response({
             'message': '회원탈퇴가 완료되었습니다. Google 연동도 해제되었습니다.'
         }, status=200)
-    except Exception:
-        return Response({'error': '회원탈퇴 처리 중 오류가 발생했습니다.'}, status=500)
+    except Exception as e:
+        import traceback
+        print(f"❌ 회원탈퇴 오류: {e}")
+        print(traceback.format_exc())
+        return Response({'error': f'회원탈퇴 처리 중 오류가 발생했습니다: {str(e)}'}, status=500)

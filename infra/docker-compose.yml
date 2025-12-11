@@ -66,9 +66,27 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis (캐싱 전용 - 블랙리스트는 PostgreSQL 사용)
+  redis:
+    image: redis:7-alpine # 경량 Alpine 이미지
+    container_name: redis_cache
+    restart: always
+    ports:
+      - "6379:6379" # 기본 Redis 포트
+    volumes:
+      - redis-data:/data # 데이터 영속화
+    command: redis-server --appendonly yes # AOF 영속성 활성화
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   fuseki-data:
     driver: local
   postgres-data:
     name: sknfinal_postgres-data
+    driver: local
+  redis-data:
     driver: local
