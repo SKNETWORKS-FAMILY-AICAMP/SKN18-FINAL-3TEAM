@@ -1,7 +1,7 @@
 """
-.restack 파일에 저장된 행 번호들만 TTL로 변환
+.restack2 파일에 저장된 행 번호들만 TTL로 변환
 
-.restack 파일 형식:
+.restack2 파일 형식:
 - 각 줄에 행 번호 (1-based, CSV 헤더 제외)
 - 빈 줄은 무시
 """
@@ -22,16 +22,16 @@ csv.field_size_limit(sys.maxsize)
 
 def load_restack_rows(restack_path: str) -> list:
     """
-    .restack 파일에서 행 번호 목록 읽기
+    .restack2 파일에서 행 번호 목록 읽기
     
     Args:
-        restack_path: .restack 파일 경로
+        restack_path: .restack2 파일 경로
         
     Returns:
         행 번호 리스트 (1-based, CSV 헤더 제외)
     """
     if not os.path.exists(restack_path):
-        print(f"⚠️ .restack 파일이 없습니다: {restack_path}")
+        print(f"⚠️ .restack2 파일이 없습니다: {restack_path}")
         return []
     
     rows = []
@@ -46,10 +46,10 @@ def load_restack_rows(restack_path: str) -> list:
 
 def save_restack_file(restack_path: str, remaining_rows: list):
     """
-    .restack 파일에 남은 행 번호만 저장
+    .restack2 파일에 남은 행 번호만 저장
     
     Args:
-        restack_path: .restack 파일 경로
+        restack_path: .restack2 파일 경로
         remaining_rows: 남은 행 번호 리스트
     """
     try:
@@ -57,18 +57,18 @@ def save_restack_file(restack_path: str, remaining_rows: list):
             for row_num in sorted(remaining_rows):
                 f.write(f"{row_num}\n")
     except Exception as e:
-        print(f"    ⚠️ .restack 파일 업데이트 중 오류: {e}")
+        print(f"    ⚠️ .restack2 파일 업데이트 중 오류: {e}")
 
 
 def generate_restack_ttl(restack_rows: list, csv_path: str, output_dir: str, restack_path: str):
     """
-    .restack 파일에 지정된 행들만 TTL로 변환
+    .restack2 파일에 지정된 행들만 TTL로 변환
     
     Args:
         restack_rows: 처리할 행 번호 리스트 (1-based, CSV 헤더 제외)
         csv_path: CSV 파일 경로
         output_dir: TTL 출력 디렉토리
-        restack_path: .restack 파일 경로 (처리된 항목 삭제용)
+        restack_path: .restack2 파일 경로 (처리된 항목 삭제용)
     """
     if not restack_rows:
         print("⚠️ 처리할 행이 없습니다.")
@@ -82,7 +82,7 @@ def generate_restack_ttl(restack_rows: list, csv_path: str, output_dir: str, res
     generator = LLMTTLGenerator(csv_path, output_dir)
     
     # 출력 파일 경로 (ttl_2에 추가)
-    output_path = os.path.join(output_dir, "korean_history_instances_2.ttl")
+    output_path = os.path.join(output_dir, "korean_history_instances_2_2.ttl")
     
     # TTL 헤더 확인 (파일이 없으면 헤더 추가)
     if not os.path.exists(output_path):
@@ -122,7 +122,7 @@ def generate_restack_ttl(restack_rows: list, csv_path: str, output_dir: str, res
             reader = csv.DictReader(csv_file)
             
             for i, row in enumerate(reader, 1):  # 1-based 인덱스
-                # .restack에 있는 행만 처리
+                # .restack2에 있는 행만 처리
                 if i not in remaining_rows:
                     continue
                 
@@ -134,7 +134,7 @@ def generate_restack_ttl(restack_rows: list, csv_path: str, output_dir: str, res
                     
                     # 배치에 추가
                     if triples:
-                        batch_triples.append(f"\n# {row['title']} ({row['category']}) ")
+                        batch_triples.append(f"\n# {row['title']} ({row['category']})")
                         batch_triples.extend(triples)
                         batch_triples.append("")
                     
@@ -151,10 +151,10 @@ def generate_restack_ttl(restack_rows: list, csv_path: str, output_dir: str, res
                             f.write(f"{i}. {row['title']}: {e}\n")
                     except:
                         pass
-                    # 에러가 발생해도 처리된 것으로 간주하고 .restack에서 제거
+                    # 에러가 발생해도 처리된 것으로 간주하고 .restack2에서 제거
                     processed_in_batch.append(i)
                 
-                # 50개마다 배치 저장 및 .restack 파일 업데이트
+                # 50개마다 배치 저장 및 .restack2 파일 업데이트
                 if processed_count % BATCH_SIZE == 0 and batch_triples:
                     try:
                         # TTL 파일에 저장
@@ -162,15 +162,15 @@ def generate_restack_ttl(restack_rows: list, csv_path: str, output_dir: str, res
                             f.write("\n".join(batch_triples))
                         batch_triples = []
                         
-                        # 처리된 항목들을 .restack에서 제거
+                        # 처리된 항목들을 .restack2에서 제거
                         for processed_row in processed_in_batch:
                             remaining_rows.discard(processed_row)
                         
-                        # .restack 파일 업데이트
+                        # .restack2 파일 업데이트
                         save_restack_file(restack_path, list(remaining_rows))
                         
                         print(f"    💾 배치 저장 완료 ({processed_count}개 처리됨)")
-                        print(f"    📝 .restack 파일 업데이트 완료 (남은 항목: {len(remaining_rows)}개)")
+                        print(f"    📝 .restack2 파일 업데이트 완료 (남은 항목: {len(remaining_rows)}개)")
                         
                         # 배치 처리된 항목 리스트 초기화
                         processed_in_batch = []
@@ -187,11 +187,11 @@ def generate_restack_ttl(restack_rows: list, csv_path: str, output_dir: str, res
                     f.write("\n".join(batch_triples))
                 print("💾 중단 전까지의 진행 상황이 저장되었습니다")
                 
-                # 처리된 항목들을 .restack에서 제거
+                # 처리된 항목들을 .restack2에서 제거
                 for processed_row in processed_in_batch:
                     remaining_rows.discard(processed_row)
                 save_restack_file(restack_path, list(remaining_rows))
-                print(f"📝 .restack 파일 업데이트 완료 (남은 항목: {len(remaining_rows)}개)")
+                print(f"📝 .restack2 파일 업데이트 완료 (남은 항목: {len(remaining_rows)}개)")
             except:
                 pass
         raise
@@ -204,16 +204,16 @@ def generate_restack_ttl(restack_rows: list, csv_path: str, output_dir: str, res
                     f.write("\n".join(batch_triples))
                 print("💾 오류 발생 전까지의 진행 상황이 저장되었습니다")
                 
-                # 처리된 항목들을 .restack에서 제거
+                # 처리된 항목들을 .restack2에서 제거
                 for processed_row in processed_in_batch:
                     remaining_rows.discard(processed_row)
                 save_restack_file(restack_path, list(remaining_rows))
-                print(f"📝 .restack 파일 업데이트 완료 (남은 항목: {len(remaining_rows)}개)")
+                print(f"📝 .restack2 파일 업데이트 완료 (남은 항목: {len(remaining_rows)}개)")
             except:
                 pass
         raise
     finally:
-        # 남은 배치 저장 및 .restack 파일 최종 업데이트
+        # 남은 배치 저장 및 .restack2 파일 최종 업데이트
         if batch_triples:
             try:
                 with open(output_path, 'a', encoding='utf-8') as f:
@@ -228,7 +228,7 @@ def generate_restack_ttl(restack_rows: list, csv_path: str, output_dir: str, res
     
     print()
     print("=" * 60)
-    print(f"✅ .restack TTL 변환 완료!")
+    print(f"✅ .restack2 TTL 변환 완료!")
     print("=" * 60)
     print(f"   총 처리: {processed_count}개")
     print(f"   에러: {error_count}개")
@@ -244,25 +244,25 @@ def main():
     project_root = script_dir.parent.parent.parent.parent
     csv_path = project_root / "backend/db_pipeline/data/encykorea_cleaned6.csv"
     output_dir = script_dir.parent / "instances"
-    restack_path = output_dir / ".restack"
+    restack_path = output_dir / ".restack2"
     
     # 출력 디렉토리 생성
     os.makedirs(output_dir, exist_ok=True)
     
-    # .restack 파일 읽기
+    # .restack2 파일 읽기
     restack_rows = load_restack_rows(str(restack_path))
     
     if not restack_rows:
-        print("⚠️ .restack 파일에 처리할 행이 없습니다.")
+        print("⚠️ .restack2 파일에 처리할 행이 없습니다.")
         print(f"   파일 경로: {restack_path}")
         return
     
     print("=" * 60)
-    print("🚀 .restack 파일 기반 TTL 재생성 시작")
+    print("🚀 .restack2 파일 기반 TTL 재생성 시작")
     print("=" * 60)
     print(f"📂 입력 CSV: {csv_path}")
-    print(f"📂 출력 TTL: {output_dir}/korean_history_instances_2.ttl")
-    print(f"📋 .restack 파일: {restack_path}")
+    print(f"📂 출력 TTL: {output_dir}/korean_history_instances_2_2.ttl")
+    print(f"📋 .restack2 파일: {restack_path}")
     print()
     
     # TTL 생성

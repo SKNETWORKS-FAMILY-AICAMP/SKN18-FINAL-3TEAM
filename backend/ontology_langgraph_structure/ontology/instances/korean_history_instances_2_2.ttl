@@ -1,0 +1,44 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix hist: <http://www.example.org/korean-history#> .
+
+# 조선시대 역사 인스턴스 데이터
+
+# 감춘추관사 (제도)
+hist:Institution_감춘추관사 rdf:type hist:Institution .
+hist:Institution_감춘추관사 rdfs:label "감춘추관사" .
+hist:Institution_감춘추관사 hist:hasYear 1325 .
+hist:Institution_감춘추관사 hist:hasStaffCountFor "정원 1원(조선 개국 당시), 정원 2원(후기 기록)" .
+hist:Institution_감춘추관사 hist:hasSummary "고려·조선시대 춘추관 소속의 정1품 관직. 1325년 예문춘추관이 예문관·춘추관으로 분리될 때 새로 설치되었으며, 예문춘추관의 최고위 관직으로 간주되었다. 기록상 시중·수상·좌의정·우의정 등이 겸임하였고, 다른 정1품 관직인 영춘추관사는 영의정이 으례 겸임하였다." .
+hist:Institution_예문춘추관 rdf:type hist:Institution .
+hist:Institution_예문춘추관 rdfs:label "예문춘추관" .
+hist:Institution_예문관 rdf:type hist:Institution .
+hist:Institution_예문관 rdfs:label "예문관" .
+hist:Institution_춘추관 rdf:type hist:Institution .
+hist:Institution_춘추관 rdfs:label "춘추관" .
+hist:Institution_영춘추관사 rdf:type hist:Institution .
+hist:Institution_영춘추관사 rdfs:label "영춘추관사" .
+hist:Institution_영관사 rdf:type hist:Institution .
+hist:Institution_영관사 rdfs:label "영관사" .
+hist:Role_수상 rdf:type hist:Role .
+hist:Role_수상 rdfs:label "수상" .
+hist:Role_시중 rdf:type hist:Role .
+hist:Role_시중 rdfs:label "시중" .
+hist:Role_좌의정 rdf:type hist:Role .
+hist:Role_좌의정 rdfs:label "좌의정" .
+hist:Role_우의정 rdf:type hist:Role .
+hist:Role_우의정 rdfs:label "우의정" .
+hist:Role_영의정 rdf:type hist:Role .
+hist:Role_영의정 rdfs:label "영의정" .
+hist:Institution_감춘추관사 hist:derivedFrom hist:Institution_예문춘추관 .
+hist:Institution_감춘추관사 hist:partOf hist:Institution_예문춘추관 .
+hist:Institution_예문관 hist:partOf hist:Institution_예문춘추관 .
+hist:Institution_춘추관 hist:partOf hist:Institution_예문춘추관 .
+hist:Role_수상 hist:affiliatedWith hist:Institution_감춘추관사 .
+hist:Role_시중 hist:affiliatedWith hist:Institution_감춘추관사 .
+hist:Role_좌의정 hist:affiliatedWith hist:Institution_감춘추관사 .
+hist:Role_우의정 hist:affiliatedWith hist:Institution_감춘추관사 .
+hist:Institution_영춘추관사 hist:affiliatedWith hist:Role_영의정 .
+
