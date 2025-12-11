@@ -2,7 +2,7 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv(override=True,dotenv_path="../.env")
+load_dotenv(override=True,dotenv_path="backend/langgraph_structure/nodes/.env")
 
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")

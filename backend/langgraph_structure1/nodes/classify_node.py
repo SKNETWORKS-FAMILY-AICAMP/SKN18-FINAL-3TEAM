@@ -1,6 +1,6 @@
-from backend.langgraph_structure.state import GraphState
+from backend.langgraph_structure1.state import GraphState
 from langgraph.graph import END
-from backend.langgraph_structure.utils import create_model
+from backend.langgraph_structure1.utils import create_model
 from deep_translator import GoogleTranslator
 
 def is_korean(text: str) -> bool:

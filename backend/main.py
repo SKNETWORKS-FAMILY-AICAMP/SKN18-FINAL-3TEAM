@@ -1,7 +1,7 @@
 # Langgraph 테스트 코드
 import asyncio
 
-from backend.langgraph_structure.graph import create_graph_flow
+from backend.langgraph_structure1.graph import create_graph_flow
 
 
 async def main():
@@ -10,7 +10,7 @@ async def main():
 
     # 테스트용 입력 state
     initial_state = {
-        "query": "Who founded the Joseon Dynasty?",
+        "query": "Who founded the Joseon?",
     }
 
     # 실행 (hybrid_node가 async이므로 ainvoke 사용)

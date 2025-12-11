@@ -1,12 +1,10 @@
 from langgraph.graph import StateGraph, END
-from backend.langgraph_structure.state import GraphState
-from backend.langgraph_structure.nodes.classify_node import classify_node, route_classify
-from backend.langgraph_structure.rag.retrieval_node import retrieval_node
-from backend.langgraph_structure.graphdb.generate_cypher_node import generate_cypher_node
-from backend.langgraph_structure.nodes.generate_node import generate_node
-from backend.langgraph_structure.nodes.tone_adjust_node import tone_adjust_node
-from backend.langgraph_structure.nodes.scene_split_node import scene_split_node
-from backend.langgraph_structure.rag.hybrid_node import hybrid_node
+from backend.langgraph_structure1.state import GraphState
+from backend.langgraph_structure1.nodes.classify_node import classify_node, route_classify
+from backend.langgraph_structure1.nodes.generate_node import generate_node
+from backend.langgraph_structure1.nodes.tone_adjust_node import tone_adjust_node
+from backend.langgraph_structure1.nodes.scene_split_node import scene_split_node
+from backend.langgraph_structure1.rag.hybrid_node import hybrid_node
 
 
 def create_graph_flow():
