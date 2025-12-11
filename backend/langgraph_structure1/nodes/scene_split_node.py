@@ -1,7 +1,7 @@
 # scene 분리(장면/대사 분리)
-from backend.langgraph_structure.state import GraphState
+from backend.langgraph_structure1.state import GraphState
 from typing import Dict, Any, List
-from backend.langgraph_structure.utils import create_model
+from backend.langgraph_structure1.utils import create_model
 import json
 
 def scene_split_node(state: GraphState) -> GraphState:
@@ -220,8 +220,10 @@ if __name__ == "__main__":
 
     scene_state = scene_split_node(test_state)
 
-    print("=== scene_script (full JSON) ===")
+    print("\n=== scene_script (full JSON) ===")
     print(json.dumps(scene_state["scene_script"], indent=2, ensure_ascii=False))
+    print("-" * 60)
 
     print("\n=== scenes only ===")
     print(json.dumps(scene_state["scenes"], indent=2, ensure_ascii=False))
+    print("-" * 60)

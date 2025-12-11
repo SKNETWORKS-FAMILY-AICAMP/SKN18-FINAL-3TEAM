@@ -1,6 +1,6 @@
-from backend.langgraph_structure.state import GraphState
-from backend.langgraph_structure.state_type import Evidence, EvidencePayload
-from backend.langgraph_structure.utils import create_model
+from backend.langgraph_structure1.state import GraphState
+from backend.langgraph_structure1.state_type import Evidence, EvidencePayload
+from backend.langgraph_structure1.utils import create_model
 from typing import List, Dict, Any
 
 
@@ -69,8 +69,6 @@ def generate_node(state: GraphState) -> GraphState:
     """
     question = state["query"]
     vector_evidences: List[Evidence] = state.get("vector_evidences", [])
-    if vector_evidences:
-        print("⭐있음!\n")
     neo4j_results: List[Dict[str, Any]] = state.get("neo4j_results", [])
 
     # 1) Neo4j 결과를 Evidence 형식으로 변환
@@ -117,6 +115,10 @@ def generate_node(state: GraphState) -> GraphState:
         )
 
         final_answer = response.choices[0].message.content.strip()
+
+        print("[최종 답변]")
+        print(final_answer)
+        print("-" * 60)
 
         return {
             **state,

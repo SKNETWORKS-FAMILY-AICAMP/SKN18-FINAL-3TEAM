@@ -1,6 +1,6 @@
 # Generate된 답변의 말투 교정하는 노드
-from backend.langgraph_structure.state import GraphState
-from backend.langgraph_structure.utils import create_model
+from backend.langgraph_structure1.state import GraphState
+from backend.langgraph_structure1.utils import create_model
 
 def tone_adjust_node(state: GraphState) -> GraphState:
     """
@@ -84,5 +84,5 @@ if __name__ == "__main__":
     }
 
     result_state = tone_adjust_node(test_state)
-    print("=== Translated & Tone-adjusted Answer ===")
+    print("\n=== Translated & Tone-adjusted Answer ===")
     print(result_state["tone_corrected_answer"])
