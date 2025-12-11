@@ -10,7 +10,7 @@
  * - /profile   : 마이페이지 (로그인 필요)
  */
 
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useEffect } from 'react';
 
 // 페이지 컴포넌트
@@ -36,8 +36,6 @@ import ProtectedRoute from './components/ProtectedRoute';
  * 4. 깔끔한 URL(/)로 이동
  */
 function TokenHandler() {
-  const navigate = useNavigate();
-
   useEffect(() => {
     // 현재 URL에서 쿼리 파라미터 읽기
     const params = new URLSearchParams(window.location.search);
@@ -54,11 +52,12 @@ function TokenHandler() {
 
       console.log('✅ 토큰 저장 완료! 홈으로 이동...');
 
-      // URL에서 토큰 파라미터 제거하고 홈으로 이동 (새로고침 없이)
-      // replace: true → 브라우저 히스토리에 남기지 않음
-      navigate('/', { replace: true });
+      // URL에서 토큰 파라미터 제거하고 홈으로 이동
+      // window.location.replace 사용 → React Router 경고 방지
+      // replace는 브라우저 히스토리에 남기지 않음
+      window.location.replace('/');
     }
-  }, [navigate]);
+  }, []);
 
   // 이 컴포넌트는 UI를 렌더링하지 않음
   return null;
