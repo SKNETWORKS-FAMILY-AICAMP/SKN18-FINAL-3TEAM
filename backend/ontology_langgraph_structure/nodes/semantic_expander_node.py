@@ -11,9 +11,18 @@ Semantic Expander Node
 """
 
 import os
+import sys
 import requests
 from pathlib import Path
 from state import GraphState
+
+# 상위 디렉토리를 경로에 추가 (entity_expander_node와 동일한 방식)
+_base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ontology_langgraph_structure
+_parent_dir = os.path.dirname(_base_dir)  # backend
+_project_root = os.path.dirname(_parent_dir)  # SKN18-FINAL-3TEAM (프로젝트 루트)
+sys.path.insert(0, _base_dir)
+sys.path.insert(0, _parent_dir)
+sys.path.insert(0, _project_root)  # 프로젝트 루트 추가 (backend.db_pipeline import용)
 
 # Fuseki 설정
 FUSEKI_URL = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
@@ -67,20 +76,14 @@ def get_pgvector_service():
     global _pgvector_service
     if _pgvector_service is None and USE_PGVECTOR:
         try:
-            import sys
-            from pathlib import Path
-            sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-            from backend.db_pipeline.vectordb.services.custom_pgvector import CustomPGVector
-            from backend.db_pipeline.common.config import POSTGRES_CONN_STR
-            from backend.db_pipeline.common.embedding_model import get_embedding
-
-            _pgvector_service = CustomPGVector(
-                conn_str=POSTGRES_CONN_STR,
-                embedding_fn=get_embedding(),
-                table="korean_history"
-            )
+            # load_title_embeddings.py와 동일한 import 방식 사용
+            from backend.db_pipeline.vectordb.services.title_vector_service import TitleVectorService
+            
+            _pgvector_service = TitleVectorService()
             print("  │  └─ pgvector 서비스 초기화 완료")
+        except ImportError as e:
+            print(f"  │  └─ pgvector 서비스 import 실패: {e}")
+            print("  │  └─ TTL 매칭만 사용 (psycopg2-binary 설치 필요: pip install psycopg2-binary)")
         except Exception as e:
             print(f"  │  └─ pgvector 초기화 실패: {e}")
     return _pgvector_service
@@ -240,14 +243,16 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
         if not uri:
             continue
 
+        # URI를 SPARQL에서 사용할 수 있도록 <URI> 형식으로 감싸기
+        uri_sparql = f"<{uri}>" if not uri.startswith("<") else uri
+
         # 1. 엔티티의 카테고리 조회
-        # URI는 hist:Person_xxx 형식이므로 그대로 사용
         sparql_category = f"""
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
             SELECT ?category WHERE {{
-                {uri} hist:hasCategory ?category .
+                {uri_sparql} hist:hasCategory ?category .
             }} LIMIT 1
         """
 
@@ -286,7 +291,7 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
                     ?entity hist:hasCategory "{category}" .
                     ?entity rdfs:label ?label .
                     ?entity rdf:type ?type .
-                    FILTER(?entity != {uri})
+                    FILTER(?entity != {uri_sparql})
                 }} LIMIT 8
             """
 
@@ -348,36 +353,92 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
     for entity in entities[:5]:  # 상위 5개만
         uri = entity.get("uri")
         entity_name = entity.get("name", "")
+        entity_type = entity.get("type", "")
         if not uri:
             continue
 
         print(f"  │  ├─ [{entity_name}] 인과관계 체인 검색 중...")
 
-        # 인과관계 체인 탐색 (leadsTo, causedBy)
-        # URI는 hist:Person_xxx 형식이므로 그대로 사용
-        sparql = f"""
-            PREFIX hist: <http://www.example.org/korean-history#>
-            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+        # URI를 SPARQL에서 사용할 수 있도록 <URI> 형식으로 감싸기
+        uri_sparql = f"<{uri}>" if not uri.startswith("<") else uri
 
-            SELECT DISTINCT ?related ?label ?type ?predicate WHERE {{
-                {{
-                    # 나가는 인과관계: entity → related
-                    {uri} ?predicate ?related .
-                    ?related rdfs:label ?label .
-                    ?related rdf:type ?type .
-                    FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
-                }}
-                UNION
-                {{
-                    # 들어오는 인과관계: related → entity
-                    ?related ?predicate {uri} .
-                    ?related rdfs:label ?label .
-                    ?related rdf:type ?type .
-                    FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
-                }}
-            }} LIMIT 10
-        """
+        # Person 타입인 경우, 관련 Event를 먼저 찾아서 그 Event의 인과관계를 검색
+        if entity_type == "Person":
+            # Person과 관련된 Event 찾기 (양방향: participatesIn, involvesPerson 등)
+            sparql = f"""
+                PREFIX hist: <http://www.example.org/korean-history#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+                SELECT DISTINCT ?related ?label ?type ?predicate WHERE {{
+                    {{
+                        # Person → Event (participatesIn)
+                        {uri_sparql} hist:participatesIn ?event .
+                        ?event rdf:type hist:Event .
+                        
+                        # 그 Event의 인과관계 찾기
+                        {{
+                            ?event ?predicate ?related .
+                            ?related rdfs:label ?label .
+                            ?related rdf:type ?type .
+                            FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
+                        }}
+                        UNION
+                        {{
+                            ?related ?predicate ?event .
+                            ?related rdfs:label ?label .
+                            ?related rdf:type ?type .
+                            FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
+                        }}
+                    }}
+                    UNION
+                    {{
+                        # Event → Person (involvesPerson)
+                        ?event hist:involvesPerson {uri_sparql} .
+                        ?event rdf:type hist:Event .
+                        
+                        # 그 Event의 인과관계 찾기
+                        {{
+                            ?event ?predicate ?related .
+                            ?related rdfs:label ?label .
+                            ?related rdf:type ?type .
+                            FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
+                        }}
+                        UNION
+                        {{
+                            ?related ?predicate ?event .
+                            ?related rdfs:label ?label .
+                            ?related rdf:type ?type .
+                            FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
+                        }}
+                    }}
+                }} LIMIT 10
+            """
+        else:
+            # Event 타입인 경우 직접 인과관계 검색
+            sparql = f"""
+                PREFIX hist: <http://www.example.org/korean-history#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+                SELECT DISTINCT ?related ?label ?type ?predicate WHERE {{
+                    {{
+                        # 나가는 인과관계: entity → related
+                        {uri_sparql} ?predicate ?related .
+                        ?related rdfs:label ?label .
+                        ?related rdf:type ?type .
+                        FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
+                    }}
+                    UNION
+                    {{
+                        # 들어오는 인과관계: related → entity
+                        ?related ?predicate {uri_sparql} .
+                        ?related rdfs:label ?label .
+                        ?related rdf:type ?type .
+                        FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
+                    }}
+                }} LIMIT 10
+            """
 
         try:
             response = requests.post(
@@ -439,17 +500,22 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
     seen = set()
 
     try:
-        # 1. 원본 질문으로 검색 (가장 관련성 높음)
-        # CustomPGVector.similarity_search_with_score()는 (Document, similarity) 튜플 리스트 반환
-        # similarity는 이미 코사인 유사도로 변환됨 (1 - cosine_distance)
-        doc_scores = pgvector.similarity_search_with_score(query=query, k=top_k)
+        # TitleVectorService 초기화 (연결 확인)
+        if not pgvector.conn:
+            if not pgvector.connect():
+                print("  │  └─ pgvector 연결 실패")
+                return []
 
-        for doc, similarity in doc_scores:
-            title = doc.metadata.get("title", "")
+        # 1. 원본 질문으로 검색 (가장 관련성 높음)
+        # TitleVectorService.search()는 [{"title": "...", "category": "...", "similarity": 0.95}] 형식 반환
+        results = pgvector.search(query=query, top_k=top_k, threshold=0.5)
+
+        for result in results:
+            title = result.get("title", "")
+            similarity = result.get("similarity", 0.0)
             if title and title not in seen:
                 seen.add(title)
                 # similarity는 이미 0-1 범위의 코사인 유사도 (1에 가까울수록 유사)
-                # 변환 불필요 - CustomPGVector에서 이미 처리됨
 
                 expanded_entities.append({
                     "type": "Event",  # 기본값
@@ -468,10 +534,11 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
             if not name:
                 continue
 
-            doc_scores = pgvector.similarity_search_with_score(query=name, k=5)
+            results = pgvector.search(query=name, top_k=5, threshold=0.5)
 
-            for doc, similarity in doc_scores:
-                title = doc.metadata.get("title", "")
+            for result in results:
+                title = result.get("title", "")
+                similarity = result.get("similarity", 0.0)
                 if title and title not in seen:
                     seen.add(title)
 
