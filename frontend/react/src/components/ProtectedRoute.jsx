@@ -1,9 +1,9 @@
 /**
  * ProtectedRoute.jsx
- * 
+ *
  * 인증이 필요한 페이지를 보호하는 컴포넌트입니다.
- * 로그인하지 않은 사용자가 접근하면 로그인 페이지로 리다이렉트합니다.
- * 
+ * 로그인하지 않은 사용자가 접근하면 홈 페이지로 리다이렉트합니다.
+ *
  * 사용 예시:
  * <Route path="/profile" element={
  *   <ProtectedRoute>
@@ -59,8 +59,8 @@ function ProtectedRoute({ children }) {
       try {
         // 서버에 인증 상태 확인 요청
         // axios 인터셉터가 자동으로 Authorization 헤더 추가
-        const response = await api.get('/api/check-auth/');
-        
+        const response = await api.get('/api/users/check-auth/');
+
         if (response.data.isAuthenticated) {
           console.log('✅ ProtectedRoute: 인증됨');
           setIsAuthenticated(true);
@@ -100,15 +100,15 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  // 2. 인증 안됨: 로그인 페이지로 리다이렉트
-  //    - state에 현재 경로 저장 → 로그인 후 원래 페이지로 돌아올 수 있음
+  // 2. 인증 안됨: 홈 페이지로 리다이렉트
+  //    - 홈 페이지에서 로그인 버튼 표시됨
   if (!isAuthenticated) {
-    console.log('🔀 ProtectedRoute: 로그인 페이지로 리다이렉트');
+    console.log('🔀 ProtectedRoute: 홈 페이지로 리다이렉트');
     return (
-      <Navigate 
-        to="/login" 
-        state={{ from: location.pathname }} 
-        replace 
+      <Navigate
+        to="/"
+        state={{ from: location.pathname }}
+        replace
       />
     );
   }
