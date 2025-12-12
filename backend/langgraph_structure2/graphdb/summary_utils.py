@@ -1,5 +1,4 @@
-from backend.db_pipeline.neo4j.services.neo4j_connection import get_driver
-from backend.db_pipeline.neo4j.services.neo4j_service import run_cypher, serialize_records
+from backend.langgraph_structure1.graphdb.neo4j_utils import get_driver, run_cypher, serialize_records
 from backend.langgraph_structure1.graphdb.embedding_utils import get_query_embedding, add_similarity
 
 
