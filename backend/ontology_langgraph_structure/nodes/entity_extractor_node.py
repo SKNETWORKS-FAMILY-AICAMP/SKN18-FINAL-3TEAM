@@ -5,7 +5,7 @@ Entity Extractor Node
 1. 형태소 분석기(kiwipiepy)로 명사 추출
 2. 키워드 확장 (classify_node에서 처리된 확장된 키워드 사용)
 3. TTL 정확 매칭 (확장된 키워드 + 원본 키워드 모두 사용)
-4. Milvus 유사도 검색 (fallback)
+4. pgvector 제목 임베딩 유사도 검색 (fallback)
 5. LLM 엔티티 추출 (최종 fallback)
 6. 엔티티 URI 반환
 
@@ -45,23 +45,23 @@ load_dotenv(env_path, override=True)
 from state import GraphState
 from ontology_schema import get_schema_summary
 
-# pgvector 서비스 import (선택적)
+# pgvector 제목 임베딩 서비스 import (선택적)
 USE_PGVECTOR = os.getenv("USE_PGVECTOR", "true").lower() == "true"
-_pgvector_service = None
+_title_vector_service = None
 
-def get_pgvector_service():
-    """pgvector 서비스 lazy loading"""
-    global _pgvector_service
-    if _pgvector_service is None and USE_PGVECTOR:
+def get_title_vector_service():
+    """제목 임베딩 pgvector 서비스 lazy loading"""
+    global _title_vector_service
+    if _title_vector_service is None and USE_PGVECTOR:
         try:
-            from db_pipeline.services.postgres_service import PostgresVectorService
-            _pgvector_service = PostgresVectorService()
-            print("✅ pgvector 서비스 초기화 완료")
+            from db_pipeline.vectordb.services.title_vector_service import TitleVectorService
+            _title_vector_service = TitleVectorService()
+            print("✅ 제목 임베딩 pgvector 서비스 초기화 완료")
         except ImportError:
-            print("⚠️ pgvector 서비스 import 실패 - TTL 매칭만 사용")
+            print("⚠️ 제목 임베딩 pgvector 서비스 import 실패 - TTL 매칭만 사용")
         except Exception as e:
-            print(f"⚠️ pgvector 초기화 실패: {e}")
-    return _pgvector_service
+            print(f"⚠️ 제목 임베딩 pgvector 초기화 실패: {e}")
+    return _title_vector_service
 
 
 # TTL 파일 경로 (normalized 버전 사용 - Fuseki에 업로드된 데이터와 일치)
@@ -603,6 +603,7 @@ def expand_keywords_with_llm(keywords: list, query: str) -> list:
 - "환국" → 갑술환국, 기사환국, 경신환국, 갑인환국 등
 - "왕" → 태조, 세종, 숙종, 정조 등 (질문 맥락에 맞는 왕들)
 - "사건" → 질문 맥락에 맞는 구체적 사건명
+- **중요: "조선", "조선시대", "조선왕조"는 확장하지 마세요. 모든 데이터가 조선 데이터이므로 의미가 없습니다.**
 
 ## 출력 형식
 JSON 형식으로 출력하세요:
@@ -622,14 +623,22 @@ JSON 형식으로 출력하세요:
         result = json.loads(content)
         expanded_dict = result.get("expanded", {})
         
+        # "조선" 관련 키워드는 제외 (모든 데이터가 조선 데이터이므로)
+        joseon_keywords = {'조선', '조선시대', '조선왕조', '한국', '우리나라'}
+        
         # 확장된 키워드 추가
         expanded_keywords = list(keywords)  # 원본 유지
         
         for general_noun, instances in expanded_dict.items():
-            if general_noun in expanded_keywords:
-                # 일반명사 제거하고 구체적 인스턴스 추가
-                expanded_keywords.remove(general_noun)
-                expanded_keywords.extend(instances)
+            # "조선" 관련 키워드는 확장하지 않음
+            if general_noun not in joseon_keywords:
+                # 확장된 인스턴스에서도 "조선" 관련 항목 제거
+                filtered_instances = [inst for inst in instances if inst not in joseon_keywords]
+                if filtered_instances:
+                    if general_noun in expanded_keywords:
+                        # 일반명사 제거하고 구체적 인스턴스 추가
+                        expanded_keywords.remove(general_noun)
+                    expanded_keywords.extend(filtered_instances)
         
         print(f"   🔄 키워드 확장: {general_nouns} → {sum(len(v) for v in expanded_dict.values())}개 인스턴스")
         return expanded_keywords
@@ -648,20 +657,20 @@ JSON 형식으로 출력하세요:
 #     pass
 
 
-def search_entities_with_milvus(keywords: list, ttl_data: dict, top_k: int = 5) -> list:
+def search_entities_with_pgvector(keywords: list, ttl_data: dict, top_k: int = 5) -> list:
     """
-    Milvus 유사도 검색으로 엔티티 찾기
-    
+    pgvector 제목 임베딩 유사도 검색으로 엔티티 찾기
+
     Args:
         keywords: 검색할 키워드 리스트
         ttl_data: TTL 데이터 (URI 매핑용)
         top_k: 키워드당 최대 결과 수
-    
+
     Returns:
         매칭된 엔티티 리스트
     """
-    pgvector = get_pgvector_service()
-    if pgvector is None:
+    title_vector_service = get_title_vector_service()
+    if title_vector_service is None:
         return []
 
     entities = []
@@ -670,7 +679,7 @@ def search_entities_with_milvus(keywords: list, ttl_data: dict, top_k: int = 5) 
     try:
         # 키워드로 벡터 검색
         query_text = " ".join(keywords)
-        results = pgvector.search(query=query_text, top_k=top_k, threshold=0.5)
+        results = title_vector_service.search(query=query_text, top_k=top_k, threshold=0.5)
 
         for result in results:
             title = result["title"]
@@ -706,13 +715,13 @@ def search_entities_with_milvus(keywords: list, ttl_data: dict, top_k: int = 5) 
                 "pgvector_score": result["similarity"],
                 "matched_keyword": query_text
             })
-        
+
         # 점수 순 정렬
         entities.sort(key=lambda x: x.get("pgvector_score", 0), reverse=True)
-        
+
     except Exception as e:
-        print(f"⚠️ pgvector 검색 실패: {e}")
-    
+        print(f"⚠️ 제목 임베딩 pgvector 검색 실패: {e}")
+
     return entities
 
 
@@ -720,11 +729,11 @@ def entity_extractor_node(state: GraphState) -> GraphState:
     """
     질문에서 핵심 엔티티 추출 (하이브리드 방식)
 
-    키워드 추출 + Milvus 유사도 검색을 병렬로 수행
+    키워드 추출 + pgvector 제목 임베딩 유사도 검색을 병렬로 수행
     - 1단계: 키워드 추출 (kiwipiepy)
     - 2단계: 키워드 확장 (classify_node에서 처리된 확장된 키워드 사용)
     - 3단계: TTL 정확 매칭 (확장된 키워드 + 원본 키워드 모두 사용)
-    - 4단계: Milvus 유사도 검색 (fallback)
+    - 4단계: pgvector 제목 임베딩 유사도 검색 (fallback)
     - 5단계: LLM 엔티티 추출 (최종 fallback - 결과 부족 시만)
 
     의도 파악: classify_node에서 이미 처리됨 (query_intent)
@@ -790,6 +799,8 @@ def entity_extractor_node(state: GraphState) -> GraphState:
         # 3. 연결된 노드에 키워드 포함 점수 (SPARQL 기반)
         connected_score = 0.0
         uri = entity.get("uri")
+        sparql_executed = False
+        connection_count = 0
 
         if uri and uri in ttl_data.get("uri_to_type", {}):
             # SPARQL로 이 엔티티와 연결된 모든 엔티티의 label 조회
@@ -828,25 +839,43 @@ def entity_extractor_node(state: GraphState) -> GraphState:
                 )
 
                 if response.status_code == 200:
+                    sparql_executed = True
                     results = response.json()
                     bindings = results.get("results", {}).get("bindings", [])
+                    connection_count = len(bindings)
 
                     # 연결된 엔티티의 label에 키워드가 있는지 확인
+                    matched_connections = []
+                    has_keyword_match = False  # 키워드 매칭 여부 플래그
                     for binding in bindings:
                         connected_label = binding.get("connectedLabel", {}).get("value", "")
                         if connected_label:
                             for kw in keywords:
                                 if kw.lower() in connected_label.lower():
                                     connected_score += 0.1
+                                    matched_connections.append(connected_label)
+                                    has_keyword_match = True  # 키워드 매칭 발견
                                     if connected_score >= 0.3:  # 최대값 도달
                                         break
 
                         if connected_score >= 0.3:
                             break
 
+                    # 연결 노드 분석 결과 저장
+                    entity["sparql_connections"] = connection_count
+                    entity["matched_connections"] = len(matched_connections)
+                    entity["has_keyword_in_connections"] = has_keyword_match  # 우선순위 정렬용 플래그
+
             except Exception as e:
                 # SPARQL 실패 시 조용히 무시 (점수만 0으로 유지)
                 pass
+
+        # 디버깅 정보 저장
+        entity["sparql_executed"] = sparql_executed
+        
+        # 연결된 노드에 키워드가 없는 경우 플래그 설정
+        if "has_keyword_in_connections" not in entity:
+            entity["has_keyword_in_connections"] = False
 
         total_score = base_score + name_match_score + min(connected_score, 0.3)
         entity["relevance_score"] = total_score
@@ -862,7 +891,7 @@ def entity_extractor_node(state: GraphState) -> GraphState:
     # --- TTL 정확 매칭 (확장된 키워드 + 원본 키워드 사용) ---
     print(f"  ├─ TTL 매칭 중...")
     ttl_matched = 0
-    
+
     # 모든 키워드로 TTL 매칭 (확장된 키워드 + 원본 키워드)
     for keyword in all_keywords:
         # 정확한 라벨 매칭
@@ -880,7 +909,7 @@ def entity_extractor_node(state: GraphState) -> GraphState:
                     "match_method": "exact"
                 })
                 ttl_matched += 1
-        
+
         # 부분 매칭 (키워드가 라벨에 포함된 경우) - 최대 3개, 최소 길이 3글자
         # "조선" 같은 일반 키워드 필터링 강화
         if len(keyword) >= 3:  # 3글자 이상만 부분 매칭
@@ -903,22 +932,22 @@ def entity_extractor_node(state: GraphState) -> GraphState:
                         partial_count += 1
                         if partial_count >= 3:  # 키워드당 최대 3개 부분 매칭 (성능 최적화)
                             break
-    
+
     print(f"     └─ TTL 매칭: {ttl_matched}개")
 
-    # --- Milvus 유사도 검색 (규칙 기반 키워드 사용) ---
+    # --- pgvector 제목 임베딩 유사도 검색 (규칙 기반 키워드 사용) ---
     # ⚡ 리팩토링: LLM 대신 규칙 기반 키워드로 벡터 검색
     # - "조선시대/조선" 제외 (모든 데이터가 조선시대라서)
     # - 조사/동사 제거된 명확한 단어만 사용
     pgvector_added = 0
     if USE_PGVECTOR and vector_keywords:
-        print(f"  ├─ pgvector 벡터 검색 중...")
+        print(f"  ├─ pgvector 제목 임베딩 벡터 검색 중...")
 
         # 동적 top_k: 키워드 수에 따라 조절
         dynamic_top_k = max(3, min(10, 15 // max(len(vector_keywords), 1)))
 
         # 규칙 기반으로 추출된 키워드로 pgvector 검색
-        pgvector_entities = search_entities_with_milvus(
+        pgvector_entities = search_entities_with_pgvector(
             vector_keywords,  # 조선시대/조선 제외된 키워드
             ttl_data,
             top_k=dynamic_top_k
@@ -1034,12 +1063,36 @@ def entity_extractor_node(state: GraphState) -> GraphState:
     # ========================================
     # 엔티티 점수 계산 및 정렬
     # ========================================
+    print(f"  ├─ SPARQL 기반 스코어링 중...")
+
     # 모든 엔티티에 대해 점수 계산
+    sparql_count = 0
+    total_connections = 0
+    total_matched_connections = 0
+
     for entity in matched_entities:
         calculate_entity_score_with_connections(entity, all_keywords, ttl_data)
+        if entity.get("sparql_executed"):
+            sparql_count += 1
+            total_connections += entity.get("sparql_connections", 0)
+            total_matched_connections += entity.get("matched_connections", 0)
 
-    # 점수 기준으로 정렬 (높은 점수 우선)
-    matched_entities.sort(key=lambda x: x.get("relevance_score", 0), reverse=True)
+    # SPARQL 스코어링 통계 출력
+    if sparql_count > 0:
+        avg_connections = total_connections / sparql_count if sparql_count > 0 else 0
+        print(f"     └─ SPARQL 스코어링: {sparql_count}개 엔티티, 평균 연결노드 {avg_connections:.1f}개, 키워드 매칭 {total_matched_connections}개")
+    else:
+        print(f"     └─ SPARQL 스코어링: 실행되지 않음")
+
+    # 정렬: 키워드가 연결된 노드에 있는 엔티티를 우선적으로, 그 다음 점수 기준
+    # 1순위: has_keyword_in_connections (True가 먼저)
+    # 2순위: relevance_score (높은 점수 우선)
+    matched_entities.sort(
+        key=lambda x: (
+            not x.get("has_keyword_in_connections", False),  # False가 먼저 오도록 (True를 우선)
+            -x.get("relevance_score", 0)  # 내림차순 정렬을 위해 음수
+        )
+    )
 
     # 상위 30개만 선택 (너무 많으면 성능 저하)
     matched_entities = matched_entities[:30]
@@ -1060,7 +1113,7 @@ def entity_extractor_node(state: GraphState) -> GraphState:
             milvus_score = entity.get("milvus_score")
 
             # 매칭 방법 레이블
-            method_label = "[정확]" if method == "exact" else "[부분]" if method == "partial" else "[벡터]" if method == "milvus" else "[LLM]"
+            method_label = "[정확]" if method == "exact" else "[부분]" if method == "partial" else "[벡터]" if method in ["milvus", "pgvector"] else "[LLM]"
 
             # 점수 표시 (연관성 점수 우선, Milvus 점수는 참고용)
             if milvus_score:
@@ -1074,7 +1127,7 @@ def entity_extractor_node(state: GraphState) -> GraphState:
             print(f"      ... 외 {len(matched_entities) - 10}개")
 
     node_elapsed = time.time() - node_start
-    print(f"  └─ 완료: {len(matched_entities)}개 엔티티 추출 (TTL: {ttl_matched}, Milvus: {milvus_added}) ({node_elapsed:.2f}초)")
+    print(f"  └─ 완료: {len(matched_entities)}개 엔티티 추출 (TTL: {ttl_matched}, pgvector: {pgvector_added}) ({node_elapsed:.2f}초)")
     print()
 
     # 노드 실행 시간 기록
