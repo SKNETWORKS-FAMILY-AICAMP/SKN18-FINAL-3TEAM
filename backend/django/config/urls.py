@@ -20,6 +20,12 @@ urlpatterns = [
     # 영상/LLM 관련 API
     path('api/video/', include('video.urls')),
 
+    # 검색 + 시청 기록 API
+    path('api/activity/', include('activity.urls')),
+
+    # 댓글 + 답글 + 좋아요 API
+    path('api/community/', include('community.urls')),
+
     # API 문서화
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
