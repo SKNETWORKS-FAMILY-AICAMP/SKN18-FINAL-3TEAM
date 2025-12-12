@@ -32,17 +32,17 @@ urlpatterns = [
     # App API Routes
     # Note: React frontend handles all UI routing
     # ============================================
-    # 인증 API (로그인, 로그아웃, 토큰 등)
-    path('api/', include('accounts.urls')),
-
-    # 사용자 관리 API
+    # 인증 + 프로필 + 관리 API
     path('api/users/', include('users.urls')),
 
-    # 검색 API
-    path('api/search/', include('search.urls')),
-
-    # 영상 API
+    # 영상 관리 API
     path('api/video/', include('video.urls')),
+
+    # 검색 + 시청 기록 API
+    path('api/activity/', include('activity.urls')),
+
+    # 댓글 + 답글 + 좋아요 API
+    path('api/community/', include('community.urls')),
 
     # API 문서화
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
