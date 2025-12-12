@@ -1691,7 +1691,7 @@ TTL 캐싱:
 현재: 파일 변경 시만 재로드 (캐시 사용 ~0ms)
 
 LLM 호출 통합:
-이전: classify_node 1회 + entity_extractor (키워드 확장) 1회 = 2회
+이전: classify_node 1회 + entity_expander (키워드 확장) 1회 = 2회
 현재: classify_node에서 통합 분석 (질문 유형/의도/프로퍼티/키워드 확장) = 1회
 
 키워드 추출:
@@ -1724,7 +1724,7 @@ Fuseki 직접 검색:
 **수정된 노드:**
 
 - `classify_node.py`: 프로퍼티 그룹 선택 기능 추가
-- `parallel_inference_executor_node.py` (Parallel Knowledge Retrieval): 범용 관계 검색 + 프로퍼티 FILTER 적용
+- `parallel_knowledge_retrieval_node.py` (Parallel Knowledge Retrieval): 범용 관계 검색 + 프로퍼티 FILTER 적용
 - `multi_path_extractor_node.py`: 범용 관계 결과 파싱 로직 추가
 - `ontology/scripts/extract_property_groups.py`: 프로퍼티 그룹 추출 스크립트
 
@@ -1848,7 +1848,7 @@ graph LR
 graph LR
     Query([사용자 질문]) --> Classify[classify_node<br/>질문 유형/의도/프로퍼티 분석]
 
-    Classify --> EntityExtractor[entity_extractor_node]
+    Classify --> EntityExpander[entity_expander_node]
     EntityExtractor --> Kiwi[kiwipiepy 형태소 분석]
     Kiwi --> Nouns[명사 추출<br/>조사/어미 자동 제거]
 
@@ -1933,7 +1933,7 @@ graph LR
 ### 캐싱 구현
 
 ```python
-# entity_extractor_node.py
+# entity_expander_node.py
 _ttl_cache = None
 _ttl_cache_mtime = None
 
@@ -1976,10 +1976,10 @@ backend/ontology_langgraph_structure/
 ├── state.py                   # GraphState 정의
 ├── nodes/
 │   ├── classify_node.py       # 질문 분류 + 프로퍼티 그룹 선택
-│   ├── entity_extractor_node.py  # 하이브리드 엔티티 추출 (⚡캐싱+LLM통합)
+│   ├── entity_expander_node.py  # 하이브리드 엔티티 추출 (⚡캐싱+LLM통합)
 │   ├── generate_node.py       # 스토리 생성
 │   └── kg/
-│       ├── parallel_inference_executor_node.py  # Parallel Knowledge Retrieval: 5개 Thread 범용 관계 검색
+│       ├── parallel_knowledge_retrieval_node.py  # Parallel Knowledge Retrieval: 5개 Thread 범용 관계 검색
 │       └── path_evidence_aggregator_node.py  # 경로 추출 및 근거 통합 (통합 노드)
 ├── ontology/
 │   ├── korean_history.owl     # 온톨로지 스키마

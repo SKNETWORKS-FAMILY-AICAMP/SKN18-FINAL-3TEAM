@@ -51,7 +51,7 @@ except ImportError:
 
 # ========================================
 # 우선순위 높은 프로퍼티 매핑 (먼저 매칭)
-# 인과관계, 시간순서, 관계 등 중요한 프로퍼티
+# 인과관계, 시기, 관계 등 중요한 프로퍼티
 # ========================================
 PRIORITY_GROUPS = {
     # ★ 인과관계 (매우 중요!)
@@ -67,15 +67,15 @@ PRIORITY_GROUPS = {
     "abolitionLedTo": "인과관계",
     "becameIneffective": "인과관계",
 
-    # ★ 시간순서 (중요!)
-    "occursBefore": "시간순서",
-    "occursAfter": "시간순서",
-    "followedBy": "시간순서",
-    "precededBy": "시간순서",
-    "advancedAfter": "시간순서",
-    "performsBefore": "시간순서",
-    "succeededBy": "시간순서",
-    "priorTo": "시간순서",
+    # ★ 시기 (중요!)
+    "occursBefore": "시기",
+    "occursAfter": "시기",
+    "followedBy": "시기",
+    "precededBy": "시기",
+    "advancedAfter": "시기",
+    "performsBefore": "시기",
+    "succeededBy": "시기",
+    "priorTo": "시기",
 
     # ★ 관계/연결 (중요!)
     "isRelatedTo": "연결관계",
@@ -239,11 +239,11 @@ PROPERTY_GROUPS = {
     "lead": "인과관계",
     "trigger": "인과관계",
 
-    # 시간순서 (우선순위 그룹에서 못 잡힌 것들)
-    "before": "시간순서",
-    "after": "시간순서",
-    "prior": "시간순서",
-    "follow": "시간순서",
+    # 시기 (우선순위 그룹에서 못 잡힌 것들)
+    "before": "시기",
+    "after": "시기",
+    "prior": "시기",
+    "follow": "시기",
 
     # 참여/관계
     "particip": "참여",

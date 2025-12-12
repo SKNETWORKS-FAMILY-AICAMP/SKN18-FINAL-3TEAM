@@ -55,7 +55,7 @@ def print_result(state: dict):
     # 노드별 실행 시간
     if node_times:
         print(f"  노드별 실행 시간:")
-        node_order = ["query_classifier", "entity_extractor", "parallel_knowledge_retrieval",
+        node_order = ["query_classifier", "entity_expander", "parallel_knowledge_retrieval",
                       "multi_path_extractor", "evidence_aggregator", "story_generator"]
         for node_name in node_order:
             if node_name in node_times:
