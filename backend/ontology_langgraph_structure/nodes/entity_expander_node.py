@@ -34,13 +34,15 @@ except ImportError:
     print("⚠️ kiwipiepy 미설치 - 규칙 기반 조사 제거 사용")
 
 # 상위 디렉토리를 경로에 추가
-_base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_parent_dir = os.path.dirname(_base_dir)
+_base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ontology_langgraph_structure
+_parent_dir = os.path.dirname(_base_dir)  # backend
+_project_root = os.path.dirname(_parent_dir)  # SKN18-FINAL-3TEAM (프로젝트 루트)
 sys.path.insert(0, _base_dir)
 sys.path.insert(0, _parent_dir)
+sys.path.insert(0, _project_root)  # 프로젝트 루트 추가 (backend.db_pipeline import용)
 
 # .env 파일 로드 (프로젝트 루트에서)
-env_path = os.path.join(os.path.dirname(_parent_dir), ".env")
+env_path = os.path.join(_project_root, ".env")
 load_dotenv(env_path, override=True)
 
 from state import GraphState
@@ -55,7 +57,8 @@ def get_title_vector_service():
     global _title_vector_service
     if _title_vector_service is None and USE_PGVECTOR:
         try:
-            from db_pipeline.vectordb.services.title_vector_service import TitleVectorService
+            # load_title_embeddings.py와 동일한 import 방식 사용
+            from backend.db_pipeline.vectordb.services.title_vector_service import TitleVectorService
             _title_vector_service = TitleVectorService()
             print("✅ 제목 임베딩 pgvector 서비스 초기화 완료")
         except ImportError:
@@ -678,6 +681,12 @@ def search_entities_with_pgvector(keywords: list, ttl_data: dict, top_k: int = 5
     seen_titles = set()
 
     try:
+        # TitleVectorService 연결 확인 (lazy connection)
+        if not title_vector_service.conn:
+            if not title_vector_service.connect():
+                print("⚠️ 제목 임베딩 pgvector 연결 실패")
+                return []
+
         # 키워드로 벡터 검색
         query_text = " ".join(keywords)
         results = title_vector_service.search(query=query_text, top_k=top_k, threshold=0.5)
