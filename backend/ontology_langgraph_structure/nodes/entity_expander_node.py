@@ -1,5 +1,5 @@
 """
-Entity Extractor Node
+Entity Expander Node
 
 질문에서 핵심 엔티티 추출 및 TTL 데이터 매칭:
 1. 형태소 분석기(kiwipiepy)로 명사 추출
@@ -19,7 +19,6 @@ import sys
 import re
 import json
 import requests
-from pathlib import Path
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
@@ -35,11 +34,13 @@ except ImportError:
     print("⚠️ kiwipiepy 미설치 - 규칙 기반 조사 제거 사용")
 
 # 상위 디렉토리를 경로에 추가
-sys.path.insert(0, str(Path(__file__).parent.parent))
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+_base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_parent_dir = os.path.dirname(_base_dir)
+sys.path.insert(0, _base_dir)
+sys.path.insert(0, _parent_dir)
 
 # .env 파일 로드 (프로젝트 루트에서)
-env_path = Path(__file__).parent.parent.parent.parent / ".env"
+env_path = os.path.join(os.path.dirname(_parent_dir), ".env")
 load_dotenv(env_path, override=True)
 
 from state import GraphState
@@ -65,7 +66,7 @@ def get_title_vector_service():
 
 
 # TTL 파일 경로 (normalized 버전 사용 - Fuseki에 업로드된 데이터와 일치)
-TTL_PATH = Path(__file__).parent.parent / "ontology/instances/korean_history_normalized.ttl"
+TTL_PATH = os.path.join(_base_dir, "ontology", "instances", "korean_history_normalized.ttl")
 
 # TTL 데이터 캐시 (매번 파일 읽지 않도록)
 _ttl_cache = None
@@ -85,15 +86,15 @@ def load_ttl_entities() -> dict:
     global _ttl_cache, _ttl_cache_mtime
     
     # 캐시 유효성 검사 (파일 수정 시간 비교)
-    if TTL_PATH.exists():
-        current_mtime = TTL_PATH.stat().st_mtime
+    if os.path.exists(TTL_PATH):
+        current_mtime = os.path.getmtime(TTL_PATH)
         if _ttl_cache is not None and _ttl_cache_mtime == current_mtime:
             return _ttl_cache  # 캐시 반환 (파일 I/O 생략)
     
     label_to_uri = {}
     uri_to_type = {}
     
-    if not TTL_PATH.exists():
+    if not os.path.exists(TTL_PATH):
         print(f"⚠️ TTL 파일이 없습니다: {TTL_PATH}")
         return {"label_to_uri": {}, "uri_to_type": {}}
     
@@ -134,7 +135,7 @@ def load_ttl_entities() -> dict:
     # 캐시 저장
     result = {"label_to_uri": label_to_uri, "uri_to_type": uri_to_type}
     _ttl_cache = result
-    _ttl_cache_mtime = TTL_PATH.stat().st_mtime if TTL_PATH.exists() else None
+    _ttl_cache_mtime = os.path.getmtime(TTL_PATH) if os.path.exists(TTL_PATH) else None
     
     return result
 
@@ -725,7 +726,7 @@ def search_entities_with_pgvector(keywords: list, ttl_data: dict, top_k: int = 5
     return entities
 
 
-def entity_extractor_node(state: GraphState) -> GraphState:
+def entity_expander_node(state: GraphState) -> GraphState:
     """
     질문에서 핵심 엔티티 추출 (하이브리드 방식)
 
@@ -1132,13 +1133,13 @@ def entity_extractor_node(state: GraphState) -> GraphState:
 
     # 노드 실행 시간 기록
     node_times = state.get("node_execution_times", {})
-    node_times["entity_extractor"] = node_elapsed
+    node_times["entity_expander"] = node_elapsed
 
     return {
         **state,
         "extracted_entities": matched_entities,
         "ontology_schema": ontology_schema,
         "ttl_data": ttl_data,
-        "executed_nodes": state.get("executed_nodes", []) + ["entity_extractor"],
+        "executed_nodes": state.get("executed_nodes", []) + ["entity_expander"],
         "node_execution_times": node_times
     }
