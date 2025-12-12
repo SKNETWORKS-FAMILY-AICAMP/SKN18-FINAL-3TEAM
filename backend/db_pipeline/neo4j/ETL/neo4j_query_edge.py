@@ -3,34 +3,15 @@ import csv
 from pathlib import Path
 from neo4j import GraphDatabase
 
-import sys
 csv.field_size_limit(2_147_483_647)
 
-# --- 프로젝트 루트 기준 경로 (create_nodes.py와 동일하게) ---
-BASE_DIR = Path(__file__).resolve().parents[3]
-CSV_PATH = BASE_DIR / "infra" / "neo4j" / "import" / "encykorea_cleaned6.csv"
-
-# --- Neo4j 접속 정보 ---
-URI = "neo4j://localhost:7687"
-USER = "neo4j"
-PASSWORD = "skn183final"
-
-# --- 카테고리 → 라벨 매핑 (create_nodes.py와 동일하게) ---
-CATEGORY_LABEL_MAP = {
-    "인물": "Person",
-    "사건": "Event",
-    "문헌": "Document",
-    "제도": "System",
-    "유적": "Heritage",
-    "개념": "Concept",
-    "물품": "Object",
-    "단체": "Organization",
-    "지명": "Place",
-    "작품": "Work",
-    "의례·행사": "Ritual",
-    "의복": "Clothing",
-    "정책": "Policy",
-}
+from backend.db_pipeline.common.config import (
+    NEO4J_URI as URI,
+    NEO4J_USER as USER,
+    NEO4J_PASSWORD as PASSWORD,
+    CATEGORY_LABEL_MAP,
+    INPUT_CSV,
+)
 
 # ============================================================
 # 공통: CSV 로딩
@@ -38,7 +19,7 @@ CATEGORY_LABEL_MAP = {
 
 def load_rows():
     """create_nodes.py에서처럼 _article_id 포함해서 로딩."""
-    with open(CSV_PATH, encoding="utf-8-sig", newline="") as f:
+    with open(Path(INPUT_CSV), encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         for i, row in enumerate(reader, start=1):
             row["_article_id"] = i

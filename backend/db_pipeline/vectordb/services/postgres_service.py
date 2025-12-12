@@ -7,28 +7,19 @@ PostgreSQL + pgvector 벡터 데이터베이스 서비스
 - 청크 단위 검색 + 문서 메타데이터
 """
 
-import os
-from typing import List, Dict, Optional
-from pathlib import Path
-from dotenv import load_dotenv
+from typing import List, Dict
 import psycopg2
 from psycopg2.extras import execute_values
-from openai import OpenAI
 
-# .env 로드
-env_path = Path(__file__).parent.parent.parent.parent / ".env"
-load_dotenv(env_path, override=True)
-
-# 설정
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
-POSTGRES_DB = os.getenv("POSTGRES_DB", "sknproject4")
-POSTGRES_USER = os.getenv("POSTGRES_USER", "root")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "root1234")
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-EMBED_MODEL = "text-embedding-3-small"  # 1536 dimensions
-EMBEDDING_DIM = 1536
+from backend.db_pipeline.common.config import (
+    POSTGRES_HOST,
+    POSTGRES_PORT,
+    POSTGRES_DB,
+    POSTGRES_USER,
+    POSTGRES_PASSWORD,
+    EMBEDDING_DIM,
+)
+from backend.db_pipeline.common.embedding_model import embed
 
 
 class PostgresVectorService:
@@ -36,7 +27,6 @@ class PostgresVectorService:
 
     def __init__(self):
         self.conn = None
-        self.openai_client = None
 
     def connect(self) -> bool:
         """PostgreSQL 연결"""
@@ -59,12 +49,6 @@ class PostgresVectorService:
             self.conn.close()
             self.conn = None
 
-    def init_openai_client(self):
-        """OpenAI 클라이언트 초기화"""
-        if self.openai_client is None:
-            self.openai_client = OpenAI(api_key=OPENAI_API_KEY)
-        return self.openai_client
-
     def create_schema(self, drop_existing: bool = False):
         """스키마 생성 (pgvector 확장 + 테이블)"""
 
@@ -76,7 +60,7 @@ class PostgresVectorService:
         try:
             # 1. pgvector 확장 설치
             cursor.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-            print("✅ pgvector 확장 활성화")
+            print("pgvector 확장 활성화")
 
             # 2. 기존 테이블 삭제
             if drop_existing:
@@ -135,70 +119,9 @@ class PostgresVectorService:
         finally:
             cursor.close()
 
-    def embed_text(self, text: str) -> List[float]:
-        """텍스트 임베딩 생성 (OpenAI)"""
-        if self.openai_client is None:
-            self.init_openai_client()
-
-        # 빈 텍스트 처리
-        if not text or not text.strip():
-            return [0.0] * EMBEDDING_DIM
-
-        response = self.openai_client.embeddings.create(
-            model=EMBED_MODEL,
-            input=text
-        )
-
-        return response.data[0].embedding
-
-    def embed_batch(self, texts: List[str], batch_size: int = 100) -> List[List[float]]:
-        """배치 임베딩 생성 (API 효율성)
-
-        Args:
-            texts: 임베딩할 텍스트 리스트
-            batch_size: OpenAI API 배치 크기 (최대 2048)
-
-        Returns:
-            임베딩 벡터 리스트
-        """
-        if self.openai_client is None:
-            self.init_openai_client()
-
-        all_embeddings = []
-
-        # 빈 텍스트 필터링 및 인덱스 매핑
-        valid_indices = []
-        valid_texts = []
-
-        for i, text in enumerate(texts):
-            if text and text.strip():
-                valid_indices.append(i)
-                valid_texts.append(text)
-
-        # 배치 처리
-        for i in range(0, len(valid_texts), batch_size):
-            batch = valid_texts[i:i + batch_size]
-
-            response = self.openai_client.embeddings.create(
-                model=EMBED_MODEL,
-                input=batch
-            )
-
-            batch_embeddings = [item.embedding for item in response.data]
-            all_embeddings.extend(batch_embeddings)
-
-        # 원래 순서대로 재구성 (빈 텍스트는 zero vector)
-        final_embeddings = []
-        valid_idx = 0
-
-        for i in range(len(texts)):
-            if i in valid_indices:
-                final_embeddings.append(all_embeddings[valid_idx])
-                valid_idx += 1
-            else:
-                final_embeddings.append([0.0] * EMBEDDING_DIM)
-
-        return final_embeddings
+    def _embed(self, texts, batch_size: int = 100):
+        """공용 임베딩 함수 (단일/배치 모두 처리)"""
+        return embed(texts, batch_size=batch_size)
 
     def insert_documents(self, documents: List[Dict]) -> int:
         """문서 배치 삽입 (메타데이터 + 청크 + 임베딩)
@@ -249,7 +172,7 @@ class PostgresVectorService:
                 chunk_texts = [chunk["text"] for chunk in chunks]
 
                 if chunk_texts:
-                    embeddings = self.embed_batch(chunk_texts)
+                    embeddings = self._embed(chunk_texts)
 
                     # 3. document_chunks 테이블 삽입
                     chunk_data = []
@@ -310,7 +233,7 @@ class PostgresVectorService:
 
         try:
             # 쿼리 임베딩
-            query_embedding = self.embed_text(query)
+            query_embedding = self._embed(query)
 
             # 코사인 유사도 검색 (1 - cosine_distance)
             cursor.execute(f"""

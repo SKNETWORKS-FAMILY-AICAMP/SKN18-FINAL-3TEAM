@@ -1,6 +1,5 @@
-from backend.db_pipeline.services.custom_pgvector import CustomPGVector
+from backend.db_pipeline.vectordb.services.custom_pgvector import CustomPGVector
 
-# 
 def create_pgvector_store(connection_string, collection_name, embeddings):
     """PGVector 스토어 생성"""
     try:

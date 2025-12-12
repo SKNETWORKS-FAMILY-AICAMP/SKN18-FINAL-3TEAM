@@ -1,5 +1,5 @@
 import math
-from backend.db_pipeline.ETL.load_to_pgvector import get_embedding
+from backend.db_pipeline.common.embedding_model import get_embedding
 
 
 def get_query_embedding(text: str):

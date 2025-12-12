@@ -1,46 +1,17 @@
 # backend/db_pipeline/ETL/load_to_pgvector.py
 
-from .transform import preprocess_data, chunk_dataframe
+from backend.db_pipeline.common.transform import preprocess_data, chunk_dataframe
 from ..services.db_connection import prepare_vectordb
 from ..services.vector_store import create_pgvector_store
-from ..config import POSTGRES_CONN_STR, INPUT_CSV, EMBED_MODEL
-import pandas as pd
-from langchain_openai import OpenAIEmbeddings
+from backend.db_pipeline.common.config import POSTGRES_CONN_STR, HISTORY_TABLE_NAME
+from backend.db_pipeline.common.load_raw_data import load_raw_data
+from backend.db_pipeline.common.embedding_model import get_embedding
+
 from tqdm import tqdm
 import psycopg2
 
 
-def load_raw_data():
-    """CSV 파일에서 원본 데이터 로드"""
-    print(f"CSV 파일 읽기: {INPUT_CSV}")
-    # CSV 필드 크기 제한 증가 및 파싱 오류 처리
-    import sys
-    import csv
-    max_int = sys.maxsize
-    while True:
-        try:
-            csv.field_size_limit(max_int)
-            break
-        except OverflowError:
-            max_int = int(max_int / 10)
-    
-    # 따옴표 처리 및 오류 행 건너뛰기
-    df = pd.read_csv(
-        INPUT_CSV, 
-        encoding='utf-8',
-        quoting=csv.QUOTE_MINIMAL,
-        on_bad_lines='skip',  # 잘못된 행 건너뛰기
-        engine='python'  # Python 엔진 사용 (더 유연한 파싱)
-    )
-    return df
-
-
-def get_embedding():
-    """임베딩 모델 반환"""
-    return OpenAIEmbeddings(model=EMBED_MODEL)
-
-
-def clear_existing_data(table_name: str = "korean_history"):
+def clear_existing_data(table_name: str = HISTORY_TABLE_NAME):
     """기존 데이터가 있으면 삭제"""
     try:
         with psycopg2.connect(POSTGRES_CONN_STR) as conn:
@@ -83,7 +54,7 @@ def run():
     print("="*70)
     
     print("\n[0/6] 기존 데이터 확인 및 삭제")
-    clear_existing_data("korean_history")
+    clear_existing_data(HISTORY_TABLE_NAME)
     
     print("\n[1/6] PostgreSQL pgvector 확장 설정")
     prepare_vectordb(POSTGRES_CONN_STR)
@@ -104,14 +75,14 @@ def run():
     metas = [c["metadata"] for c in chunks]
 
     print("\n[5/6] 임베딩 생성 및 벡터 DB 저장")
-    store = create_pgvector_store(POSTGRES_CONN_STR, "korean_history", get_embedding())
+    store = create_pgvector_store(POSTGRES_CONN_STR, HISTORY_TABLE_NAME, get_embedding())
     store.add_texts(texts, metas)
 
     print("\n[6/6] 데이터 적재 확인")
     try:
         with psycopg2.connect(POSTGRES_CONN_STR) as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT COUNT(*) FROM korean_history;")
+                cur.execute(f"SELECT COUNT(*) FROM {HISTORY_TABLE_NAME};")
                 final_count = cur.fetchone()[0]
                 print(f"  └─ 최종 적재된 데이터: {final_count:,}개")
     except Exception as e:

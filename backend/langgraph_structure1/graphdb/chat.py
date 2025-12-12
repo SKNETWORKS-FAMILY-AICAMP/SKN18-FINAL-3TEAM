@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from neo4j import GraphDatabase
 from neo4j.graph import Node, Relationship
 from openai import OpenAI
+from backend.db_pipeline.common.embedding_model import embed
 
 # ===== .env =====
 load_dotenv()
@@ -93,11 +94,7 @@ def extract_nouns(text):
 # =====================================================
 
 def get_query_embedding(text):
-    r = client.embeddings.create(
-        model="text-embedding-3-small",
-        input=text,
-    )
-    return r.data[0].embedding
+    return embed(text)
 
 
 def cosine_sim(a, b):

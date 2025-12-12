@@ -7,41 +7,26 @@ PostgreSQL + pgvector 제목 임베딩 서비스
 - title_embeddings 테이블 사용
 """
 
-import os
 from typing import List, Dict
-from pathlib import Path
-from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import execute_values
-from openai import OpenAI
 
-# 프로젝트 루트 경로 설정 및 환경변수 로드
-project_root = Path(__file__).parent.parent.parent.parent
-env_path = project_root / ".env"
-load_dotenv(env_path, override=True)
-
-# PostgreSQL 설정 (환경변수에서 로드)
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
-POSTGRES_DB = os.getenv("POSTGRES_DB", "sknproject4")
-POSTGRES_USER = os.getenv("POSTGRES_USER", "root")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "root1234")
-
-# OpenAI 설정
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-EMBED_MODEL = os.getenv("TITLE_EMBED_MODEL", "text-embedding-3-small")
-EMBEDDING_DIM = int(os.getenv("TITLE_EMBED_DIM", "1536"))
-
-# 테이블 설정
-TABLE_NAME = os.getenv("TITLE_TABLE_NAME", "title_embeddings")
-
+from backend.db_pipeline.common.config import (
+    POSTGRES_HOST,
+    POSTGRES_PORT,
+    POSTGRES_DB,
+    POSTGRES_USER,
+    POSTGRES_PASSWORD,
+    EMBEDDING_DIM,
+    TITLE_TABLE_NAME
+)
+from backend.db_pipeline.common.embedding_model import embed
 
 class TitleVectorService:
     """제목 임베딩 전용 pgvector 검색 서비스"""
 
     def __init__(self):
         self.conn = None
-        self.openai_client = None
 
     def connect(self) -> bool:
         """PostgreSQL 연결"""
@@ -64,12 +49,6 @@ class TitleVectorService:
             self.conn.close()
             self.conn = None
 
-    def init_openai_client(self):
-        """OpenAI 클라이언트 초기화"""
-        if self.openai_client is None:
-            self.openai_client = OpenAI(api_key=OPENAI_API_KEY)
-        return self.openai_client
-
     def create_schema(self, drop_existing: bool = False):
         """스키마 생성 (pgvector 확장 + title_embeddings 테이블)"""
 
@@ -89,28 +68,28 @@ class TitleVectorService:
             #  2. 기존 테이블 삭제 (옵션)
             # ------------------------------------------------------------
             if drop_existing:
-                cursor.execute(f"DROP TABLE IF EXISTS {TABLE_NAME} CASCADE;")
-                print(f"  |- 기존 테이블 삭제: {TABLE_NAME}")
+                cursor.execute(f"DROP TABLE IF EXISTS {TITLE_TABLE_NAME} CASCADE;")
+                print(f"  |- 기존 테이블 삭제: {TITLE_TABLE_NAME}")
 
             # ------------------------------------------------------------
             #  3. 테이블 생성
             # ------------------------------------------------------------
             cursor.execute(f"""
-                CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+                CREATE TABLE IF NOT EXISTS {TITLE_TABLE_NAME} (
                     id SERIAL PRIMARY KEY,
                     title VARCHAR(500) NOT NULL,
                     category VARCHAR(100),
                     embedding vector({EMBEDDING_DIM})
                 );
             """)
-            print(f"  |- 테이블 생성: {TABLE_NAME}")
+            print(f"  |- 테이블 생성: {TITLE_TABLE_NAME}")
 
             # ------------------------------------------------------------
             #  4. 벡터 인덱스 생성 (HNSW)
             # ------------------------------------------------------------
             cursor.execute(f"""
-                CREATE INDEX IF NOT EXISTS {TABLE_NAME}_embedding_idx
-                ON {TABLE_NAME}
+                CREATE INDEX IF NOT EXISTS {TITLE_TABLE_NAME}_embedding_idx
+                ON {TITLE_TABLE_NAME}
                 USING hnsw (embedding vector_cosine_ops);
             """)
             print(f"  |- 벡터 인덱스 생성 (HNSW)")
@@ -119,13 +98,13 @@ class TitleVectorService:
             #  5. 제목 인덱스 생성
             # ------------------------------------------------------------
             cursor.execute(f"""
-                CREATE INDEX IF NOT EXISTS {TABLE_NAME}_title_idx
-                ON {TABLE_NAME}(title);
+                CREATE INDEX IF NOT EXISTS {TITLE_TABLE_NAME}_title_idx
+                ON {TITLE_TABLE_NAME}(title);
             """)
             print(f"  └─ 제목 인덱스 생성")
 
             self.conn.commit()
-            print(f"  └─ 스키마 생성 완료: {TABLE_NAME}")
+            print(f"  └─ 스키마 생성 완료: {TITLE_TABLE_NAME}")
 
         except Exception as e:
             self.conn.rollback()
@@ -134,70 +113,9 @@ class TitleVectorService:
         finally:
             cursor.close()
 
-    def embed_text(self, text: str) -> List[float]:
-        """텍스트 임베딩 생성 (OpenAI)"""
-        if self.openai_client is None:
-            self.init_openai_client()
-
-        # 빈 텍스트 처리
-        if not text or not text.strip():
-            return [0.0] * EMBEDDING_DIM
-
-        response = self.openai_client.embeddings.create(
-            model=EMBED_MODEL,
-            input=text
-        )
-
-        return response.data[0].embedding
-
-    def embed_batch(self, texts: List[str], batch_size: int = 100) -> List[List[float]]:
-        """배치 임베딩 생성 (API 효율성)
-
-        Args:
-            texts: 임베딩할 텍스트 리스트
-            batch_size: OpenAI API 배치 크기 (최대 2048)
-
-        Returns:
-            임베딩 벡터 리스트
-        """
-        if self.openai_client is None:
-            self.init_openai_client()
-
-        all_embeddings = []
-
-        # 빈 텍스트 필터링 및 인덱스 매핑
-        valid_indices = []
-        valid_texts = []
-
-        for i, text in enumerate(texts):
-            if text and text.strip():
-                valid_indices.append(i)
-                valid_texts.append(text)
-
-        # 배치 처리
-        for i in range(0, len(valid_texts), batch_size):
-            batch = valid_texts[i:i + batch_size]
-
-            response = self.openai_client.embeddings.create(
-                model=EMBED_MODEL,
-                input=batch
-            )
-
-            batch_embeddings = [item.embedding for item in response.data]
-            all_embeddings.extend(batch_embeddings)
-
-        # 원래 순서대로 재구성 (빈 텍스트는 zero vector)
-        final_embeddings = []
-        valid_idx = 0
-
-        for i in range(len(texts)):
-            if i in valid_indices:
-                final_embeddings.append(all_embeddings[valid_idx])
-                valid_idx += 1
-            else:
-                final_embeddings.append([0.0] * EMBEDDING_DIM)
-
-        return final_embeddings
+    def _embed(self, texts, batch_size: int = 100):
+        """공용 임베딩 함수 (단일/배치 모두 처리)"""
+        return embed(texts, batch_size=batch_size)
 
     def insert_entities(self, entities: List[Dict]) -> int:
         """엔티티 배치 삽입 (제목 임베딩)
@@ -220,7 +138,7 @@ class TitleVectorService:
         try:
             # 제목 임베딩 생성 (배치)
             titles = [e["title"] for e in entities]
-            embeddings = self.embed_batch(titles)
+            embeddings = self._embed(titles)
 
             # 데이터 삽입
             entity_data = []
@@ -232,7 +150,7 @@ class TitleVectorService:
                 ))
 
             execute_values(cursor, f"""
-                INSERT INTO {TABLE_NAME} (title, category, embedding)
+                INSERT INTO {TITLE_TABLE_NAME} (title, category, embedding)
                 VALUES %s
             """, entity_data)
 
@@ -253,7 +171,7 @@ class TitleVectorService:
         top_k: int = 10,
         threshold: float = 0.5
     ) -> List[Dict]:
-        """유사 엔티티 검색 (코사인 유���도)
+        """유사 엔티티 검색 (코사인 유사도)
 
         Args:
             query: 검색 쿼리 (제목 또는 키워드)
@@ -274,7 +192,7 @@ class TitleVectorService:
 
         try:
             # 쿼리 임베딩
-            query_embedding = self.embed_text(query)
+            query_embedding = self._embed(query)
 
             # 코사인 유사도 검색 (1 - cosine_distance)
             cursor.execute(f"""
@@ -282,7 +200,7 @@ class TitleVectorService:
                     title,
                     category,
                     1 - (embedding <=> %s::vector) AS similarity
-                FROM {TABLE_NAME}
+                FROM {TITLE_TABLE_NAME}
                 WHERE 1 - (embedding <=> %s::vector) >= %s
                 ORDER BY embedding <=> %s::vector
                 LIMIT %s;
@@ -345,20 +263,20 @@ class TitleVectorService:
 
         try:
             # 총 엔티티 수
-            cursor.execute(f"SELECT COUNT(*) FROM {TABLE_NAME};")
+            cursor.execute(f"SELECT COUNT(*) FROM {TITLE_TABLE_NAME};")
             total_entities = cursor.fetchone()[0]
 
             # 카테고리별 통계
             cursor.execute(f"""
                 SELECT category, COUNT(*)
-                FROM {TABLE_NAME}
+                FROM {TITLE_TABLE_NAME}
                 GROUP BY category
                 ORDER BY COUNT(*) DESC;
             """)
             category_stats = dict(cursor.fetchall())
 
             return {
-                "table_name": TABLE_NAME,
+                "table_name": TITLE_TABLE_NAME,
                 "total_entities": total_entities,
                 "category_stats": category_stats
             }

@@ -54,7 +54,7 @@ def get_title_vector_service():
     global _title_vector_service
     if _title_vector_service is None and USE_PGVECTOR:
         try:
-            from db_pipeline.services.title_vector_service import TitleVectorService
+            from db_pipeline.vectordb.services.title_vector_service import TitleVectorService
             _title_vector_service = TitleVectorService()
             print("✅ 제목 임베딩 pgvector 서비스 초기화 완료")
         except ImportError:

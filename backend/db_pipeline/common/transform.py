@@ -7,22 +7,24 @@ Transform: CSV 데이터 정규화 + 청킹
 4. Output: transformed_chunks.csv 생성
 """
 
-import re
-from typing import List, Dict
+from typing import List
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import pandas as pd
-from ..config import INPUT_CSV, OUTPUT_CSV, EMBED_MODEL
+from backend.db_pipeline.common.config import INPUT_CSV
 
-# 청킹 파라미터
-CHUNK_SIZE = 800  # 800자
-OVERLAP_SIZE = 100  # 100자
+def split_chunk():
+    # 청킹 파라미터
+    CHUNK_SIZE = 800  # 800자
+    OVERLAP_SIZE = 100  # 100자
 
-# RecursiveCharacterTextSplitter 초기화
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=CHUNK_SIZE,
-    chunk_overlap=OVERLAP_SIZE,
-    separators=["\n\n", "\n", " ", ""],  # 우선순위: 문단 > 줄 > 공백 > 문자
-)
+    # RecursiveCharacterTextSplitter 초기화
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=OVERLAP_SIZE,
+        separators=["\n\n", "\n", " ", ""],  # 우선순위: 문단 > 줄 > 공백 > 문자
+    )
+
+    return text_splitter
 
 
 def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
@@ -70,7 +72,7 @@ def count_tokens(text: str) -> int:
     return len(text.split())  # 대략적인 단어 수
 
 
-def chunk_text(text: str) -> List[str]:
+def chunk_text(text: str, text_splitter: RecursiveCharacterTextSplitter) -> List[str]:
     """긴 본문을 RecursiveCharacterTextSplitter 로 청킹"""
     chunks = text_splitter.split_text(text)
 
@@ -92,7 +94,8 @@ def chunk_dataframe(df):
         content = getattr(row, "contents", "") or ""
 
         # contents를 chunk로 분할
-        chunks = chunk_text(content)
+        text_splitter = split_chunk()
+        chunks = chunk_text(content,text_splitter)
 
         for idx, chunk in enumerate(chunks):
             meta = {

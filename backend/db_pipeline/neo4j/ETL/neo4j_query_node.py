@@ -1,58 +1,33 @@
 import csv
 import re
-from neo4j import GraphDatabase
 from pathlib import Path
+from backend.db_pipeline.common.embedding_model import embed
+from backend.db_pipeline.neo4j.services.neo4j_connection import get_driver
 
-from dotenv import load_dotenv            # ✅ 추가
-from openai import OpenAI                # ✅ 추가
-
-import sys
-csv.field_size_limit(2_147_483_647)
-
-# ===== 환경변수 로드 & OpenAI 클라이언트 =====
-load_dotenv()                             # OPENAI_API_KEY 읽어옴
-client = OpenAI()                         # 임베딩용
-
-# 프로젝트 루트 기준 경로 계산 (backend/langgraph_structure/graphdb/ 기준 3단계 위)
-BASE_DIR = Path(__file__).resolve().parents[3]
-
-# --- Neo4j 접속 정보 ---
-URI = "neo4j://localhost:7687"
-USER = "neo4j"
-PASSWORD = "skn183final"
-
-# --- CSV 경로 ---
-CSV_PATH = BASE_DIR / "infra" / "neo4j" / "import" / "encykorea_cleaned6.csv"
+from backend.db_pipeline.common.config import (
+    NEO4J_URI as URI,
+    NEO4J_USER as USER,
+    NEO4J_PASSWORD as PASSWORD,
+    CATEGORY_LABEL_MAP,
+    PERIOD_KEYWORDS,
+    INPUT_CSV,
+)
 
 
-# --- 카테고리 → 라벨 매핑 ---
-CATEGORY_LABEL_MAP = {
-    "인물": "Person",
-    "사건": "Event",
-    "문헌": "Document",
-    "제도": "System",
-    "유적": "Heritage",
-    "개념": "Concept",
-    "물품": "Object",
-    "단체": "Organization",
-    "지명": "Place",
-    "작품": "Work",
-    "의례·행사": "Ritual",
-    "의복": "Clothing",
-    "정책": "Policy",
-}
+# ============================================================
+# 공통: CSV 로딩
+# ============================================================
 
-# 시기 텍스트 추출용
-PERIOD_KEYWORDS = [
-    "조선 전기", "조선 중기", "조선 후기",
-    "조선 초", "조선 말",
-    "고려 전기", "고려 후기",
-    "고려 말", "고려 초",
-    "세종 대", "영조 대", "정조 대",
-    "일제 강점기", "일제강점기",
-]
+def load_rows(csv_module, csv_path: Path):
+    """create_nodes.py에서처럼 _article_id 포함해서 로딩."""
+    with open(csv_path, encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        for i, row in enumerate(reader, start=1):
+            row["_article_id"] = i
+            yield row
 
 
+# 연도 추출
 def extract_years(text: str | None) -> list[int]:
     if not text:
         return []
@@ -72,14 +47,6 @@ def extract_period_text(text: str | None) -> str | None:
         if kw in text:
             return kw
     return None
-
-
-def load_rows():
-    with open(CSV_PATH, encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        for i, row in enumerate(reader, start=1):
-            row["_article_id"] = i
-            yield row
 
 
 def create_constraints(driver):
@@ -107,16 +74,12 @@ def generate_summary_embedding(summary: str) -> list[float] | None:
     if not summary:
         return None
 
-    resp = client.embeddings.create(
-        model="text-embedding-3-small",
-        input=summary,
-    )
-    return resp.data[0].embedding
+    return embed(summary)
 
 
-def create_nodes(driver):
+def create_nodes(csv_module, driver, csv_path: Path):
     with driver.session() as session:
-        for row in load_rows():
+        for row in load_rows(csv_module, csv_path):
             category = (row.get("category") or "").strip()
             title = (row.get("title") or "").strip()
             summary = (row.get("summary") or "").strip()
@@ -214,15 +177,16 @@ def create_nodes(driver):
             )
 
 
-def main():
-    driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
+def run_node_job(csv_module=csv, csv_path: Path | None = None):
+    driver = get_driver()
     try:
         create_constraints(driver)
-        create_nodes(driver)
+        target_path = Path(csv_path) if csv_path else Path(INPUT_CSV)
+        create_nodes(csv_module, driver, target_path)
         print("노드 생성 + summary 임베딩 완료.")
     finally:
         driver.close()
 
-
 if __name__ == "__main__":
-    main()
+    csv.field_size_limit(2_147_483_647)
+    run_node_job(csv)
