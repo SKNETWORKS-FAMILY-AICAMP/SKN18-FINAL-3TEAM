@@ -330,8 +330,7 @@ PROPERTY_GROUPS = {
 def get_group_with_llm(property_batch: list) -> dict:
     """
     LLM을 사용하여 프로퍼티 배치를 의미론적으로 분류
-    
-    LangSmith 추적을 위해 ChatOpenAI 사용 (requests 직접 호출 대신)
+
 
     Args:
         property_batch: 프로퍼티 이름 리스트 (최대 20개)
@@ -672,7 +671,7 @@ def extract_all_properties(ttl_path: str) -> list:
     return sorted(list(properties))
 
 
-def group_properties(properties: list, use_llm: bool = False) -> dict:
+def group_properties(properties: list, use_llm: bool = True) -> dict:
     """
     프로퍼티를 그룹별로 분류
     

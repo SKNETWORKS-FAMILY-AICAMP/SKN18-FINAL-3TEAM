@@ -32,7 +32,7 @@ class InferenceTripleGenerator:
         병렬 추론 결과를 TTL 형식으로 변환
 
         Args:
-            inference_results: parallel_inference_executor_node의 결과
+            inference_results: Parallel Knowledge Retrieval 노드의 결과
                 {
                     "causal": {"bindings": [...], "status": "success"},
                     "person": {"bindings": [...], "status": "success"},
