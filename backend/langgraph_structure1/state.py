@@ -27,3 +27,6 @@ class GraphState(TypedDict):
     # Scene 분할 결과
     scenes: NotRequired[List[Dict[str, Any]]]
 
+    # --- [🔥 추가된 부분] Unity 연동 변수 ---
+    asset_context: NotRequired[str]          # Unity에서 받은 자산 정보 (프롬프트용)
+    scene_script: NotRequired[Dict[str, Any]] # 최종 완성된 JSON 대본 (Title + Scenes)
