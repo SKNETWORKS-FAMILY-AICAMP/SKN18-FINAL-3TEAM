@@ -4,7 +4,7 @@ import asyncio
 from backend.langgraph_structure1.graph import create_graph_flow
 
 
-async def main():
+async def main(query: str = None):
     # LangGraph 앱 생성
     app = create_graph_flow()
 
@@ -21,4 +21,9 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+
+    while True:
+        user_query = input("질문을 입력하세요 (종료하려면 'exit' 입력): ")
+        if user_query.lower() == 'exit':
+            break
+        asyncio.run(main(query=user_query))

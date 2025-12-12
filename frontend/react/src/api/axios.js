@@ -72,15 +72,15 @@ api.interceptors.response.use(
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
 
-          // 로그인 페이지로 리다이렉트
-          window.location.href = '/login';
+          // 홈 페이지로 리다이렉트 (로그인 버튼 표시됨)
+          window.location.href = '/';
 
           return Promise.reject(refreshError);
         }
       } else {
-        // Refresh 토큰이 없는 경우 로그인 페이지로
+        // Refresh 토큰이 없는 경우 홈 페이지로
         console.warn('⚠️ Refresh 토큰 없음. 로그인 필요.');
-        window.location.href = '/login';
+        window.location.href = '/';
       }
     }
 
