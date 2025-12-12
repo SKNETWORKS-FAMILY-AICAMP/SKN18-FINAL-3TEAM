@@ -10,7 +10,7 @@ async def main(query: str = None):
 
     # 테스트용 입력 state
     initial_state = {
-        "query": "Who founded the Joseon?",
+        "query": query,
     }
 
     # 실행 (hybrid_node가 async이므로 ainvoke 사용)
