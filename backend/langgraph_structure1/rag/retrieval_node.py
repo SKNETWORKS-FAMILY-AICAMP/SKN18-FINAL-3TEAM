@@ -5,9 +5,9 @@ from typing import Any, Dict, List
 # 상위 절대 경로
 
 from backend.langgraph_structure1.state import GraphState
-from backend.db_pipeline.ETL.load_to_pgvector import get_embedding
-from backend.db_pipeline.services.custom_pgvector import CustomPGVector
-from backend.db_pipeline.config import POSTGRES_CONN_STR
+from backend.db_pipeline.vectordb.ETL.load_to_pgvector import get_embedding
+from backend.db_pipeline.vectordb.services.custom_pgvector import CustomPGVector
+from backend.db_pipeline.common.config import POSTGRES_CONN_STR, HISTORY_TABLE_NAME
 
 def retrieval_node(state: GraphState) -> GraphState:
     question = state.get("query")
@@ -22,7 +22,7 @@ def retrieval_node(state: GraphState) -> GraphState:
     vectorstore = CustomPGVector(
         conn_str=POSTGRES_CONN_STR,
         embedding_fn=embed,
-        table="korean_history",  # 실제 테이블명
+        table=HISTORY_TABLE_NAME,  # 실제 테이블명
     )
     
     start_time = time.time()

@@ -1,43 +1,22 @@
 # create_edges.py
 import csv
 from pathlib import Path
-from neo4j import GraphDatabase
+from backend.db_pipeline.neo4j.services.neo4j_connection import get_driver
 
-import sys
-csv.field_size_limit(2_147_483_647)
-
-# --- 프로젝트 루트 경로 ---
-BASE_DIR = Path(__file__).resolve().parents[3]
-CSV_PATH = BASE_DIR / "infra" / "neo4j" / "import" / "encykorea_cleaned6.csv"
-
-# --- Neo4j 접속 정보 ---
-URI = "neo4j://localhost:7687"
-USER = "neo4j"
-PASSWORD = "skn183final"
-
-# --- 카테고리 → 라벨 매핑 ---
-CATEGORY_LABEL_MAP = {
-    "인물": "Person",
-    "사건": "Event",
-    "문헌": "Document",
-    "제도": "System",
-    "유적": "Heritage",
-    "개념": "Concept",
-    "물품": "Object",
-    "단체": "Organization",
-    "지명": "Place",
-    "작품": "Work",
-    "의례·행사": "Ritual",
-    "의복": "Clothing",
-    "정책": "Policy",
-}
+from backend.db_pipeline.common.config import (
+    NEO4J_URI as URI,
+    NEO4J_USER as USER,
+    NEO4J_PASSWORD as PASSWORD,
+    CATEGORY_LABEL_MAP,
+    INPUT_CSV,
+)
 
 # ============================================================
 # CSV 로드
 # ============================================================
 
-def load_rows():
-    with open(CSV_PATH, encoding="utf-8-sig", newline="") as f:
+def load_rows(csv_module, csv_path: Path):
+    with open(csv_path, encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         for i, row in enumerate(reader, start=1):
             row["_article_id"] = i
@@ -121,7 +100,7 @@ def canonicalize_pair(label1, id1, label2, id2):
     return None   # 선언되지 않은 조합은 엣지 생성 안 함
 
 
-def create_text_edges(driver):
+def create_text_edges(csv_module, driver, csv_path: Path):
     TARGET_LABELS = {
         "Person", "Event", "Place", "Organization",
         "Concept", "Heritage", "Object", "System",
@@ -130,7 +109,7 @@ def create_text_edges(driver):
 
     # 1) 모든 노드 로드
     nodes = []
-    for row in load_rows():
+    for row in load_rows(csv_module, csv_path):
         category = (row.get("category") or "").strip()
         label = CATEGORY_LABEL_MAP.get(category)
         if not label:
@@ -205,19 +184,20 @@ def create_text_edges(driver):
 # MAIN
 # ============================================================
 
-def main():
-    driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
+def run_edge_job(csv_module=csv, csv_path: Path | None = None):
+    driver = get_driver()
     try:
         print("\n=== YEAR 엣지 생성 ===")
         create_year_edges(driver)
 
         print("\n=== TEXT 기반 엣지 생성 (선언된 관계만) ===")
-        create_text_edges(driver)
+        target_path = Path(csv_path) if csv_path else Path(INPUT_CSV)
+        create_text_edges(csv_module, driver, target_path)
 
-        print("\n🎉 모든 엣지 생성 완료!")
+        print("\n모든 엣지 생성 완료!")
     finally:
         driver.close()
 
-
 if __name__ == "__main__":
-    main()
+    csv.field_size_limit(2_147_483_647)
+    run_edge_job(csv)

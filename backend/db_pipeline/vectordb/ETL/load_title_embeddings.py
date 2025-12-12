@@ -9,7 +9,6 @@ encykorea_cleaned6.csv → PostgreSQL title_embeddings 테이블
 
 import os
 import sys
-import csv
 import time
 from pathlib import Path
 from typing import List, Dict
@@ -23,47 +22,14 @@ sys.path.insert(0, str(project_root / "backend"))
 env_path = project_root / ".env"
 load_dotenv(env_path, override=True)
 
-from db_pipeline.services.title_vector_service import get_title_vector_service, TitleVectorService
+from db_pipeline.vectordb.services.title_vector_service import get_title_vector_service, TitleVectorService
+from db_pipeline.common.load_raw_data import load_raw_data
 
 # 경로 설정
 DATA_DIR = Path(__file__).parent.parent / "data"
 CSV_FILENAME = os.getenv("CSV_FILENAME", "encykorea_cleaned6.csv")
 CSV_FILE = DATA_DIR / CSV_FILENAME
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "100"))
-
-
-def load_csv_data(csv_path: Path) -> List[Dict]:
-    """CSV 파일 로드"""
-    # CSV 필드 크기 제한 증가
-    max_int = sys.maxsize
-    while True:
-        try:
-            csv.field_size_limit(max_int)
-            break
-        except OverflowError:
-            max_int = int(max_int / 10)
-
-    entities = []
-
-    with open(csv_path, 'r', encoding='utf-8-sig') as f:  # BOM 제거를 위해 utf-8-sig 사용
-        reader = csv.DictReader(f)
-
-        for row in reader:
-            # BOM이 포함된 경우를 대비해 컬럼명 정규화
-            category_key = "category"
-            if "\ufeffcategory" in row:
-                category_key = "\ufeffcategory"
-            
-            entities.append({
-                "title": row.get("title", "").strip(),
-                "category": row.get(category_key, "").strip(),
-                "summary": row.get("summary", "").strip()
-            })
-
-    # 빈 title 필터링
-    entities = [e for e in entities if e["title"]]
-
-    return entities
 
 
 def main():
@@ -76,14 +42,35 @@ def main():
     # ------------------------------------------------------------
     #  1. CSV 파일 로드
     # ------------------------------------------------------------
-    print("\n[1/5] CSV 파일 로드")
+    print("\n[1/4] CSV 파일 로드")
     print(f"  |- 파일 경로: {CSV_FILE}")
 
     if not CSV_FILE.exists():
         print(f"  |- [ERROR] 파일이 없습니다: {CSV_FILE}")
         return
 
-    entities = load_csv_data(CSV_FILE)
+    df = load_raw_data(CSV_FILE, encoding="utf-8-sig")
+
+    # title/category/summary 추출 후 빈 제목 제거
+    entities: List[Dict] = []
+    for row in df.itertuples(index=False):
+        title = getattr(row, "title", "") or ""
+        category = getattr(row, "category", "") or ""
+        summary = getattr(row, "summary", "") or ""
+
+        title = str(title).strip()
+        category = str(category).strip()
+        summary = str(summary).strip()
+
+        if not title:
+            continue
+
+        entities.append({
+            "title": title,
+            "category": category,
+            "summary": summary,
+        })
+
     print(f"  |- 로드 완료: {len(entities)}개 엔티티")
 
     # 샘플 출력
@@ -97,7 +84,7 @@ def main():
     # ------------------------------------------------------------
     #  2. PostgreSQL 연결 및 스키마 생성
     # ------------------------------------------------------------
-    print("\n[2/5] PostgreSQL 연결 및 스키마 생성")
+    print("\n[2/4] PostgreSQL 연결 및 스키마 생성")
     service = get_title_vector_service()
 
     if not service.connect():
@@ -108,16 +95,9 @@ def main():
     service.create_schema(drop_existing=True)
 
     # ------------------------------------------------------------
-    #  3. OpenAI 클라이언트 초기화
+    #  3. 데이터 적재 (배치 처리)
     # ------------------------------------------------------------
-    print("\n[3/5] OpenAI 클라이언트 초기화")
-    service.init_openai_client()
-    print("  └─ 초기화 완료")
-
-    # ------------------------------------------------------------
-    #  4. 데이터 적재 (배치 처리)
-    # ------------------------------------------------------------
-    print(f"\n[4/5] 데이터 적재 (배치 크기: {BATCH_SIZE})")
+    print(f"\n[3/4] 데이터 적재 (배치 크기: {BATCH_SIZE})")
 
     start_time = time.time()
     total_inserted = 0
@@ -140,9 +120,9 @@ def main():
     elapsed = time.time() - start_time
 
     # ------------------------------------------------------------
-    #  5. 적재 결과 확인
+    #  4. 적재 결과 확인
     # ------------------------------------------------------------
-    print("\n[5/5] 적재 결과")
+    print("\n[4/4] 적재 결과")
     print("-" * 60)
 
     stats = service.get_stats()

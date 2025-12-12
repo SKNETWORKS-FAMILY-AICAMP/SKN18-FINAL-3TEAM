@@ -1,19 +1,4 @@
-import os
-from neo4j import GraphDatabase
 from neo4j.graph import Node, Relationship
-from dotenv import load_dotenv
-
-load_dotenv()
-
-# neo4j 접속 정보
-NEO4J_URI = os.getenv("NEO4J_URI", "neo4j://localhost:7687")
-NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
-
-# neo4j 접속
-def get_driver():
-    return GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-
 
 # Cypher 실행 함수
 def run_cypher(driver, query, params=None):
