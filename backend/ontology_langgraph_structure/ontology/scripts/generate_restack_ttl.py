@@ -60,7 +60,7 @@ def save_restack_file(restack_path: str, remaining_rows: list):
         print(f"    ⚠️ .restack 파일 업데이트 중 오류: {e}")
 
 
-def generate_restack_ttl(restack_rows: list, csv_path: str, output_dir: str, restack_path: str):
+def generate_restack_ttl(restack_rows: list, csv_path: str, output_dir: str, restack_path: str, part_number: int = None):
     """
     .restack 파일에 지정된 행들만 TTL로 변환
     
@@ -69,20 +69,27 @@ def generate_restack_ttl(restack_rows: list, csv_path: str, output_dir: str, res
         csv_path: CSV 파일 경로
         output_dir: TTL 출력 디렉토리
         restack_path: .restack 파일 경로 (처리된 항목 삭제용)
+        part_number: 파트 번호 (병렬 실행 시 사용, None이면 기본 파일 사용)
     """
     if not restack_rows:
         print("⚠️ 처리할 행이 없습니다.")
         return
     
     print(f"📋 처리할 행: {len(restack_rows)}개")
-    print(f"   행 번호: {restack_rows}")
+    if len(restack_rows) <= 10:
+        print(f"   행 번호: {restack_rows}")
+    else:
+        print(f"   행 번호: {restack_rows[:5]} ... {restack_rows[-5:]}")
     print()
     
     # 생성기 초기화
     generator = LLMTTLGenerator(csv_path, output_dir)
     
-    # 출력 파일 경로 (ttl_2에 추가)
-    output_path = os.path.join(output_dir, "korean_history_instances_2.ttl")
+    # 출력 파일 경로 (파트 번호가 있으면 별도 파일, 없으면 기본 파일)
+    if part_number:
+        output_path = os.path.join(output_dir, f"korean_history_instances_2_part{part_number}.ttl")
+    else:
+        output_path = os.path.join(output_dir, "korean_history_instances_2.ttl")
     
     # TTL 헤더 확인 (파일이 없으면 헤더 추가)
     if not os.path.exists(output_path):
@@ -239,12 +246,28 @@ def generate_restack_ttl(restack_rows: list, csv_path: str, output_dir: str, res
 
 def main():
     """메인 함수"""
+    import argparse
+    
+    # 커맨드라인 인자 파싱
+    parser = argparse.ArgumentParser(description='.restack 파일 기반 TTL 재생성')
+    parser.add_argument('--restack-file', type=str, help='.restack 파일 경로 (기본값: instances/.restack)')
+    parser.add_argument('--part-number', type=int, help='파트 번호 (병렬 실행 시 사용)')
+    args = parser.parse_args()
+    
     # 경로 설정
     script_dir = Path(__file__).parent
     project_root = script_dir.parent.parent.parent.parent
     csv_path = project_root / "backend/db_pipeline/data/encykorea_cleaned6.csv"
     output_dir = script_dir.parent / "instances"
-    restack_path = output_dir / ".restack"
+    
+    # .restack 파일 경로 설정
+    if args.restack_file:
+        restack_path = Path(args.restack_file)
+    else:
+        restack_path = output_dir / ".restack"
+    
+    # 파트 번호 저장
+    part_number = args.part_number if args.part_number else None
     
     # 출력 디렉토리 생성
     os.makedirs(output_dir, exist_ok=True)
@@ -257,16 +280,24 @@ def main():
         print(f"   파일 경로: {restack_path}")
         return
     
+    # 출력 파일명 결정
+    if args.part_number:
+        output_filename = f"korean_history_instances_2_part{args.part_number}.ttl"
+    else:
+        output_filename = "korean_history_instances_2.ttl"
+    
     print("=" * 60)
     print("🚀 .restack 파일 기반 TTL 재생성 시작")
+    if args.part_number:
+        print(f"   파트 {args.part_number}")
     print("=" * 60)
     print(f"📂 입력 CSV: {csv_path}")
-    print(f"📂 출력 TTL: {output_dir}/korean_history_instances_2.ttl")
+    print(f"📂 출력 TTL: {output_dir}/{output_filename}")
     print(f"📋 .restack 파일: {restack_path}")
     print()
     
     # TTL 생성
-    generate_restack_ttl(restack_rows, str(csv_path), str(output_dir), str(restack_path))
+    generate_restack_ttl(restack_rows, str(csv_path), str(output_dir), str(restack_path), part_number)
 
 
 if __name__ == "__main__":
