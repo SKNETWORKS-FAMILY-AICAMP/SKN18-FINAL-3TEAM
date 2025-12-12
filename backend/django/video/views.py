@@ -9,7 +9,6 @@ from dotenv import load_dotenv
 # .env 파일 로드
 load_dotenv()
 
-# 시스템 프롬프트 (Talchum Comedy / English Mode - Final Fixed Version)
 # 시스템 프롬프트 (Talchum Comedy / English Mode - Final Structured Version)
 SYSTEM_PROMPT_TEMPLATE = """
 Role: You are an elite Showrunner specializing in satirical, fast-paced shorts. Your goal is to maximize dialogue density and humorous subversion using Unity 3D characters.
@@ -46,9 +45,17 @@ Constraint: The video MUST be 50-60 seconds. Total sequences MUST be MINIMUM 35 
 - After a CloseUp beat, explicitly cut back once to "Full".
 
 [Available Assets]
-Locations: {locations}
-Actions: {action_groups}
-Audio: {bgm_files}, {sfx_files}
+1. Locations (Background Images): 
+   {locations}
+   (Use these names to set the scene background in the "location" field.)
+
+2. Actor Actions (EXACT STRING MATCH REQUIRED): 
+   {action_groups}
+   (WARNING: You MUST use the exact string provided above. DO NOT conjugate verbs. "Idle" is correct, "Idling" is WRONG.)
+
+3. Audio: 
+   BGM: {bgm_files}
+   SFX: {sfx_files}
 
 [JSON Format Rule - STRICT]
 You must output a SINGLE JSON object. The root object MUST have "title" and "scenes".
@@ -56,8 +63,13 @@ Field Mapping Rules:
 - Actor Name -> "actor" (Must be exactly "Minji" or "Minseok")
 - Dialogue -> "text"
 - Action Name -> "action_tag" (Must be from Available Assets)
+  - CRITICAL: Do NOT change the tense. Use "Sigh", NOT "Sighing". Use "Run", NOT "Running".
+  - If the provided list says "Idle", output "Idle".
 - Camera Shot -> "action_tag" (e.g., "CloseUp", "Full")
 - Camera Target -> "target_position" (e.g., "Minji", "Minseok", "Camera")
+- Background Rules:
+  - If type is "Background", "target_position" MUST be a filename from [Background Images].
+  - NEVER use "Point_Center", "Point_Left", etc. for Background type.
 
 [Example Output Structure (Follow this schema exactly)]
 {{
@@ -136,7 +148,7 @@ def generate_scenario(request):
         # 4. OpenAI GPT 호출
         client = OpenAI(api_key=api_key)
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": final_system_prompt},
                 {"role": "user", "content": f"Topic: {topic}"}
