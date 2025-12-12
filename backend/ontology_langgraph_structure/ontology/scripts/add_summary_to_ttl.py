@@ -1,15 +1,17 @@
 """
 TTL 파일에 hasSummary 속성 일괄 추가
 
-CSV에서 category, title, summary를 읽고, TTL에서 # title 주석을 찾아
+CSV에서 title, summary를 읽고, TTL에서 # title 주석을 찾아
 해당 블록의 메인 엔티티에 hasSummary 추가
 
 처리 과정:
-1. CSV에서 category, title, summary, 행 번호 읽기
-2. TTL 파일에서 # title 주석 찾기
-3. 주석 다음 블록에서 category와 label이 일치하는 메인 엔티티 찾기
-4. 해당 엔티티의 rdfs:label 아래에 hasSummary 추가
-5. 매칭되지 않는 CSV 행 번호를 .restack에 기록
+1. TTL 파일을 한 번 읽어서 모든 주석 블록 인덱싱
+2. CSV에서 순차적으로 title, summary 읽기
+3. 이미 TTL에 summary가 있는 항목 제외
+4. CSV의 title과 TTL 블록의 title이 일치하면:
+   - 해당 블록의 rdfs:label 다음에 hasSummary 추가
+   - CSV 다음 항목으로 이동
+5. 매칭되지 않는 CSV 항목은 .restack에 기록
 """
 
 import os
@@ -25,22 +27,21 @@ csv.field_size_limit(sys.maxsize)
 
 def load_csv_data(csv_path: str) -> list:
     """
-    CSV에서 category, title, summary, 행 번호 로드
+    CSV에서 title, summary 순차적으로 로드
     
     Returns:
-        [(row_num, category, title, summary), ...] 리스트 (행 번호는 1-based)
+        [(row_num, title, summary), ...] 리스트 (행 번호는 1-based)
     """
     csv_data = []
     
     with open(csv_path, 'r', encoding='utf-8-sig') as f:
         reader = csv.DictReader(f)
         for row_num, row in enumerate(reader, start=1):  # 1-based
-            category = row['category'].strip()
             title = row['title'].strip()
             summary = row['summary'].strip()
             
             if title and summary:
-                csv_data.append((row_num, category, title, summary))
+                csv_data.append((row_num, title, summary))
     
     print(f"📖 CSV에서 {len(csv_data)}개 항목 로드됨")
     return csv_data
@@ -51,45 +52,89 @@ def escape_ttl_string(s: str) -> str:
     return s.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ').replace('\r', '')
 
 
-def normalize_category(category: str) -> str:
-    """category 정규화 (비교를 위해)"""
-    # 괄호 제거, 공백 정리
-    category = re.sub(r'\s*\([^)]*\)\s*', '', category)  # 괄호 내용 제거
-    category = category.strip()
-    return category
+def extract_title_from_comment(comment_text: str) -> str:
+    """
+    주석에서 title 추출
+    예: "이순신 (인물)" -> "이순신"
+    예: "가" -> "가"
+    """
+    # 괄호가 있으면 괄호 앞의 텍스트만 추출
+    match = re.match(r'^(.+?)\s*\([^)]+\)\s*$', comment_text)
+    if match:
+        return match.group(1).strip()
+    return comment_text.strip()
 
 
-def type_to_category(entity_type: str) -> str:
-    """rdf:type을 CSV category로 변환"""
-    type_mapping = {
-        'Person': '인물',
-        'Event': '사건',
-        'Battle': '사건',  # Battle은 Event의 하위
-        'Policy': '정책',
-        'Institution': '제도',
-        'Document': '문헌',
-        'Nation': '국가',
-        'Place': '장소',
-        'Object': '물품',
-        'Role': '역할',
-        'SocialClass': '사회계층'
-    }
-    # hist:Person -> Person
-    type_name = entity_type.replace('hist:', '')
-    return type_mapping.get(type_name, '')
-
-
+def index_ttl_blocks(lines: list) -> dict:
+    """
+    TTL 파일의 모든 주석 블록을 인덱싱
+    
+    Returns:
+        {title: {'comment_line': int, 'label_line': int, 'has_summary': bool, 'uri': str}, ...}
+    """
+    blocks = {}
+    
+    # 주석 패턴: # title 또는 # title (category)
+    comment_pattern = re.compile(r'^#\s*(.+)$')
+    # rdfs:label 패턴
+    label_pattern = re.compile(r'^(hist:\S+)\s+rdfs:label\s+"([^"]+)"')
+    # hasSummary 패턴
+    summary_pattern = re.compile(r'^(hist:\S+)\s+hist:hasSummary\s+')
+    
+    current_block = None
+    current_block_title = None
+    found_label = False
+    
+    for i, line in enumerate(lines):
+        # 새 블록 시작 (주석)
+        comment_match = comment_pattern.match(line)
+        if comment_match:
+            # 이전 블록 저장
+            if current_block and current_block_title and found_label:
+                blocks[current_block_title] = current_block
+            
+            # 새 블록 시작
+            comment_text = comment_match.group(1).strip()
+            current_block_title = extract_title_from_comment(comment_text)
+            current_block = {
+                'comment_line': i,
+                'label_line': None,
+                'has_summary': False,
+                'uri': None
+            }
+            found_label = False
+            continue
+        
+        # 현재 블록에서 label 찾기
+        if current_block and not found_label:
+            label_match = label_pattern.match(line)
+            if label_match:
+                uri = label_match.group(1)
+                label = label_match.group(2)
+                
+                # label이 현재 블록의 title과 일치하면 저장
+                if label == current_block_title:
+                    current_block['label_line'] = i
+                    current_block['uri'] = uri
+                    found_label = True
+        
+        # hasSummary 찾기
+        if current_block and found_label:
+            summary_match = summary_pattern.match(line)
+            if summary_match and summary_match.group(1) == current_block['uri']:
+                current_block['has_summary'] = True
+    
+    # 마지막 블록 저장
+    if current_block and current_block_title and found_label:
+        blocks[current_block_title] = current_block
+    
+    print(f"📊 TTL에서 발견된 블록: {len(blocks)}개")
+    return blocks
 
 
 def process_ttl_file(ttl_path: str, csv_data: list, output_path: str = None, restack_path: str = None):
     """
     TTL 파일을 처리하여 hasSummary 추가
-    
-    Args:
-        ttl_path: 입력 TTL 파일 경로
-        csv_data: [(row_num, category, title, summary), ...] 리스트
-        output_path: 출력 TTL 파일 경로 (None이면 원본 덮어쓰기)
-        restack_path: .restack 파일 경로
     """
     if output_path is None:
         output_path = ttl_path
@@ -102,238 +147,70 @@ def process_ttl_file(ttl_path: str, csv_data: list, output_path: str = None, res
     
     print(f"   총 {len(lines)}줄 읽음")
     
-    # 1단계: TTL 구조 분석 - 주석 블록과 엔티티 매핑
-    print("   1단계: TTL 구조 분석 중...")
+    # 1단계: TTL 블록 인덱싱
+    print("   1단계: TTL 블록 인덱싱 중...")
+    ttl_blocks = index_ttl_blocks(lines)
     
-    # 주석 패턴: # title 또는 # title (category)
-    comment_pattern = re.compile(r'^#\s*(.+)$')
-    # rdf:type 패턴
-    type_pattern = re.compile(r'^(hist:\S+)\s+rdf:type\s+(hist:\S+)')
-    # rdfs:label 패턴
-    label_pattern = re.compile(r'^(hist:\S+)\s+rdfs:label\s+"([^"]+)"')
-    # hasSummary 패턴
-    summary_pattern = re.compile(r'^(hist:\S+)\s+hist:hasSummary\s+')
+    # 이미 summary가 있는 블록 수집
+    existing_summaries = {title for title, block in ttl_blocks.items() if block['has_summary']}
+    print(f"   - 이미 summary가 있는 블록: {len(existing_summaries)}개")
     
-    # 블록 구조: {comment_line_index: {'title': title, 'category': category, 'entities': [...]}}
-    blocks = {}
-    # 엔티티 정보: {uri: {'line': line_index, 'label': label, 'type': type, 'category': category, 'has_summary': bool}}
-    entities = {}
+    # 2단계: CSV 필터링 (이미 summary가 있는 항목 제외)
+    print("   2단계: CSV 필터링 중...")
+    filtered_csv_data = []
+    skipped_count = 0
+    for row_num, title, summary in csv_data:
+        if title in existing_summaries:
+            skipped_count += 1
+        else:
+            filtered_csv_data.append((row_num, title, summary))
     
-    current_block_start = None
-    current_block_info = None
+    print(f"   - 이미 summary 있어서 건너뛴 항목: {skipped_count}개")
+    print(f"   - 추가할 항목: {len(filtered_csv_data)}개")
     
-    for i, line in enumerate(lines):
-        # 주석 라인 찾기
-        comment_match = comment_pattern.match(line)
-        if comment_match:
-            # 이전 블록 저장 (딕셔너리 복사)
-            if current_block_start is not None and current_block_info:
-                blocks[current_block_start] = {
-                    'title': current_block_info['title'],
-                    'category': current_block_info['category'],
-                    'entities': list(current_block_info['entities'])  # 리스트 복사
-                }
-            
-            # 새 블록 시작
-            comment_text = comment_match.group(1).strip()
-            # title과 category 분리
-            title_match = re.match(r'^(.+?)\s*\(([^)]+)\)\s*$', comment_text)
-            if title_match:
-                title = title_match.group(1).strip()
-                category = normalize_category(title_match.group(2))
-            else:
-                title = comment_text
-                category = ""
-            
-            current_block_start = i
-            current_block_info = {
-                'title': title,
-                'category': category,
-                'entities': []
-            }
-            continue
-        
-        # 엔티티 정보 수집 (주석 블록 내에서만)
-        if current_block_start is not None:
-            # rdf:type 찾기
-            type_match = type_pattern.match(line)
-            if type_match:
-                uri = type_match.group(1)
-                entity_type = type_match.group(2)
-                
-                # 엔티티가 이미 있으면 타입만 업데이트, 없으면 생성
-                if uri not in entities:
-                    entities[uri] = {
-                        'line': i,
-                        'label': '',
-                        'type': entity_type,
-                        'category': current_block_info['category'],  # 주석의 category 우선!
-                        'has_summary': False
-                    }
-                else:
-                    entities[uri]['type'] = entity_type
-                    # category는 주석 것을 유지 (rdf:type으로 덮어쓰지 않음)
-            
-            # rdfs:label 찾기
-            label_match = label_pattern.match(line)
-            if label_match:
-                uri = label_match.group(1)
-                label = label_match.group(2)
-                
-                if uri not in entities:
-                    entity_info = {
-                        'line': i,
-                        'label': label,
-                        'type': '',
-                        'category': current_block_info['category'],  # 주석의 category
-                        'has_summary': False
-                    }
-                    entities[uri] = entity_info
-                else:
-                    entities[uri]['line'] = i  # label 라인으로 업데이트
-                    entities[uri]['label'] = label
-                
-                if uri not in current_block_info['entities']:
-                    current_block_info['entities'].append(uri)
-            
-            # hasSummary 찾기
-            summary_match = summary_pattern.match(line)
-            if summary_match:
-                uri = summary_match.group(1)
-                if uri in entities:
-                    entities[uri]['has_summary'] = True
+    if not filtered_csv_data:
+        print("   ⚠️ 추가할 summary가 없습니다.")
+        return
     
-    # 마지막 블록 저장 (딕셔너리 복사)
-    if current_block_start is not None and current_block_info:
-        blocks[current_block_start] = {
-            'title': current_block_info['title'],
-            'category': current_block_info['category'],
-            'entities': list(current_block_info['entities'])  # 리스트 복사
-        }
+    # 3단계: CSV를 순차적으로 처리하면서 TTL 블록 찾기
+    print("   3단계: CSV와 TTL 매칭 중...")
     
-    print(f"   - 발견된 주석 블록: {len(blocks)}개")
-    print(f"   - 발견된 엔티티: {len(entities)}개")
-    
-    # 2단계: CSV 데이터와 TTL 블록 매칭
-    print("   2단계: CSV와 TTL 매칭 중...")
-    
-    # CSV 데이터를 title로 인덱싱 (동명이인 처리 위해 category도 고려)
-    csv_by_title = defaultdict(list)  # {title: [(row_num, category, summary), ...]}
-    for row_num, category, title, summary in csv_data:
-        csv_by_title[title].append((row_num, category, summary))
-    
-    # 매칭 결과
     lines_to_insert = {}  # {line_index: summary_line}
-    matched_csv_rows = set()  # 매칭된 CSV 행 번호
-    unmatched_csv_rows = []  # 매칭 안된 CSV 행 번호
+    matched_csv_rows = set()
     
-    for block_start, block_info in blocks.items():
-        title = block_info['title']
-        block_category = block_info['category']
-        
-        
-        if title not in csv_by_title:
-            continue
-        
-        # 같은 title을 가진 CSV 항목들 중에서 category가 일치하는 것 찾기
-        matched_csv_item = None
-        for row_num, csv_category, summary in csv_by_title[title]:
-            csv_cat_norm = normalize_category(csv_category)
+    for row_num, csv_title, csv_summary in filtered_csv_data:
+        # TTL 블록에서 해당 title 찾기
+        if csv_title in ttl_blocks:
+            block = ttl_blocks[csv_title]
             
-            # category 매칭 (둘 다 있으면 정확히 일치, 하나만 있으면 통과)
-            if block_category and csv_cat_norm:
-                if block_category == csv_cat_norm:
-                    matched_csv_item = (row_num, csv_category, summary)
-                    break
-            elif not block_category and not csv_cat_norm:
-                # 둘 다 없으면 첫 번째 매칭
-                matched_csv_item = (row_num, csv_category, summary)
-                break
-            elif not block_category:
-                # TTL에 category 없으면 CSV category로 매칭
-                matched_csv_item = (row_num, csv_category, summary)
-                break
-        
-        if not matched_csv_item:
-            # 매칭 안됨 - CSV 항목들 중 첫 번째를 unmatched로 기록
-            for row_num, _, _ in csv_by_title[title]:
-                if row_num not in matched_csv_rows:
-                    unmatched_csv_rows.append(row_num)
-            continue
-        
-        row_num, matched_csv_category, summary = matched_csv_item
-        matched_csv_rows.add(row_num)
-        matched_csv_cat_norm = normalize_category(matched_csv_category)
-        
-        # 블록 내에서 메인 엔티티 찾기 (label이 title과 일치하고 category도 일치)
-        main_entity_uri = None
-        for uri in block_info['entities']:
-            if uri not in entities:
-                if debug_mode:
-                    print(f"    [WARN] 엔티티 {uri}가 entities 딕셔너리에 없음")
+            # 이미 summary가 있으면 건너뛰기
+            if block['has_summary']:
                 continue
             
-            if entities[uri]['label'] == title:
-                # category도 확인
-                entity_category = entities[uri]['category']
-                
-                if debug_mode:
-                    print(f"    엔티티 매칭: {uri}")
-                    print(f"      label='{entities[uri]['label']}' == title='{title}': {entities[uri]['label'] == title}")
-                    print(f"      entity_category='{entity_category}', matched_csv_cat_norm='{matched_csv_cat_norm}'")
-                
-                # category 매칭 확인
-                if not entity_category or not matched_csv_cat_norm or entity_category == matched_csv_cat_norm:
-                    main_entity_uri = uri
-                    if debug_mode:
-                        print(f"      -> category 매칭 성공!")
-                    break
-                elif debug_mode:
-                    print(f"      -> category 매칭 실패")
-        
-        if not main_entity_uri:
-            # 메인 엔티티 못 찾음
-            if debug_mode:
-                print(f"  -> 메인 엔티티 못 찾음")
-            unmatched_csv_rows.append(row_num)
-            continue
-        
-        # hasSummary 이미 있으면 스킵 (이미 추가된 경우)
-        if entities[main_entity_uri]['has_summary']:
-            if debug_mode:
-                print(f"  -> 이미 hasSummary 있음, 스킵")
-            continue
-        
-        # rdfs:label 라인 찾기 (label 라인에 추가해야 함)
-        label_line = None
-        for i in range(entities[main_entity_uri]['line'], min(entities[main_entity_uri]['line'] + 10, len(lines))):
-            label_match = label_pattern.match(lines[i])
-            if label_match and label_match.group(1) == main_entity_uri:
-                label_line = i
-                break
-        
-        if label_line is None:
-            if debug_mode:
-                print(f"  -> rdfs:label 라인을 찾지 못함")
-            unmatched_csv_rows.append(row_num)
-            continue
-        
-        if debug_mode:
-            print(f"  -> hasSummary 추가 예정: {main_entity_uri} (라인 {label_line+1} 다음)")
-        
-        # rdfs:label 라인 다음에 hasSummary 추가
-        escaped_summary = escape_ttl_string(summary)
-        summary_line = f'{main_entity_uri} hist:hasSummary "{escaped_summary}" .\n'
-        
-        lines_to_insert[label_line + 1] = summary_line
+            # label 라인이 없으면 건너뛰기
+            if block['label_line'] is None:
+                continue
+            
+            # summary 추가
+            uri = block['uri']
+            escaped_summary = escape_ttl_string(csv_summary)
+            summary_line = f'{uri} hist:hasSummary "{escaped_summary}" .\n'
+            lines_to_insert[block['label_line'] + 1] = summary_line
+            matched_csv_rows.add(row_num)
     
-    print(f"   - 매칭된 CSV 항목: {len(matched_csv_rows)}개")
+    # 매칭되지 않은 항목 수집
+    unmatched_csv_rows = []
+    for row_num, title, summary in filtered_csv_data:
+        if row_num not in matched_csv_rows:
+            unmatched_csv_rows.append(row_num)
+    
+    print(f"   - 매칭된 항목: {len(matched_csv_rows)}개")
     print(f"   - 추가할 hasSummary: {len(lines_to_insert)}개")
-    print(f"   - 매칭 안된 CSV 항목: {len(unmatched_csv_rows)}개")
+    print(f"   - 매칭 안된 항목: {len(unmatched_csv_rows)}개")
     
-    # 3단계: 새 TTL 파일 생성
+    # 4단계: 새 TTL 파일 생성
     if lines_to_insert:
-        print("   3단계: 새 TTL 파일 생성 중...")
+        print("   4단계: 새 TTL 파일 생성 중...")
         
         # 삽입 위치를 역순으로 정렬
         sorted_inserts = sorted(lines_to_insert.items(), key=lambda x: x[0], reverse=True)
@@ -351,9 +228,9 @@ def process_ttl_file(ttl_path: str, csv_data: list, output_path: str = None, res
     else:
         print("   ⚠️ 추가할 summary가 없습니다.")
     
-    # 4단계: .restack 파일 생성
+    # 5단계: .restack 파일 생성
     if restack_path and unmatched_csv_rows:
-        print("   4단계: .restack 파일 생성 중...")
+        print("   5단계: .restack 파일 생성 중...")
         
         # 중복 제거 및 정렬
         unique_unmatched = sorted(set(unmatched_csv_rows))
