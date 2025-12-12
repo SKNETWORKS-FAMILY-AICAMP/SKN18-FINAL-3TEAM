@@ -71,13 +71,13 @@ def get_pgvector_service():
             from pathlib import Path
             sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-            from db_pipeline.services.custom_pgvector import CustomPGVector
-            from db_pipeline.config import POSTGRES_CONN_STR
-            from langchain_openai import OpenAIEmbeddings
+            from backend.db_pipeline.vectordb.services.custom_pgvector import CustomPGVector
+            from backend.db_pipeline.common.config import POSTGRES_CONN_STR
+            from backend.db_pipeline.common.embedding_model import get_embedding
 
             _pgvector_service = CustomPGVector(
                 conn_str=POSTGRES_CONN_STR,
-                embedding_fn=OpenAIEmbeddings(model="text-embedding-3-small"),
+                embedding_fn=get_embedding(),
                 table="korean_history"
             )
             print("  │  └─ pgvector 서비스 초기화 완료")
