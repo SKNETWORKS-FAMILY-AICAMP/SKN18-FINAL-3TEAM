@@ -875,8 +875,8 @@ def save_inference_results_as_ttl(
     """Parallel Knowledge Retrieval의 지식 검색 결과를 TTL 파일로 저장"""
     
     try:
-        from utils.inference_triple_generator import InferenceTripleGenerator
-        
+        from backend.langgraph_fuseki.utils.inference_triple_generator import InferenceTripleGenerator
+
         output_dir = Path(INFERENCE_OUTPUT_DIR)
         output_dir.mkdir(parents=True, exist_ok=True)
         
