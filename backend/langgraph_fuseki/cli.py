@@ -115,15 +115,25 @@ def status():
         import requests
         from backend.langgraph_fuseki.config import FUSEKI_URL
 
+        # Fuseki URL에서 기본 서버 URL과 데이터셋 분리
+        # FUSEKI_URL = "http://localhost:3030/korean-history"
+        if "//" in FUSEKI_URL:
+            parts = FUSEKI_URL.split("/")
+            base_url = f"{parts[0]}//{parts[2]}"  # http://localhost:3030
+            dataset = parts[3] if len(parts) > 3 else "korean-history"
+        else:
+            base_url = "http://localhost:3030"
+            dataset = "korean-history"
+
         # Fuseki 서버 ping
-        response = requests.get(f"{FUSEKI_URL}/$/ping", timeout=5)
+        response = requests.get(f"{base_url}/$/ping", timeout=5)
 
         if response.status_code == 200:
-            click.echo(f"✅ Fuseki 서버 연결: {FUSEKI_URL}")
+            click.echo(f"✅ Fuseki 서버 연결: {base_url}")
 
             # 데이터셋 통계 (SPARQL COUNT 쿼리)
             query = "SELECT (COUNT(*) as ?count) WHERE { ?s ?p ?o }"
-            sparql_url = f"{FUSEKI_URL}/query"
+            sparql_url = f"{base_url}/{dataset}/query"
 
             response = requests.post(
                 sparql_url,
@@ -135,11 +145,12 @@ def status():
             if response.status_code == 200:
                 result = response.json()
                 count = result['results']['bindings'][0]['count']['value']
+                click.echo(f"   데이터셋: {dataset}")
                 click.echo(f"   총 트리플 수: {count}")
             else:
-                click.echo("   ⚠️  데이터셋 통계 조회 실패")
+                click.echo(f"   ⚠️  데이터셋 '{dataset}' 통계 조회 실패")
         else:
-            click.echo(f"❌ Fuseki 서버 연결 실패: {FUSEKI_URL}", err=True)
+            click.echo(f"❌ Fuseki 서버 연결 실패: {base_url}", err=True)
 
     except ImportError:
         click.echo("❌ requests 라이브러리가 필요합니다: pip install requests", err=True)
