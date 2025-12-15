@@ -35,6 +35,18 @@ class IsAdminUser(BasePermission):
         )
 
 
+class IsOwnerOrAdmin(BasePermission):
+    """
+    작성자 본인 또는 관리자만 삭제 가능
+    """
+    def has_object_permission(self, request, view, obj):
+        # Admin은 모든 댓글/답글 삭제 가능
+        if request.user.permission == 'admin':
+            return True
+        # 작성자 본인만 자신의 댓글/답글 삭제 가능
+        return obj.user == request.user
+
+
 # ============================================
 # 댓글 API
 # ============================================
@@ -165,14 +177,15 @@ class CommentReplyView(APIView):
 # 관리자 API (댓글/답글 삭제)
 # ============================================
 
-class AdminCommentDeleteView(DestroyAPIView):
+class CommentDeleteView(DestroyAPIView):
     """
-    관리자용 댓글 삭제 API
+    댓글 삭제 API
+    - 작성자 본인 또는 관리자만 삭제 가능
 
-    DELETE /api/community/admin/comments/{comment_id}/
+    DELETE /api/community/comments/{comment_id}/
     """
     queryset = Comment.objects.all()
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
     lookup_url_kwarg = 'comment_id'
 
     def destroy(self, request, *args, **kwargs):
@@ -184,14 +197,15 @@ class AdminCommentDeleteView(DestroyAPIView):
         }, status=status.HTTP_200_OK)
 
 
-class AdminReplyDeleteView(DestroyAPIView):
+class ReplyDeleteView(DestroyAPIView):
     """
-    관리자용 답글 삭제 API
+    답글 삭제 API
+    - 작성자 본인 또는 관리자만 삭제 가능
 
-    DELETE /api/community/admin/replies/{reply_id}/
+    DELETE /api/community/replies/{reply_id}/
     """
     queryset = Reply.objects.all()
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
     lookup_url_kwarg = 'reply_id'
 
     def destroy(self, request, *args, **kwargs):
