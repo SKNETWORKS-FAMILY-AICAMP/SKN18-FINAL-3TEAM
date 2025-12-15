@@ -5,7 +5,8 @@ from rest_framework.decorators import api_view
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.generics import ListAPIView, CreateAPIView, DestroyAPIView
+from rest_framework.generics import DestroyAPIView
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from video.models import Video
 from .models import Comment, Reply, Likes
@@ -38,44 +39,49 @@ class IsAdminUser(BasePermission):
 # 댓글 API
 # ============================================
 
-class VideoCommentListView(ListAPIView):
+class VideoCommentView(APIView):
     """
-    영상별 댓글 목록 조회 API
+    영상 댓글 API
 
     GET /api/community/videos/{video_id}/comments/
-    - 특정 영상의 댓글 목록
-    - 최신순 정렬
+    - 댓글 목록 조회 (최신순 정렬)
+
+    POST /api/community/videos/{video_id}/comments/
+    - 댓글 작성
+    - request body: {"comment_content": "댓글 내용"}
     """
-    serializer_class = CommentSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        video_id = self.kwargs['video_id']
-        return Comment.objects.filter(video_id=video_id).select_related('user', 'video').order_by('-created_at')
+    @extend_schema(
+        summary="댓글 목록 조회",
+        description="특정 영상의 댓글 목록을 최신순으로 조회합니다.",
+        responses={200: CommentSerializer(many=True)},
+        tags=["댓글"]
+    )
+    def get(self, request, video_id):
+        """댓글 목록 조회"""
+        comments = Comment.objects.filter(
+            video_id=video_id
+        ).select_related('user', 'video').order_by('-created_at')
 
-    def list(self, request, *args, **kwargs):
-        response = super().list(request, *args, **kwargs)
+        serializer = CommentSerializer(comments, many=True)
         return Response({
-            'data': response.data,
+            'data': serializer.data,
             'message': 'ok'
         })
 
-
-class VideoCommentCreateView(CreateAPIView):
-    """
-    댓글 작성 API
-
-    POST /api/community/videos/{video_id}/comments/
-    - request body: {"comment_content": "댓글 내용"}
-    """
-    serializer_class = CommentCreateSerializer
-    permission_classes = [IsAuthenticated]
-
-    def create(self, request, *args, **kwargs):
-        video_id = self.kwargs['video_id']
+    @extend_schema(
+        summary="댓글 작성",
+        description="영상에 댓글을 작성합니다.",
+        request=CommentCreateSerializer,
+        responses={201: CommentSerializer},
+        tags=["댓글"]
+    )
+    def post(self, request, video_id):
+        """댓글 작성"""
         video = get_object_or_404(Video, id=video_id)
+        serializer = CommentCreateSerializer(data=request.data)
 
-        serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             serializer.save(user=request.user, video=video)
             return Response({
@@ -96,44 +102,49 @@ class VideoCommentCreateView(CreateAPIView):
 # 답글 API
 # ============================================
 
-class CommentReplyListView(ListAPIView):
+class CommentReplyView(APIView):
     """
-    댓글별 답글 목록 조회 API
+    댓글 답글 API
 
     GET /api/community/comments/{comment_id}/replies/
-    - 특정 댓글의 답글 목록
-    - 오래된 순 정렬
+    - 답글 목록 조회 (오래된 순 정렬)
+
+    POST /api/community/comments/{comment_id}/replies/
+    - 답글 작성
+    - request body: {"reply_content": "답글 내용", "parent_reply": 1} (parent_reply는 선택)
     """
-    serializer_class = ReplySerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        comment_id = self.kwargs['comment_id']
-        return Reply.objects.filter(comment_id=comment_id).select_related('user', 'comment').order_by('created_at')
+    @extend_schema(
+        summary="답글 목록 조회",
+        description="특정 댓글의 답글 목록을 오래된 순으로 조회합니다.",
+        responses={200: ReplySerializer(many=True)},
+        tags=["답글"]
+    )
+    def get(self, request, comment_id):
+        """답글 목록 조회"""
+        replies = Reply.objects.filter(
+            comment_id=comment_id
+        ).select_related('user', 'comment').order_by('created_at')
 
-    def list(self, request, *args, **kwargs):
-        response = super().list(request, *args, **kwargs)
+        serializer = ReplySerializer(replies, many=True)
         return Response({
-            'data': response.data,
+            'data': serializer.data,
             'message': 'ok'
         })
 
-
-class CommentReplyCreateView(CreateAPIView):
-    """
-    답글 작성 API
-
-    POST /api/community/comments/{comment_id}/replies/
-    - request body: {"reply_content": "답글 내용", "parent_reply": 1} (parent_reply는 선택)
-    """
-    serializer_class = ReplyCreateSerializer
-    permission_classes = [IsAuthenticated]
-
-    def create(self, request, *args, **kwargs):
-        comment_id = self.kwargs['comment_id']
+    @extend_schema(
+        summary="답글 작성",
+        description="댓글에 답글을 작성합니다.",
+        request=ReplyCreateSerializer,
+        responses={201: ReplySerializer},
+        tags=["답글"]
+    )
+    def post(self, request, comment_id):
+        """답글 작성"""
         comment = get_object_or_404(Comment, id=comment_id)
+        serializer = ReplyCreateSerializer(data=request.data)
 
-        serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             serializer.save(user=request.user, comment=comment)
             return Response({
