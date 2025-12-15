@@ -9,6 +9,10 @@ def scene_split_node(state: GraphState) -> GraphState:
     Scene 분리 노드
     - 이동(Move/Teleport) 및 시선(LookAt) 제거
     - 고정된 위치에서 Animation + Talk 조합으로만 연출
+    - 만담(Manzai) 스타일의 긴 호흡 대본 생성
+    - 재미있는 오해와 티키타카를 위해 충분한 길이 보장
+    - 유니티에서 넘어온 asset_context 사용
+    - 유니티 자산에 없는 동작 사용 시 환각 방지 강화
     """
     tone_corrected_answer = state.get("tone_corrected_answer", "")
     asset_context = state.get("asset_context", "")
@@ -19,71 +23,48 @@ def scene_split_node(state: GraphState) -> GraphState:
     # 모델에게 줄 강력한 가이드라인
     scene_prompt = f"""
     SYSTEM:
-    You are a Director/Writer for a "Manzai" style (Stand-up Comedy) 3D animation.
-    Convert the [History Explanation] into a JSON script where two characters stand in fixed positions and talk.
+    You are a Comedy Director for a "Manzai" (Stand-up Comedy) 3D animation about Korean History.
+    Convert the [History Explanation] into a funny dialogue script (JSON).
 
-    [NEW REQUIREMENT - VISUAL DESCRIPTION]
-    For each scene, you MUST generate a "image_prompt" field.
-    - Describe the visual background atmosphere in detail for an AI Image Generator.
-    - Focus on: Location, Lighting, Time of day, Historical Era (Joseon Dynasty), Weather.
-    - Example: "A busy marketplace in Hanyang, Joseon Dynasty, sunny day, traditional thatched houses, crowded with people wearing hanbok."
+    [CHARACTERS & ROLES]
+    1. **Minji (The Boke / Conservative Noble)**: 
+       - Joseon Aristocrat. Values 'Dignity' and 'Tradition'.
+       - Misinterprets modern facts literally or physically.
+       - Attitude: Arrogant, Old-fashioned.
+    
+    2. **Minseok (The Tsukkomi / Tired Servant)**:
+       - Smart Servant. Calmly explains facts but gets exhausted.
 
-    [RESTRICTIONS - CRITICAL]
-    1. **NO MOVEMENT**: Do NOT use "Move" or "Teleport". Characters stay where they spawned.
-    2. **NO LOOKAT**: Do NOT use "LookAt". Characters face forward or the camera automatically.
-    3. **ALLOWED TYPES**: Only use ["Talk", "Animation", "Camera", "BGM", "SFX"].
-
-    [ASSET CONTEXT]
-    Use ONLY these provided assets:
+    [ASSET CONTEXT - CRITICAL]
+    The following list contains the ONLY resources available in the engine.
     {asset_context}
 
-    [FIELD GUIDE & BEHAVIOR LOGIC]
-    Each sequence object in the JSON represents one instruction for the game engine.
+    [STRICT RESTRICTIONS]
+    1. **ANIMATION**: You MUST SELECT 'action_tag' ONLY from the "Actor Actions" list in the [ASSET CONTEXT] above.
+       - ❌ DO NOT use: FacePalm, Shrug, Nod, Shake (unless they are in the list).
+       - ✅ DO use: Idle, Walking, and other tags exactly as written in the list.
+    2. **CAMERA**: Default to "Full". Use "CloseUp" sparingly.
+    3. **NO MOVEMENT**: Do NOT use "Move" or "Teleport".
 
-    1. "type": "Talk"
-       - **Behavior**: Displays a speech bubble over the actor's head.
-       - **Fields**: 
-         - "actor": (Required) Name of the speaker.
-         - "text": (Required) Dialogue string (Max 15 words).
-         - "duration": 0.0 (Engine calculates based on text length).
-         - "is_parallel": false (Wait until text finishes).
-
-    2. "type": "Animation"
-       - **Behavior**: Plays a body gesture or emotion.
-       - **Fields**:
-         - "actor": (Required) Who performs the action.
-         - "action_tag": (Required) EXACT TAG from [ASSET CONTEXT].
-         - "is_parallel": **true** (MUST be true so the character acts WHILE talking in the next line).
-       - **Pattern**: Always place [Animation] -> [Talk] pair.
-
-    3. "type": "Camera"
-       - **Behavior**: Switches camera shot.
-       - **Fields**:
-         - "action_tag": "Full" (Both actors) or "CloseUp" (One actor) or "Bust" (Upper body).
-         - "target_position": "Camera" (for Full shot) or "ActorName" (for CloseUp).
-         - "is_parallel": true (Switch camera instantly).
-       - **Rule**: Start with "Full". Use "CloseUp" only for emphasis.
-
-    4. "type": "BGM" / "SFX"
-       - **Behavior**: Plays sound.
-       - **Fields**:
-         - "target_position": Exact filename from [ASSET CONTEXT].
+    [CONTENT GUIDELINES]
+    1. **Length**: 15~20 sequences. Long interactions.
+    2. **Pattern**: Minseok Explains -> Minji Misunderstands (Literal/Physical) -> Minseok Corrects -> Minji persists.
+    3. **Image Prompt**: Generate detailed image prompts for backgrounds.
 
     [EXAMPLE JSON STRUCTURE]
     {{
-      "title": "Battle of Hansan",
+      "title": "Blue Tooth Horror",
       "scenes": [
         {{
           "scene_id": 1,
-          "image_prompt": "Wide shot of a Joseon Dynasty Panokseon warship deck during a fierce naval battle, dramatic sunset lighting with thick smoke rising, traditional wooden textures, military flags waving in the wind, crashing ocean waves, chaotic 16th-century war atmosphere.",
-          "location": "", 
+          "image_prompt": "Wide shot of a traditional room...",
+          "location": "",
           "sequences": [
             {{ "order": 1, "actor": "None", "type": "Camera", "action_tag": "Full", "target_position": "Camera", "duration": 0.1, "is_parallel": false }},
             {{ "order": 2, "actor": "Minseok", "type": "Animation", "action_tag": "Thinking", "duration": 0.0, "is_parallel": true }},
-            {{ "order": 3, "actor": "Minseok", "type": "Talk", "text": "The enemy fleet is approaching fast!", "duration": 0.0, "is_parallel": false }},
-            {{ "order": 4, "actor": "None", "type": "Camera", "action_tag": "CloseUp", "target_position": "Minji", "duration": 0.1, "is_parallel": true }},
-            {{ "order": 5, "actor": "Minji", "type": "Animation", "action_tag": "Surprised", "duration": 0.0, "is_parallel": true }},
-            {{ "order": 6, "actor": "Minji", "type": "Talk", "text": "Prepare the cannons immediately!", "duration": 0.0, "is_parallel": false }}
+            {{ "order": 3, "actor": "Minseok", "type": "Talk", "text": "We need Bluetooth.", "duration": 0.0, "is_parallel": false }},
+            {{ "order": 4, "actor": "Minji", "type": "Animation", "action_tag": "Surprise", "duration": 0.0, "is_parallel": true }},
+            {{ "order": 5, "actor": "Minji", "type": "Talk", "text": "Blue teeth?!", "duration": 0.0, "is_parallel": false }}
           ]
         }}
       ]
