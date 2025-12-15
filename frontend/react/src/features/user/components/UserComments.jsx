@@ -1,34 +1,17 @@
 import { COLORS } from "../../../constants/theme";
 
-const UserComments = ({ onViewAll }) => {
-  const comments = [
-    {
-      id: 1,
-      title: "영상 제목",
-      question: "해당 사건은 몇년도에 발생하였나요?",
-      answer:
-        "안녕하세요 사용자님!\n해당 사건은 1425년(세종 7년)에 발생한 사건입니다.",
-    },
-    {
-      id: 2,
-      title: "다른 영상",
-      question: "흥미로운 내용이네요!",
-      answer: null,
-    },
-    {
-      id: 3,
-      title: "임진왜란 해전",
-      question: "이순신 장군의 전략이 정말 대단해요!",
-      answer: null,
-    },
-    {
-      id: 4,
-      title: "수원 화성 축조",
-      question: "화성 축조 기간이 궁금합니다.",
-      answer:
-        "수원 화성은 1794년부터 1796년까지 약 2년 반에 걸쳐 축조되었습니다.",
-    },
-  ];
+const UserComments = ({
+  comments: commentsProp = [],
+  loading = false,
+  onViewAll,
+}) => {
+  // API에서 가져온 댓글을 화면에 맞는 형식으로 변환
+  const comments = commentsProp.map((c) => ({
+    id: c.id,
+    title: c.videoTitle || "영상",
+    question: c.text,
+    answer: null, // 답글은 별도로 로드해야 함
+  }));
 
   return (
     <div>
@@ -81,56 +64,54 @@ const UserComments = ({ onViewAll }) => {
         className="user-comments-scroll"
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {comments.map((comment) => (
+          {loading ? (
             <div
-              key={comment.id}
               style={{
-                padding: "16px 0",
-                borderBottom: "1px solid #eee",
+                fontSize: "13px",
+                color: COLORS.gray,
+                padding: "20px",
+                textAlign: "center",
               }}
             >
+              로딩 중...
+            </div>
+          ) : comments.length === 0 ? (
+            <div
+              style={{
+                fontSize: "13px",
+                color: COLORS.gray,
+                padding: "20px",
+                textAlign: "center",
+              }}
+            >
+              작성한 댓글이 없습니다.
+            </div>
+          ) : (
+            comments.map((comment) => (
               <div
+                key={comment.id}
                 style={{
-                  fontSize: "14px",
-                  fontWeight: "600",
-                  marginBottom: "10px",
+                  padding: "16px 0",
+                  borderBottom: "1px solid #eee",
                 }}
               >
-                {comment.title}
-              </div>
-              <div style={{ marginLeft: "12px" }}>
                 <div
                   style={{
-                    fontSize: "13px",
-                    color: COLORS.gray,
-                    position: "relative",
-                    paddingLeft: "16px",
-                    marginBottom: comment.answer ? "8px" : "0",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    marginBottom: "10px",
                   }}
                 >
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: "0",
-                      top: "0",
-                      width: "10px",
-                      height: "100%",
-                      borderLeft: "1.5px solid #ccc",
-                      borderBottom: "1.5px solid #ccc",
-                      borderBottomLeftRadius: "8px",
-                    }}
-                  ></div>
-                  {comment.question}
+                  {comment.title}
                 </div>
-                {comment.answer && (
+                <div style={{ marginLeft: "12px" }}>
                   <div
                     style={{
                       fontSize: "13px",
                       color: COLORS.gray,
                       position: "relative",
                       paddingLeft: "16px",
-                      marginLeft: "16px",
-                      whiteSpace: "pre-line",
+                      marginBottom: comment.answer ? "8px" : "0",
                     }}
                   >
                     <div
@@ -145,12 +126,38 @@ const UserComments = ({ onViewAll }) => {
                         borderBottomLeftRadius: "8px",
                       }}
                     ></div>
-                    {comment.answer}
+                    {comment.question}
                   </div>
-                )}
+                  {comment.answer && (
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        color: COLORS.gray,
+                        position: "relative",
+                        paddingLeft: "16px",
+                        marginLeft: "16px",
+                        whiteSpace: "pre-line",
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: "0",
+                          top: "0",
+                          width: "10px",
+                          height: "100%",
+                          borderLeft: "1.5px solid #ccc",
+                          borderBottom: "1.5px solid #ccc",
+                          borderBottomLeftRadius: "8px",
+                        }}
+                      ></div>
+                      {comment.answer}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         <style>{`
