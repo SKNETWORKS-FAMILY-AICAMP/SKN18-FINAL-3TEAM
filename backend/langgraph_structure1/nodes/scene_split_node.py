@@ -22,6 +22,12 @@ def scene_split_node(state: GraphState) -> GraphState:
     You are a Director/Writer for a "Manzai" style (Stand-up Comedy) 3D animation.
     Convert the [History Explanation] into a JSON script where two characters stand in fixed positions and talk.
 
+    [NEW REQUIREMENT - VISUAL DESCRIPTION]
+    For each scene, you MUST generate a "image_prompt" field.
+    - Describe the visual background atmosphere in detail for an AI Image Generator.
+    - Focus on: Location, Lighting, Time of day, Historical Era (Joseon Dynasty), Weather.
+    - Example: "A busy marketplace in Hanyang, Joseon Dynasty, sunny day, traditional thatched houses, crowded with people wearing hanbok."
+
     [RESTRICTIONS - CRITICAL]
     1. **NO MOVEMENT**: Do NOT use "Move" or "Teleport". Characters stay where they spawned.
     2. **NO LOOKAT**: Do NOT use "LookAt". Characters face forward or the camera automatically.
@@ -65,18 +71,19 @@ def scene_split_node(state: GraphState) -> GraphState:
 
     [EXAMPLE JSON STRUCTURE]
     {{
-      "title": "History of Hanbok",
+      "title": "Battle of Hansan",
       "scenes": [
         {{
           "scene_id": 1,
-          "location": "Stage_01",
+          "image_prompt": "Wide shot of a Joseon Dynasty Panokseon warship deck during a fierce naval battle, dramatic sunset lighting with thick smoke rising, traditional wooden textures, military flags waving in the wind, crashing ocean waves, chaotic 16th-century war atmosphere.",
+          "location": "", 
           "sequences": [
             {{ "order": 1, "actor": "None", "type": "Camera", "action_tag": "Full", "target_position": "Camera", "duration": 0.1, "is_parallel": false }},
             {{ "order": 2, "actor": "Minseok", "type": "Animation", "action_tag": "Thinking", "duration": 0.0, "is_parallel": true }},
-            {{ "order": 3, "actor": "Minseok", "type": "Talk", "text": "Did you know about Hanbok?", "duration": 0.0, "is_parallel": false }},
+            {{ "order": 3, "actor": "Minseok", "type": "Talk", "text": "The enemy fleet is approaching fast!", "duration": 0.0, "is_parallel": false }},
             {{ "order": 4, "actor": "None", "type": "Camera", "action_tag": "CloseUp", "target_position": "Minji", "duration": 0.1, "is_parallel": true }},
             {{ "order": 5, "actor": "Minji", "type": "Animation", "action_tag": "Surprised", "duration": 0.0, "is_parallel": true }},
-            {{ "order": 6, "actor": "Minji", "type": "Talk", "text": "Is it the traditional clothes?", "duration": 0.0, "is_parallel": false }}
+            {{ "order": 6, "actor": "Minji", "type": "Talk", "text": "Prepare the cannons immediately!", "duration": 0.0, "is_parallel": false }}
           ]
         }}
       ]
