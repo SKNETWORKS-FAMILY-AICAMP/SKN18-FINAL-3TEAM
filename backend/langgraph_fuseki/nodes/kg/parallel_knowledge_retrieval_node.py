@@ -13,12 +13,11 @@ import requests
 import concurrent.futures
 from datetime import datetime
 from pathlib import Path
-from state import GraphState
+from backend.langgraph_fuseki.state import GraphState
+from backend.langgraph_fuseki.config import FUSEKI_URL, INFERENCE_OUTPUT_DIR
 
 
-FUSEKI_URL = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
 SAVE_INFERENCE_TRIPLES = os.getenv("SAVE_INFERENCE_TRIPLES", "true").lower() == "true"
-INFERENCE_OUTPUT_DIR = os.getenv("INFERENCE_OUTPUT_DIR", "./inference_results")
 
 
 # 질문 유형별 Thread 가중치 (데이터 기반)
@@ -876,8 +875,8 @@ def save_inference_results_as_ttl(
     """Parallel Knowledge Retrieval의 지식 검색 결과를 TTL 파일로 저장"""
     
     try:
-        from utils.inference_triple_generator import InferenceTripleGenerator
-        
+        from backend.langgraph_fuseki.utils.inference_triple_generator import InferenceTripleGenerator
+
         output_dir = Path(INFERENCE_OUTPUT_DIR)
         output_dir.mkdir(parents=True, exist_ok=True)
         

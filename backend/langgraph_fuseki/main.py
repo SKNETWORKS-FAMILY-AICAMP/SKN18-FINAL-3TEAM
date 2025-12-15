@@ -1,28 +1,21 @@
 """
-Korean History LangGraph - 인터랙티브 실행 스크립트
+HistoK LangGraph Fuseki - 인터랙티브 실행 스크립트
 
-사용자 질문을 입력받아 LangGraph를 통해 온톨로지 기반 추론 실행
+사용자 질문을 입력받아 Fuseki 기반 LangGraph를 통해 온톨로지 추론 실행
+
+실행 방법:
+    python -m backend.langgraph_fuseki.main
 """
 
-import os
-import sys
-from pathlib import Path
-from dotenv import load_dotenv
-
-# .env 파일 로드 (프로젝트 루트에서)
-env_path = Path(__file__).parent.parent.parent / ".env"
-load_dotenv(env_path, override=True)  # override=True: 기존 환경변수도 .env로 덮어쓰기
-
-# LangSmith 프로젝트 이름 변경 (랭그래프 전용)
-os.environ["LANGCHAIN_PROJECT"] = "Korean-History-LangGraph"
-
-from graph import graph
+# 환경변수 및 LangSmith 설정은 config.py에서 자동 로드됨
+from backend.langgraph_fuseki.config import PACKAGE_DIR
+from backend.langgraph_fuseki.graph import graph
 
 
 def print_header():
     """헤더 출력"""
     print(f"\n{'='*70}")
-    print(f"Korean History LangGraph - 조선시대 역사 스토리텔링")
+    print(f"HistoK LangGraph Fuseki - 조선시대 역사 스토리텔링")
     print(f"{'='*70}")
     print(f"  ├─ 질문 예시:")
     print(f"  │   • 경복궁을 건축한 왕은 누구인가?")

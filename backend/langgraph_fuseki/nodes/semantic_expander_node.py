@@ -14,7 +14,7 @@ import os
 import sys
 import requests
 from pathlib import Path
-from state import GraphState
+from backend.langgraph_fuseki.state import GraphState
 
 # 상위 디렉토리를 경로에 추가 (entity_expander_node와 동일한 방식)
 _base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ontology_langgraph_structure

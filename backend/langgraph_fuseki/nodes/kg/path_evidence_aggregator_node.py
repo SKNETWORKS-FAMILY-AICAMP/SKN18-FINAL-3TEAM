@@ -9,7 +9,7 @@ Parallel Knowledge Retrieval의 5개 Thread 결과에서 경로 추출 및 근�
 
 import os
 import json
-from state import GraphState
+from backend.langgraph_fuseki.state import GraphState
 from langchain_openai import ChatOpenAI
 
 # ========================================
