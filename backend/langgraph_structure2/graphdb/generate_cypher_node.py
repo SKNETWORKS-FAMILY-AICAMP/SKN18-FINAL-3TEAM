@@ -93,4 +93,7 @@ def create_cypher(state: GraphState) -> GraphState:
     RETURN n AS main, n.summary AS main_summary, out_nodes, in_nodes
     """
 
-    return cypher
+    return {
+        **state,
+        "cypher": cypher
+        }

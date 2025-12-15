@@ -13,6 +13,7 @@ class GraphState(TypedDict):
 
     # Retrieval 결과
     vector_evidences: NotRequired[List[Evidence]]
+    retrieval_elapsed: NotRequired[float]
 
     # Neo4j 검색 결과
     cypher: NotRequired[str]

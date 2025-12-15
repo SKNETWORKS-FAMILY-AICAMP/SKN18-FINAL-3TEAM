@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, NotRequired, TypedDict
-from backend.langgraph_structure1.state_type import Evidence
+from backend.langgraph_structure2.state_type import Evidence
 
 
 class GraphState(TypedDict):
@@ -13,6 +13,12 @@ class GraphState(TypedDict):
 
     # Retrieval 결과
     vector_evidences: NotRequired[List[Evidence]]
+    retrieval_elapsed: NotRequired[float]
+    retrieval_max_similarity: NotRequired[float]
+
+    # evaluation 결과
+    related_num: NotRequired[int]
+    context_chunks: NotRequired[List[Dict[str, Any]]]
 
     # Neo4j 검색 결과
     cypher: NotRequired[str]
