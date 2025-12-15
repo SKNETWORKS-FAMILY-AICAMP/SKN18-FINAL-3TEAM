@@ -40,18 +40,9 @@ export const getVideoUrl = (videoUrl) => {
   }
 
   // /videos/ 로 시작하면 public 폴더의 영상
-  // Vite 개발 서버에서는 절대 URL로 변환 필요
+  // Vite는 public 폴더를 루트로 제공하므로 상대 경로 그대로 사용
   if (videoUrl.startsWith("/videos/")) {
-    // 개발 환경에서는 현재 호스트의 절대 URL로 변환
-    const isDev = import.meta.env.DEV;
-    if (isDev) {
-      // Vite 개발 서버 (기본 포트 3000)
-      const devUrl = `http://localhost:3000${videoUrl}`;
-      console.log("Public 폴더 영상 (절대 URL로 변환):", devUrl);
-      return devUrl;
-    }
-    // 프로덕션에서는 그대로 반환 (빌드 시 정적 파일로 제공)
-    console.log("Public 폴더 영상 (프로덕션):", videoUrl);
+    console.log("Public 폴더 영상 (상대 경로):", videoUrl);
     return videoUrl;
   }
 
