@@ -1,9 +1,7 @@
 from django.urls import path
 from .views import (
-    VideoCommentListView,
-    VideoCommentCreateView,
-    CommentReplyListView,
-    CommentReplyCreateView,
+    VideoCommentView,
+    CommentReplyView,
     AdminCommentDeleteView,
     AdminReplyDeleteView,
     VideoLikeView,
@@ -21,16 +19,14 @@ urlpatterns = [
     # ============================================
     # GET /api/community/videos/<video_id>/comments/ - 영상별 댓글 목록
     # POST /api/community/videos/<video_id>/comments/ - 댓글 작성
-    path('videos/<int:video_id>/comments/', VideoCommentListView.as_view(), name='video-comment-list'),
-    path('videos/<int:video_id>/comments/', VideoCommentCreateView.as_view(), name='video-comment-create'),
+    path('videos/<int:video_id>/comments/', VideoCommentView.as_view(), name='video-comments'),
 
     # ============================================
     # 답글 API
     # ============================================
     # GET /api/community/comments/<comment_id>/replies/ - 댓글별 답글 목록
     # POST /api/community/comments/<comment_id>/replies/ - 답글 작성
-    path('comments/<int:comment_id>/replies/', CommentReplyListView.as_view(), name='comment-reply-list'),
-    path('comments/<int:comment_id>/replies/', CommentReplyCreateView.as_view(), name='comment-reply-create'),
+    path('comments/<int:comment_id>/replies/', CommentReplyView.as_view(), name='comment-replies'),
 
     # ============================================
     # 관리자 API (댓글/답글 삭제)

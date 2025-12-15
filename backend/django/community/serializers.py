@@ -65,17 +65,35 @@ class ReplySerializer(serializers.ModelSerializer):
 
 class ReplyCreateSerializer(serializers.ModelSerializer):
     """답글 작성용 serializer"""
+    # parent_reply는 기본 PrimaryKeyRelatedField를 사용하지만, 0/빈 값이면 None으로 강제
+    # to_internal_value에서 미리 정규화해 pk=0 검증 에러를 방지한다.
+
+    def to_internal_value(self, data):
+        data = data.copy()
+        # 0, "0", "", None => 부모 없음으로 처리
+        if data.get('parent_reply') in (0, '0', '', None):
+            data['parent_reply'] = None
+        return super().to_internal_value(data)
 
     class Meta:
         model = Reply
         fields = ['reply_content', 'parent_reply']
         extra_kwargs = {
-            'parent_reply': {'required': False}
+            'parent_reply': {'required': False, 'allow_null': True}
         }
 
     def create(self, validated_data):
         # user와 comment는 view에서 설정
         return super().create(validated_data)
+
+    def validate_parent_reply(self, value):
+        """
+        0, 빈 값, null 등을 부모 없음으로 처리.
+        실제 존재하는 PK만 유지.
+        """
+        if not value:
+            return None
+        return value
 
 
 class LikesSerializer(serializers.ModelSerializer):
