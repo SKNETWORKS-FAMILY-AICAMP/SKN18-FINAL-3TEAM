@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Space Mono";
+  src: url("/fonts/space-mono.bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
