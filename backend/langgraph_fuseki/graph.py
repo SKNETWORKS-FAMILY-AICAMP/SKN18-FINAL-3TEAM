@@ -1,5 +1,5 @@
 """
-창작 모드 - 데이터 기반 LangGraph
+HistoK LangGraph Fuseki - 데이터 기반 LangGraph
 
 5가지 관점에서 데이터를 병렬로 검색하여
 풍부한 근거 기반 역사 스토리 생성
@@ -8,30 +8,25 @@
 - 하이브리드 엔티티 추출 (TTL + pgvector)
 - 데이터 기반 5개 Thread (event_context, actor_network, timeline, similar_events, background)
 - 이야기 모드 지원 (선택적)
+
+실행 방법:
+    python -m backend.langgraph_fuseki.main
 """
 
-import os
-from pathlib import Path
-from dotenv import load_dotenv
-
-# 환경변수 로드 (가장 먼저 실행)
-env_path = Path(__file__).parent.parent.parent / ".env"
-load_dotenv(env_path, override=True)
-
-# LangSmith 프로젝트 이름 설정 (랭그래프 전용)
-os.environ["LANGCHAIN_PROJECT"] = "Korean-History-LangGraph"
+# 환경변수 설정은 config.py에서 자동 로드됨
+from backend.langgraph_fuseki.config import PACKAGE_DIR
 
 from langgraph.graph import StateGraph, END
-from state import GraphState
+from backend.langgraph_fuseki.state import GraphState
 
 # 노드 import
-from nodes.history_check_node import history_check_node
-from nodes.classify_node import query_classifier_node
-from nodes.entity_expander_node import entity_expander_node
-from nodes.semantic_expander_node import semantic_expander_node
-from nodes.kg.parallel_knowledge_retrieval_node import parallel_knowledge_retrieval_node
-from nodes.kg.path_evidence_aggregator_node import path_evidence_aggregator_node
-from nodes.generate_node import story_generator_node
+from backend.langgraph_fuseki.nodes.history_check_node import history_check_node
+from backend.langgraph_fuseki.nodes.classify_node import query_classifier_node
+from backend.langgraph_fuseki.nodes.entity_expander_node import entity_expander_node
+from backend.langgraph_fuseki.nodes.semantic_expander_node import semantic_expander_node
+from backend.langgraph_fuseki.nodes.kg.parallel_knowledge_retrieval_node import parallel_knowledge_retrieval_node
+from backend.langgraph_fuseki.nodes.kg.path_evidence_aggregator_node import path_evidence_aggregator_node
+from backend.langgraph_fuseki.nodes.generate_node import story_generator_node
 
 
 def create_graph_flow():

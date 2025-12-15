@@ -19,11 +19,8 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from langchain_openai import ChatOpenAI
 
-# 환경변수 로드
-sys.path.insert(0, str(Path(__file__).parent.parent))
-import __init__  # 환경변수 및 LangSmith 설정 로드
-
-from state import GraphState
+from backend.langgraph_fuseki.state import GraphState
+from backend.langgraph_fuseki.config import PROPERTY_GROUPS_PATH
 
 # 한국어 형태소 분석기 (키워드 추출용)
 try:
@@ -44,10 +41,8 @@ def load_property_groups() -> dict:
     if _PROPERTY_GROUPS is not None:
         return _PROPERTY_GROUPS
     
-    groups_path = Path(__file__).parent.parent / "ontology" / "instances" / "property_groups.json"
-    
-    if groups_path.exists():
-        with open(groups_path, 'r', encoding='utf-8') as f:
+    if PROPERTY_GROUPS_PATH.exists():
+        with open(PROPERTY_GROUPS_PATH, 'r', encoding='utf-8') as f:
             data = json.load(f)
             _PROPERTY_GROUPS = data.get("groups", {})
     else:

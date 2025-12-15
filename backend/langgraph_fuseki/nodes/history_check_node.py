@@ -10,11 +10,7 @@ import json
 from pathlib import Path
 from langchain_openai import ChatOpenAI
 
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent))
-import __init__  # 환경변수 로드
-
-from state import GraphState
+from backend.langgraph_fuseki.state import GraphState
 
 
 def history_check_node(state: GraphState) -> GraphState:

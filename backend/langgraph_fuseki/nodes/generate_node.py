@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 env_path = Path(__file__).parent.parent.parent.parent / ".env"
 load_dotenv(env_path, override=True)
 
-from state import GraphState
+from backend.langgraph_fuseki.state import GraphState
 
 
 def clean_entity_name(name: str) -> str:

@@ -33,23 +33,12 @@ except ImportError:
     USE_KIWI = False
     print("⚠️ kiwipiepy 미설치 - 규칙 기반 조사 제거 사용")
 
-# 상위 디렉토리를 경로에 추가
-_base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ontology_langgraph_structure
-_parent_dir = os.path.dirname(_base_dir)  # backend
-_project_root = os.path.dirname(_parent_dir)  # SKN18-FINAL-3TEAM (프로젝트 루트)
-sys.path.insert(0, _base_dir)
-sys.path.insert(0, _parent_dir)
-sys.path.insert(0, _project_root)  # 프로젝트 루트 추가 (backend.db_pipeline import용)
-
-# .env 파일 로드 (프로젝트 루트에서)
-env_path = os.path.join(_project_root, ".env")
-load_dotenv(env_path, override=True)
-
-from state import GraphState
-from ontology_schema import get_schema_summary
+# config.py에서 환경변수 자동 로드
+from backend.langgraph_fuseki.config import TTL_PATH, USE_PGVECTOR
+from backend.langgraph_fuseki.state import GraphState
+from backend.langgraph_fuseki.ontology_schema import get_schema_summary
 
 # pgvector 제목 임베딩 서비스 import (선택적)
-USE_PGVECTOR = os.getenv("USE_PGVECTOR", "true").lower() == "true"
 _title_vector_service = None
 
 def get_title_vector_service():
@@ -67,9 +56,6 @@ def get_title_vector_service():
             print(f"⚠️ 제목 임베딩 pgvector 초기화 실패: {e}")
     return _title_vector_service
 
-
-# TTL 파일 경로 (normalized 버전 사용 - Fuseki에 업로드된 데이터와 일치)
-TTL_PATH = os.path.join(_base_dir, "ontology", "instances", "korean_history_normalized.ttl")
 
 # TTL 데이터 캐시 (매번 파일 읽지 않도록)
 _ttl_cache = None
