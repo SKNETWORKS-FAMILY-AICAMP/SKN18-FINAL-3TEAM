@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import VideoPlayer from "../features/video/components/VideoPlayer";
 import VideoInfo from "../features/video/components/VideoInfo";
 import CommentSection from "../features/video/components/CommentSection";
 import { getVideo } from "../api/videoApi";
 import { getVideoComments, likeVideo, unlikeVideo } from "../api/communityApi";
+import { createWatchHistory } from "../api/activityApi";
 import { getVideoUrl } from "../utils/imageUtils";
 
 const VideoDetailPage = ({ videoId = 1, isLoggedIn = false, user = null }) => {
@@ -11,6 +12,7 @@ const VideoDetailPage = ({ videoId = 1, isLoggedIn = false, user = null }) => {
   const [comments, setComments] = useState([]);
   const [isLiked, setIsLiked] = useState(false);
   const [loading, setLoading] = useState(true);
+  const watchHistorySaved = useRef(false);
 
   // 한국 날짜 형식 포맷팅 함수 (YYYY. MM. DD.)
   const formatKoreanDate = (dateString) => {
@@ -62,6 +64,7 @@ const VideoDetailPage = ({ videoId = 1, isLoggedIn = false, user = null }) => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        watchHistorySaved.current = false;
 
         // 비디오 정보 로드
         const videoResponse = await getVideo(videoId);
@@ -107,6 +110,28 @@ const VideoDetailPage = ({ videoId = 1, isLoggedIn = false, user = null }) => {
 
     fetchData();
   }, [videoId, isLoggedIn]);
+
+  // 시청 기록 저장 (영상 로드 후 한 번만)
+  useEffect(() => {
+    const saveWatchHistory = async () => {
+      if (
+        !watchHistorySaved.current &&
+        isLoggedIn &&
+        video &&
+        videoId
+      ) {
+        try {
+          await createWatchHistory(videoId, 0, video.tags || []);
+          watchHistorySaved.current = true;
+          console.log("시청 기록 저장 완료:", videoId);
+        } catch (error) {
+          console.error("시청 기록 저장 실패:", error);
+        }
+      }
+    };
+
+    saveWatchHistory();
+  }, [video, videoId, isLoggedIn]);
 
   const handleLikeClick = async () => {
     if (!isLoggedIn) {
@@ -162,6 +187,7 @@ const VideoDetailPage = ({ videoId = 1, isLoggedIn = false, user = null }) => {
           date={formatKoreanDate(video?.upload_date)}
           isLiked={isLiked}
           onLikeClick={handleLikeClick}
+          likesCount={video?.likes_count || 0}
         />
       </div>
 

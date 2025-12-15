@@ -2,7 +2,7 @@ import { COLORS } from "../../../constants/theme";
 
 const WatchHistory = ({ items, loading = false }) => {
   return (
-    <div>
+    <div style={{ width: "100%", maxWidth: "100%", overflow: "hidden" }}>
       <div
         style={{
           display: "flex",
@@ -31,9 +31,12 @@ const WatchHistory = ({ items, loading = false }) => {
           display: "flex",
           gap: "20px",
           overflowX: "auto",
+          overflowY: "hidden",
           paddingBottom: "20px",
           scrollbarWidth: "thin",
           scrollbarColor: `${COLORS.primary} ${COLORS.lightGray}`,
+          WebkitOverflowScrolling: "touch",
+          width: "100%",
         }}
         className="watch-history-scroll"
       >
@@ -70,16 +73,24 @@ const WatchHistory = ({ items, loading = false }) => {
       </div>
 
       <style>{`
+        .watch-history-scroll {
+          cursor: grab;
+        }
+        .watch-history-scroll:active {
+          cursor: grabbing;
+        }
         .watch-history-scroll::-webkit-scrollbar {
-          height: 8px;
+          height: 10px;
         }
         .watch-history-scroll::-webkit-scrollbar-track {
           background: ${COLORS.lightGray};
-          border-radius: 4px;
+          border-radius: 5px;
+          margin: 0 10px;
         }
         .watch-history-scroll::-webkit-scrollbar-thumb {
           background: ${COLORS.primary};
-          border-radius: 4px;
+          border-radius: 5px;
+          transition: background 0.2s ease;
         }
         .watch-history-scroll::-webkit-scrollbar-thumb:hover {
           background: ${COLORS.secondary};

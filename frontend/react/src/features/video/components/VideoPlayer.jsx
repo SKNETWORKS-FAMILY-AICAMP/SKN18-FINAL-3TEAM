@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import ReactPlayer from "react-player";
-import { COLORS } from "../../../constants/theme";
 
 // 5초 뒤로 가기 아이콘 (이중 왼쪽 화살표)
 const SkipBackwardIcon = ({ size = 48, color = "#fff" }) => (
@@ -168,7 +167,8 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
           file: {
             attributes: {
               controlsList: "nodownload",
-              preload: "auto",
+              preload: "metadata",
+              crossOrigin: "anonymous",
             },
             forceVideo: true,
             forceHLS: false,

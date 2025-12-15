@@ -1,7 +1,7 @@
 import { COLORS } from '../../../constants/theme';
 import { HeartIcon } from '../../../components/common/Icons';
 
-const VideoInfo = ({ tags, title, date, isLiked, onLikeClick }) => {
+const VideoInfo = ({ tags, title, date, isLiked, onLikeClick, likesCount = 0 }) => {
   return (
     <div
       style={{
@@ -39,7 +39,7 @@ const VideoInfo = ({ tags, title, date, isLiked, onLikeClick }) => {
             cursor: 'pointer',
           }}
         >
-          <span>좋아요.</span>
+          <span>좋아요 {likesCount}</span>
           <HeartIcon filled={isLiked} />
         </div>
       </div>

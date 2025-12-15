@@ -24,13 +24,18 @@ const MyPage = ({ onNavigate, user }) => {
         // 시청 기록 가져오기
         const watchResponse = await getWatchHistory();
         if (watchResponse?.data) {
-          setWatchHistory(
-            watchResponse.data.map((w) => ({
-              id: w.id,
-              title: w.video_title || "제목 없음",
-              videoId: w.video,
-            }))
-          );
+          // 중복 제거: videoId 기준으로 최신 기록만 유지
+          const uniqueVideos = new Map();
+          watchResponse.data.forEach((w) => {
+            if (!uniqueVideos.has(w.video)) {
+              uniqueVideos.set(w.video, {
+                id: w.id,
+                title: w.video_title || "제목 없음",
+                videoId: w.video,
+              });
+            }
+          });
+          setWatchHistory(Array.from(uniqueVideos.values()));
         }
 
         // 내 댓글 가져오기
@@ -63,11 +68,13 @@ const MyPage = ({ onNavigate, user }) => {
         gap: "40px",
         padding: "60px 60px 40px 60px",
         minHeight: "calc(100vh - 76px)",
+        maxWidth: "100vw",
+        overflow: "hidden",
       }}
     >
       <UserProfile onEdit={() => onNavigate("profile-edit")} user={user} />
 
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
         <WatchHistory items={watchHistory} loading={loading} />
 
         <div
