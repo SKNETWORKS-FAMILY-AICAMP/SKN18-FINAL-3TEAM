@@ -1,4 +1,5 @@
 # create_cypher.py와 graph_summary.py 호출하는 neo4j검색 노드
+# langgraph는 dict 형태의 반환만 지원하므로 dict 형태의 cypher를 받음.
 
 import json
 
@@ -31,7 +32,6 @@ def neo4j_search_node(state: GraphState) -> GraphState:
 
     return {
         **state,
-        "cypher": cypher,
         "neo4j_results": summary_nodes,
     }
 

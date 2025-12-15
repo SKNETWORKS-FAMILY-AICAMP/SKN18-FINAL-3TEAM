@@ -1,59 +1,58 @@
 # vector db에서 문서 검색 노드
-# neo4j를 타기 위해서는 해당 노드에서 조정 필요!
 import time
 from typing import Any, Dict, List
-# 상위 절대 경로
 
-from backend.langgraph_structure1.state import GraphState
+from backend.langgraph_structure2.state import GraphState
 from backend.db_pipeline.vectordb.ETL.load_to_pgvector import get_embedding
 from backend.db_pipeline.vectordb.services.custom_pgvector import CustomPGVector
 from backend.db_pipeline.common.config import POSTGRES_CONN_STR, HISTORY_TABLE_NAME
+from backend.langgraph_structure2.rag.rag_config import RETRIEVAL_TOP_K
 
 def retrieval_node(state: GraphState) -> GraphState:
     question = state.get("query")
     if not question:
         raise ValueError("retrieval_node: 'query' 값이 state에 없습니다.")
-    
-    MIN_SIMILARITY = 0.0
 
+    # 한 질문당 한 번 실행된다는 가정으로 호출마다 embed/vectorstore 생성
     embed = get_embedding()
-
-    # Postgres(pgvector) 연결 설정
     vectorstore = CustomPGVector(
         conn_str=POSTGRES_CONN_STR,
         embedding_fn=embed,
-        table=HISTORY_TABLE_NAME,  # 실제 테이블명
+        table=HISTORY_TABLE_NAME,
     )
-    
-    start_time = time.time()
-    # 유사도 기반 검색
+
+    t0 = time.perf_counter()
     results = vectorstore.similarity_search_with_score(
-            query=question,
-            k=2
-        )
-    end_time = time.time()
-    print("\n⏰", end_time - start_time)
+        query=question,
+        k=int(RETRIEVAL_TOP_K),
+    )
+    elapsed = time.perf_counter() - t0
 
+    # Top-K 후보를 그대로 넘깁니다. (평가/라우팅은 evaluate_node에서)
+    vector_candidates: List[Dict[str, Any]] = []
 
-    filtered_docs = []
-    
-    for doc, score in results:
-        if score >= MIN_SIMILARITY:
-            filtered_docs.append({
-                "source": "vector",
-                "score": float(score),
-                "payload": {
-                    "content": doc.page_content,
-                    "metadata": doc.metadata,
-                }
-            })
+    max_sim = 0.0
+    for doc, raw_score in results:
+        sim = float(raw_score)
+        if sim > max_sim:
+            max_sim = sim
 
-    print(f"[벡터 검색 결과] {len(filtered_docs)}개 문서 반환 (최소 유사도 {MIN_SIMILARITY})")
-    print("-" * 60)
-    
+        vector_candidates.append({
+            "source": "vector",
+            # score는 "정규화된 코사인 유사도(0~1, 클수록 좋음)"로 통일
+            "score": float(sim),
+            "payload": {
+                "content": doc.page_content,
+                "metadata": doc.metadata,
+            }
+        })
+
     return {
         **state,
-        "vector_evidences": filtered_docs,
+        # evaluate_node가 판단할 수 있도록 후보를 그대로 전달
+        "vector_evidences": vector_candidates,
+        "retrieval_elapsed": float(elapsed),
+        "retrieval_max_similarity": float(max_sim),
     }
 
 if __name__ == "__main__":
