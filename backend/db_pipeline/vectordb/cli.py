@@ -11,6 +11,7 @@ pgvector 데이터 로딩 관리 CLI
 
 import click
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -48,12 +49,23 @@ def title(batch_size, verbose):
         raise click.Abort()
 
     try:
-        cmd = ["python", str(script_path)]
+        # 모듈로 실행하여 패키지 컨텍스트 보장
+        python_executable = sys.executable
+        # 모듈 경로: backend.db_pipeline.vectordb.ETL.load_title_embeddings
+        module_path = "backend.db_pipeline.vectordb.ETL.load_title_embeddings"
+        cmd = [python_executable, "-m", module_path]
         if verbose:
             cmd.append("--verbose")
 
-        result = subprocess.run(cmd, check=True, capture_output=not verbose)
-
+        # 항상 실시간 출력
+        result = subprocess.run(
+            cmd,
+            check=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace'
+        )
+        
         if result.returncode == 0:
             click.echo("✅ 제목 임베딩 로드 완료!")
         else:
@@ -62,6 +74,15 @@ def title(batch_size, verbose):
 
     except subprocess.CalledProcessError as e:
         click.echo(f"❌ 오류 발생: {e}", err=True)
+        if hasattr(e, 'stdout') and e.stdout:
+            click.echo(f"출력:\n{e.stdout}", err=True)
+        if hasattr(e, 'stderr') and e.stderr:
+            click.echo(f"오류 메시지:\n{e.stderr}", err=True)
+        raise click.Abort()
+    except Exception as e:
+        click.echo(f"❌ 예상치 못한 오류: {e}", err=True)
+        import traceback
+        click.echo(traceback.format_exc(), err=True)
         raise click.Abort()
 
 
@@ -88,12 +109,23 @@ def contents(batch_size, verbose):
         raise click.Abort()
 
     try:
-        cmd = ["python", str(script_path)]
+        # 모듈로 실행하여 패키지 컨텍스트 보장
+        python_executable = sys.executable
+        # 모듈 경로: backend.db_pipeline.vectordb.ETL.load_to_pgvector
+        module_path = "backend.db_pipeline.vectordb.ETL.load_to_pgvector"
+        cmd = [python_executable, "-m", module_path]
         if verbose:
             cmd.append("--verbose")
 
-        result = subprocess.run(cmd, check=True, capture_output=not verbose)
-
+        # 항상 실시간 출력
+        result = subprocess.run(
+            cmd,
+            check=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace'
+        )
+        
         if result.returncode == 0:
             click.echo("✅ 문서 내용 임베딩 로드 완료!")
         else:
@@ -102,6 +134,15 @@ def contents(batch_size, verbose):
 
     except subprocess.CalledProcessError as e:
         click.echo(f"❌ 오류 발생: {e}", err=True)
+        if hasattr(e, 'stdout') and e.stdout:
+            click.echo(f"출력:\n{e.stdout}", err=True)
+        if hasattr(e, 'stderr') and e.stderr:
+            click.echo(f"오류 메시지:\n{e.stderr}", err=True)
+        raise click.Abort()
+    except Exception as e:
+        click.echo(f"❌ 예상치 못한 오류: {e}", err=True)
+        import traceback
+        click.echo(traceback.format_exc(), err=True)
         raise click.Abort()
 
 
