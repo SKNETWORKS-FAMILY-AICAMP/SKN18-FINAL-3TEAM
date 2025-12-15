@@ -11,6 +11,7 @@ pgvector 데이터 로딩 관리 CLI
 
 import click
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -48,29 +49,25 @@ def title(batch_size, verbose):
         raise click.Abort()
 
     try:
-        cmd = ["python", str(script_path)]
+        # 현재 실행 중인 Python 인터프리터 사용 (가상환경 보장)
+        python_executable = sys.executable
+        cmd = [python_executable, str(script_path)]
         if verbose:
             cmd.append("--verbose")
 
+        # 항상 실시간 출력
         result = subprocess.run(
             cmd,
             check=True,
-            capture_output=True,
             text=True,
             encoding='utf-8',
             errors='replace'
         )
-
+        
         if result.returncode == 0:
-            if verbose or result.stdout:
-                click.echo(result.stdout)
             click.echo("✅ 제목 임베딩 로드 완료!")
         else:
             click.echo("❌ 로드 실패", err=True)
-            if result.stderr:
-                click.echo(f"오류 메시지:\n{result.stderr}", err=True)
-            if result.stdout:
-                click.echo(f"출력:\n{result.stdout}", err=True)
             raise click.Abort()
 
     except subprocess.CalledProcessError as e:
@@ -110,29 +107,25 @@ def contents(batch_size, verbose):
         raise click.Abort()
 
     try:
-        cmd = ["python", str(script_path)]
+        # 현재 실행 중인 Python 인터프리터 사용 (가상환경 보장)
+        python_executable = sys.executable
+        cmd = [python_executable, str(script_path)]
         if verbose:
             cmd.append("--verbose")
 
+        # 항상 실시간 출력
         result = subprocess.run(
             cmd,
             check=True,
-            capture_output=True,
             text=True,
             encoding='utf-8',
             errors='replace'
         )
-
+        
         if result.returncode == 0:
-            if verbose or result.stdout:
-                click.echo(result.stdout)
             click.echo("✅ 문서 내용 임베딩 로드 완료!")
         else:
             click.echo("❌ 로드 실패", err=True)
-            if result.stderr:
-                click.echo(f"오류 메시지:\n{result.stderr}", err=True)
-            if result.stdout:
-                click.echo(f"출력:\n{result.stdout}", err=True)
             raise click.Abort()
 
     except subprocess.CalledProcessError as e:
