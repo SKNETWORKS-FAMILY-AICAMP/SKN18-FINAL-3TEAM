@@ -5,6 +5,7 @@ from backend.langgraph_structure1.nodes.generate_node import generate_node
 from backend.langgraph_structure1.nodes.tone_adjust_node import tone_adjust_node
 from backend.langgraph_structure1.nodes.scene_split_node import scene_split_node
 from backend.langgraph_structure1.rag.hybrid_node import hybrid_node
+from backend.langgraph_structure1.nodes.background_gen_node import background_gen_node
 
 
 def create_graph_flow():
@@ -16,6 +17,7 @@ def create_graph_flow():
     workflow.add_node("generate_node", generate_node)
     workflow.add_node("tone_adjust_node",tone_adjust_node)
     workflow.add_node("scene_split_node",scene_split_node)
+    workflow.add_node("background_gen_node", background_gen_node) # 배경 생성 노드 추가
 
     # 하이브리드 노드 추가
     workflow.add_node("hybrid_node", hybrid_node)
@@ -38,7 +40,8 @@ def create_graph_flow():
     # 말투 및 scene 분리 노드 연결
     workflow.add_edge("generate_node", "tone_adjust_node")
     workflow.add_edge("tone_adjust_node", "scene_split_node")
-    workflow.add_edge("scene_split_node", END)
+    workflow.add_edge("scene_split_node", "background_gen_node")
+    workflow.add_edge("background_gen_node", END)
 
     # 4) 그래프 compile
     graph = workflow.compile()
