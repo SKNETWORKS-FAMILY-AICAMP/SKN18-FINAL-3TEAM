@@ -6,14 +6,13 @@ from backend.langgraph_structure2.state import GraphState
 from backend.db_pipeline.vectordb.ETL.load_to_pgvector import get_embedding
 from backend.db_pipeline.vectordb.services.custom_pgvector import CustomPGVector
 from backend.db_pipeline.common.config import POSTGRES_CONN_STR, HISTORY_TABLE_NAME
-from backend.langgraph_structure2.rag.rag_config import RETRIEVAL_TOP_K
+from backend.langgraph_structure2.rag.rag_config import COSINE_SIMILARITY_THRESHOLD, RETRIEVAL_TOP_K, FETCHED_COUNT
 
 def retrieval_node(state: GraphState) -> GraphState:
     question = state.get("query")
     if not question:
         raise ValueError("retrieval_node: 'query' 값이 state에 없습니다.")
 
-    # 한 질문당 한 번 실행된다는 가정으로 호출마다 embed/vectorstore 생성
     embed = get_embedding()
     vectorstore = CustomPGVector(
         conn_str=POSTGRES_CONN_STR,
@@ -22,38 +21,47 @@ def retrieval_node(state: GraphState) -> GraphState:
     )
 
     t0 = time.perf_counter()
+
+    # 넉넉히 FETCHED_COUNT(5)개 가져온 뒤 필터링
     results = vectorstore.similarity_search_with_score(
         query=question,
-        k=int(RETRIEVAL_TOP_K),
+        k=FETCHED_COUNT,
     )
-    elapsed = time.perf_counter() - t0
 
-    # Top-K 후보를 그대로 넘깁니다. (평가/라우팅은 evaluate_node에서)
-    vector_candidates: List[Dict[str, Any]] = []
+    # 점수 float 변환 및 필터
+    filtered = [
+        (doc, float(score))
+        for doc, score in results
+        if float(score) >= COSINE_SIMILARITY_THRESHOLD
+    ]
 
-    max_sim = 0.0
-    for doc, raw_score in results:
-        sim = float(raw_score)
-        if sim > max_sim:
-            max_sim = sim
+    # (선택) 안정적인 순서 보장
+    filtered.sort(key=lambda x: x[1], reverse=True)
 
-        vector_candidates.append({
+    # 임계값 통과한 것 중 top-k
+    top_k = filtered[:RETRIEVAL_TOP_K]
+
+    # 증거 패킹은 top_k만 사용
+    vector_evidences: List[Dict[str, Any]] = [
+        {
             "source": "vector",
-            # score는 "정규화된 코사인 유사도(0~1, 클수록 좋음)"로 통일
-            "score": float(sim),
+            "score": float(score),
             "payload": {
                 "content": doc.page_content,
                 "metadata": doc.metadata,
-            }
-        })
+            },
+        }
+        for doc, score in top_k
+    ]
+
+    elapsed = time.perf_counter() - t0
 
     return {
         **state,
-        # evaluate_node가 판단할 수 있도록 후보를 그대로 전달
-        "vector_evidences": vector_candidates,
+        "vector_evidences": vector_evidences,
         "retrieval_elapsed": float(elapsed),
-        "retrieval_max_similarity": float(max_sim),
     }
+
 
 if __name__ == "__main__":
     # 간단 테스트

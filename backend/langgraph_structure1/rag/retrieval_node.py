@@ -10,6 +10,7 @@ from backend.db_pipeline.common.config import POSTGRES_CONN_STR, HISTORY_TABLE_N
 from backend.langgraph_structure1.rag.rag_config import (
     RETRIEVAL_TOP_K,
     COSINE_SIMILARITY_THRESHOLD,
+    FETCHED_COUNT
 )
 
 def retrieval_node(state: GraphState) -> GraphState:
@@ -25,33 +26,45 @@ def retrieval_node(state: GraphState) -> GraphState:
     )
 
     t0 = time.perf_counter()
+
+    # 넉넉히 FETCHED_COUNT(5)개 가져온 뒤 필터링
     results = vectorstore.similarity_search_with_score(
         query=question,
-        k=RETRIEVAL_TOP_K,
+        k=FETCHED_COUNT,
     )
+
+    # 점수 float 변환 및 필터
+    filtered = [
+        (doc, float(score))
+        for doc, score in results
+        if float(score) >= COSINE_SIMILARITY_THRESHOLD
+    ]
+
+    # (선택) 안정적인 순서 보장
+    filtered.sort(key=lambda x: x[1], reverse=True)
+
+    # 임계값 통과한 것 중 top-k
+    top_k = filtered[:RETRIEVAL_TOP_K]
+
+    # 증거 패킹은 top_k만 사용
+    vector_evidences: List[Dict[str, Any]] = [
+        {
+            "source": "vector",
+            "score": float(score),
+            "payload": {
+                "content": doc.page_content,
+                "metadata": doc.metadata,
+            },
+        }
+        for doc, score in top_k
+    ]
+
     elapsed = time.perf_counter() - t0
-
-    vector_evidences: List[Dict[str, Any]] = []
-    similarities: List[float] = []
-
-    for doc, raw_score in results:
-        sim = float(raw_score)
-        similarities.append(sim)
-        if sim >= COSINE_SIMILARITY_THRESHOLD:
-            vector_evidences.append({
-                "source": "vector",
-                "score": float(sim),
-                "payload": {
-                    "content": doc.page_content,
-                    "metadata": doc.metadata,
-                },
-            })
-
 
     return {
         **state,
         "vector_evidences": vector_evidences,
-        "retrieval_elapsed": elapsed,
+        "retrieval_elapsed": float(elapsed),
     }
 
 

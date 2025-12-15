@@ -72,31 +72,29 @@ def generate_node(state: GraphState) -> GraphState:
     neo4j_results: List[Dict[str, Any]] = state.get("neo4j_results", [])
 
     # 1) Neo4j 결과를 Evidence 형식으로 변환
-    if not vector_evidences and not neo4j_results:
-        neo4j_evidences: List[Evidence] = []
-        for row in neo4j_results:
-            similarity = float(row.get("similarity", 0.0))
-            payload: EvidencePayload = {
-                "content": row.get("summary", ""),
-                "metadata": {
-                    "title": row.get("title", ""),
-                    "category": row.get("category", ""),
-                    "raw": row,
-                },
+    neo4j_evidences: List[Evidence] = []
+    for row in neo4j_results:
+        similarity = float(row.get("similarity", 0.0))
+        payload: EvidencePayload = {
+            "content": row.get("summary", ""),
+            "metadata": {
+                "title": row.get("title", ""),
+                "category": row.get("category", ""),
+                "raw": row,
+            },
+        }
+        neo4j_evidences.append(
+            {
+                "source": "graph",
+                "score": similarity,
+                "payload": payload,
             }
-            neo4j_evidences.append(
-                {
-                    "source": "graph",
-                    "score": similarity,
-                    "payload": payload,
-                }
-            )
-            evidences = neo4j_evidences
-    elif vector_evidences and not neo4j_results:
-        evidences = vector_evidences
+        )
+
+    evidences = vector_evidences + neo4j_evidences
 
     # 둘 다 없을 때
-    elif not vector_evidences and not neo4j_results:
+    if not evidences:
         return {
             **state,
             "final_answer": (
