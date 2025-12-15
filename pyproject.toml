@@ -49,6 +49,7 @@ dependencies = [
     "deep_translator==1.11.4",
     "drf-spectacular==0.29.0",
     "click>=8.0.0",
+    "ragas==0.2.15",
 ]
 
 [project.scripts]
