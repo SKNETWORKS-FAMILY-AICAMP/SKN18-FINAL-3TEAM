@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { COLORS } from "../constants/theme";
 import {
   UserIcon,
@@ -6,56 +6,103 @@ import {
   PlusIcon,
   LogoIcon,
 } from "../components/common/Icons";
+import { getMyActivity } from "../api/communityApi";
 
 const AllCommentsPage = ({ onNavigate }) => {
   const [expandedIds, setExpandedIds] = useState(new Set());
+  const [allComments, setAllComments] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const allComments = [
-    {
-      id: 1,
-      videoTitle: "정조의 군사 개혁",
-      date: "2025.12.10",
-      comment: "해당 사건은 몇년도에 발생하였나요?",
-      reply: { text: "해당 사건은 1425년(세종 7년)에 발생한 사건입니다." },
-      color: COLORS.cardCream,
-    },
-    {
-      id: 2,
-      videoTitle: "해시계 앙부일구",
-      date: "2025.12.08",
-      comment: "앙부일구의 작동 원리가 궁금합니다.",
-      reply: {
-        text: "앙부일구는 해의 그림자를 이용해 시간을 측정하는 해시계입니다.",
-      },
-      color: COLORS.sub_color,
-    },
-    {
-      id: 3,
-      videoTitle: "수원 화성 축조",
-      date: "2025.12.05",
-      comment: "화성 축조에 걸린 기간이 얼마나 되나요?",
-      reply: null,
-      color: COLORS.cardCream,
-    },
-    {
-      id: 4,
-      videoTitle: "임진왜란 해전",
-      date: "2025.12.01",
-      comment: "이순신 장군의 전략이 정말 대단하네요!",
-      reply: null,
-      color: COLORS.sky,
-    },
-    {
-      id: 5,
-      videoTitle: "집현전의 학자들",
-      date: "2025.11.28",
-      comment: "집현전에서 가장 유명한 학자는 누구인가요?",
-      reply: {
-        text: "정인지, 성삼문, 신숙주 등이 대표적인 집현전 학자입니다.",
-      },
-      color: COLORS.sub_color,
-    },
-  ];
+  // 배경색 배열 (순환)
+  const colors = [COLORS.cardCream, COLORS.sub_color, COLORS.sky];
+
+  // 시간 포맷팅 함수
+  const formatTimeAgo = (dateString) => {
+    if (!dateString) return "";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "";
+
+      const now = new Date();
+      const diffMs = now - date;
+      const diffSec = Math.floor(diffMs / 1000);
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffSec < 60) return "방금 전";
+      if (diffMins < 60) return `${diffMins}분 전`;
+      if (diffHours < 24) return `${diffHours}시간 전`;
+      if (diffDays < 7) return `${diffDays}일 전`;
+      return date
+        .toLocaleDateString("ko-KR", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        })
+        .replace(/\. /g, ".")
+        .replace(".", "");
+    } catch (error) {
+      console.error("날짜 포맷 오류:", error, dateString);
+      return "";
+    }
+  };
+
+  useEffect(() => {
+    const fetchComments = async () => {
+      try {
+        setLoading(true);
+        const response = await getMyActivity();
+        if (response?.data?.comments) {
+          // 같은 영상의 댓글을 그룹화
+          const groupedByVideo = {};
+
+          response.data.comments.forEach((c, idx) => {
+            const videoId = c.video?.id || c.video || "unknown";
+            const videoTitle = c.video_title || c.video?.title || "영상";
+
+            if (!groupedByVideo[videoId]) {
+              groupedByVideo[videoId] = {
+                videoId,
+                videoTitle,
+                comments: [],
+                color:
+                  colors[Object.keys(groupedByVideo).length % colors.length],
+              };
+            }
+
+            groupedByVideo[videoId].comments.push({
+              id: c.id,
+              comment_content: c.comment_content,
+              created_at: c.created_at,
+              replies: c.replies || [], // 백엔드에서 받은 replies
+              date: formatTimeAgo(c.created_at),
+            });
+          });
+
+          // 그룹화된 데이터를 배열로 변환
+          const formattedComments = Object.values(groupedByVideo).map(
+            (group, idx) => ({
+              id: `video-${group.videoId}`, // 그룹 ID
+              videoId: group.videoId,
+              videoTitle: group.videoTitle,
+              color: group.color,
+              comments: group.comments, // 같은 영상의 모든 댓글
+              date: group.comments[0]?.date || "", // 가장 최근 댓글의 날짜
+            })
+          );
+
+          setAllComments(formattedComments);
+        }
+      } catch (error) {
+        console.error("댓글 로드 실패:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchComments();
+  }, []);
 
   const toggleExpand = (id) => {
     setExpandedIds((prev) => {
@@ -117,214 +164,406 @@ const AllCommentsPage = ({ onNavigate }) => {
               color: COLORS.textPrimary,
             }}
           >
-            {allComments.length}개
+            {allComments.reduce(
+              (sum, group) => sum + (group.comments?.length || 0),
+              0
+            )}
+            개
           </span>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          {allComments.map((item, idx) => {
-            const isExpanded = expandedIds.has(item.id);
-            return (
-              <div
-                key={item.id}
-                style={{
-                  backgroundColor: item.color,
-                  borderRadius: "12px",
-                  padding: isExpanded ? "20px 24px" : "16px 24px",
-                  cursor: "pointer",
-                  transition: "all 0.3s ease",
-                  animation: `fadeIn 0.4s ease ${idx * 0.05}s both`,
-                }}
-                onClick={() => toggleExpand(item.id)}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.transform = "translateX(4px)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.transform = "translateX(0)")
-                }
-              >
+          {loading ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "40px",
+                color: COLORS.gray,
+              }}
+            >
+              로딩 중...
+            </div>
+          ) : allComments.length === 0 ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "40px",
+                color: COLORS.gray,
+              }}
+            >
+              작성한 댓글이 없습니다.
+            </div>
+          ) : (
+            allComments.map((item, idx) => {
+              const isExpanded = expandedIds.has(item.id);
+              return (
                 <div
+                  key={item.id}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
+                    backgroundColor: item.color,
+                    borderRadius: "12px",
+                    padding: isExpanded ? "20px 24px" : "16px 24px",
+                    cursor: "pointer",
+                    transition: "all 0.3s ease",
+                    animation: `fadeIn 0.4s ease ${idx * 0.05}s both`,
                   }}
+                  onClick={() => toggleExpand(item.id)}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.transform = "translateX(4px)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.transform = "translateX(0)")
+                  }
                 >
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "12px",
+                      justifyContent: "space-between",
                     }}
                   >
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "center",
-                        width: "24px",
-                        height: "24px",
-                        transition: "transform 0.3s ease",
-                        transform: isExpanded
-                          ? "rotate(45deg)"
-                          : "rotate(0deg)",
-                      }}
-                    >
-                      <PlusIcon size={20} color={COLORS.dark} />
-                    </div>
-                    <span
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: "600",
-                        color: COLORS.dark,
-                      }}
-                    >
-                      {item.videoTitle}
-                    </span>
-                  </div>
-                  <span
-                    style={{
-                      fontSize: "13px",
-                      color: COLORS.textMuted,
-                      fontWeight: "500",
-                    }}
-                  >
-                    {item.date}
-                  </span>
-                </div>
-
-                {isExpanded && (
-                  <div
-                    style={{
-                      marginTop: "20px",
-                      paddingTop: "20px",
-                      borderTop: "1px solid rgba(0, 0, 0, 0.1)",
-                      animation: "slideDown 0.3s ease",
-                    }}
-                  >
-                    <div
-                      style={{
-                        backgroundColor: "rgba(255,255,255,0.5)",
-                        borderRadius: "12px",
-                        padding: "16px 20px",
-                        marginBottom: item.reply ? "12px" : 0,
+                        gap: "12px",
                       }}
                     >
                       <div
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: "10px",
-                          marginBottom: "8px",
+                          justifyContent: "center",
+                          width: "24px",
+                          height: "24px",
+                          transition: "transform 0.3s ease",
+                          transform: isExpanded
+                            ? "rotate(45deg)"
+                            : "rotate(0deg)",
                         }}
                       >
-                        <div
-                          style={{
-                            width: "26px",
-                            height: "26px",
-                            borderRadius: "50%",
-                            backgroundColor: COLORS.primary,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <UserIcon size={14} color={COLORS.textPrimary} />
-                        </div>
-                        <span
-                          style={{
-                            fontSize: "13px",
-                            fontWeight: "700",
-                            color: COLORS.textPrimary,
-                          }}
-                        >
-                          나
-                        </span>
+                        <PlusIcon size={20} color={COLORS.dark} />
                       </div>
-                      <p
+                      <span
                         style={{
-                          fontSize: "15px",
-                          color: COLORS.textPrimary,
-                          margin: 0,
-                          lineHeight: "1.5",
+                          fontSize: "16px",
+                          fontWeight: "600",
+                          color: COLORS.dark,
                         }}
                       >
-                        {item.comment}
-                      </p>
+                        {item.videoTitle}
+                      </span>
                     </div>
+                    <span
+                      style={{
+                        fontSize: "13px",
+                        color: COLORS.textMuted,
+                        fontWeight: "500",
+                      }}
+                    >
+                      {item.date}
+                    </span>
+                  </div>
 
-                    {item.reply && (
-                      <div
-                        style={{ position: "relative", paddingLeft: "24px" }}
-                      >
+                  {isExpanded && (
+                    <div
+                      style={{
+                        marginTop: "20px",
+                        paddingTop: "20px",
+                        borderTop: "1px solid rgba(0, 0, 0, 0.1)",
+                        animation: "slideDown 0.3s ease",
+                      }}
+                      onClick={(e) => e.stopPropagation()} // 확장 영역 클릭 시 닫히지 않도록
+                    >
+                      {/* 같은 영상의 모든 댓글 표시 */}
+                      {item.comments?.map((comment, commentIdx) => (
                         <div
+                          key={comment.id}
                           style={{
-                            position: "absolute",
-                            left: "10px",
-                            top: "-8px",
-                            width: "14px",
-                            height: "28px",
-                            borderLeft: `2px solid ${COLORS.border}`,
-                            borderBottom: `2px solid ${COLORS.border}`,
-                            borderBottomLeftRadius: "12px",
-                          }}
-                        />
-                        <div
-                          style={{
-                            backgroundColor: "rgba(255,255,255,0.7)",
-                            borderRadius: "12px",
-                            padding: "16px 20px",
+                            marginBottom:
+                              commentIdx < item.comments.length - 1
+                                ? "16px"
+                                : "0",
                           }}
                         >
+                          {/* 댓글 */}
                           <div
                             style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "10px",
-                              marginBottom: "8px",
+                              backgroundColor: "rgba(255,255,255,0.5)",
+                              borderRadius: "12px",
+                              padding: "16px 20px",
+                              marginBottom:
+                                comment.replies?.length > 0 ? "12px" : "0",
                             }}
                           >
                             <div
                               style={{
-                                width: "26px",
-                                height: "26px",
-                                borderRadius: "50%",
-                                backgroundColor: COLORS.cardSky,
                                 display: "flex",
                                 alignItems: "center",
-                                justifyContent: "center",
+                                gap: "10px",
+                                marginBottom: "8px",
                               }}
                             >
-                              <LogoIcon size={14} />
+                              <div
+                                style={{
+                                  width: "26px",
+                                  height: "26px",
+                                  borderRadius: "50%",
+                                  backgroundColor: COLORS.primary,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                <UserIcon
+                                  size={14}
+                                  color={COLORS.textPrimary}
+                                />
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: "13px",
+                                  fontWeight: "700",
+                                  color: COLORS.textPrimary,
+                                }}
+                              >
+                                나
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  color: COLORS.textMuted,
+                                  marginLeft: "8px",
+                                }}
+                              >
+                                {comment.date}
+                              </span>
                             </div>
-                            <span
+                            <p
                               style={{
-                                fontSize: "13px",
-                                fontWeight: "700",
+                                fontSize: "15px",
                                 color: COLORS.textPrimary,
+                                margin: 0,
+                                lineHeight: "1.5",
                               }}
                             >
-                              AI 답변
-                            </span>
+                              {comment.comment_content}
+                            </p>
                           </div>
-                          <p
-                            style={{
-                              fontSize: "15px",
-                              color: COLORS.textPrimary,
-                              margin: 0,
-                              lineHeight: "1.5",
-                            }}
-                          >
-                            {item.reply.text}
-                          </p>
+
+                          {/* 하위 댓글들 (재귀적 렌더링) */}
+                          {comment.replies && comment.replies.length > 0 && (
+                            <div style={{ marginLeft: "20px" }}>
+                              {comment.replies.map((reply, replyIdx) => (
+                                <div
+                                  key={reply.id}
+                                  style={{
+                                    position: "relative",
+                                    paddingLeft: "24px",
+                                    marginBottom:
+                                      replyIdx < comment.replies.length - 1
+                                        ? "12px"
+                                        : "0",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      left: "10px",
+                                      top: "-8px",
+                                      width: "14px",
+                                      height: "28px",
+                                      borderLeft: `2px solid ${COLORS.border}`,
+                                      borderBottom: `2px solid ${COLORS.border}`,
+                                      borderBottomLeftRadius: "12px",
+                                    }}
+                                  />
+                                  <div
+                                    style={{
+                                      backgroundColor: "rgba(255,255,255,0.7)",
+                                      borderRadius: "12px",
+                                      padding: "16px 20px",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "10px",
+                                        marginBottom: "8px",
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          width: "26px",
+                                          height: "26px",
+                                          borderRadius: "50%",
+                                          backgroundColor: COLORS.cardSky,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                        }}
+                                      >
+                                        <UserIcon
+                                          size={12}
+                                          color={COLORS.textPrimary}
+                                        />
+                                      </div>
+                                      <span
+                                        style={{
+                                          fontSize: "13px",
+                                          fontWeight: "700",
+                                          color: COLORS.textPrimary,
+                                        }}
+                                      >
+                                        {reply.user?.display_name ||
+                                          reply.user?.nickname ||
+                                          "사용자"}
+                                      </span>
+                                      <span
+                                        style={{
+                                          fontSize: "11px",
+                                          color: COLORS.textMuted,
+                                          marginLeft: "8px",
+                                        }}
+                                      >
+                                        {formatTimeAgo(reply.created_at)}
+                                      </span>
+                                    </div>
+                                    <p
+                                      style={{
+                                        fontSize: "15px",
+                                        color: COLORS.textPrimary,
+                                        margin: 0,
+                                        lineHeight: "1.5",
+                                      }}
+                                    >
+                                      {reply.reply_content || reply.text}
+                                    </p>
+
+                                    {/* 답글의 답글들 (재귀) */}
+                                    {reply.child_replies &&
+                                      reply.child_replies.length > 0 && (
+                                        <div
+                                          style={{
+                                            marginTop: "12px",
+                                            marginLeft: "20px",
+                                          }}
+                                        >
+                                          {reply.child_replies.map(
+                                            (childReply) => (
+                                              <div
+                                                key={childReply.id}
+                                                style={{
+                                                  position: "relative",
+                                                  paddingLeft: "20px",
+                                                  marginBottom: "8px",
+                                                }}
+                                              >
+                                                <div
+                                                  style={{
+                                                    position: "absolute",
+                                                    left: "8px",
+                                                    top: "-6px",
+                                                    width: "12px",
+                                                    height: "24px",
+                                                    borderLeft: `2px solid ${COLORS.border}`,
+                                                    borderBottom: `2px solid ${COLORS.border}`,
+                                                    borderBottomLeftRadius:
+                                                      "10px",
+                                                  }}
+                                                />
+                                                <div
+                                                  style={{
+                                                    backgroundColor:
+                                                      "rgba(255,255,255,0.8)",
+                                                    borderRadius: "10px",
+                                                    padding: "12px 16px",
+                                                  }}
+                                                >
+                                                  <div
+                                                    style={{
+                                                      display: "flex",
+                                                      alignItems: "center",
+                                                      gap: "8px",
+                                                      marginBottom: "6px",
+                                                    }}
+                                                  >
+                                                    <div
+                                                      style={{
+                                                        width: "20px",
+                                                        height: "20px",
+                                                        borderRadius: "50%",
+                                                        backgroundColor:
+                                                          COLORS.lightGray,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        justifyContent:
+                                                          "center",
+                                                      }}
+                                                    >
+                                                      <UserIcon
+                                                        size={10}
+                                                        color={
+                                                          COLORS.textPrimary
+                                                        }
+                                                      />
+                                                    </div>
+                                                    <span
+                                                      style={{
+                                                        fontSize: "12px",
+                                                        fontWeight: "600",
+                                                        color:
+                                                          COLORS.textPrimary,
+                                                      }}
+                                                    >
+                                                      {childReply.user
+                                                        ?.display_name ||
+                                                        childReply.user
+                                                          ?.nickname ||
+                                                        "사용자"}
+                                                    </span>
+                                                    <span
+                                                      style={{
+                                                        fontSize: "10px",
+                                                        color: COLORS.textMuted,
+                                                      }}
+                                                    >
+                                                      {formatTimeAgo(
+                                                        childReply.created_at
+                                                      )}
+                                                    </span>
+                                                  </div>
+                                                  <p
+                                                    style={{
+                                                      fontSize: "14px",
+                                                      color: COLORS.textPrimary,
+                                                      margin: 0,
+                                                      lineHeight: "1.5",
+                                                    }}
+                                                  >
+                                                    {childReply.reply_content ||
+                                                      childReply.text}
+                                                  </p>
+                                                </div>
+                                              </div>
+                                            )
+                                          )}
+                                        </div>
+                                      )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { COLORS } from "../../constants/theme";
 import { SearchIcon, UserIcon, GlobeIcon } from "../common/Icons";
+import { getProfileImageUrl } from "../../utils/imageUtils";
 
 // 글라스 효과 스타일
 const glassStyle = {
@@ -13,11 +14,13 @@ const glassStyle = {
 
 const Header = ({
   isLoggedIn,
+  user,
   showUserDropdown,
   setShowUserDropdown,
   onSearchClick,
   onLogoClick,
   onMyPageClick,
+  onLogin,
   onLogout,
 }) => {
   const [showLangDropdown, setShowLangDropdown] = useState(false);
@@ -75,6 +78,7 @@ const Header = ({
           top: 0,
           left: 0,
           right: 0,
+          width: "100%",
           zIndex: 1000,
           display: "flex",
           alignItems: "center",
@@ -83,6 +87,7 @@ const Header = ({
           background: "transparent",
           pointerEvents: "none",
           transition: "padding 0.3s ease",
+          boxSizing: "border-box",
         }}
       >
         {/* 로고 */}
@@ -192,20 +197,75 @@ const Header = ({
             </button>
           </div>
 
-          {/* 사용자 버튼 - 글라스 효과 */}
-          <div style={{ position: "relative" }}>
+          {/* 사용자 버튼 또는 로그인 버튼 */}
+          {isLoggedIn ? (
+            <div style={{ position: "relative" }}>
+              <button
+                ref={userButtonRef}
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "6px 16px 6px 6px",
+                  ...glassStyle,
+                  borderRadius: "24px",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.9)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.7)";
+                }}
+              >
+                <div
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "50%",
+                    backgroundColor: user?.profile_image
+                      ? "transparent"
+                      : COLORS.primary,
+                    backgroundImage: user?.profile_image
+                      ? `url(${getProfileImageUrl(user.profile_image)})`
+                      : "none",
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {!user?.profile_image && <UserIcon size={16} />}
+                </div>
+                <span
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: "500",
+                    color: COLORS.dark,
+                  }}
+                >
+                  {user?.nickname ||
+                    user?.display_name ||
+                    user?.email?.split("@")[0] ||
+                    "사용자"}
+                </span>
+              </button>
+            </div>
+          ) : (
             <button
-              ref={userButtonRef}
-              onClick={() => setShowUserDropdown(!showUserDropdown)}
+              onClick={onLogin}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                padding: "6px 16px 6px 6px",
+                padding: "8px 20px",
                 ...glassStyle,
                 borderRadius: "24px",
                 cursor: "pointer",
                 transition: "all 0.2s ease",
+                fontSize: "14px",
+                fontWeight: "600",
+                color: COLORS.dark,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "rgba(255, 255, 255, 0.9)";
@@ -214,30 +274,9 @@ const Header = ({
                 e.currentTarget.style.background = "rgba(255, 255, 255, 0.7)";
               }}
             >
-              <div
-                style={{
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "50%",
-                  backgroundColor: COLORS.primary,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <UserIcon size={16} />
-              </div>
-              <span
-                style={{
-                  fontSize: "14px",
-                  fontWeight: "500",
-                  color: COLORS.dark,
-                }}
-              >
-                {isLoggedIn ? "사용자" : "로그인"}
-              </span>
+              로그인
             </button>
-          </div>
+          )}
         </div>
       </header>
 
