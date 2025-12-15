@@ -49,9 +49,11 @@ def title(batch_size, verbose):
         raise click.Abort()
 
     try:
-        # 현재 실행 중인 Python 인터프리터 사용 (가상환경 보장)
+        # 모듈로 실행하여 패키지 컨텍스트 보장
         python_executable = sys.executable
-        cmd = [python_executable, str(script_path)]
+        # 모듈 경로: backend.db_pipeline.vectordb.ETL.load_title_embeddings
+        module_path = "backend.db_pipeline.vectordb.ETL.load_title_embeddings"
+        cmd = [python_executable, "-m", module_path]
         if verbose:
             cmd.append("--verbose")
 
@@ -107,9 +109,11 @@ def contents(batch_size, verbose):
         raise click.Abort()
 
     try:
-        # 현재 실행 중인 Python 인터프리터 사용 (가상환경 보장)
+        # 모듈로 실행하여 패키지 컨텍스트 보장
         python_executable = sys.executable
-        cmd = [python_executable, str(script_path)]
+        # 모듈 경로: backend.db_pipeline.vectordb.ETL.load_to_pgvector
+        module_path = "backend.db_pipeline.vectordb.ETL.load_to_pgvector"
+        cmd = [python_executable, "-m", module_path]
         if verbose:
             cmd.append("--verbose")
 
