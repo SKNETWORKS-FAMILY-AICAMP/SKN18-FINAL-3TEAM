@@ -9,7 +9,7 @@ urlpatterns = [
     path('accounts/', include('allauth.urls')),
 
     # 인증/계정 API
-    path('api/', include('accounts.urls')),
+    path('api/', include('users.urls')),
 
     # 사용자 관리 API
     path('api/users/', include('users.urls')),
@@ -30,6 +30,7 @@ urlpatterns = [
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    
 ]
 
 # 개발 환경에서 media 파일 서빙
