@@ -14,7 +14,7 @@ from backend.db_pipeline.common.config import INPUT_CSV
 
 def split_chunk():
     # 청킹 파라미터
-    CHUNK_SIZE = 800  # 800자
+    CHUNK_SIZE = 600  # 800자
     OVERLAP_SIZE = 100  # 100자
 
     # RecursiveCharacterTextSplitter 초기화
