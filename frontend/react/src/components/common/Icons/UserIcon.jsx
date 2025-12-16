@@ -1,10 +1,10 @@
-const UserIcon = ({ size = 20 }) => (
+const UserIcon = ({ size = 20, color = "#333" }) => (
   <svg
     width={size}
     height={size}
     viewBox="0 0 24 24"
     fill="none"
-    stroke="#333"
+    stroke={color}
     strokeWidth="2"
   >
     <circle cx="12" cy="8" r="4" />

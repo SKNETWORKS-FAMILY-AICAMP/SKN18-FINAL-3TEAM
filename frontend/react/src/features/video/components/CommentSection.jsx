@@ -44,7 +44,10 @@ const CommentSection = ({
           profileImage: user?.profile_image,
           created_at: response.data.created_at || new Date().toISOString(),
           likes: 0,
+          comment_likes_count: 0,
+          likes_count: 0,
           replies: [],
+          is_liked: false,
           user: {
             id: user?.id,
             nickname: user?.nickname,
@@ -109,7 +112,10 @@ const CommentSection = ({
           overflowY: "auto",
           overflowX: "hidden",
           minHeight: 0,
+          scrollbarWidth: "thin",
+          scrollbarColor: `${COLORS.lightGray} transparent`,
         }}
+        className="comment-section-scroll"
       >
         <div style={{ display: "flex", flexDirection: "column" }}>
           {commentsList.map((comment, index) => (
@@ -173,7 +179,7 @@ const CommentSection = ({
               justifyContent: "center",
             }}
           >
-            {!user?.profile_image && <UserIcon size={16} />}
+            {!user?.profile_image && <UserIcon size={16} color={COLORS.gray} />}
           </div>
           <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
             <input
@@ -204,6 +210,7 @@ const CommentSection = ({
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 backgroundColor: isLoggedIn ? COLORS.white : COLORS.lightGray,
+                color: COLORS.dark,
                 cursor: isLoggedIn ? "text" : "not-allowed",
                 opacity: isLoggedIn ? 1 : 0.6,
               }}
@@ -226,6 +233,8 @@ const CommentSection = ({
                 transform: "translateY(-50%)",
                 width: "32px",
                 height: "32px",
+                minWidth: "32px",
+                minHeight: "32px",
                 borderRadius: "50%",
                 backgroundColor: (isLoggedIn && commentText.trim())
                   ? COLORS.primary
@@ -235,17 +244,36 @@ const CommentSection = ({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                flexShrink: 0,
+                overflow: "hidden",
                 transition: "all 0.2s ease",
+                padding: 0,
               }}
             >
               <SendIcon
                 size={16}
-                color={(isLoggedIn && commentText.trim()) ? COLORS.dark : "#999"}
+                color={(isLoggedIn && commentText.trim()) ? COLORS.dark : COLORS.textMuted}
               />
             </button>
           </div>
         </div>
       </div>
+
+      <style>{`
+        .comment-section-scroll::-webkit-scrollbar {
+          width: 8px;
+        }
+        .comment-section-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .comment-section-scroll::-webkit-scrollbar-thumb {
+          background: ${COLORS.lightGray};
+          border-radius: 4px;
+        }
+        .comment-section-scroll::-webkit-scrollbar-thumb:hover {
+          background: ${COLORS.gray};
+        }
+      `}</style>
     </div>
   );
 };

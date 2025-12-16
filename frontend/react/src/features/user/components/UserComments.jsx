@@ -59,7 +59,7 @@ const UserComments = ({
           maxHeight: "400px",
           overflowY: "auto",
           scrollbarWidth: "thin",
-          scrollbarColor: `${COLORS.primary} ${COLORS.lightGray}`,
+          scrollbarColor: `${COLORS.lightGray} transparent`,
         }}
         className="user-comments-scroll"
       >
@@ -169,11 +169,11 @@ const UserComments = ({
             border-radius: 4px;
           }
           .user-comments-scroll::-webkit-scrollbar-thumb {
-            background: ${COLORS.primary};
+            background: ${COLORS.lightGray};
             border-radius: 4px;
           }
           .user-comments-scroll::-webkit-scrollbar-thumb:hover {
-            background: ${COLORS.secondary};
+            background: ${COLORS.gray};
           }
         `}</style>
       </div>
