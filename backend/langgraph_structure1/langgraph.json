@@ -1,0 +1,7 @@
+{
+  "dependencies": ["../.."],
+  "graphs": {
+    "agent": "backend.langgraph_structure1.graph:graph"
+  },
+  "env": "../../.env"
+}
