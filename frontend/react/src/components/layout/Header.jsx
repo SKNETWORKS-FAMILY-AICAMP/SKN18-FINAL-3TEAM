@@ -185,6 +185,8 @@ const Header = ({
                 borderRadius: "12px",
                 cursor: "pointer",
                 transition: "all 0.2s ease",
+                border: "none",
+                padding: 0,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "rgba(255, 255, 255, 0.9)";
@@ -193,7 +195,7 @@ const Header = ({
                 e.currentTarget.style.background = "rgba(255, 255, 255, 0.7)";
               }}
             >
-              <GlobeIcon size={20} color="#555" />
+              <GlobeIcon size={22} color="#333" />
             </button>
           </div>
 
