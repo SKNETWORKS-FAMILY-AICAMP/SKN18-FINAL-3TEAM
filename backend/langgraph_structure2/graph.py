@@ -1,6 +1,7 @@
 from langgraph.graph import StateGraph, END
 from backend.langgraph_structure2.state import GraphState
 from backend.langgraph_structure2.nodes.classify_node import classify_node, route_classify
+from backend.langgraph_structure2.nodes.extract_keywords_node import extract_keywords_node
 from backend.langgraph_structure2.rag.retrieval_node import retrieval_node
 from backend.langgraph_structure2.rag.evaluate_node import evaluate_node, route_evaluate
 from backend.langgraph_structure2.graphdb.generate_cypher_node import create_cypher
@@ -24,20 +25,25 @@ def create_graph_flow():
     workflow.add_node("tone_adjust_node",tone_adjust_node)
     workflow.add_node("scene_split_node",scene_split_node)
 
+    # 핵심 키워드 추출 노드 추가
+    workflow.add_node("extract_keywords_node", extract_keywords_node)
+
     # 노드 연결(엣지 추가)
     workflow.set_entry_point("classify_node") 
 
     # classify_node → route_classify 로 분기
-    # route_classify(state) 가 "retrieval_node" 또는 END를 리턴
     workflow.add_conditional_edges(
         "classify_node",
         route_classify,
         {  # 분기 후보를 명시
-            "retrieval_node": "retrieval_node",
+            "extract_keywords_node": "extract_keywords_node",
             "generate_cypher_node": "generate_cypher_node",
             END: END,
         },
     )
+
+    # extract_keywords_node → retrieval_node 로 연결
+    workflow.add_edge("extract_keywords_node", "retrieval_node")
 
     # retrieval_node → evaluate_node 로 연결
     workflow.add_edge("retrieval_node", "evaluate_node")

@@ -3,7 +3,7 @@ Transform: CSV 데이터 정규화 + 청킹
 
 1. Extract: encykorea_cleaned6.csv 읽기
 2. Normalize: 데이터 정규화 (한자 제거, 괄호 제거, 공백 정리)
-3. Chunking: contents 긴 텍스트 청킹 (800자, 100자 오버랩)
+3. Chunking: contents 긴 텍스트 청킹 (600자, 120자 오버랩)
 4. Output: transformed_chunks.csv 생성
 """
 
@@ -15,7 +15,7 @@ from backend.db_pipeline.common.config import INPUT_CSV
 def split_chunk():
     # 청킹 파라미터
     CHUNK_SIZE = 600  # 800자
-    OVERLAP_SIZE = 100  # 100자
+    OVERLAP_SIZE = 120  # 100자
 
     # RecursiveCharacterTextSplitter 초기화
     text_splitter = RecursiveCharacterTextSplitter(
