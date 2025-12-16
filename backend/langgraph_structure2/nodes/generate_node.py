@@ -91,44 +91,10 @@ def generate_node(state: GraphState) -> GraphState:
             }
         )
 
-    # 2) 벡터/그래프 evidence를 한 줄로 모아서 score 기준 정렬
-    all_evidences: List[Evidence] = vector_evidences + neo4j_evidences
+    evidences = vector_evidences + neo4j_evidences
 
-    if all_evidences:
-        all_evidences.sort(key=lambda e: e["score"], reverse=True)
-
-        # 상위 2~3개만 사용 (원하면 top_k 조절)
-        top_evidences = all_evidences[:3]
-
-        prompt = build_llm_prompt(question, top_evidences)
-
-        # LLM 호출, 최종 답변 생성
-        client = create_model()
-        MODEL_NAME = "gpt-5-mini"
-
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            response_format={"type": "text"},
-            messages=[
-                {"role": "user", "content": prompt},
-            ],
-        )
-
-        final_answer = response.choices[0].message.content.strip()
-
-        print("[최종 답변]")
-        print(final_answer)
-        print("-" * 60)
-
-        return {
-            **state,
-            "final_answer": final_answer,
-        }
-
-
-    # 2) 둘 다 없을 때: 아무 정보도 못 찾은 경우
-    else:
-        # evidence 없을 때는 그냥 안내 문구를 draft로 써도 됨
+    # 둘 다 없을 때
+    if not evidences:
         return {
             **state,
             "final_answer": (
@@ -136,6 +102,32 @@ def generate_node(state: GraphState) -> GraphState:
                 "더 구체적인 질문이나 추가 자료가 필요합니다."
             )
         }
+
+
+    prompt = build_llm_prompt(question, evidences)
+
+    # LLM 호출, 최종 답변 생성
+    client = create_model()
+    MODEL_NAME = "gpt-5-mini"
+
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        response_format={"type": "text"},
+        messages=[
+            {"role": "user", "content": prompt},
+        ],
+    )
+
+    final_answer = response.choices[0].message.content.strip()
+
+    print("[최종 답변]")
+    print(final_answer)
+    print("-" * 60)
+
+    return {
+        **state,
+        "final_answer": final_answer,
+    }
 
 
 # 테스트용

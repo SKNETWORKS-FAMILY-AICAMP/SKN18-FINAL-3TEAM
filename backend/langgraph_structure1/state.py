@@ -3,6 +3,9 @@ from backend.langgraph_structure1.state_type import Evidence
 
 
 class GraphState(TypedDict):
+    # langgraph 사용 상태
+    tag: NotRequired[str]
+    
     # 사용자 질문(필수)
     query: str
 
@@ -11,8 +14,12 @@ class GraphState(TypedDict):
     translated_query: NotRequired[str]
     query_type: NotRequired[str]
 
+    # 핵심 키워드 추출 결과
+    keywords: NotRequired[List[str]]
+
     # Retrieval 결과
     vector_evidences: NotRequired[List[Evidence]]
+    retrieval_elapsed: NotRequired[float]
 
     # Neo4j 검색 결과
     cypher: NotRequired[str]
