@@ -10,25 +10,23 @@ encykorea_cleaned6.csv → PostgreSQL title_embeddings 테이블
 import os
 import sys
 import time
-from pathlib import Path
 from typing import List, Dict
 from dotenv import load_dotenv
 
 # 프로젝트 루트 경로 설정
-project_root = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(project_root / "backend"))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+sys.path.insert(0, os.path.join(project_root, "backend"))
 
 # 환경변수 로드
-env_path = project_root / ".env"
+env_path = os.path.join(project_root, ".env")
 load_dotenv(env_path, override=True)
 
-from db_pipeline.vectordb.services.title_vector_service import get_title_vector_service, TitleVectorService
-from db_pipeline.common.load_raw_data import load_raw_data
+from backend.db_pipeline.vectordb.services.title_vector_service import get_title_vector_service, TitleVectorService
+from backend.db_pipeline.common.load_raw_data import load_raw_data
+from backend.db_pipeline.common.config import INPUT_CSV
 
-# 경로 설정
-DATA_DIR = Path(__file__).parent.parent / "data"
-CSV_FILENAME = os.getenv("CSV_FILENAME", "encykorea_cleaned6.csv")
-CSV_FILE = DATA_DIR / CSV_FILENAME
+# 경로 설정 (모듈 방식)
+CSV_FILE = INPUT_CSV
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "100"))
 
 
@@ -45,7 +43,7 @@ def main():
     print("\n[1/4] CSV 파일 로드")
     print(f"  |- 파일 경로: {CSV_FILE}")
 
-    if not CSV_FILE.exists():
+    if not os.path.exists(CSV_FILE):
         print(f"  |- [ERROR] 파일이 없습니다: {CSV_FILE}")
         return
 

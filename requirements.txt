@@ -65,3 +65,5 @@ deep_translator==1.11.4
 
 # API 문서화 or API Test용
 drf-spectacular==0.29.0
+
+ragas==0.2.15
