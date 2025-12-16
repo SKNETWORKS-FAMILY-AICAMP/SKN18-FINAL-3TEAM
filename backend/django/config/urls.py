@@ -12,10 +12,10 @@ urlpatterns = [
     path('api/', include('users.urls')),
 
     # 사용자 관리 API
-    # path('api/users/', include('users.urls')),
+    path('api/users/', include('users.urls')),
 
     # 검색 API
-    # path('api/search/', include('search.urls')),
+    path('api/search/', include('search.urls')),
 
     # 영상/LLM 관련 API
     path('api/video/', include('video.urls')),
