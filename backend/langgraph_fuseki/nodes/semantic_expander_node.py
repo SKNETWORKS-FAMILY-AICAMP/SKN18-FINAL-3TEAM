@@ -5,7 +5,7 @@ Semantic Expander Node
 1. 시간적 맥락 확장 (±10년 이내 이벤트)
 2. 카테고리 기반 주제 확장 (동일 카테고리 이벤트)
 3. 벡터 유사도 확장 (pgvector)
-4. 인과관계 체인 확장 (leadsTo, causedBy)
+4. 인과관계 체인 확장 (leadsTo, ledTo, causes)
 
 이 노드는 entity_expander 이후, parallel_knowledge_retrieval 이전에 실행됩니다.
 """
@@ -108,7 +108,7 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
     expanded_entities = []
     seen = set()
 
-    # 엔티티에서 연도 추출 (Person: BirthYear/DeathYear, Event: hasYear)
+    # 엔티티에서 연도 추출 (Person: BirthYear/DeathYear, Event: hasYear/hasStartYear/hasEndYear)
     entity_years = []
 
     for entity in entities[:10]:  # 상위 10개만
@@ -137,13 +137,23 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
                 }} LIMIT 1
             """
         else:
-            # Event, Battle 등: hasYear 사용
+            # Event, Battle 등: hasYear, hasStartYear, hasEndYear 모두 확인
             sparql = f"""
                 PREFIX hist: <http://www.example.org/korean-history#>
                 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
                 SELECT ?year WHERE {{
-                    {uri} hist:hasYear ?year .
+                    {{
+                        {uri} hist:hasYear ?year .
+                    }}
+                    UNION
+                    {{
+                        {uri} hist:hasStartYear ?year .
+                    }}
+                    UNION
+                    {{
+                        {uri} hist:hasEndYear ?year .
+                    }}
                 }} LIMIT 1
             """
 
@@ -185,9 +195,36 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
             SELECT DISTINCT ?entity ?label ?type ?year WHERE {{
                 ?entity rdf:type ?type .
                 ?entity rdfs:label ?label .
-                ?entity hist:hasYear ?year .
-                FILTER(?year >= {min_year} && ?year <= {max_year})
                 FILTER(?type IN (hist:Event, hist:Battle))
+                {{
+                    # hasYear가 있는 경우
+                    ?entity hist:hasYear ?year .
+                    FILTER(?year >= {min_year} && ?year <= {max_year})
+                }}
+                UNION
+                {{
+                    # hasStartYear만 있는 경우
+                    ?entity hist:hasStartYear ?year .
+                    FILTER(?year >= {min_year} && ?year <= {max_year})
+                }}
+                UNION
+                {{
+                    # hasEndYear만 있는 경우
+                    ?entity hist:hasEndYear ?year .
+                    FILTER(?year >= {min_year} && ?year <= {max_year})
+                }}
+                UNION
+                {{
+                    # hasStartYear와 hasEndYear가 모두 있는 경우 (기간이 겹치는 경우 포함)
+                    ?entity hist:hasStartYear ?startYear .
+                    ?entity hist:hasEndYear ?endYear .
+                    BIND(?startYear AS ?year)
+                    FILTER(
+                        (?startYear >= {min_year} && ?startYear <= {max_year}) ||
+                        (?endYear >= {min_year} && ?endYear <= {max_year}) ||
+                        (?startYear <= {min_year} && ?endYear >= {max_year})
+                    )
+                }}
             }} LIMIT 10
         """
 
@@ -363,7 +400,7 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
 
 def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) -> list:
     """
-    인과관계 체인 확장: leadsTo, causedBy 관계를 따라 확장
+    인과관계 체인 확장: leadsTo, ledTo, causes 관계를 따라 확장
 
     Args:
         entities: 추출된 엔티티 리스트
@@ -412,19 +449,19 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                         {uri_sparql} hist:participatesIn ?event .
                         ?event rdf:type hist:Event .
                         
-                        # 그 Event의 인과관계 찾기 (leadsTo, ledTo 사용)
+                        # 그 Event의 인과관계 찾기 (leadsTo, ledTo, causes 사용)
                         {{
                             ?event ?predicate ?related .
                             ?related rdfs:label ?label .
                             ?related rdf:type ?type .
-                            FILTER(?predicate IN (hist:leadsTo, hist:ledTo))
+                            FILTER(?predicate IN (hist:leadsTo, hist:ledTo, hist:causes))
                         }}
                         UNION
                         {{
                             ?related ?predicate ?event .
                             ?related rdfs:label ?label .
                             ?related rdf:type ?type .
-                            FILTER(?predicate IN (hist:leadsTo, hist:ledTo))
+                            FILTER(?predicate IN (hist:leadsTo, hist:ledTo, hist:causes))
                         }}
                     }}
                     UNION
@@ -433,25 +470,25 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                         ?event hist:involvesPerson {uri_sparql} .
                         ?event rdf:type hist:Event .
 
-                        # 그 Event의 인과관계 찾기 (leadsTo, ledTo 사용)
+                        # 그 Event의 인과관계 찾기 (leadsTo, ledTo, causes 사용)
                         {{
                             ?event ?predicate ?related .
                             ?related rdfs:label ?label .
                             ?related rdf:type ?type .
-                            FILTER(?predicate IN (hist:leadsTo, hist:ledTo))
+                            FILTER(?predicate IN (hist:leadsTo, hist:ledTo, hist:causes))
                         }}
                         UNION
                         {{
                             ?related ?predicate ?event .
                             ?related rdfs:label ?label .
                             ?related rdf:type ?type .
-                            FILTER(?predicate IN (hist:leadsTo, hist:ledTo))
+                            FILTER(?predicate IN (hist:leadsTo, hist:ledTo, hist:causes))
                         }}
                     }}
                 }} LIMIT 10
             """
         else:
-            # Event 타입인 경우 직접 인과관계 검색 (leadsTo, ledTo 사용)
+            # Event 타입인 경우 직접 인과관계 검색 (leadsTo, ledTo, causes 사용)
             sparql = f"""
                 PREFIX hist: <http://www.example.org/korean-history#>
                 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -463,7 +500,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                         {uri_sparql} ?predicate ?related .
                         ?related rdfs:label ?label .
                         ?related rdf:type ?type .
-                        FILTER(?predicate IN (hist:leadsTo, hist:ledTo))
+                        FILTER(?predicate IN (hist:leadsTo, hist:ledTo, hist:causes))
                     }}
                     UNION
                     {{
@@ -471,7 +508,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                         ?related ?predicate {uri_sparql} .
                         ?related rdfs:label ?label .
                         ?related rdf:type ?type .
-                        FILTER(?predicate IN (hist:leadsTo, hist:ledTo))
+                        FILTER(?predicate IN (hist:leadsTo, hist:ledTo, hist:causes))
                     }}
                 }} LIMIT 10
             """
