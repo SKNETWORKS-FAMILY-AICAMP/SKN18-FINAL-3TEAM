@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, NotRequired, TypedDict
 from backend.langgraph_structure2.state_type import Evidence
 
-
 class GraphState(TypedDict):
     # langgraph 사용 상태
     tag: NotRequired[str]
