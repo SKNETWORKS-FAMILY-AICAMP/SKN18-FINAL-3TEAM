@@ -41,9 +41,7 @@ const App = () => {
     const handleHashChange = () => {
       const initial = getInitialPage();
       setCurrentPage(initial.page);
-      if (initial.videoId) {
-        setSelectedVideoId(initial.videoId);
-      }
+      setSelectedVideoId(initial.videoId);
     };
 
     window.addEventListener("hashchange", handleHashChange);
