@@ -11,15 +11,11 @@
    - 추가된 엔드포인트:
      - `GET /api/video/list/` - 영상 목록 조회
      - `GET /api/video/<id>/` - 영상 상세 조회
-     - `GET /api/video/popular/` - 인기 영상 조회
-     - `GET /api/video/tags/popular/` - 인기 태그 조회
 
 3. **`views.py`** (수정됨)
    - 추가된 뷰 클래스:
      - `VideoListView`
      - `VideoDetailView`
-     - `PopularVideosView`
-     - `PopularTagsView`
 
 ## 🚨 복구 시 발생할 문제
 
@@ -29,7 +25,6 @@
 - **영향**: 영상 목록이 표시되지 않음
 - **사용 API**: 
   - `GET /api/video/list/` (로그인 사용자)
-  - `GET /api/video/popular/` (비로그인 사용자)
 - **증상**: 
   - "로딩 중..." 상태에서 멈춤
   - 또는 "영상이 없습니다" 메시지 표시
@@ -43,14 +38,6 @@
   - 영상 정보가 표시되지 않음
   - 콘솔에 `404 Not Found` 에러 발생
 
-#### ExpandableSearch (검색 기능)
-- **영향**: 인기 태그 및 추천 영상이 표시되지 않음
-- **사용 API**:
-  - `GET /api/video/tags/popular/` (인기 태그)
-  - `GET /api/video/popular/` (추천 영상)
-- **증상**:
-  - 검색창 열었을 때 인기 태그가 비어있음
-  - 추천 영상이 표시되지 않음
 
 ### 2. **에러 메시지**
 
@@ -60,8 +47,6 @@
 // 브라우저 콘솔 에러 예시
 GET http://localhost:8000/api/video/list/ 404 (Not Found)
 GET http://localhost:8000/api/video/1/ 404 (Not Found)
-GET http://localhost:8000/api/video/popular/ 404 (Not Found)
-GET http://localhost:8000/api/video/tags/popular/ 404 (Not Found)
 ```
 
 ### 3. **영향받는 컴포넌트 목록**
@@ -70,7 +55,6 @@ GET http://localhost:8000/api/video/tags/popular/ 404 (Not Found)
 |---------|----------|--------|
 | MainPage | `frontend/react/src/pages/MainPage.jsx` | 🔴 **치명적** - 메인 페이지 작동 불가 |
 | VideoDetailPage | `frontend/react/src/pages/VideoDetailPage.jsx` | 🔴 **치명적** - 영상 상세 페이지 작동 불가 |
-| ExpandableSearch | `frontend/react/src/features/search/components/ExpandableSearch.jsx` | 🟡 **중간** - 검색 기능 일부 작동 불가 |
 
 ### 4. **기능별 영향 요약**
 
@@ -78,8 +62,6 @@ GET http://localhost:8000/api/video/tags/popular/ 404 (Not Found)
 |------|------|------|
 | 메인 페이지 영상 목록 | ❌ 작동 불가 | 로그인/비로그인 모두 영향 |
 | 영상 상세 페이지 | ❌ 작동 불가 | 영상 클릭 시 페이지 진입 불가 |
-| 검색창 인기 태그 | ❌ 작동 불가 | 태그 목록이 비어있음 |
-| 검색창 추천 영상 | ❌ 작동 불가 | 추천 영상이 표시되지 않음 |
 | 유니티 시나리오 생성 | ✅ 정상 작동 | `generate_scenario`는 영향 없음 |
 
 ## 💡 복구 전 확인 사항
@@ -98,9 +80,7 @@ GET http://localhost:8000/api/video/tags/popular/ 404 (Not Found)
 영상 담당자가 수정을 완료하면, 다음 엔드포인트들이 반드시 구현되어야 합니다:
 
 1. ✅ `GET /api/video/list/` - 영상 목록 조회
-2. ✅ `GET /api/video/<id>/` - 영상 상세 조회  
-3. ✅ `GET /api/video/popular/` - 인기 영상 조회
-4. ✅ `GET /api/video/tags/popular/` - 인기 태그 조회
+2. ✅ `GET /api/video/<id>/` - 영상 상세 조회
 
 각 API는 다음 응답 형식을 반환해야 합니다:
 ```json
