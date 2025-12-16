@@ -22,9 +22,17 @@ def retrieval_node(state: GraphState) -> GraphState:
 
     t0 = time.perf_counter()
 
+    # keywords가 있으면 질문과 함께 조합해 쿼리 문자열을 만든다
+    keywords: List[str] = state.get("keywords", []) or []
+    if keywords:
+        kw_str = " ".join(keywords)
+        combined_query = f"{question} {kw_str}"
+    else:
+        combined_query = question
+
     # 넉넉히 FETCHED_COUNT(5)개 가져온 뒤 필터링
     results = vectorstore.similarity_search_with_score(
-        query=question,
+        query=combined_query,
         k=FETCHED_COUNT,
     )
 
@@ -55,6 +63,16 @@ def retrieval_node(state: GraphState) -> GraphState:
     ]
 
     elapsed = time.perf_counter() - t0
+
+        # 디버그 출력
+    print(f"[DEBUG] 벡터 검색 결과: query={question!r}, keywords={keywords}, "
+          f"retrieved={len(results)}, filtered={len(filtered)}, top_k={len(top_k)}")
+    
+    # 뽑힌 청크 출력
+    for evidence in vector_evidences:
+        print(evidence)
+    print(f"[DEBUG] 벡터 검색 시간: {elapsed:.2f}초")
+    print("-" * 60)
 
     return {
         **state,

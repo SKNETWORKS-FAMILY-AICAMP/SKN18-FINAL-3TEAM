@@ -119,7 +119,7 @@ def route_classify(state: GraphState) -> str:
     query_type = state.get("query_type")
 
     if query_type=="vector_only":
-        return "retrieval_node"
+        return "extract_keywords_node"  # 키워드 추출 후 벡터 검색
     elif query_type=="graph_only":
         return "generate_cypher_node"
     elif query_type=="no_related":
