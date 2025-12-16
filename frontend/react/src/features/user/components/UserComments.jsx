@@ -40,11 +40,22 @@ const UserComments = ({
           onClick={onViewAll}
           style={{
             padding: "8px 16px",
-            border: "1px solid #333",
+            border: `1.5px solid ${COLORS.textSecondary}`,
             borderRadius: "6px",
             backgroundColor: "transparent",
+            color: COLORS.textSecondary,
             fontSize: "13px",
+            fontWeight: "500",
             cursor: "pointer",
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = COLORS.dark;
+            e.currentTarget.style.color = COLORS.dark;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = COLORS.textSecondary;
+            e.currentTarget.style.color = COLORS.textSecondary;
           }}
         >
           전체보기

@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.generics import DestroyAPIView
+from rest_framework.generics import DestroyAPIView, UpdateAPIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from video.models import Video
@@ -178,6 +178,32 @@ class CommentReplyView(APIView):
 # ============================================
 # 관리자 API (댓글/답글 삭제)
 # ============================================
+
+class CommentUpdateView(UpdateAPIView):
+    """
+    댓글 수정 API
+    - 작성자 본인 또는 관리자만 수정 가능
+
+    PATCH /api/community/comments/{comment_id}/
+    """
+    queryset = Comment.objects.all()
+    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    serializer_class = CommentCreateSerializer
+    lookup_url_kwarg = 'comment_id'
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        # 수정된 댓글을 CommentSerializer로 반환
+        updated_comment = CommentSerializer(instance, context={'request': request})
+        return Response({
+            'data': updated_comment.data,
+            'message': '댓글이 수정되었습니다.'
+        }, status=status.HTTP_200_OK)
+
 
 class CommentDeleteView(DestroyAPIView):
     """

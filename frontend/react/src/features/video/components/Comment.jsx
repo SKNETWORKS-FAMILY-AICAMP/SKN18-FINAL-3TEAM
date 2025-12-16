@@ -5,9 +5,11 @@ import {
   HeartIcon,
   CloseIcon,
   SendIcon,
+  EditIcon,
 } from "../../../components/common/Icons";
 import {
   deleteComment,
+  updateComment,
   createReply,
   likeComment,
   unlikeComment,
@@ -430,6 +432,9 @@ const Comment = ({
   const [likesCount, setLikesCount] = useState(
     comment.comment_likes_count || comment.likes_count || 0
   );
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(comment.comment_content || comment.text || "");
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   const isOwnComment = currentUser && comment.user?.id === currentUser.id;
   const profileSize = 32;
@@ -450,6 +455,36 @@ const Comment = ({
       setCommentLineHeight(height);
     }
   }, [hasReplies, replies.length, showReplyInput, replyText]);
+
+  const handleEdit = () => {
+    setIsEditing(true);
+    setEditText(comment.comment_content || comment.text || "");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editText.trim() || isSubmittingEdit) return;
+
+    setIsSubmittingEdit(true);
+    try {
+      const response = await updateComment(comment.id, editText.trim());
+      if (response?.data) {
+        // 댓글 내용 업데이트
+        comment.comment_content = response.data.comment_content;
+        comment.text = response.data.comment_content;
+        setIsEditing(false);
+      }
+    } catch (error) {
+      console.error("댓글 수정 실패:", error);
+      alert("댓글 수정에 실패했습니다.");
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditText(comment.comment_content || comment.text || "");
+  };
 
   const handleDelete = async () => {
     if (window.confirm("댓글을 삭제하시겠습니까?")) {
@@ -600,37 +635,145 @@ const Comment = ({
               <span style={{ fontSize: "11px", color: "#999" }}>
                 {formatTimeAgo(comment.created_at || comment.timeAgo)}
               </span>
-              {isOwnComment && (
-                <button
-                  onClick={handleDelete}
-                  style={{
-                    marginLeft: "auto",
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: "4px",
-                    opacity: 0.5,
-                    transition: "opacity 0.2s",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
-                  onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
-                >
-                  <CloseIcon size={14} color="#999" />
-                </button>
+              {isOwnComment && !isEditing && (
+                <div style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
+                  <button
+                    onClick={handleEdit}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "4px",
+                      opacity: 0.5,
+                      transition: "opacity 0.2s",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
+                  >
+                    <EditIcon size={14} color="#999" />
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "4px",
+                      opacity: 0.5,
+                      transition: "opacity 0.2s",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
+                  >
+                    <CloseIcon size={14} color="#999" />
+                  </button>
+                </div>
               )}
             </div>
 
             {/* 댓글 내용 */}
-            <div
-              style={{
-                fontSize: "13px",
-                color: COLORS.dark,
-                lineHeight: "1.5",
-                marginBottom: "8px",
-              }}
-            >
-              {comment.text || comment.comment_content}
-            </div>
+            {isEditing ? (
+              <div style={{ marginBottom: "8px" }}>
+                <input
+                  type="text"
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSaveEdit();
+                    } else if (e.key === "Escape") {
+                      handleCancelEdit();
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    border: "2px solid",
+                    borderColor: COLORS.primary,
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    color: COLORS.dark,
+                    backgroundColor: COLORS.white,
+                    outline: "none",
+                    boxSizing: "border-box",
+                    boxShadow: `0 0 0 2px ${COLORS.primary}20`,
+                  }}
+                  autoFocus
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "8px",
+                    marginTop: "10px",
+                  }}
+                >
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={!editText.trim() || isSubmittingEdit}
+                    style={{
+                      padding: "8px 16px",
+                      border: "none",
+                      borderRadius: "6px",
+                      backgroundColor: editText.trim()
+                        ? COLORS.primary
+                        : COLORS.lightGray,
+                      color: editText.trim() ? COLORS.dark : COLORS.gray,
+                      fontSize: "13px",
+                      fontWeight: "600",
+                      cursor: editText.trim() ? "pointer" : "not-allowed",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (editText.trim()) {
+                        e.currentTarget.style.transform = "scale(1.02)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "scale(1)";
+                    }}
+                  >
+                    저장
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    disabled={isSubmittingEdit}
+                    style={{
+                      padding: "8px 16px",
+                      border: `1.5px solid ${COLORS.textSecondary}`,
+                      borderRadius: "6px",
+                      backgroundColor: COLORS.white,
+                      color: COLORS.textSecondary,
+                      fontSize: "13px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = COLORS.dark;
+                      e.currentTarget.style.color = COLORS.dark;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = COLORS.textSecondary;
+                      e.currentTarget.style.color = COLORS.textSecondary;
+                    }}
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: COLORS.dark,
+                  lineHeight: "1.5",
+                  marginBottom: "8px",
+                }}
+              >
+                {comment.text || comment.comment_content}
+              </div>
+            )}
 
             {/* 좋아요 & 답글 버튼 */}
             <div
