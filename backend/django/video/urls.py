@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import VideoListView, VideoDetailView, PopularVideosView, PopularTagsView
+from .views import VideoListView, VideoDetailView
 
 # Video app URLs
 
@@ -16,10 +16,4 @@ urlpatterns = [
     
     # GET /api/video/<id>/ - 영상 상세 조회
     path('<int:pk>/', VideoDetailView.as_view(), name='video-detail'),
-    
-    # GET /api/video/popular/ - 인기 영상 조회
-    path('popular/', PopularVideosView.as_view(), name='video-popular'),
-    
-    # GET /api/video/tags/popular/ - 인기 태그 조회
-    path('tags/popular/', PopularTagsView.as_view(), name='popular-tags'),
 ]
