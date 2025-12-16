@@ -25,9 +25,17 @@ export const createComment = async (videoId, commentContent) => {
   return response.data;
 };
 
+// 댓글 수정 (작성자 본인만)
+export const updateComment = async (commentId, commentContent) => {
+  const response = await api.patch(`/api/community/comments/${commentId}/`, {
+    comment_content: commentContent,
+  });
+  return response.data;
+};
+
 // 댓글 삭제 (작성자 본인만)
 export const deleteComment = async (commentId) => {
-  const response = await api.delete(`/api/community/comments/${commentId}/`);
+  const response = await api.delete(`/api/community/comments/${commentId}/delete/`);
   return response.data;
 };
 

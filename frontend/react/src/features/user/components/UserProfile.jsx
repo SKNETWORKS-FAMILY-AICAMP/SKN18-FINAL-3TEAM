@@ -53,12 +53,22 @@ const UserProfile = ({ onEdit, user }) => {
         onClick={onEdit}
         style={{
           padding: "10px 24px",
-          border: "2px solid #333",
+          border: `1.5px solid ${COLORS.textSecondary}`,
           borderRadius: "8px",
           backgroundColor: "transparent",
+          color: COLORS.textSecondary,
           fontSize: "14px",
           fontWeight: "600",
           cursor: "pointer",
+          transition: "all 0.2s ease",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = COLORS.dark;
+          e.currentTarget.style.color = COLORS.dark;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = COLORS.textSecondary;
+          e.currentTarget.style.color = COLORS.textSecondary;
         }}
       >
         수정하기
