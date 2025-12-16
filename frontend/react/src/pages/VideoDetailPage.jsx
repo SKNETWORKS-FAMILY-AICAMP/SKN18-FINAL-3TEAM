@@ -87,25 +87,30 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
 
         // 댓글 로드 (로그인한 경우만)
         if (isLoggedIn) {
-          const commentsResponse = await getVideoComments(actualVideoId);
-          if (commentsResponse?.data) {
-            console.log("댓글 데이터:", commentsResponse.data);
-            const formattedComments = commentsResponse.data.map((c) => ({
-              id: c.id,
-              username: c.user?.nickname || c.user?.display_name || "사용자",
-              text: c.comment_content,
-              comment_content: c.comment_content,
-              profileImage: c.user?.profile_image,
-              likes: c.comment_likes_count || 0,
-              comment_likes_count: c.comment_likes_count || 0,
-              created_at: c.created_at,
-              timeAgo: formatTimeAgo(c.created_at),
-              replies: c.replies || [], // 백엔드에서 받은 replies 사용
-              user: c.user,
-              is_liked: c.is_liked || false,
-            }));
-            console.log("포맷된 댓글:", formattedComments);
-            setComments(formattedComments);
+          try {
+            const commentsResponse = await getVideoComments(actualVideoId);
+            if (commentsResponse?.data) {
+              console.log("댓글 데이터:", commentsResponse.data);
+              const formattedComments = commentsResponse.data.map((c) => ({
+                id: c.id,
+                username: c.user?.nickname || c.user?.display_name || "사용자",
+                text: c.comment_content,
+                comment_content: c.comment_content,
+                profileImage: c.user?.profile_image,
+                likes: c.comment_likes_count || 0,
+                comment_likes_count: c.comment_likes_count || 0,
+                created_at: c.created_at,
+                timeAgo: formatTimeAgo(c.created_at),
+                replies: c.replies || [], // 백엔드에서 받은 replies 사용
+                user: c.user,
+                is_liked: c.is_liked || false,
+              }));
+              console.log("포맷된 댓글:", formattedComments);
+              setComments(formattedComments);
+            }
+          } catch (error) {
+            console.error("댓글 로드 실패:", error);
+            setComments([]);
           }
         }
       } catch (error) {
@@ -172,12 +177,11 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
         display: "flex",
         gap: "30px",
         padding: "60px 60px 30px 60px",
-        height: "calc(100vh - 76px)",
-        overflow: "hidden",
+        minHeight: "calc(100vh - 76px)",
         boxSizing: "border-box",
       }}
     >
-      <div style={{ flex: 1, overflow: "hidden" }}>
+      <div style={{ flex: 1 }}>
         <VideoPlayer
           videoUrl={
             video?.video_url
@@ -200,6 +204,7 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
           comments={comments}
           videoId={actualVideoId}
           user={user}
+          isLoggedIn={isLoggedIn}
           onCommentDelete={handleCommentDelete}
         />
       )}

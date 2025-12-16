@@ -9,6 +9,7 @@ const CommentSection = ({
   comments,
   videoId,
   user,
+  isLoggedIn = false,
   onCommentDelete,
   onCommentAdd,
 }) => {
@@ -22,6 +23,11 @@ const CommentSection = ({
   }, [comments]);
 
   const handleSubmit = async () => {
+    if (!isLoggedIn) {
+      alert("댓글을 작성하려면 로그인이 필요합니다.");
+      return;
+    }
+    
     if (!commentText.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -172,10 +178,20 @@ const CommentSection = ({
           <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
             <input
               type="text"
-              placeholder="댓글을 입력하세요"
+              placeholder={isLoggedIn ? "댓글을 입력하세요" : "로그인 후 댓글을 작성할 수 있습니다"}
               value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
+              onChange={(e) => {
+                if (isLoggedIn) {
+                  setCommentText(e.target.value);
+                }
+              }}
               onKeyDown={handleKeyDown}
+              disabled={!isLoggedIn}
+              onClick={() => {
+                if (!isLoggedIn) {
+                  alert("댓글을 작성하려면 로그인이 필요합니다.");
+                }
+              }}
               style={{
                 width: "100%",
                 padding: "10px 40px 10px 14px",
@@ -187,9 +203,14 @@ const CommentSection = ({
                 boxSizing: "border-box",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
+                backgroundColor: isLoggedIn ? COLORS.white : COLORS.lightGray,
+                cursor: isLoggedIn ? "text" : "not-allowed",
+                opacity: isLoggedIn ? 1 : 0.6,
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = COLORS.primary;
+                if (isLoggedIn) {
+                  e.target.style.borderColor = COLORS.primary;
+                }
               }}
               onBlur={(e) => {
                 e.target.style.borderColor = "#ddd";
@@ -197,7 +218,7 @@ const CommentSection = ({
             />
             <button
               onClick={handleSubmit}
-              disabled={!commentText.trim()}
+              disabled={!isLoggedIn || !commentText.trim()}
               style={{
                 position: "absolute",
                 right: "4px",
@@ -206,11 +227,11 @@ const CommentSection = ({
                 width: "32px",
                 height: "32px",
                 borderRadius: "50%",
-                backgroundColor: commentText.trim()
+                backgroundColor: (isLoggedIn && commentText.trim())
                   ? COLORS.primary
                   : COLORS.lightGray,
                 border: "none",
-                cursor: commentText.trim() ? "pointer" : "not-allowed",
+                cursor: (isLoggedIn && commentText.trim()) ? "pointer" : "not-allowed",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -219,7 +240,7 @@ const CommentSection = ({
             >
               <SendIcon
                 size={16}
-                color={commentText.trim() ? COLORS.dark : "#999"}
+                color={(isLoggedIn && commentText.trim()) ? COLORS.dark : "#999"}
               />
             </button>
           </div>
