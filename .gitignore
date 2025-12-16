@@ -262,6 +262,7 @@ error_log.txt
 */logs/*.log
 backend/ontology_langgraph_structure/inference_results/
 backend/ontology_langgraph_structure/ontology/logs/
+backend/langgraph_fuseki/outputs/
 
 # neo4j
 infra/neo4j/
@@ -333,3 +334,5 @@ infra/database/
 0001_initial.py
 
 .bak
+
+backend/ragas/data/

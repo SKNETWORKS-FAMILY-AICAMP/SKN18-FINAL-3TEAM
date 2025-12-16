@@ -1,8 +1,8 @@
 # backend/db_pipeline/ETL/load_to_pgvector.py
 
 from backend.db_pipeline.common.transform import preprocess_data, chunk_dataframe
-from ..services.db_connection import prepare_vectordb
-from ..services.vector_store import create_pgvector_store
+from backend.db_pipeline.vectordb.services.db_connection import prepare_vectordb
+from backend.db_pipeline.vectordb.services.vector_store import create_pgvector_store
 from backend.db_pipeline.common.config import POSTGRES_CONN_STR, HISTORY_TABLE_NAME
 from backend.db_pipeline.common.load_raw_data import load_raw_data
 from backend.db_pipeline.common.embedding_model import get_embedding
