@@ -15,63 +15,69 @@ import sys
 import requests
 from pathlib import Path
 from backend.langgraph_fuseki.state import GraphState
+from backend.langgraph_fuseki.config import (
+    FUSEKI_URL,
+    USE_PGVECTOR,
+    SEMANTIC_EXPANDER_TOP_N,
+    FIXED_SCORE_CAUSAL_CHAIN,
+    FIXED_SCORE_TEMPORAL,
+    FIXED_SCORE_CATEGORY,
+    FIXED_SCORE_PGVECTOR
+)
 
 # 상위 디렉토리를 경로에 추가 (entity_expander_node와 동일한 방식)
-_base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ontology_langgraph_structure
+_base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # langgraph_fuseki
 _parent_dir = os.path.dirname(_base_dir)  # backend
 _project_root = os.path.dirname(_parent_dir)  # SKN18-FINAL-3TEAM (프로젝트 루트)
 sys.path.insert(0, _base_dir)
 sys.path.insert(0, _parent_dir)
 sys.path.insert(0, _project_root)  # 프로젝트 루트 추가 (backend.db_pipeline import용)
 
-# Fuseki 설정
-FUSEKI_URL = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
-
 # pgvector 서비스 lazy loading
-USE_PGVECTOR = os.getenv("USE_PGVECTOR", "true").lower() == "true"
 _pgvector_service = None
 
 # 벡터 유사도 점수 사용 여부 (RAGAS 평가 시 false로 설정)
 USE_VECTOR_SIMILARITY_SCORE = os.getenv("USE_VECTOR_SIMILARITY_SCORE", "false").lower() == "true"
 
-# ------------------------------------------------------------
-#  관련성 점수 가중치 (Hybrid Scoring - ver2)
-# ------------------------------------------------------------
-# 고정 점수: 각 확장 방법별 기준 점수
+# 확장 방법별 가중치 (config에서 가져온 값 사용)
 FIXED_SCORES = {
-    "causal_chain": 0.95,   # 인과관계 (가장 높은 관련성)
-    "temporal": 0.85,       # 시간적 맥락 (높은 관련성)
-    "category": 0.75,       # 카테고리 (중간 관련성)
-    "pgvector": 0.65        # 벡터 유사도 (보통 관련성)
+    "causal_chain": FIXED_SCORE_CAUSAL_CHAIN,
+    "temporal": FIXED_SCORE_TEMPORAL,
+    "category": FIXED_SCORE_CATEGORY,
+    "pgvector": FIXED_SCORE_PGVECTOR
 }
 
-def calculate_hybrid_score(similarity, expansion_method, alpha=0.6):
+def calculate_relevance_score(similarity, expansion_method):
     """
-    하이브리드 점수 계산: (고정 점수 × α) + (유사도 × (1 - α))
+    관련성 점수 계산:
+    - pgvector 확장: 벡터 유사도가 있으면 유사도 × 가중치, 없으면 가중치 사용
+    - 다른 확장 방법: 가중치 사용
 
     Args:
         similarity: 벡터 유사도 (0-1) 또는 None
         expansion_method: 확장 방법 ("causal_chain", "temporal", "category", "pgvector")
-        alpha: 고정 점수 가중치 (0-1), 기본값 0.6 = 고정 60%, 유사도 40%
 
     Returns:
-        하이브리드 점수 (0-1)
+        관련성 점수 (0-1)
 
     Examples:
-        >>> calculate_hybrid_score(0.88, "pgvector", alpha=0.6)
-        0.742  # (0.65 × 0.6) + (0.88 × 0.4) = 0.39 + 0.352
+        >>> calculate_relevance_score(0.88, "pgvector")
+        0.88  # 유사도(0.88) × 가중치(1.0) = 0.88
 
-        >>> calculate_hybrid_score(None, "temporal", alpha=0.6)
-        0.85  # 유사도 없으면 고정 점수만 사용
+        >>> calculate_relevance_score(None, "pgvector")
+        1.0  # 벡터 유사도 없으면 가중치만 사용
+
+        >>> calculate_relevance_score(None, "temporal")
+        1.0  # 가중치 사용
     """
-    fixed_score = FIXED_SCORES.get(expansion_method, 0.5)
+    weight = FIXED_SCORES.get(expansion_method, 1.0)
+    
+    # pgvector 확장이고 벡터 유사도가 있고 USE_VECTOR_SIMILARITY_SCORE=true이면 유사도 × 가중치
+    if expansion_method == "pgvector" and similarity is not None and USE_VECTOR_SIMILARITY_SCORE:
+        return similarity * weight
 
-    # 유사도가 없거나 USE_VECTOR_SIMILARITY_SCORE=false이면 고정 점수만 사용
-    if similarity is None or (not USE_VECTOR_SIMILARITY_SCORE and expansion_method == "pgvector"):
-        return fixed_score
-
-    # 가중평균 (USE_VECTOR_SIMILARITY_SCORE=true일 때만)
-    return (fixed_score * alpha) + (similarity * (1 - alpha))
+    # 그 외의 경우 가중치만 사용
+    return weight
 
 
 def get_pgvector_service():
@@ -254,7 +260,7 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
                             "matched": True,
                             "expansion_method": "temporal",
                             "expansion_source": entity.get("name"),
-                            "relevance_score": calculate_hybrid_score(None, "temporal")  # 유사도 없음 → 0.85
+                            "relevance_score": calculate_relevance_score(None, "temporal")  # 가중치 사용
                         })
         except:
             pass
@@ -388,7 +394,7 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
                             "expansion_method": "category",
                             "expansion_source": entity.get("name"),
                             "category": category,
-                            "relevance_score": calculate_hybrid_score(None, "category")  # 유사도 없음 → 0.75
+                            "relevance_score": calculate_relevance_score(None, "category")  # 가중치 사용
                         })
             else:
                 print(f"  │  │  └─ 동일 카테고리 검색 실패 (HTTP {response2.status_code})")
@@ -542,7 +548,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                             "expansion_method": "causal_chain",
                             "expansion_source": entity.get("name"),
                             "causal_relation": predicate,
-                            "relevance_score": calculate_hybrid_score(None, "causal_chain")  # 유사도 없음 → 0.95
+                            "relevance_score": calculate_relevance_score(None, "causal_chain")  # 가중치 사용
                         })
             else:
                 print(f"  │  │  └─ SPARQL 실패 (HTTP {response.status_code})")
@@ -598,7 +604,7 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
                     "expansion_method": "pgvector",
                     "expansion_source": "query",
                     "pgvector_similarity": similarity,
-                    "relevance_score": calculate_hybrid_score(similarity, "pgvector")  # 하이브리드 점수
+                    "relevance_score": calculate_relevance_score(similarity, "pgvector")  # 벡터 유사도 사용
                 })
 
         # 2. 추출된 엔티티 이름으로도 검색
@@ -623,7 +629,7 @@ def expand_by_pgvector(entities: list, query: str, top_k: int = 15) -> list:
                         "expansion_method": "pgvector",
                         "expansion_source": name,
                         "pgvector_similarity": similarity,
-                        "relevance_score": calculate_hybrid_score(similarity, "pgvector")
+                        "relevance_score": calculate_relevance_score(similarity, "pgvector")
                     })
 
     except Exception as e:
@@ -789,20 +795,22 @@ def semantic_expander_node(state: GraphState) -> GraphState:
         if entity.get("uri"):
             bonus = calculate_sparql_score_with_connections(entity, core_keywords)
             if bonus > 0:
-                entity["relevance_score"] = entity.get("relevance_score", 0.5) + bonus
+                # relevance_score에 bonus 추가
+                current_score = entity.get("relevance_score", 0.0)
+                entity["relevance_score"] = current_score + bonus
                 sparql_scored_count += 1
     
     print(f"  │  └─ SPARQL 스코어링 완료: {sparql_scored_count}개 엔티티에 키워드 매칭 발견")
 
-    # 상위 40개로 제한 (성능 최적화)
+    # 상위 N개로 제한 (환경변수로 설정 가능, 기본값: 30)
     # 키워드가 연결된 노드에 있는 엔티티를 우선적으로 정렬
     all_expanded = sorted(
         all_expanded,
         key=lambda x: (
             not x.get("has_keyword_in_connections", False),  # 키워드 매칭 우선
-            -x.get("relevance_score", 0.5)  # 점수 내림차순
+            -x.get("relevance_score", 0.0)  # 점수 내림차순
         )
-    )[:40]
+    )[:SEMANTIC_EXPANDER_TOP_N]
 
     # 통계 출력
     expansion_stats = {
@@ -826,7 +834,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
             name = entity.get("name", "")
             method = entity.get("expansion_method", "")
             source = entity.get("expansion_source", "")
-            score = entity.get("relevance_score", 0)
+            score = entity.get("relevance_score")
 
             method_display = {
                 "temporal": "시간",
@@ -852,3 +860,4 @@ def semantic_expander_node(state: GraphState) -> GraphState:
         "executed_nodes": state.get("executed_nodes", []) + ["semantic_expander"],
         "node_execution_times": node_times
     }
+

@@ -14,48 +14,55 @@ import concurrent.futures
 from datetime import datetime
 from pathlib import Path
 from backend.langgraph_fuseki.state import GraphState
-from backend.langgraph_fuseki.config import FUSEKI_URL, INFERENCE_OUTPUT_DIR
+from backend.langgraph_fuseki.config import (
+    FUSEKI_URL,
+    INFERENCE_OUTPUT_DIR,
+    THREAD_WEIGHT_OUTGOING_RELATIONS,
+    THREAD_WEIGHT_INCOMING_RELATIONS,
+    THREAD_WEIGHT_CONNECTED_ENTITIES,
+    THREAD_WEIGHT_ENTITY_PROPERTIES,
+    THREAD_WEIGHT_TYPE_AND_SUMMARY
+)
 
 
 SAVE_INFERENCE_TRIPLES = os.getenv("SAVE_INFERENCE_TRIPLES", "true").lower() == "true"
 
-
-# 질문 유형별 Thread 가중치 (데이터 기반)
+# 질문 유형별 Thread 가중치 (config에서 가져온 값 사용)
 THREAD_WEIGHTS = {
     "causal": {
-        "outgoing_relations": 0.30,    # 나가는 관계 중요
-        "incoming_relations": 0.25,    # 들어오는 관계
-        "connected_entities": 0.20,     # 연결된 엔티티
-        "entity_properties": 0.15,     # 엔티티 속성
-        "type_and_summary": 0.10       # 타입/요약
+        "outgoing_relations": THREAD_WEIGHT_OUTGOING_RELATIONS,
+        "incoming_relations": THREAD_WEIGHT_INCOMING_RELATIONS,
+        "connected_entities": THREAD_WEIGHT_CONNECTED_ENTITIES,
+        "entity_properties": THREAD_WEIGHT_ENTITY_PROPERTIES,
+        "type_and_summary": THREAD_WEIGHT_TYPE_AND_SUMMARY
     },
     "deep_analysis": {
-        "entity_properties": 0.30,     # 속성 정보 중요
-        "incoming_relations": 0.25,    # 들어오는 관계
-        "outgoing_relations": 0.20,    # 나가는 관계
-        "connected_entities": 0.15,    # 연결된 엔티티
-        "type_and_summary": 0.10      # 타입/요약
+        "outgoing_relations": THREAD_WEIGHT_OUTGOING_RELATIONS,
+        "incoming_relations": THREAD_WEIGHT_INCOMING_RELATIONS,
+        "connected_entities": THREAD_WEIGHT_CONNECTED_ENTITIES,
+        "entity_properties": THREAD_WEIGHT_ENTITY_PROPERTIES,
+        "type_and_summary": THREAD_WEIGHT_TYPE_AND_SUMMARY
     },
     "factual": {
-        "outgoing_relations": 0.35,    # 사실 기반 질문
-        "entity_properties": 0.25,     # 속성 정보
-        "connected_entities": 0.20,    # 연결된 엔티티
-        "incoming_relations": 0.10,    # 들어오는 관계
-        "type_and_summary": 0.10      # 타입/요약
+        "outgoing_relations": THREAD_WEIGHT_OUTGOING_RELATIONS,
+        "incoming_relations": THREAD_WEIGHT_INCOMING_RELATIONS,
+        "connected_entities": THREAD_WEIGHT_CONNECTED_ENTITIES,
+        "entity_properties": THREAD_WEIGHT_ENTITY_PROPERTIES,
+        "type_and_summary": THREAD_WEIGHT_TYPE_AND_SUMMARY
     },
     "comparative": {
-        "connected_entities": 0.35,   # 비교 분석 - 연결 엔티티 중요
-        "outgoing_relations": 0.25,    # 나가는 관계
-        "incoming_relations": 0.20,    # 들어오는 관계
-        "entity_properties": 0.10,    # 속성 정보
-        "type_and_summary": 0.10      # 타입/요약
+        "outgoing_relations": THREAD_WEIGHT_OUTGOING_RELATIONS,
+        "incoming_relations": THREAD_WEIGHT_INCOMING_RELATIONS,
+        "connected_entities": THREAD_WEIGHT_CONNECTED_ENTITIES,
+        "entity_properties": THREAD_WEIGHT_ENTITY_PROPERTIES,
+        "type_and_summary": THREAD_WEIGHT_TYPE_AND_SUMMARY
     },
     "what_if": {
-        "outgoing_relations": 0.30,    # 가상 시나리오
-        "connected_entities": 0.25,   # 연결된 엔티티
-        "incoming_relations": 0.20,    # 들어오는 관계
-        "entity_properties": 0.15,    # 속성 정보
-        "type_and_summary": 0.10      # 타입/요약
+        "outgoing_relations": THREAD_WEIGHT_OUTGOING_RELATIONS,
+        "incoming_relations": THREAD_WEIGHT_INCOMING_RELATIONS,
+        "connected_entities": THREAD_WEIGHT_CONNECTED_ENTITIES,
+        "entity_properties": THREAD_WEIGHT_ENTITY_PROPERTIES,
+        "type_and_summary": THREAD_WEIGHT_TYPE_AND_SUMMARY
     }
 }
 

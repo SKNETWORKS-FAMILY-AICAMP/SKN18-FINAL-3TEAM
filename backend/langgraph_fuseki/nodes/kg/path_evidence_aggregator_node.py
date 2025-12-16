@@ -10,75 +10,18 @@ Parallel Knowledge Retrieval의 5개 Thread 결과에서 경로 추출 및 근�
 import os
 import json
 from backend.langgraph_fuseki.state import GraphState
+from backend.langgraph_fuseki.config import (
+    THREAD_WEIGHT_OUTGOING_RELATIONS,
+    THREAD_WEIGHT_INCOMING_RELATIONS,
+    THREAD_WEIGHT_ENTITY_PROPERTIES,
+    THREAD_WEIGHT_TYPE_AND_SUMMARY,
+    THREAD_WEIGHT_CONNECTED_ENTITIES,
+    THREAD_TYPE_PENALTY_NO_MATCH,
+    QUERY_ENTITY_MATCH_BOOST_EXACT,
+    QUERY_ENTITY_MATCH_BOOST_PARTIAL,
+    QUERY_ENTITY_MATCH_BOOST_NORMALIZED
+)
 from langchain_openai import ChatOpenAI
-
-# ========================================
-# 속성/관계 타입별 Relevance Score 가중치 (개선)
-# ========================================
-
-# 관계(Predicate) 타입별 가중치 (공격적 점수 체계 - 편차 확대) -> 1.00 ~ 1.10로 가중치 부여
-RELATION_WEIGHTS = {
-    # 인과관계 (가장 중요) - 가중치 대폭 상향
-    "leadsTo": 2.5,
-    "causedBy": 2.5,
-    "causes": 2.5,
-    "ledTo": 2.5,
-    "triggeredBy": 2.2,
-
-    # 직접적 참여/지휘 (높은 관련성, 하지만 왕/사건의 경우 주의 필요)
-    "commands": 2.0,
-    "involved": 1.8,
-    "involves": 1.8,
-    "participatesIn": 1.5,  # 왕이 사건에 "참여"는 부적절하므로 가중치 낮춤
-
-    # 부분 관계 (높은 관련성)
-    "partOf": 1.8,
-
-    # 설립/건설
-    "establishedBy": 1.8,
-    "founded": 1.8,
-    "built": 1.5,
-
-    # 시간적 관계
-    "occursBefore": 1.2,
-    "occursAfter": 1.2,
-    "followedBy": 1.2,
-    "precededBy": 1.2,
-
-    # 연결관계
-    "relatedTo": 1.0,
-    "associatedWith": 1.0,
-    "connectedTo": 1.0,
-
-    # 일반 속성 (낮은 관련성) - 1.0 이상으로 조정 (곱셈 시 감소 방지)
-    "hasYear": 1.0,  # 기본값과 동일 (0.5 → 1.0)
-    "hasCategory": 1.0,  # 기본값과 동일 (0.4 → 1.0)
-    "hasDescription": 1.0,  # 기본값과 동일 (0.3 → 1.0)
-
-    # 기본값 (매칭 안되는 경우)
-    "_default": 1.0
-}
-
-# 속성 이름 패턴별 가중치 (관계가 아닌 속성값)
-PROPERTY_WEIGHTS = {
-    # 핵심 속성
-    "Achievement": 1.3,
-    "Rank": 1.2,
-    "Role": 1.2,
-
-    # 시간 속성 - 1.0 이상으로 조정
-    "Year": 1.0,  # 기본값과 동일 (0.9 → 1.0)
-    "StartYear": 1.0,  # 기본값과 동일 (0.9 → 1.0)
-    "EndYear": 1.0,  # 기본값과 동일 (0.9 → 1.0)
-    "Month": 1.0,  # 기본값과 동일 (0.8 → 1.0)
-
-    # 일반 속성 - 1.0 이상으로 조정
-    "Category": 1.0,  # 기본값과 동일 (0.7 → 1.0)
-    "Type": 1.0,  # 기본값과 동일 (0.7 → 1.0)
-
-    # 기본값
-    "_default": 1.0  # 기본값과 동일 (0.8 → 1.0)
-}
 
 
 def calculate_improved_relevance_score(path_data: dict, query_entities: list = None, thread_type: str = "") -> float:
@@ -88,7 +31,6 @@ def calculate_improved_relevance_score(path_data: dict, query_entities: list = N
     개선 사항:
     1. 쿼리 엔티티와의 직접 연결성 강화
     2. Thread 타입별 가중치 조정
-    3. 관계 타입별 세밀한 가중치 적용
 
     Args:
         path_data: 경로 데이터 (binding 정보)
@@ -96,29 +38,11 @@ def calculate_improved_relevance_score(path_data: dict, query_entities: list = N
         thread_type: Thread 타입 (outgoing_relations, incoming_relations 등)
 
     Returns:
-        relevance score (0.5 ~ 2.0)
+        relevance score
     """
     score = 1.0
 
-    # 1. 관계(predicate) 가중치
-    predicate = path_data.get("predicate", {}).get("value", "")
-    if predicate:
-        pred_name = predicate.split("#")[-1]  # hist:leadsTo → leadsTo
-        score *= RELATION_WEIGHTS.get(pred_name, RELATION_WEIGHTS["_default"])
-
-    # 2. 속성명 가중치
-    property_name = path_data.get("property", {}).get("value", "")
-    if property_name:
-        prop_name = property_name.split("#")[-1]
-        # 속성명에서 키워드 추출 (예: hasAchievement → Achievement)
-        for keyword, weight in PROPERTY_WEIGHTS.items():
-            if keyword != "_default" and keyword.lower() in prop_name.lower():
-                score *= weight
-                break
-        else:
-            score *= PROPERTY_WEIGHTS["_default"]
-
-    # 3. 쿼리 엔티티와의 직접 연결 여부 (강화 - 차별화를 위해)
+    # 1. 쿼리 엔티티와의 직접 연결 여부 (강화 - 차별화를 위해)
     query_entity_match_boost = 1.0  # 기본값 (매칭 없음)
     if query_entities:
         subject = path_data.get("subject", {}).get("value", "")
@@ -153,40 +77,39 @@ def calculate_improved_relevance_score(path_data: dict, query_entities: list = N
             
             # 정확한 매칭 (매우 높은 부스트) - 차별화 강화
             if entity_name in all_entity_names or entity_name_normalized in all_entity_names_normalized:
-                query_entity_match_boost = 3.0  # 200% 부스트 (매우 강하게 차별화)
+                query_entity_match_boost = QUERY_ENTITY_MATCH_BOOST_EXACT
                 break
             # 부분 매칭 (중간 부스트)
             elif any(entity_name in name or name in entity_name for name in all_entity_names if name):
-                query_entity_match_boost = 2.0  # 100% 부스트
+                query_entity_match_boost = QUERY_ENTITY_MATCH_BOOST_PARTIAL
                 break
             # 정규화된 부분 매칭
             elif any(entity_name_normalized in norm_name or norm_name in entity_name_normalized 
                     for norm_name in all_entity_names_normalized if norm_name):
-                query_entity_match_boost = 1.5  # 50% 부스트
+                query_entity_match_boost = QUERY_ENTITY_MATCH_BOOST_NORMALIZED
                 break
     
     score *= query_entity_match_boost
 
-    # 4. Thread 타입별 추가 가중치 - 편차 확대 (차별화 강화, 모두 1.0 이상)
+    # 2. Thread 타입별 추가 가중치 (환경변수로 설정 가능)
     if thread_type == "outgoing_relations":
-        score *= 1.8  # 나가는 관계는 직접적 관련성 (더 강하게)
+        score *= THREAD_WEIGHT_OUTGOING_RELATIONS
     elif thread_type == "incoming_relations":
-        score *= 1.4  # 들어오는 관계는 간접적
+        score *= THREAD_WEIGHT_INCOMING_RELATIONS
     elif thread_type == "entity_properties":
-        score *= 1.1  # 속성은 약간 높음 (0.7 → 1.1로 변경, 곱셈 시 감소 방지)
+        score *= THREAD_WEIGHT_ENTITY_PROPERTIES
     elif thread_type == "type_and_summary":
-        score *= 1.0  # 요약은 기본값 (0.6 → 1.0로 변경, 곱셈 시 감소 방지)
+        score *= THREAD_WEIGHT_TYPE_AND_SUMMARY
     elif thread_type == "connected_entities":
-        score *= 1.2  # 연결 엔티티는 중간 (0.8 → 1.2로 변경)
+        score *= THREAD_WEIGHT_CONNECTED_ENTITIES
 
-    # 5. 관계 중요도에 따른 추가 차별화
-    # 쿼리 엔티티와 매칭되지 않은 경우 페널티 적용 (곱셈 대신 비율 조정)
+    # 3. 관계 중요도에 따른 추가 차별화
+    # 쿼리 엔티티와 매칭되지 않은 경우 페널티 적용 (환경변수로 설정 가능)
     if query_entity_match_boost == 1.0 and query_entities:
-        # 매칭되지 않은 경로는 페널티 (곱셈 대신 작은 배수로)
-        score *= 0.8  # 20% 감소 (0.6 → 0.8로 완화, 여전히 감소하지만 덜 심각하게)
+        # 매칭되지 않은 경로는 페널티
+        score *= THREAD_TYPE_PENALTY_NO_MATCH
 
-    # 6. 범위 제한 (0.2 ~ 5.0) - 범위 대폭 확대 (차별화 강화)
-    return max(0.2, min(5.0, score))
+    return score
 
 
 def detect_convergence_nodes(inference_paths: dict, query_entities: list) -> dict:
