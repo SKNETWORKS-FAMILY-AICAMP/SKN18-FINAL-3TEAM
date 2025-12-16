@@ -9,6 +9,10 @@ const GlobeIcon = ({ size = 20, color = '#666' }) => {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      style={{
+        display: 'block',
+        flexShrink: 0,
+      }}
     >
       <circle cx="12" cy="12" r="10" />
       <path d="M2 12h20" />
