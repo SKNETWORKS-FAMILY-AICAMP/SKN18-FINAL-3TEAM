@@ -31,6 +31,9 @@ FUSEKI_URL = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
 USE_PGVECTOR = os.getenv("USE_PGVECTOR", "true").lower() == "true"
 _pgvector_service = None
 
+# 벡터 유사도 점수 사용 여부 (RAGAS 평가 시 false로 설정)
+USE_VECTOR_SIMILARITY_SCORE = os.getenv("USE_VECTOR_SIMILARITY_SCORE", "false").lower() == "true"
+
 # ------------------------------------------------------------
 #  관련성 점수 가중치 (Hybrid Scoring - ver2)
 # ------------------------------------------------------------
@@ -63,11 +66,11 @@ def calculate_hybrid_score(similarity, expansion_method, alpha=0.6):
     """
     fixed_score = FIXED_SCORES.get(expansion_method, 0.5)
 
-    # 유사도가 없으면 고정 점수만 사용 (SPARQL 기반 확장)
-    if similarity is None:
+    # 유사도가 없거나 USE_VECTOR_SIMILARITY_SCORE=false이면 고정 점수만 사용
+    if similarity is None or (not USE_VECTOR_SIMILARITY_SCORE and expansion_method == "pgvector"):
         return fixed_score
 
-    # 가중평균
+    # 가중평균 (USE_VECTOR_SIMILARITY_SCORE=true일 때만)
     return (fixed_score * alpha) + (similarity * (1 - alpha))
 
 
@@ -243,16 +246,33 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
         if not uri:
             continue
 
-        # URI를 SPARQL에서 사용할 수 있도록 <URI> 형식으로 감싸기
-        uri_sparql = f"<{uri}>" if not uri.startswith("<") else uri
+        # URI 형식 처리: hist:Entity_xxx 형태면 그대로 사용, full URI면 <> 감싸기
+        if uri.startswith("hist:"):
+            # PREFIX 형식 (hist:Person_xxx) - 그대로 사용
+            uri_sparql = uri
+        elif uri.startswith("http://"):
+            # Full URI 형식 - <> 감싸기
+            uri_sparql = f"<{uri}>"
+        elif uri.startswith("<"):
+            # 이미 <> 감싸져 있음
+            uri_sparql = uri
+        else:
+            # 기타 형식 - hist: prefix 추가
+            uri_sparql = f"hist:{uri}"
 
-        # 1. 엔티티의 카테고리 조회
+        # 1. 엔티티의 카테고리 조회 (hist:category 또는 hist:hasCategory 모두 확인)
         sparql_category = f"""
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
             SELECT ?category WHERE {{
-                {uri_sparql} hist:hasCategory ?category .
+                {{
+                    {uri_sparql} hist:hasCategory ?category .
+                }}
+                UNION
+                {{
+                    {uri_sparql} hist:category ?category .
+                }}
             }} LIMIT 1
         """
 
@@ -281,17 +301,26 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
 
             print(f"  │  ├─ [{entity_name}] 카테고리: {category}, 동일 카테고리 검색 중...")
 
-            # 2. 동일 카테고리의 다른 엔티티 검색
+            # 2. 동일 카테고리의 다른 엔티티 검색 (hist:category 또는 hist:hasCategory 모두 확인)
             sparql_similar = f"""
                 PREFIX hist: <http://www.example.org/korean-history#>
                 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
                 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
                 SELECT DISTINCT ?entity ?label ?type WHERE {{
-                    ?entity hist:hasCategory "{category}" .
-                    ?entity rdfs:label ?label .
-                    ?entity rdf:type ?type .
-                    FILTER(?entity != {uri_sparql})
+                    {{
+                        ?entity hist:hasCategory "{category}" .
+                        ?entity rdfs:label ?label .
+                        ?entity rdf:type ?type .
+                        FILTER(?entity != {uri_sparql})
+                    }}
+                    UNION
+                    {{
+                        ?entity hist:category "{category}" .
+                        ?entity rdfs:label ?label .
+                        ?entity rdf:type ?type .
+                        FILTER(?entity != {uri_sparql})
+                    }}
                 }} LIMIT 8
             """
 
@@ -359,8 +388,15 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
 
         print(f"  │  ├─ [{entity_name}] 인과관계 체인 검색 중...")
 
-        # URI를 SPARQL에서 사용할 수 있도록 <URI> 형식으로 감싸기
-        uri_sparql = f"<{uri}>" if not uri.startswith("<") else uri
+        # URI 형식 처리: hist:Entity_xxx 형태면 그대로 사용, full URI면 <> 감싸기
+        if uri.startswith("hist:"):
+            uri_sparql = uri
+        elif uri.startswith("http://"):
+            uri_sparql = f"<{uri}>"
+        elif uri.startswith("<"):
+            uri_sparql = uri
+        else:
+            uri_sparql = f"hist:{uri}"
 
         # Person 타입인 경우, 관련 Event를 먼저 찾아서 그 Event의 인과관계를 검색
         if entity_type == "Person":
@@ -376,19 +412,19 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                         {uri_sparql} hist:participatesIn ?event .
                         ?event rdf:type hist:Event .
                         
-                        # 그 Event의 인과관계 찾기
+                        # 그 Event의 인과관계 찾기 (leadsTo, ledTo 사용)
                         {{
                             ?event ?predicate ?related .
                             ?related rdfs:label ?label .
                             ?related rdf:type ?type .
-                            FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
+                            FILTER(?predicate IN (hist:leadsTo, hist:ledTo))
                         }}
                         UNION
                         {{
                             ?related ?predicate ?event .
                             ?related rdfs:label ?label .
                             ?related rdf:type ?type .
-                            FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
+                            FILTER(?predicate IN (hist:leadsTo, hist:ledTo))
                         }}
                     }}
                     UNION
@@ -396,26 +432,26 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                         # Event → Person (involvesPerson)
                         ?event hist:involvesPerson {uri_sparql} .
                         ?event rdf:type hist:Event .
-                        
-                        # 그 Event의 인과관계 찾기
+
+                        # 그 Event의 인과관계 찾기 (leadsTo, ledTo 사용)
                         {{
                             ?event ?predicate ?related .
                             ?related rdfs:label ?label .
                             ?related rdf:type ?type .
-                            FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
+                            FILTER(?predicate IN (hist:leadsTo, hist:ledTo))
                         }}
                         UNION
                         {{
                             ?related ?predicate ?event .
                             ?related rdfs:label ?label .
                             ?related rdf:type ?type .
-                            FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
+                            FILTER(?predicate IN (hist:leadsTo, hist:ledTo))
                         }}
                     }}
                 }} LIMIT 10
             """
         else:
-            # Event 타입인 경우 직접 인과관계 검색
+            # Event 타입인 경우 직접 인과관계 검색 (leadsTo, ledTo 사용)
             sparql = f"""
                 PREFIX hist: <http://www.example.org/korean-history#>
                 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -427,7 +463,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                         {uri_sparql} ?predicate ?related .
                         ?related rdfs:label ?label .
                         ?related rdf:type ?type .
-                        FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
+                        FILTER(?predicate IN (hist:leadsTo, hist:ledTo))
                     }}
                     UNION
                     {{
@@ -435,7 +471,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                         ?related ?predicate {uri_sparql} .
                         ?related rdfs:label ?label .
                         ?related rdf:type ?type .
-                        FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
+                        FILTER(?predicate IN (hist:leadsTo, hist:ledTo))
                     }}
                 }} LIMIT 10
             """

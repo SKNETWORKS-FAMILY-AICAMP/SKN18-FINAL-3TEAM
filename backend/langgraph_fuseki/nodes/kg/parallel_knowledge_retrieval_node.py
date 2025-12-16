@@ -483,7 +483,7 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
                 continue
 
             # 양방향 BFS 실행
-            paths = find_bidirectional_paths(uri_a, uri_b, max_depth=5)
+            paths = find_bidirectional_paths(uri_a, uri_b, max_depth=3)
             
             if paths:
                 paths_found += len(paths)
@@ -529,14 +529,14 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
     return bindings
 
 
-def find_bidirectional_paths(entity_a_uri: str, entity_b_uri: str, max_depth: int = 5) -> list:
+def find_bidirectional_paths(entity_a_uri: str, entity_b_uri: str, max_depth: int = 3) -> list:
     """
     양방향 BFS로 두 엔티티 간 최단 경로 탐색
 
     Args:
         entity_a_uri: 시작 엔티티 URI (예: hist:Person_정약용)
         entity_b_uri: 목표 엔티티 URI (예: hist:Person_사도세자)
-        max_depth: 최대 탐색 깊이 (기본 5)
+        max_depth: 최대 탐색 깊이 (기본 3)
 
     Returns:
         경로 리스트 [{"path": [uri1, uri2, ..., uriN], "length": N, "predicates": [...]}]
@@ -637,6 +637,17 @@ def get_1hop_neighbors(entity_uri: str, timeout: int = 2) -> list:
         [(neighbor_uri, predicate), ...]
     """
 
+    # URI 형식 처리: hist:Entity_xxx 형태면 그대로 사용, full URI면 <> 감싸기
+    if entity_uri.startswith("hist:"):
+        # PREFIX 형식 (hist:Person_xxx) - 그대로 사용
+        entity_ref = entity_uri
+    elif entity_uri.startswith("http://"):
+        # Full URI 형식 - <> 감싸기
+        entity_ref = f"<{entity_uri}>"
+    else:
+        # 기타 형식 - hist: prefix 추가
+        entity_ref = f"hist:{entity_uri}"
+
     sparql = f"""
         PREFIX hist: <http://www.example.org/korean-history#>
         PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -645,7 +656,7 @@ def get_1hop_neighbors(entity_uri: str, timeout: int = 2) -> list:
         SELECT DISTINCT ?neighbor ?predicate WHERE {{
             {{
                 # 나가는 관계
-                <{entity_uri}> ?predicate ?neighbor .
+                {entity_ref} ?predicate ?neighbor .
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
                 FILTER(isURI(?neighbor))
@@ -653,7 +664,7 @@ def get_1hop_neighbors(entity_uri: str, timeout: int = 2) -> list:
             UNION
             {{
                 # 들어오는 관계
-                ?neighbor ?predicate <{entity_uri}> .
+                ?neighbor ?predicate {entity_ref} .
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
             }}
