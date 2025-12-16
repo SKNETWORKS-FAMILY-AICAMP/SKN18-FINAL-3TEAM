@@ -6,83 +6,92 @@ import re
 
 def scene_split_node(state: GraphState) -> GraphState:
     """
-    Scene 분리 노드
-    - 이동(Move/Teleport) 및 시선(LookAt) 제거
-    - 고정된 위치에서 Animation + Talk 조합으로만 연출
-    - 만담(Manzai) 스타일의 긴 호흡 대본 생성
-    - 재미있는 오해와 티키타카를 위해 충분한 길이 보장
-    - 유니티에서 넘어온 asset_context 사용
-    - 유니티 자산에 없는 동작 사용 시 환각 방지 강화
+    Scene 분리 노드 (Manzai Comedy Version)
+    - gpt-4o-mini의 모방 능력을 활용해 '웃긴 예시'를 그대로 따라하게 함.
+    - 양반(민지)의 '권위적 무식함'과 하인(민석)의 '체념적 비꼬기'를 극대화.
+    - 상황과 반대되는 동작(Action Mismatch)을 유도.
     """
     tone_corrected_answer = state.get("tone_corrected_answer", "")
     asset_context = state.get("asset_context", "")
-
+    
+    # 혹시 에셋 정보가 없으면 기본값 설정 (환각 방지용)
     if not asset_context:
-        asset_context = "No specific assets provided. Use generic character names."
+        asset_context = "Available Actions: Idle, Walk, Run, Victory, Defeat, Cheer, Surprise, HeadShake, Attack, Dying"
 
-    # 모델에게 줄 강력한 가이드라인
+    # -------------------------------------------------------------------------
+    # 강력한 만담 전용 프롬프트
+    # -------------------------------------------------------------------------
     scene_prompt = f"""
     SYSTEM:
-    You are a Comedy Director for a "Manzai" (Stand-up Comedy) 3D animation about Korean History.
-    Convert the [History Explanation] into a funny dialogue script (JSON).
-
-    [CHARACTERS & ROLES]
-    1. **Minji (The Boke / Conservative Noble)**: 
-       - Joseon Aristocrat. Values 'Dignity' and 'Tradition'.
-       - Misinterprets modern facts literally or physically.
-       - Attitude: Arrogant, Old-fashioned.
+    You are a legendary Comedy Writer for a 'Manzai' (Stand-up Comedy) show about Korean History.
+    Your goal is to convert the [History Explanation] into a HILARIOUS dialogue script (JSON).
     
-    2. **Minseok (The Tsukkomi / Tired Servant)**:
-       - Smart Servant. Calmly explains facts but gets exhausted.
+    [CHARACTERS]
+    1. **Minji (The Boss / Boke)**: 
+       - A Joseon Dynasty Aristocrat (Yangban). Extremely arrogant.
+       - **KEY TRAIT**: She NEVER admits ignorance. She interprets all modern/historical facts through "Joseon Logic" (Treason, Magic, Confucianism).
+       - **Action Style**: When she says something stupid, she uses CONFIDENT actions (Victory, Cheer, Attack).
+       
+    2. **Minseok (The Servant / Tsukkomi)**:
+       - A tired, smart servant. 
+       - **KEY TRAIT**: He explains facts but gets exhausted by Minji's stupidity. Eventually, he just gives up and agrees sarcastically.
+       - **Action Style**: Uses tired actions (HeadShake, Dying, Idle) even when he is right.
 
-    [ASSET CONTEXT - CRITICAL]
-    The following list contains the ONLY resources available in the engine.
+    [COMEDY ALGORITHM]
+    1. Minseok explains a fact.
+    2. **Minji misunderstands it** as something offensive, treasonous, or magical. (e.g., "Election" -> "Rebellion against the King?!")
+    3. Minseok sighs and corrects her.
+    4. **Minji doubles down** and gets angry or proud of her wrong idea.
+    5. Minseok gives up: "Yes, my lady. You are absolutely right..." (Sarcasm).
+
+    [ASSET RULES - CRITICAL]
+    - You must ONLY use 'action_tag' from this list:
     {asset_context}
+    - If the exact action is not in the list, use 'Idle'.
+    - DO NOT use 'Move' or 'Teleport'. Characters stand still and talk.
 
-    [STRICT RESTRICTIONS]
-    1. **ANIMATION**: You MUST SELECT 'action_tag' ONLY from the "Actor Actions" list in the [ASSET CONTEXT] above.
-       - ❌ DO NOT use: FacePalm, Shrug, Nod, Shake (unless they are in the list).
-       - ✅ DO use: Idle, Walking, and other tags exactly as written in the list.
-    2. **CAMERA**: Default to "Full". Use "CloseUp" sparingly.
-    3. **NO MOVEMENT**: Do NOT use "Move" or "Teleport".
-
-    [CONTENT GUIDELINES]
-    1. **Length**: 15~20 sequences. Long interactions.
-    2. **Pattern**: Minseok Explains -> Minji Misunderstands (Literal/Physical) -> Minseok Corrects -> Minji persists.
-    3. **Image Prompt**: Generate detailed image prompts for backgrounds.
-
-    [EXAMPLE JSON STRUCTURE]
+    [ONE-SHOT EXAMPLE (COPY THIS STYLE!)]
+    Topic: "Smartphone"
     {{
-      "title": "Blue Tooth Horror",
+      "title": "The Magic Stone",
       "scenes": [
         {{
           "scene_id": 1,
-          "image_prompt": "Wide shot of a traditional room...",
+          "image_prompt": "Joseon market street, sunny day",
           "location": "",
           "sequences": [
-            {{ "order": 1, "actor": "None", "type": "Camera", "action_tag": "Full", "target_position": "Camera", "duration": 0.1, "is_parallel": false }},
-            {{ "order": 2, "actor": "Minseok", "type": "Animation", "action_tag": "Thinking", "duration": 0.0, "is_parallel": true }},
-            {{ "order": 3, "actor": "Minseok", "type": "Talk", "text": "We need Bluetooth.", "duration": 0.0, "is_parallel": false }},
-            {{ "order": 4, "actor": "Minji", "type": "Animation", "action_tag": "Surprise", "duration": 0.0, "is_parallel": true }},
-            {{ "order": 5, "actor": "Minji", "type": "Talk", "text": "Blue teeth?!", "duration": 0.0, "is_parallel": false }}
+            {{ "order": 1, "actor": "Minseok", "type": "Animation", "action_tag": "Idle", "duration": 0.0, "is_parallel": true }},
+            {{ "order": 2, "actor": "Minseok", "type": "Talk", "text": "My Lady, look at this. It is a Smartphone.", "duration": 0.0 }},
+            {{ "order": 3, "actor": "Minji", "type": "Animation", "action_tag": "Surprise", "duration": 0.0, "is_parallel": true }},
+            {{ "order": 4, "actor": "Minji", "type": "Talk", "text": "Smart... Phone? Is it a name of a new execution device?", "duration": 0.0 }},
+            {{ "order": 5, "actor": "Minseok", "type": "Talk", "text": "No. You can talk to people far away with this glass plate.", "duration": 0.0 }},
+            {{ "order": 6, "actor": "Minji", "type": "Animation", "action_tag": "Yelling Out", "duration": 0.0, "is_parallel": true }},
+            {{ "order": 7, "actor": "Minji", "type": "Talk", "text": "Talking to a glass plate?! You are possessed by a demon! Guard! Behead him!", "duration": 0.0 }},
+            {{ "order": 8, "actor": "Minseok", "type": "Animation", "action_tag": "Thoughtful Head Shake", "duration": 0.0, "is_parallel": true }},
+            {{ "order": 9, "actor": "Minseok", "type": "Talk", "text": "(Sigh) Yes, yes. I am a demon. Please put down the sword.", "duration": 0.0 }}
           ]
         }}
       ]
     }}
 
+    [INPUT DATA]
+    [History Explanation]:
+    {tone_corrected_answer}
+
     [OUTPUT]
-    Output ONLY the valid JSON object.
+    Output ONLY the valid JSON object based on the [History Explanation].
+    Make it funny and long enough (15+ sequences).
     """
 
     client = create_model()
-    MODEL_NAME = "gpt-4o-mini"
+    # 개그와 포맷 준수에 강한 4o-mini 사용
+    MODEL_NAME = "gpt-4o-mini" 
 
     response = client.chat.completions.create(
         model=MODEL_NAME,
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": scene_prompt},
-            {"role": "user", "content": f"[History Explanation]:\n{tone_corrected_answer}"},
         ],
     )
 
@@ -91,11 +100,12 @@ def scene_split_node(state: GraphState) -> GraphState:
     try:
         script_json = json.loads(raw_content)
     except json.JSONDecodeError:
+        # JSON 파싱 실패 시, 정규식으로 JSON 부분만 추출 시도
         match = re.search(r"\{.*\}", raw_content, re.DOTALL)
         if match:
             script_json = json.loads(match.group(0))
         else:
-            print(f"❌ [SceneNode] JSON Parsing Failed.")
+            print(f"❌ [SceneNode] JSON Parsing Failed. Raw: {raw_content[:50]}...")
             script_json = {"title": "Error", "scenes": []}
 
     scenes = script_json.get("scenes", [])
