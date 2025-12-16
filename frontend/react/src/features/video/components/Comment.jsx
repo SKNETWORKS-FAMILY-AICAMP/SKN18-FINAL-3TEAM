@@ -197,7 +197,7 @@ const ReplyItem = ({
             flexShrink: 0,
           }}
         >
-          {!reply.user?.profile_image && <UserIcon size={12} />}
+          {!reply.user?.profile_image && <UserIcon size={12} color={COLORS.gray} />}
         </div>
 
         {/* 세로선: 자식 답글이 있을 때 프로필 아래로 (동적 높이) */}
@@ -556,7 +556,7 @@ const Comment = ({
               flexShrink: 0,
             }}
           >
-            {!comment.user?.profile_image && <UserIcon size={16} />}
+            {!comment.user?.profile_image && <UserIcon size={16} color={COLORS.gray} />}
           </div>
 
           {/* 세로선: 답글이 있을 때 (동적 높이) */}
