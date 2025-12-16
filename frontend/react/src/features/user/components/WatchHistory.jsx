@@ -1,6 +1,6 @@
 import { COLORS } from "../../../constants/theme";
 
-const WatchHistory = ({ items, loading = false }) => {
+const WatchHistory = ({ items, loading = false, onVideoClick }) => {
   return (
     <div style={{ width: "100%", maxWidth: "100%", overflow: "hidden" }}>
       <div
@@ -54,7 +54,12 @@ const WatchHistory = ({ items, loading = false }) => {
           </div>
         ) : (
           items.map((item) => (
-            <div key={item.id} style={{ minWidth: "140px", flexShrink: 0 }}>
+            <div
+              key={item.id}
+              style={{ minWidth: "140px", flexShrink: 0, cursor: "pointer" }}
+              onClick={() => onVideoClick && onVideoClick(item.videoId)}
+              className="video-thumbnail"
+            >
               <div
                 style={{
                   width: "140px",
@@ -62,6 +67,7 @@ const WatchHistory = ({ items, loading = false }) => {
                   backgroundColor: COLORS.lightGray,
                   borderRadius: "8px",
                   marginBottom: "8px",
+                  transition: "transform 0.2s ease, box-shadow 0.2s ease",
                 }}
               ></div>
               <div style={{ fontSize: "13px", color: COLORS.dark }}>
@@ -94,6 +100,10 @@ const WatchHistory = ({ items, loading = false }) => {
         }
         .watch-history-scroll::-webkit-scrollbar-thumb:hover {
           background: ${COLORS.secondary};
+        }
+        .video-thumbnail:hover > div:first-child {
+          transform: scale(1.05);
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
       `}</style>
     </div>

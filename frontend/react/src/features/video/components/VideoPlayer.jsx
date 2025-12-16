@@ -42,6 +42,32 @@ const PauseCenterIcon = ({ size = 48, color = "#fff" }) => (
   </svg>
 );
 
+// 전체화면 아이콘
+const FullscreenIcon = ({ size = 24, color = "#fff" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <path
+      d="M8 3H5C3.89543 3 3 3.89543 3 5V8M21 8V5C21 3.89543 20.1046 3 19 3H16M16 21H19C20.1046 21 21 20.1046 21 19V16M3 16V19C3 20.1046 3.89543 21 5 21H8"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// 전체화면 나가기 아이콘
+const FullscreenExitIcon = ({ size = 24, color = "#fff" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <path
+      d="M8 3V8H3M16 3V8H21M16 21V16H21M8 21V16H3"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
   const [playing, setPlaying] = useState(false);
   const [played, setPlayed] = useState(0);
@@ -49,7 +75,9 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
   const [seeking, setSeeking] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [error, setError] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const playerRef = useRef(null);
+  const containerRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
 
   // videoUrl이 변경되면 에러 상태 초기화
@@ -116,13 +144,74 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
     }
   };
 
+  const handleFullscreen = () => {
+    if (!containerRef.current) return;
+
+    if (!isFullscreen) {
+      // 전체화면 진입
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen();
+      } else if (containerRef.current.webkitRequestFullscreen) {
+        // Safari
+        containerRef.current.webkitRequestFullscreen();
+      } else if (containerRef.current.mozRequestFullScreen) {
+        // Firefox
+        containerRef.current.mozRequestFullScreen();
+      } else if (containerRef.current.msRequestFullscreen) {
+        // IE/Edge
+        containerRef.current.msRequestFullscreen();
+      }
+    } else {
+      // 전체화면 나가기
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        // Safari
+        document.webkitExitFullscreen();
+      } else if (document.mozCancelFullScreen) {
+        // Firefox
+        document.mozCancelFullScreen();
+      } else if (document.msExitFullscreen) {
+        // IE/Edge
+        document.msExitFullscreen();
+      }
+    }
+  };
+
+  // 전체화면 상태 변경 감지
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(
+        !!(
+          document.fullscreenElement ||
+          document.webkitFullscreenElement ||
+          document.mozFullScreenElement ||
+          document.msFullscreenElement
+        )
+      );
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
+    };
+  }, []);
+
   return (
     <div
+      ref={containerRef}
       style={{
         width: "100%",
         aspectRatio: "16/9",
         backgroundColor: "#000",
-        borderRadius: "16px",
+        borderRadius: isFullscreen ? "0" : "16px",
         position: "relative",
         overflow: "hidden",
       }}
@@ -310,18 +399,49 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 시간 표시 */}
+        {/* 시간 표시 및 전체화면 버튼 */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
+            alignItems: "center",
             marginBottom: "8px",
             color: "#fff",
             fontSize: "14px",
           }}
         >
           <span>{formatTime(played * duration)}</span>
-          <span>{formatTime(duration)}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span>{formatTime(duration)}</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleFullscreen();
+              }}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "transform 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.1)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
+              {isFullscreen ? (
+                <FullscreenExitIcon size={20} color="#fff" />
+              ) : (
+                <FullscreenIcon size={20} color="#fff" />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* 플레이바 */}

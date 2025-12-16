@@ -7,7 +7,10 @@ import { getVideoComments, likeVideo, unlikeVideo } from "../api/communityApi";
 import { createWatchHistory } from "../api/activityApi";
 import { getVideoUrl } from "../utils/imageUtils";
 
-const VideoDetailPage = ({ videoId = 1, isLoggedIn = false, user = null }) => {
+const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
+  // videoId가 없으면 기본값 1 사용
+  const actualVideoId = videoId || 1;
+
   const [video, setVideo] = useState(null);
   const [comments, setComments] = useState([]);
   const [isLiked, setIsLiked] = useState(false);
@@ -66,21 +69,25 @@ const VideoDetailPage = ({ videoId = 1, isLoggedIn = false, user = null }) => {
         setLoading(true);
         watchHistorySaved.current = false;
 
+        // videoId가 없으면 조기 종료
+        if (!actualVideoId) {
+          console.error("videoId가 없습니다.");
+          setLoading(false);
+          return;
+        }
+
         // 비디오 정보 로드
-        const videoResponse = await getVideo(videoId);
+        const videoResponse = await getVideo(actualVideoId);
         if (videoResponse?.data) {
-          console.log("영상 데이터:", videoResponse.data);
-          console.log("영상 URL (원본):", videoResponse.data.video_url);
           const processedUrl = videoResponse.data.video_url
             ? getVideoUrl(videoResponse.data.video_url)
             : "/videos/selected_scene_1_video.mp4";
-          console.log("영상 URL (처리 후):", processedUrl);
           setVideo(videoResponse.data);
         }
 
         // 댓글 로드 (로그인한 경우만)
         if (isLoggedIn) {
-          const commentsResponse = await getVideoComments(videoId);
+          const commentsResponse = await getVideoComments(actualVideoId);
           if (commentsResponse?.data) {
             console.log("댓글 데이터:", commentsResponse.data);
             const formattedComments = commentsResponse.data.map((c) => ({
@@ -103,27 +110,24 @@ const VideoDetailPage = ({ videoId = 1, isLoggedIn = false, user = null }) => {
         }
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
+        // 에러 발생 시에도 로딩 상태 해제
+        setLoading(false);
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [videoId, isLoggedIn]);
+  }, [actualVideoId, isLoggedIn]);
 
   // 시청 기록 저장 (영상 로드 후 한 번만)
   useEffect(() => {
     const saveWatchHistory = async () => {
-      if (
-        !watchHistorySaved.current &&
-        isLoggedIn &&
-        video &&
-        videoId
-      ) {
+      if (!watchHistorySaved.current && isLoggedIn && video && actualVideoId) {
         try {
-          await createWatchHistory(videoId, 0, video.tags || []);
+          await createWatchHistory(actualVideoId, 0, video.tags || []);
           watchHistorySaved.current = true;
-          console.log("시청 기록 저장 완료:", videoId);
+          console.log("시청 기록 저장 완료:", actualVideoId);
         } catch (error) {
           console.error("시청 기록 저장 실패:", error);
         }
@@ -131,7 +135,7 @@ const VideoDetailPage = ({ videoId = 1, isLoggedIn = false, user = null }) => {
     };
 
     saveWatchHistory();
-  }, [video, videoId, isLoggedIn]);
+  }, [video, actualVideoId, isLoggedIn]);
 
   const handleLikeClick = async () => {
     if (!isLoggedIn) {
@@ -141,10 +145,10 @@ const VideoDetailPage = ({ videoId = 1, isLoggedIn = false, user = null }) => {
 
     try {
       if (isLiked) {
-        await unlikeVideo(videoId);
+        await unlikeVideo(actualVideoId);
         setIsLiked(false);
       } else {
-        await likeVideo(videoId);
+        await likeVideo(actualVideoId);
         setIsLiked(true);
       }
     } catch (error) {
@@ -194,7 +198,7 @@ const VideoDetailPage = ({ videoId = 1, isLoggedIn = false, user = null }) => {
       {isLoggedIn && (
         <CommentSection
           comments={comments}
-          videoId={videoId}
+          videoId={actualVideoId}
           user={user}
           onCommentDelete={handleCommentDelete}
         />

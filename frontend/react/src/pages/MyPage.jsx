@@ -75,7 +75,11 @@ const MyPage = ({ onNavigate, user }) => {
       <UserProfile onEdit={() => onNavigate("profile-edit")} user={user} />
 
       <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-        <WatchHistory items={watchHistory} loading={loading} />
+        <WatchHistory
+          items={watchHistory}
+          loading={loading}
+          onVideoClick={(videoId) => onNavigate("video", videoId)}
+        />
 
         <div
           style={{
