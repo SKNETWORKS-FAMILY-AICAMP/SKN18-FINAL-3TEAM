@@ -1,7 +1,7 @@
 # Langgraph 테스트 코드
 import asyncio
 
-from backend.langgraph_structure1.graph import create_graph_flow
+from backend.langgraph_structure2.graph import create_graph_flow
 
 
 async def main(query: str = None):
@@ -15,9 +15,6 @@ async def main(query: str = None):
 
     # 실행 (hybrid_node가 async이므로 ainvoke 사용)
     result = await app.ainvoke(initial_state)
-
-    print("=== 최종 결과 ===")
-    print(result)
 
 
 if __name__ == "__main__":
