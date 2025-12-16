@@ -28,7 +28,7 @@ class VideoListView(ListAPIView):
     
     GET /api/video/list/
     - 전체 영상 목록 조회 (최신순)
-    - 인기순, 조회수순 정렬 가능
+    - 조회수순 정렬 가능
     """
     queryset = Video.objects.all()
     serializer_class = VideoSerializer
@@ -39,9 +39,7 @@ class VideoListView(ListAPIView):
         
         # 정렬
         sort = self.request.query_params.get('sort', 'latest')
-        if sort == 'popular':
-            queryset = queryset.order_by('-likes_count', '-upload_date')
-        elif sort == 'comments':
+        if sort == 'comments':
             queryset = queryset.order_by('-comments_count', '-upload_date')
         else:
             queryset = queryset.order_by('-upload_date')
@@ -76,57 +74,6 @@ class VideoDetailView(RetrieveAPIView):
         response = super().retrieve(request, *args, **kwargs)
         return Response({
             'data': response.data,
-            'message': 'ok'
-        })
-
-
-class PopularVideosView(APIView):
-    """
-    인기 영상 API
-    
-    GET /api/video/popular/
-    - 좋아요 수 기준 인기 영상 상위 10개
-    """
-    permission_classes = [AllowAny]
-    
-    def get(self, request):
-        videos = Video.objects.all().order_by('-likes_count')[:10]
-        serializer = VideoSerializer(videos, many=True)
-        return Response({
-            'data': serializer.data,
-            'message': 'ok'
-        })
-
-
-class PopularTagsView(APIView):
-    """
-    인기 태그 API
-    
-    GET /api/video/tags/popular/
-    - 가장 많이 사용된 태그 상위 10개
-    """
-    permission_classes = [AllowAny]
-    
-    def get(self, request):
-        from django.db.models import Count
-        from django.db import connection
-        
-        # PostgreSQL에서 태그 집계
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT unnest(tags) as tag, COUNT(*) as count
-                FROM video
-                WHERE tags IS NOT NULL
-                GROUP BY tag
-                ORDER BY count DESC
-                LIMIT 10
-            """)
-            rows = cursor.fetchall()
-        
-        tags = [{'tag': row[0], 'count': row[1]} for row in rows]
-        
-        return Response({
-            'data': tags,
             'message': 'ok'
         })
 

@@ -35,7 +35,7 @@ const VideoInfo = ({ tags, title, date, isLiked, onLikeClick, likesCount = 0 }) 
             display: 'flex',
             alignItems: 'center',
             gap: '6px',
-            color: '#e8a4b8',
+            color: '#ff1493',
             cursor: 'pointer',
           }}
         >
