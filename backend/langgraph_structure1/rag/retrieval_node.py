@@ -28,7 +28,7 @@ def retrieval_node(state: GraphState) -> GraphState:
 
     t0 = time.perf_counter()
 
-    # keywords가 있으면 질문과 함께 조합해 쿼리 문자열을 만든다
+    # keywords가 있으면 질문과 함께 조합해 쿼리 문자열을 만든다 (복수 키워드 지원)
     keywords: List[str] = state.get("keywords", []) or []
     if keywords:
         kw_str = " ".join(keywords)
