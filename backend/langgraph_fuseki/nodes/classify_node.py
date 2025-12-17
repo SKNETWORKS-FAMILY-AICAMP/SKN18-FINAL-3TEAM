@@ -21,6 +21,7 @@ from langchain_openai import ChatOpenAI
 
 from backend.langgraph_fuseki.state import GraphState
 from backend.langgraph_fuseki.config import PROPERTY_GROUPS_PATH
+from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
 
 # 한국어 형태소 분석기 (키워드 추출용)
 try:
@@ -207,8 +208,54 @@ def query_classifier_node(state: GraphState) -> GraphState:
     is_english = not detect_korean_content(query)
     
     if is_english:
-        translated_query = translate_english_query_to_korean(query, llm)
-        query = translated_query
+        # 번역 전에 임시로 response를 받아서 토큰 추출
+        translation_prompt = f"""당신은 조선시대 한국 역사 데이터에 특화된 번역 전문가입니다.
+
+## 영어 질문
+{query}
+
+## 번역 규칙 (반드시 준수)
+
+### 1. 역사 데이터에 맞는 전문 용어 사용
+- "kill" → "살해" (절대 "살인" 사용 금지)
+- "murder" → "살해" 또는 "시해" (맥락에 따라)
+- "assassinate" → "시해"
+- "timeline" → "연대기"가 아니라 "연대순으로" 또는 "시기별로" 등 자연스러운 표현
+- "show me" → "보여주세요"가 아니라 "알려주세요" 또는 "설명해주세요" 등 자연스러운 표현
+- "who" → "누가"
+- "what" → "무엇" 또는 "어떤"
+- "when" → "언제"
+- "where" → "어디"
+- "why" → "왜"
+- "how" → "어떻게"
+
+### 2. 조선시대 역사 데이터에 맞는 어투
+- 현대적 표현보다는 역사적 맥락에 맞는 표현 사용
+- 예: "Who killed the king?" → "누가 왕을 살해하였나?" (절대 "살인" 사용 금지)
+- 예: "Show me the timeline" → "연대순으로 알려주세요" 또는 "시기별로 설명해주세요"
+- 예: "What happened in 1592?" → "1592년에 무슨 일이 일어났나?"
+
+### 3. 자연스러운 한국어 표현
+- 직역보다는 자연스러운 한국어로 번역
+- 질문의 의도와 맥락을 정확히 전달
+- 조선시대 역사 데이터에 적합한 어투 사용
+
+## 출력 형식
+번역된 한글 질문만 출력하세요. 다른 설명이나 주석은 포함하지 마세요.
+
+번역 결과:"""
+        response = llm.invoke(translation_prompt)
+        # 토큰 사용량 추출 및 state에 누적
+        token_update = extract_and_accumulate_tokens(state, response)
+        state.update(token_update)
+        
+        translated_query = response.content.strip()
+        # 마크다운 코드 블록 제거
+        if "```" in translated_query:
+            translated_query = translated_query.split("```")[1]
+            if translated_query.startswith("한국어") or translated_query.startswith("korean"):
+                translated_query = translated_query.split("\n", 1)[1] if "\n" in translated_query else translated_query
+        query = translated_query.strip()
         print(f"\n{'='*70}")
         print(f"[0/6] 질문 번역 (Query Translation)")
         print(f"{'='*70}")
@@ -302,7 +349,7 @@ def query_classifier_node(state: GraphState) -> GraphState:
             if content.startswith("json"):
                 content = content[4:]
 
-        return json.loads(content)
+        return response, json.loads(content)  # response도 함께 반환
 
     # Thread 2: 키워드 확장
     def expand_keywords():
@@ -359,7 +406,7 @@ def query_classifier_node(state: GraphState) -> GraphState:
             if content.startswith("json"):
                 content = content[4:]
 
-        return json.loads(content)
+        return response, json.loads(content)  # response도 함께 반환
 
     # ========== 병렬 실행 ==========
     try:
@@ -367,8 +414,18 @@ def query_classifier_node(state: GraphState) -> GraphState:
             future1 = executor.submit(analyze_intent_and_properties)
             future2 = executor.submit(expand_keywords)
 
-            result1 = future1.result()
-            result2 = future2.result()
+            response1, result1 = future1.result()
+            response2, result2 = future2.result()
+            
+            # 토큰 사용량 추출 및 state에 누적
+            token_update1 = extract_and_accumulate_tokens(state, response1)
+            token_update2 = extract_and_accumulate_tokens(state, response2)
+            # 두 응답의 토큰을 합산
+            state.update({
+                "total_tokens": token_update1["total_tokens"] + token_update2["total_tokens"],
+                "prompt_tokens": token_update1["prompt_tokens"] + token_update2["prompt_tokens"],
+                "completion_tokens": token_update1["completion_tokens"] + token_update2["completion_tokens"]
+            })
 
         # ========== 결과 병합 ==========
         # Thread 1 결과 (의도 분석 + 프로퍼티 그룹)

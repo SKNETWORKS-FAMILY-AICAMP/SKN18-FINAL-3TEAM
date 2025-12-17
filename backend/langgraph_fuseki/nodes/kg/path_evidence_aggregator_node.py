@@ -21,6 +21,7 @@ from backend.langgraph_fuseki.config import (
     QUERY_ENTITY_MATCH_BOOST_PARTIAL,
     QUERY_ENTITY_MATCH_BOOST_NORMALIZED
 )
+from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
 from langchain_openai import ChatOpenAI
 
 
@@ -458,7 +459,8 @@ def select_top_evidences_with_llm(
     query: str,
     query_intent: str = "",
     query_type: str = "causal",
-    top_k: int = 15
+    top_k: int = 15,
+    state: GraphState = None
 ) -> list:
     """
     LLM을 사용하여 질문 의도에 맞는 상위 근거 선택
@@ -525,6 +527,12 @@ def select_top_evidences_with_llm(
 - JSON 형식만 출력하세요."""
         
         response = llm.invoke(prompt)
+        
+        # 토큰 사용량 추출 및 state에 누적
+        if state is not None:
+            token_update = extract_and_accumulate_tokens(state, response)
+            state.update(token_update)
+        
         content = response.content.strip()
         
         # JSON 파싱
@@ -734,6 +742,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
             query, 
             query_intent, 
             query_type,
+            state=state,
             top_k=15
         )
         print(f"        - 최종 선택: {len(top_evidences)}개 (LLM 판단)")

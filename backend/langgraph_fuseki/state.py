@@ -88,6 +88,11 @@ class GraphState(TypedDict):
     executed_nodes: NotRequired[List[str]]  # 실행된 노드 추적
     execution_time: NotRequired[float]  # 실행 시간 (초)
     node_execution_times: NotRequired[Dict[str, float]]  # 노드별 실행 시간 (초)
+    
+    # ========== 토큰 사용량 추적 ==========
+    total_tokens: NotRequired[int]  # 총 토큰 사용량
+    prompt_tokens: NotRequired[int]  # 프롬프트 토큰 사용량
+    completion_tokens: NotRequired[int]  # 완료 토큰 사용량
 
     # ========== 테스트 설정 (RAGAS 평가용) ==========
     test_config: NotRequired[Dict[str, Any]]  # 테스트 모드 설정

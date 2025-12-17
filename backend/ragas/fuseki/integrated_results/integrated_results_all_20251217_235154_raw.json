@@ -1,0 +1,79 @@
+{
+  "test_type": "integrated",
+  "config": {
+    "all_semantic_expanders_on": true,
+    "all_aggregator_threads_on": true,
+    "entity_boost_mode": "exact_match",
+    "custom_weights": {
+      "semantic_expanders": {
+        "temporal": 1.3,
+        "category": 1.2,
+        "causal_chain": 1.4,
+        "pgvector": 1.0
+      },
+      "aggregator_threads": {
+        "outgoing_relations": 1.3,
+        "incoming_relations": 1.1,
+        "entity_properties": 1.2,
+        "connected_entities": 1.0,
+        "type_and_summary": 1.15
+      },
+      "entity_boost_mode": "exact_match",
+      "evidence_selection": {
+        "top_k": 30,
+        "diversity_bonus": 0.1
+      }
+    }
+  },
+  "n_questions": 1,
+  "n_samples": 1,
+  "scores": {
+    "nv_context_relevance": 1.0,
+    "answer_relevancy": 0.821310347979801,
+    "faithfulness": 1.0,
+    "nv_response_groundedness": 1.0
+  },
+  "raw_logs": [
+    {
+      "idx": 1,
+      "persona": "foreigner_culture_history",
+      "question": "세조는 누구였나요?",
+      "answer": "세조는 조선의 제7대 왕으로, 수양대군으로 불리던 인물이자 단종을 폐위하고 반정으로 즉위한 왕입니다. 1453년에는 수양대군이 안평대군·김종서·황보인을 살해하여 실권을 장악했고, 이 과정을 통해 권력을 자신의 손에 확고히 했습니다.\n\n이후 1455년에 반정이 성공하면서 공식적으로 왕좌에 올랐고, 세조로 즉위하여 재위에 들어갔습니다. 이 과정에서 단종은 폐위되었고 세조의 정권 기반은 강화되었으며, 반정의 정당성은 세조실록과 같은 기록에 자세히 남아 있습니다. 추출된 엔티티로는 수양대군, 안평대군, 김종서, 황보인, 단종, 반정, 세조, 세조실록이 있으며, 이유라는 인물도 기록에 언급되지만 그 구체적 역할은 명확히 남아 있지 않습니다. 이들 사실은 조선 전기 제7대 왕 세조의 재위 기간과 정권 형성 과정을 설명하는 주요 근거입니다. 세조의 재위 기간은 일반적으로 1455년의 반정으로 공식 왕위에 오른 이후 1468년까지로 간주됩니다. 문헌으로는 세조실록과 세조혜장대왕실록이 재위 기간과 반정의 경위를 기록합니다.",
+      "contexts": [
+        "세조실록 [Document] 조선 전기 제7대 왕 세조의 재위 기간 사실을 기록한 역사서(정식 명칭: 세조혜장대왕실록). 47권(본문), 49권 18책의 인본과 정초본 등이 제작되어 춘추관·사고 등에 분장되었",
+        "수양대군(세조) [Person] 단종을 몰아내고 스스로 세조로 즉위한 인물. 그의 왕위 찬탈이 단종 복위 모의를 촉발했다고 서술됨.",
+        "1453년 수양대군의 안평대군·김종서·황보인 살해 및 실권 장악 [Event] (1453년)",
+        "김종서·황보인 제거 [Event] (1453년)",
+        "단종 [Person] 조선의 왕 (재위 기간 언급됨)",
+        "단종 [Person] 조선의 임금(단종) — 어린 단종을 김종서가 보필함",
+        "단종 [Person] 조선의 제6대(재위: 1452년~1455년) 왕.",
+        "단종 [Person] 조선전기 제6대 왕으로 1452년 즉위하여 1455년 폐위된 뒤 노산군으로 강봉되었음.",
+        "세조실록의 Summary: 본문에 따르면 ≪세조실록≫ 편찬부터 동지사가 5∼6인으로 나타남",
+        "세조실록의 Summary: 조선 전기 제7대 왕 세조의 재위 기간 사실을 기록한 역사서(정식 명칭: 세조혜장대왕실록). 47권(본문), 49권 18책의 인본과 정초본 등이 제작되어 춘추관·사고 등에 분장되었...",
+        "수양대군(세조)의 Summary: 단종을 몰아내고 스스로 세조로 즉위한 인물. 그의 왕위 찬탈이 단종 복위 모의를 촉발했다고 서술됨.",
+        "1453년 수양대군의 안평대군·김종서·황보인 살해 및 실권 장악의 Year: 1453",
+        "김종서·황보인 제거의 Year: 1453",
+        "단종의 Summary: 조의제문에서 언급된 인물로, 세조가 단종을 폐위·살해한 점이 조의제문의 문제 제기의 배경이 됨.",
+        "단종의 Summary: 1453년 당시 왕(단종). 계유정란 이후 정변의 배경으로 본문에 언급됨."
+      ],
+      "n_contexts": 15,
+      "elapsed_seconds": 173.19240498542786,
+      "tokens": {
+        "total": 0,
+        "prompt": 0,
+        "completion": 0
+      },
+      "thread_evidence_counts": {
+        "type_and_summary": 8,
+        "entity_properties": 7
+      },
+      "ragas_scores": {
+        "nv_context_relevance": 1.0,
+        "answer_relevancy": 0.821310347979801,
+        "faithfulness": 1.0,
+        "nv_response_groundedness": 1.0
+      }
+    }
+  ],
+  "timestamp": "2025-12-17T23:55:16.741838"
+}
