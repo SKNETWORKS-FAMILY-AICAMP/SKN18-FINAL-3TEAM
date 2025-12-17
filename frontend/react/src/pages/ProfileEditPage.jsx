@@ -9,7 +9,7 @@ import { checkAuth } from "../api/authApi";
 import api from "../api/axios";
 import { getProfileImageUrl } from "../utils/imageUtils";
 
-const ProfileEditPage = ({ onNavigate, user: initialUser }) => {
+const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
   const [user, setUser] = useState(initialUser || null);
   const [formData, setFormData] = useState({
     nickname: "",
@@ -95,10 +95,15 @@ const ProfileEditPage = ({ onNavigate, user: initialUser }) => {
 
       if (response.data.data) {
         // 프로필 이미지 업데이트
-        setUser({
+        const updatedUser = {
           ...user,
           profile_image: response.data.data.image_url,
-        });
+        };
+        setUser(updatedUser);
+        // 부모 컴포넌트(App.jsx)의 user 상태 업데이트
+        if (onUserUpdate) {
+          onUserUpdate(updatedUser);
+        }
         alert("프로필 이미지가 업로드되었습니다.");
       }
     } catch (error) {
@@ -193,6 +198,10 @@ const ProfileEditPage = ({ onNavigate, user: initialUser }) => {
           타입: typeof response.data.data.gender,
         });
         setUser(response.data.data);
+        // 부모 컴포넌트(App.jsx)의 user 상태 즉시 업데이트
+        if (onUserUpdate) {
+          onUserUpdate(response.data.data);
+        }
         // 스크롤을 맨 위로 이동
         window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
         // 마이페이지로 돌아가기
