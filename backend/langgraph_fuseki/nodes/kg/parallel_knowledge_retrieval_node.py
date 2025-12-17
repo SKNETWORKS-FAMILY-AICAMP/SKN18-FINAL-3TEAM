@@ -75,11 +75,12 @@ DATA_THREADS = {
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
             PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-            
+
             SELECT ?entity ?entityLabel ?predicate ?object ?objectLabel WHERE {{
                 ?entity rdfs:label ?entityLabel .
                 FILTER ({label_filter})
                 ?entity ?predicate ?object .
+                FILTER(isURI(?object))
                 OPTIONAL {{ ?object rdfs:label ?objectLabel }}
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
@@ -92,11 +93,12 @@ DATA_THREADS = {
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
             PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-            
+
             SELECT ?subject ?subjectLabel ?predicate ?entity ?entityLabel WHERE {{
                 ?entity rdfs:label ?entityLabel .
                 FILTER ({label_filter})
                 ?subject ?predicate ?entity .
+                FILTER(isURI(?subject))
                 OPTIONAL {{ ?subject rdfs:label ?subjectLabel }}
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
@@ -174,11 +176,11 @@ DATA_THREADS = {
 
 def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
     """
-    Parallel Knowledge Retrieval: 5개 Thread에서 쿼리 생성 + 추론 실행을 병렬로 수행
+    Parallel Knowledge Retrieval: 5개 Thread에서 SPARQL 쿼리 생성 + 실행을 병렬로 수행
 
-    기존 multi_query_generator_node를 통합하여 효율성 향상:
-    - 기존: 쿼리 5개 순차 생성(~10초) → 추론 5개 병렬 실행(~3초) = ~13초
-    - 개선: 쿼리생성+추론을 Thread별로 동시 실행 = ~3-5초
+    성능 최적화:
+    - 쿼리 생성과 실행을 Thread별로 동시 처리 (~3-5초)
+    - ThreadPoolExecutor로 병렬 실행
 
     프로퍼티 필터링:
     - classify_node에서 선택된 프로퍼티 그룹으로 SPARQL FILTER 적용
@@ -689,6 +691,7 @@ def get_1hop_neighbors(entity_uri: str, timeout: int = 2) -> list:
                 ?neighbor ?predicate {entity_ref} .
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
+                FILTER(isURI(?neighbor))
             }}
         }} LIMIT 50
     """

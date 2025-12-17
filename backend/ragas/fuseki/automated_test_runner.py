@@ -5,11 +5,11 @@ Automated Test Runner for Fuseki RAG System
 - 4가지 Semantic Expander × 5가지 Aggregator Thread × 4가지 Entity Boost Mode = 80가지
 
 Usage:
+    # 모든 질문(40개)으로 80가지 조합 테스트 (기본값)
+    python backend/ragas/fuseki/automated_test_runner.py --save-every 10
+
     # 각 조합당 3개 질문만 테스트 (디버깅용)
     python backend/ragas/fuseki/automated_test_runner.py --limit 3 --debug
-
-    # 전체 질문으로 80가지 조합 테스트
-    python backend/ragas/fuseki/automated_test_runner.py --persona foreigner_culture_history --save-every 10
 
     # 특정 조합만 테스트
     python backend/ragas/fuseki/automated_test_runner.py --semantic temporal --thread outgoing_relations --boost exact_match --limit 3
@@ -82,9 +82,13 @@ def pick_question(item: dict) -> str:
     return ""
 
 
-def filter_questions_by_persona(items: List[Dict], persona_id: str) -> List[Dict]:
-    """Persona ID로 질문 필터링"""
-    return [item for item in items if item.get("persona_id") == persona_id]
+def load_all_questions_with_stats(items: List[Dict]) -> tuple:
+    """모든 질문 로드 및 통계 반환"""
+    persona_counts = {}
+    for item in items:
+        persona = item.get("persona_id", "unknown")
+        persona_counts[persona] = persona_counts.get(persona, 0) + 1
+    return items, persona_counts
 
 
 def save_json(data: Any, path: Path):
@@ -110,7 +114,6 @@ class AutomatedTestRunner:
         self,
         questions_path: Path,
         output_dir: Path,
-        persona_id: str = "foreigner_culture_history",
         limit: int = 0,
         debug: bool = False,
         save_every: int = 10,
@@ -120,7 +123,6 @@ class AutomatedTestRunner:
     ):
         self.questions_path = questions_path
         self.output_dir = output_dir
-        self.persona_id = persona_id
         self.limit = limit
         self.debug = debug
         self.save_every = save_every
@@ -149,19 +151,21 @@ class AutomatedTestRunner:
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     def load_questions(self) -> List[Dict]:
-        """질문 로드 및 필터링"""
+        """질문 로드 (모든 페르소나)"""
         if not self.questions_path.exists():
             raise FileNotFoundError(f"Questions file not found: {self.questions_path}")
 
         items = load_jsonl(self.questions_path)
 
-        # Persona 필터링
-        items = filter_questions_by_persona(items, self.persona_id)
-
         if self.limit > 0:
             items = items[:self.limit]
 
-        print(f"[INFO] Loaded {len(items)} questions (persona: {self.persona_id})")
+        # 페르소나별 통계 출력
+        items, persona_counts = load_all_questions_with_stats(items)
+        print(f"[INFO] Loaded {len(items)} questions total:")
+        for persona, count in sorted(persona_counts.items()):
+            print(f"  - {persona}: {count} questions")
+
         return items
 
     def run_single_test(
@@ -416,19 +420,13 @@ class AutomatedTestRunner:
 # =====================================================
 def main():
     parser = argparse.ArgumentParser(
-        description="Automated Test Runner for Fuseki RAG System (80 Combinations)"
-    )
-    parser.add_argument(
-        "--persona",
-        type=str,
-        default="foreigner_culture_history",
-        help="Persona ID to test (default: foreigner_culture_history)"
+        description="Automated Test Runner for Fuseki RAG System (80 Combinations with 40 Questions)"
     )
     parser.add_argument(
         "--limit",
         type=int,
         default=0,
-        help="Limit number of questions per combination (0 = no limit, default: 0)"
+        help="Limit number of questions per combination (0 = all 40 questions, default: 0)"
     )
     parser.add_argument(
         "--debug",
@@ -439,7 +437,7 @@ def main():
         "--save-every",
         type=int,
         default=5,
-        help="Save results every N combinations (default: 10)"
+        help="Save results every N combinations (default: 5)"
     )
     parser.add_argument(
         "--semantic",
@@ -466,7 +464,6 @@ def main():
     runner = AutomatedTestRunner(
         questions_path=QUESTIONS_PATH,
         output_dir=FUSEKI_RESULTS_DIR,
-        persona_id=args.persona,
         limit=args.limit,
         debug=args.debug,
         save_every=args.save_every,

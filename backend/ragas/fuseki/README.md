@@ -1,467 +1,407 @@
-# Fuseki RAG System - Automated RAGAS Evaluation (80 Combinations)
+# Fuseki RAG System - RAGAS 평가
 
-이 디렉토리는 Fuseki 기반 RAG 시스템의 자동화된 RAGAS 평가를 수행합니다.
+Fuseki 기반 한국사 RAG 시스템의 RAGAS 평가 도구 모음입니다.
 
-## 개요
+## 📋 목차
 
-**목적**: **80가지 노드 조합**에 대해 RAGAS 평가를 자동으로 수행하여 최적의 가중치와 설정을 찾습니다.
+1. [테스트 개요](#테스트-개요)
+2. [질문 데이터셋](#질문-데이터셋)
+3. [테스트 모드](#테스트-모드)
+4. [실행 방법](#실행-방법)
+5. [결과 분석](#결과-분석)
+6. [가중치 설정](#가중치-설정)
 
-**평가 조합 (총 80가지 = 4 × 5 × 4)**:
+---
 
-### 1. Semantic Expander (4가지)
-의미론적 엔티티 확장 방법:
-- `temporal`: 시간적 맥락 확장 (±10년 이내 이벤트)
-- `category`: 카테고리 기반 주제 확장
-- `causal_chain`: 인과관계 체인 확장 (leadsTo, ledTo, causes)
-- `pgvector`: 벡터 유사도 기반 확장
+## 테스트 개요
 
-### 2. Aggregator Thread (5가지)
-Parallel Knowledge Retrieval Thread:
-- `outgoing_relations`: 엔티티에서 나가는 관계 (엔티티 → ?)
-- `incoming_relations`: 엔티티로 들어오는 관계 (? → 엔티티)
-- `entity_properties`: 엔티티의 속성 (리터럴 값)
-- `connected_entities`: 두 엔티티를 연결하는 중간 노드
-- `type_and_summary`: 엔티티 타입과 요약 정보
+### 테스트 구성 요소
 
-### 3. Entity Boost Mode (4가지)
-쿼리 엔티티와의 매칭 방식:
-- `exact_match`: **정확 매칭**된 엔티티만 사용 (엔티티명이 정확히 일치)
-- `partial_match`: **부분 매칭**된 엔티티만 사용 (엔티티명이 부분 포함)
-- `normalized_match`: **정규화 매칭**된 엔티티만 사용 (공백/언더스코어 제거 후 일치)
-- `penalty_match`: **매칭 안 된** 엔티티만 사용 (품질 비교용 - 베이스라인)
+#### 1. Semantic Expanders (4가지)
+- **temporal**: 시간 기반 확장 (연도, 기간 등)
+- **category**: 카테고리 기반 확장 (인물, 사건, 제도 등)
+- **causal_chain**: 인과관계 기반 확장
+- **pgvector**: 벡터 유사도 기반 확장
 
-**평가 메트릭 (LLM Judge 기반)**:
+#### 2. Aggregator Threads (5가지)
+- **outgoing_relations**: 엔티티에서 나가는 관계 (A → B)
+- **incoming_relations**: 엔티티로 들어오는 관계 (B → A)
+- **entity_properties**: 엔티티의 속성 (Year, Location, Title 등)
+- **connected_entities**: 2-hop 연결된 엔티티
+- **type_and_summary**: 엔티티 타입과 요약 정보
 
-### 검색 단계
-1. **Context Relevance** - 질문과 검색된 context의 의미적 관련성
+#### 3. Entity Boost Modes (4가지)
+- **exact_match**: 정확히 일치하는 엔티티만 높은 점수
+- **partial_match**: 부분 일치하는 엔티티
+- **normalized_match**: 정규화 매칭 (공백, 대소문자 무시)
+- **penalty_match**: 매칭 안 된 엔티티 (품질 비교용)
 
-### 생성 단계
-2. **Response Relevancy (Answer Relevancy)** - 답변이 질문에 잘 답하는지
-3. **Faithfulness** - 답변이 context에 기반하는지 (환각 없음)
-4. **Response Groundedness (Answer Correctness)** - 답변이 context를 얼마나 사용하는지
+### RAGAS 평가 지표
 
-## 파일 구조
+1. **nv_context_relevance**: 검색된 컨텍스트의 질문 관련성
+2. **answer_relevancy**: 생성된 답변의 질문 관련성
+3. **faithfulness**: 답변이 컨텍스트에 기반했는지 (환각 감지)
+4. **nv_response_groundedness**: 답변의 근거 기반성
 
+---
+
+## 질문 데이터셋
+
+### 위치
 ```
-backend/ragas/fuseki/
-├── README.md                    # 이 파일 (상세 문서)
-├── QUICKSTART.md                # 빠른 시작 가이드
-├── config_manager.py            # 80가지 조합 설정 관리
-├── ragas_metrics.py             # RAGAS 메트릭 로더
-├── automated_test_runner.py    # 자동화 테스트 러너 (80 조합)
-├── results_analyzer.py          # 결과 분석 및 리포트 생성
-└── results/                     # 결과 저장 디렉토리
-    ├── ragas_results_80combos_YYYYMMDD_HHMMSS.json
-    ├── ragas_summary_80combos_YYYYMMDD_HHMMSS.json
-    ├── ragas_results_80combos_YYYYMMDD_HHMMSS_raw.json
-    ├── ragas_results_80combos_YYYYMMDD_HHMMSS_ranked.csv
-    └── ragas_results_80combos_YYYYMMDD_HHMMSS_report.txt
+backend/ragas/questions.jsonl
 ```
 
-## 설치
+### 구성
+- **총 40개 질문**
+  - 외국인 페르소나 (`foreigner_culture_history`): 20개
+  - 아이들 페르소나 (`kids_child`): 20개
 
-### 필수 패키지
+### 형식
+```json
+{
+  "question_ko": "세조는 누구였나요?",
+  "question_en": "Who was King Sejo?",
+  "persona_id": "foreigner_culture_history",
+  "reference": "세조는 조선 제7대 임금으로..."
+}
+```
 
+---
+
+## 테스트 모드
+
+### 1. 80가지 조합 테스트 (Isolation Test)
+
+**목적**: 각 구성 요소를 독립적으로 평가하여 최적 조합 발견
+
+**조합 수**: 4 (semantic) × 5 (thread) × 4 (boost) = **80가지**
+
+**특징**:
+- 각 테스트마다 **하나의 semantic expander + 하나의 thread + 하나의 boost mode**만 활성화
+- 각 조합의 성능을 독립적으로 측정
+- 40개 질문(외국인 20개 + 아이들 20개)으로 테스트
+
+**파일**: `automated_test_runner.py`
+
+### 2. 통합 테스트 (Integrated Test)
+
+**목적**: 모든 기능을 동시에 활성화하여 시너지 효과 측정
+
+**조합 수**: **1가지** (모든 기능 ON)
+
+**특징**:
+- **모든 semantic expanders** 동시 활성화
+- **모든 aggregator threads** 동시 활성화
+- **커스텀 가중치** 적용하여 중요도 반영
+- 40개 질문(외국인 20개 + 아이들 20개)으로 테스트
+
+**파일**: `integrated_test_runner.py`
+
+---
+
+## 실행 방법
+
+### 사전 준비
+
+1. **Fuseki 서버 실행 확인**
 ```bash
-pip install ragas pandas datasets
+# Fuseki가 http://localhost:3030/korean_history 에서 실행 중이어야 함
+curl http://localhost:3030/korean_history/sparql
 ```
 
-### 선택 패키지 (시각화)
-
+2. **환경 설정**
 ```bash
-pip install matplotlib seaborn
+cd /path/to/SKN18-FINAL-3TEAM
 ```
 
-### 환경 변수 설정
+### 1. 80가지 조합 테스트
 
+#### 기본 실행 (전체 40개 질문)
 ```bash
-# .env 파일에 추가
-USE_VECTOR_SIMILARITY_SCORE=false  # 벡터 유사도를 가중치로 사용하지 않음
-```
-
-## 빠른 시작
-
-자세한 시작 가이드는 [QUICKSTART.md](QUICKSTART.md)를 참고하세요.
-
-```bash
-# 빠른 테스트 (각 조합당 3개 질문만)
-python backend/ragas/fuseki/automated_test_runner.py --limit 3 --debug
-
-# 전체 테스트 (80가지 조합)
-python backend/ragas/fuseki/automated_test_runner.py
-```
-
-## 사용 방법
-
-### 1. 전체 테스트 실행 (80가지 조합)
-
-```bash
-# 기본 실행
-python backend/ragas/fuseki/automated_test_runner.py
-
-# 백그라운드 실행 + 로그 저장
-nohup python backend/ragas/fuseki/automated_test_runner.py > ragas_test.log 2>&1 &
-tail -f ragas_test.log
-```
-
-### 2. 옵션을 사용한 실행
-
-```bash
-# 질문 수 제한 (각 조합당 5개 질문만)
-python backend/ragas/fuseki/automated_test_runner.py --limit 5
-
-# 디버그 모드
-python backend/ragas/fuseki/automated_test_runner.py --debug
-
-# Persona 지정
-python backend/ragas/fuseki/automated_test_runner.py --persona foreigner_culture_history
-
-# 중간 저장 주기 설정 (10개 조합마다 저장 - 기본값)
 python backend/ragas/fuseki/automated_test_runner.py --save-every 10
+```
 
-# 특정 semantic 방법만 테스트 (20가지 조합)
-python backend/ragas/fuseki/automated_test_runner.py --semantic temporal
+#### 디버깅 (3개 질문만)
+```bash
+python backend/ragas/fuseki/automated_test_runner.py --limit 3 --debug
+```
 
-# 특정 thread만 테스트 (16가지 조합)
-python backend/ragas/fuseki/automated_test_runner.py --thread outgoing_relations
-
-# 특정 boost 모드만 테스트 (20가지 조합)
-python backend/ragas/fuseki/automated_test_runner.py --boost exact_match
-
-# 특정 조합 하나만 테스트 (1가지 조합)
+#### 특정 조합만 테스트
+```bash
+# Temporal + Outgoing Relations + Exact Match 조합만
 python backend/ragas/fuseki/automated_test_runner.py \
   --semantic temporal \
   --thread outgoing_relations \
   --boost exact_match \
-  --limit 3 \
-  --debug
+  --limit 3
 ```
 
-### 3. 결과 분석
-
+#### 특정 Semantic Expander만 테스트 (20가지)
 ```bash
-# 기본 분석 (콘솔 출력)
-python backend/ragas/fuseki/results_analyzer.py \
-  --input results/ragas_results_80combos_20250101_120000.json
-
-# CSV 내보내기
-python backend/ragas/fuseki/results_analyzer.py \
-  --input results/ragas_results_80combos_20250101_120000.json \
-  --export-csv
-
-# 리포트 생성
-python backend/ragas/fuseki/results_analyzer.py \
-  --input results/ragas_results_80combos_20250101_120000.json \
-  --export-report
-
-# 전체 옵션
-python backend/ragas/fuseki/results_analyzer.py \
-  --input results/ragas_results_80combos_20250101_120000.json \
-  --export-csv \
-  --export-report
+python backend/ragas/fuseki/automated_test_runner.py \
+  --semantic temporal \
+  --save-every 5
 ```
 
-## 테스트 워크플로우
-
-### 전체 프로세스
-
-```
-1. 질문 로드 (questions.jsonl)
-   └─ Persona 필터링: foreigner_culture_history
-
-2. 80가지 조합 생성
-   ├─ 4 Semantic × 5 Thread × 4 Boost = 80 조합
-   └─ 각 조합마다 고유한 test_config 생성
-
-3. 각 조합마다:
-   ├─ test_config를 GraphState에 추가
-   ├─ 랭그래프 노드들이 test_config 확인
-   │   ├─ semantic_expander_node: 해당 semantic 방법만 실행
-   │   ├─ parallel_knowledge_retrieval_node: 해당 thread만 실행
-   │   └─ path_evidence_aggregator_node: 해당 boost 모드로 필터링
-   ├─ 그래프 실행 (질문 → 답변 생성)
-   ├─ 컨텍스트 추출 (evidences → contexts)
-   ├─ 시간/토큰 사용량 기록
-   └─ RAGAS 샘플 생성
-
-4. RAGAS 평가 실행
-   ├─ 검색 단계: Context Relevance
-   └─ 생성 단계: Response Relevancy, Faithfulness, Response Groundedness
-
-5. 결과 저장
-   ├─ 전체 결과: ragas_results_80combos_TIMESTAMP.json
-   ├─ 요약: ragas_summary_80combos_TIMESTAMP.json
-   └─ 질문별 상세: ragas_results_80combos_TIMESTAMP_raw.json
-
-6. 결과 분석
-   ├─ 순위 계산 (메트릭별, 종합)
-   ├─ 리포트 생성
-   └─ CSV 내보내기
+#### 특정 Thread만 테스트 (16가지)
+```bash
+python backend/ragas/fuseki/automated_test_runner.py \
+  --thread outgoing_relations \
+  --save-every 5
 ```
 
-## 출력 파일 설명
+### 2. 통합 테스트
 
-### 1. `ragas_results_80combos_TIMESTAMP.json`
-
-모든 테스트 결과를 포함하는 전체 데이터:
-
-```json
-[
-  {
-    "test_id": 1,
-    "combination_id": "temporal__outgoing_relations__exact_match",
-    "config": {
-      "semantic_expander": {"temporal": true, "category": false, ...},
-      "aggregator_threads": {"outgoing_relations": true, ...},
-      "entity_boost_mode": "exact_match"
-    },
-    "n_questions": 10,
-    "n_samples": 10,
-    "scores": {
-      "context_relevance": 0.8234,
-      "answer_relevancy": 0.8123,
-      "faithfulness": 0.7651,
-      "response_groundedness": 0.8012
-    },
-    "avg_elapsed_seconds": 3.45,
-    "avg_tokens": {"total": 2450, "prompt": 1200, "completion": 1250},
-    "timestamp": "2025-01-01T12:00:00"
-  },
-  ...
-]
+#### 기본 실행 (전체 40개 질문)
+```bash
+python backend/ragas/fuseki/integrated_test_runner.py
 ```
 
-### 2. `ragas_summary_80combos_TIMESTAMP.json`
+#### 디버깅 (3개 질문만)
+```bash
+python backend/ragas/fuseki/integrated_test_runner.py --limit 3 --debug
+```
 
-점수 요약:
+### 옵션 설명
 
+| 옵션 | 설명 | 기본값 |
+|------|------|--------|
+| `--limit N` | 테스트할 질문 개수 제한 | 0 (전체 40개) |
+| `--debug` | 디버그 모드 (상세 로그 출력) | False |
+| `--save-every N` | N개 조합마다 중간 저장 | 5 |
+| `--semantic X` | Semantic Expander 필터링 | None |
+| `--thread X` | Aggregator Thread 필터링 | None |
+| `--boost X` | Entity Boost Mode 필터링 | None |
+
+---
+
+## 결과 분석
+
+### 결과 파일 위치
+
+#### 80가지 조합 테스트
+```
+backend/ragas/fuseki/results/
+├── ragas_results_80combos_YYYYMMDD_HHMMSS.json          # 간소화된 결과
+├── ragas_results_80combos_YYYYMMDD_HHMMSS_raw.json      # 전체 로그 포함
+└── ragas_summary_80combos_YYYYMMDD_HHMMSS.json          # 점수 요약
+```
+
+#### 통합 테스트
+```
+backend/ragas/fuseki/integrated_results/
+├── integrated_results_all_YYYYMMDD_HHMMSS.json          # 간소화된 결과
+└── integrated_results_all_YYYYMMDD_HHMMSS_raw.json      # 전체 로그 포함
+```
+
+### 결과 파일 구조
+
+#### 간소화된 결과 (`*.json`)
 ```json
 {
-  "timestamp": "20250101_120000",
-  "persona_id": "foreigner_culture_history",
-  "n_tests": 80,
-  "test_results": [
+  "combination_id": 1,
+  "semantic_expander": "temporal",
+  "aggregator_thread": "outgoing_relations",
+  "entity_boost_mode": "exact_match",
+  "short_name": "temp_out_exact",
+  "n_questions": 40,
+  "n_samples": 40,
+  "scores": {
+    "nv_context_relevance": 0.5,
+    "answer_relevancy": 0.733,
+    "faithfulness": 0.572,
+    "nv_response_groundedness": 0.95
+  },
+  "timestamp": "2025-12-17T..."
+}
+```
+
+#### Raw 결과 (`*_raw.json`)
+위 정보 + `raw_logs` 포함:
+```json
+{
+  "raw_logs": [
     {
-      "test_id": 1,
-      "combination_id": "temporal__outgoing_relations__exact_match",
-      "semantic_expander": "temporal",
-      "aggregator": "outgoing_relations",
-      "entity_boost_mode": "exact_match",
-      "n_samples": 10,
-      "scores": {...},
-      "avg_elapsed_seconds": 3.45,
-      "avg_tokens": {...}
-    },
-    ...
+      "idx": 1,
+      "persona": "foreigner_culture_history",
+      "question": "세조는 누구였나요?",
+      "answer": "세조는 조선 제7대 임금으로...",
+      "contexts": ["...", "..."],
+      "n_contexts": 15,
+      "elapsed_seconds": 5.23,
+      "tokens": {
+        "total": 1234,
+        "prompt": 890,
+        "completion": 344
+      }
+    }
   ]
 }
 ```
 
-### 3. `ragas_results_80combos_TIMESTAMP_raw.json`
+### 결과 분석 팁
 
-질문별 상세 로그 (디버깅용):
+#### 1. 최고 성능 조합 찾기
+```python
+import json
 
-```json
-{
-  "temporal__outgoing_relations__exact_match": [
-    {
-      "idx": 0,
-      "question": "세조는 누구였나요?",
-      "answer": "세조는 조선의 제7대 왕입니다...",
-      "contexts": ["세조 → [즉위] → 1455년", ...],
-      "n_contexts": 15,
-      "elapsed_seconds": 3.2,
-      "tokens": {"total": 2400, ...}
-    },
-    ...
-  ],
-  ...
+# 결과 로드
+with open("ragas_results_80combos_*.json", "r") as f:
+    results = json.load(f)
+
+# nv_context_relevance 기준 정렬
+sorted_results = sorted(results, key=lambda x: x["scores"]["nv_context_relevance"], reverse=True)
+
+# Top 5 출력
+for i, r in enumerate(sorted_results[:5], 1):
+    print(f"{i}. {r['short_name']}: {r['scores']['nv_context_relevance']:.4f}")
+```
+
+#### 2. Thread별 평균 점수 비교
+```python
+from collections import defaultdict
+
+thread_scores = defaultdict(list)
+for r in results:
+    thread = r["aggregator_thread"]
+    score = r["scores"]["nv_context_relevance"]
+    thread_scores[thread].append(score)
+
+for thread, scores in thread_scores.items():
+    avg = sum(scores) / len(scores)
+    print(f"{thread}: {avg:.4f} (n={len(scores)})")
+```
+
+#### 3. 페르소나별 성능 비교
+```python
+# Raw 결과에서 페르소나별 분석
+with open("integrated_results_all_*_raw.json", "r") as f:
+    result = json.load(f)
+
+persona_contexts = defaultdict(list)
+for log in result["raw_logs"]:
+    persona = log["persona"]
+    n_contexts = log["n_contexts"]
+    persona_contexts[persona].append(n_contexts)
+
+for persona, contexts in persona_contexts.items():
+    avg = sum(contexts) / len(contexts)
+    print(f"{persona}: avg {avg:.2f} contexts")
+```
+
+---
+
+## 가중치 설정
+
+### 통합 테스트 가중치
+
+자세한 내용은 [WEIGHTS_ANALYSIS.md](./WEIGHTS_ANALYSIS.md) 참조
+
+#### Semantic Expanders 가중치
+```python
+"semantic_expanders": {
+    "temporal": 1.3,      # 시간 정보는 역사에서 핵심
+    "category": 1.2,      # 카테고리 분류로 정확도 향상
+    "causal_chain": 1.4,  # 인과관계가 가장 중요 (최고)
+    "pgvector": 1.0       # 벡터 검색은 보조적
 }
 ```
 
-### 4. `ragas_results_80combos_TIMESTAMP_ranked.csv`
+#### Aggregator Threads 가중치
+```python
+"aggregator_threads": {
+    "outgoing_relations": 1.3,    # 서술적 풍부함 (최고 점수)
+    "entity_properties": 1.2,     # 정확한 정보, 다양성
+    "type_and_summary": 1.15,     # 개요 제공
+    "incoming_relations": 1.1,    # 대칭 관계이지만 활용도 낮음
+    "connected_entities": 1.0     # 2-hop, 보조적
+}
+```
 
-순위가 포함된 CSV 파일 (pandas, Excel에서 분석 가능)
+### 가중치 수정 방법
 
-### 5. `ragas_results_80combos_TIMESTAMP_report.txt`
+`integrated_test_runner.py`의 `OPTIMIZED_WEIGHTS` 딕셔너리를 수정:
 
-텍스트 리포트:
-- 전체 순위 Top 10
-- 메트릭별 1위 조합
-- Semantic/Thread/Boost 별 평균 점수
-- 상세 점수
+```python
+OPTIMIZED_WEIGHTS = {
+    "semantic_expanders": {
+        "temporal": 1.5,  # 시간 정보 가중치 증가
+        ...
+    },
+    ...
+}
+```
 
-## Entity Boost Mode 상세 설명
+---
 
-### 목적
-쿼리 엔티티와의 매칭 정도에 따라 evidence를 필터링하여, 어떤 매칭 방식이 가장 효과적인지 비교
+## 문제 해결
 
-### 각 모드의 동작
+### 1. Fuseki 연결 실패
+```
+ConnectionError: Failed to connect to Fuseki
+```
 
-#### 1. exact_match
-- **사용**: 정확히 매칭된 evidence만
-- **예시**: 질문에 "세조"가 있고, evidence에 "세조"가 정확히 있는 경우
-- **목적**: 가장 정확한 정보만 사용했을 때 품질 측정
-
-#### 2. partial_match
-- **사용**: 부분 매칭된 evidence만
-- **예시**: 질문에 "조선왕"이 있고, evidence에 "조선왕조"가 있는 경우
-- **목적**: 부분 일치하는 정보의 품질 측정
-
-#### 3. normalized_match
-- **사용**: 정규화 후 매칭된 evidence만
-- **예시**: 질문에 "경복궁"이 있고, evidence에 "경복_궁"이 있는 경우 (공백/언더스코어 제거 후 일치)
-- **목적**: 표기 변형에 강건한 매칭의 품질 측정
-
-#### 4. penalty_match
-- **사용**: 매칭 **안 된** evidence만
-- **목적**: 쿼리 엔티티와 직접 관련 없는 정보만 사용했을 때 얼마나 품질이 낮은지 측정 (베이스라인)
-- **가중치**: 1.0 (순수 측정 - 인위적인 패널티 없음)
-
-### 비교 예시
-
-질문: "세조는 누구였나요?"
-
-| Boost Mode | 사용하는 Evidence 예시 | 목적 |
-|------------|------------------------|------|
-| exact_match | "세조 → [즉위] → 1455년" | 정확 매칭의 품질 |
-| partial_match | "세조대왕의 업적" | 부분 매칭의 품질 |
-| normalized_match | "세_조 → [통치]" | 정규화 매칭의 품질 |
-| penalty_match | "조선왕조의 역사" | 매칭 없는 정보의 품질 (낮을 것으로 예상) |
-
-## 주의사항
-
-### 1. 가중치 설정
-
-**테스트 모드**에서는 모든 가중치를 1.0으로 고정:
-- 각 조합마다 하나의 semantic, thread, boost만 활성화
-- 비활성화된 것들은 실행하지 않음 (빈 결과 반환)
-
-**일반 모드** (test_config 없음):
-- 모든 방법 실행
-- 환경변수로 설정된 가중치 사용
-
-### 2. 벡터 유사도 처리
-
-**환경변수 설정**:
+**해결**:
 ```bash
-# 벡터 유사도 점수를 가중치로 사용하지 않음 (RAGAS 평가 시)
-export USE_VECTOR_SIMILARITY_SCORE=false
+# Fuseki 상태 확인
+curl http://localhost:3030/korean_history/sparql
+
+# Fuseki 재시작
+cd /path/to/fuseki
+./fuseki-server --config=config.ttl
 ```
 
-**동작 방식**:
-- `USE_VECTOR_SIMILARITY_SCORE=false` (기본값, RAGAS 평가 시):
-  - `pgvector.search(threshold=0.5)`: 0.5 이상만 필터링
-  - `relevance_score = 1.0` (고정값): 벡터 유사도를 가중치로 사용하지 않음
-  - **sorting 및 필터링 목적으로만 사용**
-
-- `USE_VECTOR_SIMILARITY_SCORE=true` (하이브리드 모드):
-  - `relevance_score = 0.65 × 0.6 + similarity × 0.4` (하이브리드 점수)
-  - 벡터 유사도를 가중치로 사용
-
-**RAGAS 평가에서는 `USE_VECTOR_SIMILARITY_SCORE=false`로 고정**하여 벡터 유사도를 순수하게 필터링/sorting 용도로만 사용합니다.
-
-### 3. 실행 시간
-
-- 조합당 평균 2-5분 소요 (질문 수에 따라)
-- 전체 80개 조합:
-  - 질문 3개/조합: 약 40분 ~ 1시간
-  - 질문 10개/조합: 약 2-3시간
-  - 전체 질문: 3-5시간
-
-### 4. 중간 저장
-
-`--save-every 10` (기본값)으로 10개 조합마다 자동 저장하여 중단 시 재개 가능합니다.
-
-## 트러블슈팅
-
-### 1. RAGAS 메트릭 로드 실패
-
+### 2. 메모리 부족
 ```
-ImportError: Cannot resolve ragas.evaluate
+MemoryError: Out of memory
 ```
 
-**해결**: RAGAS 버전 확인 및 재설치
-
+**해결**:
 ```bash
-pip install --upgrade ragas datasets
+# limit 옵션으로 질문 수 제한
+python backend/ragas/fuseki/automated_test_runner.py --limit 10
+
+# 또는 배치 크기 축소 (save-every)
+python backend/ragas/fuseki/automated_test_runner.py --save-every 3
 ```
 
-### 2. Fuseki 연결 실패
-
+### 3. RAGAS 평가 실패
 ```
-ConnectionError: Fuseki 서버 연결 실패
+RAGAS evaluation failed: ...
 ```
 
-**해결**: Fuseki Docker 컨테이너 확인
-
+**해결**:
 ```bash
-docker ps | grep fuseki
-docker-compose up -d fuseki
+# 디버그 모드로 실행하여 상세 로그 확인
+python backend/ragas/fuseki/automated_test_runner.py --debug --limit 3
 ```
 
-### 3. 메모리 부족
-
-**해결**: 질문 수 제한
-
-```bash
-python automated_test_runner.py --limit 3
-```
-
-### 4. OpenAI API Rate Limit
-
-```
-OpenAIError: Rate limit exceeded
-```
-
-**해결**: API 키 및 요금제 확인
-```bash
-# https://platform.openai.com/account/rate-limits
-```
-
-## 예시 결과
-
-### Top 5 조합 (예시)
-
-```
-[Rank 1] temporal__outgoing_relations__exact_match
-  Semantic Expander: temporal
-  Aggregator: outgoing_relations
-  Entity Boost: exact_match
-  Average Rank: 1.50
-    - context_relevance: 0.8456 (rank: 1)
-    - answer_relevancy: 0.8123 (rank: 2)
-    - faithfulness: 0.8234 (rank: 1)
-    - response_groundedness: 0.7989 (rank: 2)
-
-[Rank 2] causal_chain__outgoing_relations__exact_match
-  Semantic Expander: causal_chain
-  Aggregator: outgoing_relations
-  Entity Boost: exact_match
-  Average Rank: 2.25
-  ...
-
-[Rank 3] temporal__connected_entities__partial_match
-  Semantic Expander: temporal
-  Aggregator: connected_entities
-  Entity Boost: partial_match
-  Average Rank: 3.00
-  ...
-```
-
-## 향후 개선 사항
-
-1. **가중치 튜닝**: 현재는 1.0 고정, 향후 Grid Search 등으로 최적 가중치 탐색
-2. **병렬 실행**: 80개 조합을 병렬로 실행하여 시간 단축
-3. **Checkpoint 재개**: 중단된 테스트 자동 재개 기능
-4. **추가 메트릭**: Custom 메트릭 추가 (예: Entity Coverage, Path Diversity)
-5. **관계 가중치 튜닝**: RELATION_WEIGHTS, PROPERTY_WEIGHTS 최적화
-
-## 문의
-
-이슈가 있거나 질문이 있으면 팀원에게 문의하세요.
+---
 
 ## 참고 문서
 
-- [QUICKSTART.md](QUICKSTART.md) - 빠른 시작 가이드
-- RAGAS 공식 문서: https://docs.ragas.io/
+- [WEIGHTS_ANALYSIS.md](./WEIGHTS_ANALYSIS.md): 가중치 분석 및 근거
+- [config_manager.py](./config_manager.py): 80가지 조합 생성 로직
+- [ragas_metrics.py](./ragas_metrics.py): RAGAS 메트릭 구현
+
+---
+
+## 예상 실행 시간
+
+### 80가지 조합 테스트
+- **전체 (40개 질문 × 80가지 조합)**: 약 8-10시간
+- **디버깅 (3개 질문 × 80가지 조합)**: 약 40-60분
+- **단일 조합 (40개 질문)**: 약 5-8분
+
+### 통합 테스트
+- **전체 (40개 질문)**: 약 10-15분
+- **디버깅 (3개 질문)**: 약 2-3분
+
+*실행 시간은 하드웨어 사양과 Fuseki 서버 성능에 따라 달라질 수 있습니다.*
+
+---
+
+## 라이선스
+
+이 프로젝트는 SKN18-FINAL-3TEAM의 일부입니다.

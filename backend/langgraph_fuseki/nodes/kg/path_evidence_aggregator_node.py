@@ -54,20 +54,40 @@ def calculate_improved_relevance_score(path_data: dict, query_entities: list = N
         object_label = path_data.get("objectLabel", {}).get("value", "")
 
         # 모든 가능한 엔티티 이름 수집 (정규화)
+        # Thread 타입에 따라 우선순위 다르게 처리
         all_entity_names = []
         all_entity_names_normalized = []
-        
+
         def normalize_name(name):
             """이름 정규화 (공백 제거, 소문자 변환)"""
             if not name:
                 return ""
             return name.replace(" ", "").replace("_", "").lower()
-        
-        for name_source in [subject, obj, entity_label, subject_label, object_label]:
+
+        # Thread별 매칭 대상 선택
+        if thread_type == "incoming_relations":
+            # incoming: entityLabel(목적지)를 우선 체크
+            priority_sources = [entity_label, subject_label]
+        elif thread_type == "outgoing_relations":
+            # outgoing: entityLabel(출발지)를 우선 체크
+            priority_sources = [entity_label, object_label]
+        else:
+            # 나머지: 모든 라벨 체크
+            priority_sources = [entity_label, subject_label, object_label]
+
+        for name_source in priority_sources:
             if name_source:
                 raw_name = name_source.split("#")[-1] if "#" in name_source else name_source
                 all_entity_names.append(raw_name)
                 all_entity_names_normalized.append(normalize_name(raw_name))
+
+        # URI도 추가 (subject, obj)
+        for uri_source in [subject, obj]:
+            if uri_source:
+                raw_name = uri_source.split("#")[-1] if "#" in uri_source else uri_source
+                if raw_name not in all_entity_names:
+                    all_entity_names.append(raw_name)
+                    all_entity_names_normalized.append(normalize_name(raw_name))
 
         # 쿼리 엔티티와 직접 매칭 확인 (더 정확하게)
         for entity in query_entities:
@@ -221,6 +241,10 @@ def extract_outgoing_relations(bindings: list, base_weight: float, query_entitie
         # 개선된 Relevance score 계산
         relevance_score = calculate_improved_relevance_score(binding, query_entities, "outgoing_relations", entity_boost_mode)
 
+        # 0점 경로는 필터링 (entity_boost_mode 테스트 시)
+        if entity_boost_mode and relevance_score == 0.0:
+            continue
+
         # 프로퍼티 이름을 읽기 좋게 변환
         predicate_display = predicate.replace("has", "").replace("_", " ")
 
@@ -261,6 +285,10 @@ def extract_incoming_relations(bindings: list, base_weight: float, query_entitie
         # 개선된 Relevance score 계산
         relevance_score = calculate_improved_relevance_score(binding, query_entities, "incoming_relations", entity_boost_mode)
 
+        # 0점 경로는 필터링 (entity_boost_mode 테스트 시)
+        if entity_boost_mode and relevance_score == 0.0:
+            continue
+
         # 프로퍼티 이름을 읽기 좋게 변환
         predicate_display = predicate.replace("has", "").replace("_", " ")
 
@@ -272,7 +300,7 @@ def extract_incoming_relations(bindings: list, base_weight: float, query_entitie
             "predicate": predicate,
             "predicate_display": predicate_display,
             "object": entity_label,
-            "weight": base_weight * relevance_score,  # 기존 1.2 배수 제거
+            "weight": base_weight * relevance_score,
             "relevance_score": relevance_score,
             "description": description,
             "raw_data": binding
@@ -291,14 +319,18 @@ def extract_entity_properties(bindings: list, base_weight: float, query_entities
         predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
         value = binding.get("value", {}).get("value", "")
 
-        # 중복 제거
-        key = f"{entity_label}-{predicate}"
+        # 중복 제거 (값도 포함하여 정확한 중복만 제거)
+        key = f"{entity_label}-{predicate}-{value}"
         if key in seen or not predicate or not value:
             continue
         seen.add(key)
 
         # 개선된 Relevance score 계산
         relevance_score = calculate_improved_relevance_score(binding, query_entities, "entity_properties", entity_boost_mode)
+
+        # 0점 경로는 필터링 (entity_boost_mode 테스트 시)
+        if entity_boost_mode and relevance_score == 0.0:
+            continue
 
         # 값 정리 (너무 길면 자르기)
         value_display = value[:100] + "..." if len(value) > 100 else value
@@ -323,62 +355,75 @@ def extract_entity_properties(bindings: list, base_weight: float, query_entities
     return paths[:30]
 
 
-def extract_connected_entities(bindings: list, base_weight: float) -> list:
+def extract_connected_entities(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None) -> list:
     """
     연결된 엔티티들 간의 관계 추출 (2-hop)
-    category가 다를 경우, 가중치 positive (1.02)
-    같을 경우, neutral(1.00)
     """
     paths = []
     seen = set()
-    
+
     for binding in bindings:
         entity1 = binding.get("label1", {}).get("value", "")
         predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
         entity2 = binding.get("label2", {}).get("value", "")
-        
+
         # 중복 제거
         key = f"{entity1}-{predicate}-{entity2}"
         if key in seen or not predicate:
             continue
         seen.add(key)
-        
+
+        # Relevance score 계산 (entity_boost_mode 테스트용)
+        relevance_score = calculate_improved_relevance_score(binding, query_entities, "connected_entities", entity_boost_mode)
+
+        # 0점 경로는 필터링
+        if entity_boost_mode and relevance_score == 0.0:
+            continue
+
         # 프로퍼티 이름을 읽기 좋게 변환
         predicate_display = predicate.replace("has", "").replace("_", " ")
-        
+
         description = f"{entity1} ↔ [{predicate_display}] ↔ {entity2}"
-        
-        # connected_entities는 relevance_score 계산 없이 base_weight만 사용
-        # 차별화를 위해 작은 배수 적용 (1.0 이상으로)
+
         paths.append({
             "type": "connection",
             "entity1": entity1,
             "predicate": predicate,
             "predicate_display": predicate_display,
             "entity2": entity2,
-            "weight": base_weight * 1.0,  # 기본값 유지 (0.8 → 1.0, 곱셈 시 감소 방지)
+            "weight": base_weight * relevance_score,
+            "relevance_score": relevance_score,
             "description": description,
             "raw_data": binding
         })
-    
+
     return paths[:20]
 
 
-def extract_type_and_summary(bindings: list, base_weight: float) -> list:
+def extract_type_and_summary(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None) -> list:
     """엔티티 타입과 요약 정보 추출"""
     paths = []
     seen = set()
-    
+
     for binding in bindings:
         entity_label = binding.get("entityLabel", {}).get("value", "")
         entity_type = binding.get("type", {}).get("value", "").split("#")[-1] if binding.get("type") else ""
         summary = binding.get("summary", {}).get("value", "") if binding.get("summary") else ""
         category = binding.get("category", {}).get("value", "") if binding.get("category") else ""
         year = binding.get("year", {}).get("value", "") if binding.get("year") else ""
-        
-        if entity_label in seen:
+
+        # 중복 제거: 완전히 동일한 조합만 제거 (엔티티만으로 제거하지 않음)
+        key = f"{entity_label}-{entity_type}-{summary[:50] if summary else ''}"
+        if key in seen:
             continue
-        seen.add(entity_label)
+        seen.add(key)
+
+        # Relevance score 계산 (entity_boost_mode 테스트용)
+        relevance_score = calculate_improved_relevance_score(binding, query_entities, "type_and_summary", entity_boost_mode)
+
+        # 0점 경로는 필터링
+        if entity_boost_mode and relevance_score == 0.0:
+            continue
         
         # 설명 생성
         parts = []
@@ -574,9 +619,9 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
         elif thread_type == "entity_properties":
             paths = extract_entity_properties(bindings, base_weight, query_entities, entity_boost_mode)
         elif thread_type == "connected_entities":
-            paths = extract_connected_entities(bindings, base_weight)
+            paths = extract_connected_entities(bindings, base_weight, query_entities, entity_boost_mode)
         elif thread_type == "type_and_summary":
-            paths = extract_type_and_summary(bindings, base_weight)
+            paths = extract_type_and_summary(bindings, base_weight, query_entities, entity_boost_mode)
         else:
             # 알 수 없는 Thread는 빈 리스트
             paths = []
@@ -706,7 +751,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
             description = ev.get("description", "")
             weight = ev.get("weight", 0)
 
-            # Thread 이름 정규화 (기존 evidence_aggregator_node와 동일)
+            # Thread 이름 정규화
             type_map = {
                 "outgoing_relations": "나가는관계",
                 "incoming_relations": "들어오는관계",
