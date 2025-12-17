@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import VideoListView, VideoDetailView
+from .views import VideoListView, VideoDetailView, VideoUploadView
 
 # Video app URLs
 
@@ -16,4 +16,7 @@ urlpatterns = [
     
     # GET /api/video/<id>/ - 영상 상세 조회
     path('<int:pk>/', VideoDetailView.as_view(), name='video-detail'),
+    
+    # POST /api/video/upload/ - 영상 업로드 (관리자 전용)
+    path('upload/', VideoUploadView.as_view(), name='video-upload'),
 ]

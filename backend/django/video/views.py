@@ -7,15 +7,30 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView, CreateAPIView
 from openai import OpenAI
 from dotenv import load_dotenv
 
 from .models import Video
-from .serializers import VideoSerializer, VideoDetailSerializer
+from .serializers import VideoSerializer, VideoDetailSerializer, VideoCreateSerializer
 
 # .env 파일 로드
 load_dotenv()
+
+
+# ============================================
+# 커스텀 권한 클래스
+# ============================================
+from rest_framework.permissions import BasePermission
+
+
+class IsAdminUser(BasePermission):
+    """관리자(permission='admin')만 접근 가능"""
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated and
+            request.user.permission == 'admin'
+        )
 
 
 # ============================================
@@ -59,6 +74,7 @@ class VideoListView(ListAPIView):
         })
 
 
+
 class VideoDetailView(RetrieveAPIView):
     """
     영상 상세 API
@@ -76,6 +92,63 @@ class VideoDetailView(RetrieveAPIView):
             'data': response.data,
             'message': 'ok'
         })
+
+
+class VideoUploadView(CreateAPIView):
+    """
+    영상 업로드 API (관리자 전용)
+
+    POST /api/video/upload/
+    - 관리자만 영상 업로드 가능
+    - 파일 업로드 또는 URL 입력 가능
+    """
+    queryset = Video.objects.all()
+    serializer_class = VideoCreateSerializer
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def create(self, request, *args, **kwargs):
+        import os
+        from django.core.files.storage import default_storage
+        from django.conf import settings
+
+        # 파일 업로드인 경우
+        if 'video_file' in request.FILES:
+            video_file = request.FILES['video_file']
+
+            # 파일 저장 경로 생성
+            upload_dir = 'videos'
+            os.makedirs(os.path.join(settings.MEDIA_ROOT, upload_dir), exist_ok=True)
+
+            # 파일명 생성 (중복 방지)
+            import time
+            file_extension = os.path.splitext(video_file.name)[1]
+            file_name = f"{int(time.time())}_{video_file.name}"
+            file_path = os.path.join(upload_dir, file_name)
+
+            # 파일 저장
+            saved_path = default_storage.save(file_path, video_file)
+
+            # URL 생성
+            video_url = request.build_absolute_uri(f"{settings.MEDIA_URL}{saved_path}")
+
+            # 데이터 준비
+            data = {
+                'title': request.data.get('title'),
+                'video_url': video_url,
+                'tags': request.data.getlist('tags[]') if 'tags[]' in request.data else []
+            }
+        else:
+            # URL 입력인 경우
+            data = request.data
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+
+        return Response({
+            'data': VideoSerializer(serializer.instance).data,
+            'message': '영상이 업로드되었습니다.'
+        }, status=status.HTTP_201_CREATED)
 
 
 # 시스템 프롬프트 (Talchum Comedy / English Mode - Final Structured Version)
