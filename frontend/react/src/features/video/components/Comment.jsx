@@ -74,6 +74,8 @@ const ReplyItem = ({
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   const isOwnReply = currentUser && reply.user?.id === currentUser.id;
+  const isAdmin = currentUser && currentUser.permission === 'admin';
+  const canDelete = isOwnReply || isAdmin; // 작성자 또는 admin은 삭제 가능
   const maxDepth = 5;
 
   const handleReplySubmit = async () => {
@@ -292,36 +294,40 @@ const ReplyItem = ({
             <span style={{ fontSize: "11px", color: "#999" }}>
               {formatTimeAgo(reply.created_at)}
             </span>
-            {isOwnReply && !isEditing && (
+            {!isEditing && (
               <div style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
-                <button
-                  onClick={handleEdit}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: "2px",
-                    opacity: 0.5,
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
-                  onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
-                >
-                  <EditIcon size={10} color="#999" />
-                </button>
-                <button
-                  onClick={handleDelete}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: "2px",
-                    opacity: 0.5,
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
-                  onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
-                >
-                  <CloseIcon size={10} color="#999" />
-                </button>
+                {isOwnReply && (
+                  <button
+                    onClick={handleEdit}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "2px",
+                      opacity: 0.5,
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
+                  >
+                    <EditIcon size={10} color="#999" />
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    onClick={handleDelete}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "2px",
+                      opacity: 0.5,
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
+                  >
+                    <CloseIcon size={10} color="#999" />
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -549,6 +555,8 @@ const Comment = ({
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   const isOwnComment = currentUser && comment.user?.id === currentUser.id;
+  const isAdmin = currentUser && currentUser.permission === 'admin';
+  const canDelete = isOwnComment || isAdmin; // 작성자 또는 admin은 삭제 가능
   const profileSize = 32;
   const hasReplies = replies && replies.length > 0;
 
@@ -747,38 +755,42 @@ const Comment = ({
               <span style={{ fontSize: "11px", color: "#999" }}>
                 {formatTimeAgo(comment.created_at || comment.timeAgo)}
               </span>
-              {isOwnComment && !isEditing && (
+              {!isEditing && (
                 <div style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
-                  <button
-                    onClick={handleEdit}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      padding: "4px",
-                      opacity: 0.5,
-                      transition: "opacity 0.2s",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
-                    onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
-                  >
-                    <EditIcon size={14} color="#999" />
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      padding: "4px",
-                      opacity: 0.5,
-                      transition: "opacity 0.2s",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
-                    onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
-                  >
-                    <CloseIcon size={14} color="#999" />
-                  </button>
+                  {isOwnComment && (
+                    <button
+                      onClick={handleEdit}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "4px",
+                        opacity: 0.5,
+                        transition: "opacity 0.2s",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                      onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
+                    >
+                      <EditIcon size={14} color="#999" />
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      onClick={handleDelete}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "4px",
+                        opacity: 0.5,
+                        transition: "opacity 0.2s",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                      onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
+                    >
+                      <CloseIcon size={14} color="#999" />
+                    </button>
+                  )}
                 </div>
               )}
             </div>
