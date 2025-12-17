@@ -95,14 +95,21 @@ backend/ragas/questions.jsonl
 
 **목적**: 모든 기능을 동시에 활성화하여 시너지 효과 측정
 
-**조합 수**: **1가지** (모든 기능 ON)
+**조합 수**: **1가지** (모든 기능 ON) - **단일 설정만 테스트**
+
+**중요**:
+
+- **여러 조합을 테스트하지 않습니다**
+- **단일 통합 설정(모든 기능 ON)으로만 테스트합니다**
+- `automated_test_runner.py`와 달리 80가지 조합을 테스트하지 않습니다
 
 **특징**:
 
-- **모든 semantic expanders** 동시 활성화
-- **모든 aggregator threads** 동시 활성화
+- **모든 semantic expanders** 동시 활성화 (temporal, category, causal_chain, pgvector)
+- **모든 aggregator threads** 동시 활성화 (5개 스레드 모두)
 - **커스텀 가중치** 적용하여 중요도 반영
 - 40개 질문(외국인 20개 + 아이들 20개)으로 테스트
+- **모든 질문 처리 완료 후 한 번만 저장** (중간 저장 없음)
 
 **파일**: `integrated_test_runner.py`
 
@@ -110,93 +117,14 @@ backend/ragas/questions.jsonl
 
 ## 실행 방법
 
-### 사전 준비
+### 1. 80가지 조합 테스트 (Automated Test Runner)
 
-1. **Fuseki 서버 실행 확인**
-
-**Linux/Mac:**
-
-```bash
-# Fuseki가 http://localhost:3030/korean_history 에서 실행 중이어야 함
-curl http://localhost:3030/korean_history/sparql
-```
-
-**Windows:**
-
-```powershell
-# PowerShell에서 확인
-Invoke-WebRequest -Uri http://localhost:3030/korean_history/sparql
-
-# 또는 브라우저에서 직접 접속
-# http://localhost:3030/korean_history/sparql
-```
-
-2. **환경 설정**
+**병렬 실행 (8개 워커, nohup으로 백그라운드 실행)**
 
 **Linux/Mac:**
 
 ```bash
-cd /path/to/SKN18-FINAL-3TEAM
-```
-
-**Windows:**
-
-```cmd
-cd C:\path\to\SKN18-FINAL-3TEAM
-```
-
-### 1. 80가지 조합 테스트
-
-#### 기본 실행 (전체 40개 질문, 단일 프로세스)
-
-```bash
-python backend/ragas/fuseki/automated_test_runner.py --save-every 10
-```
-
-#### 병렬 실행 (8개 워커로 분할 처리)
-
-**Linux/Mac:**
-
-```bash
-# 80개 조합을 8개 워커로 분할 (각 워커당 10개 조합)
-./backend/ragas/fuseki/run_parallel.sh 0 10
-
-# 또는 직접 실행
-python backend/ragas/fuseki/automated_test_runner.py \
-  --save-every 10 \
-  --worker-id 0 \
-  --num-workers 8
-```
-
-**Windows (PowerShell):**
-
-```powershell
-# PowerShell 스크립트 실행
-.\backend\ragas\fuseki\run_parallel.ps1 -Limit 0 -SaveEvery 10 -NumWorkers 8
-
-# 또는 직접 실행
-python backend/ragas/fuseki/automated_test_runner.py `
-  --save-every 10 `
-  --worker-id 0 `
-  --num-workers 8
-```
-
-**Windows (Command Prompt):**
-
-```cmd
-REM 배치 파일 실행
-backend\ragas\fuseki\run_parallel.bat 0 10
-
-REM 또는 직접 실행
-python backend/ragas/fuseki/automated_test_runner.py --save-every 10 --worker-id 0 --num-workers 8
-```
-
-**병렬 실행 예시:**
-
-**Linux/Mac:**
-
-```bash
-# 8개 워커로 병렬 처리 (각 워커가 10개 조합 처리)
+# 한 번의 명령으로 8개 워커가 자동으로 실행됨
 ./backend/ragas/fuseki/run_parallel.sh 0 10
 
 # 로그 확인
@@ -212,14 +140,11 @@ pkill -f automated_test_runner
 **Windows (PowerShell):**
 
 ```powershell
-# 8개 워커로 병렬 처리
+# 한 번의 명령으로 8개 워커가 자동으로 실행됨
 .\backend\ragas\fuseki\run_parallel.ps1 -Limit 0 -SaveEvery 10
 
 # 작업 상태 확인
 Get-Job
-
-# 작업 출력 확인
-Get-Job | Receive-Job
 
 # 모든 작업 중지
 Get-Job | Stop-Job
@@ -229,7 +154,7 @@ Get-Job | Remove-Job
 **Windows (Command Prompt):**
 
 ```cmd
-REM 8개 워커로 병렬 처리
+REM 한 번의 명령으로 8개 워커가 자동으로 실행됨
 backend\ragas\fuseki\run_parallel.bat 0 10
 
 REM 실행 중인 프로세스 확인
@@ -239,67 +164,25 @@ REM 모든 워커 중지
 taskkill /F /IM python.exe /FI "WINDOWTITLE eq Worker*"
 ```
 
-#### 디버깅 (3개 질문만)
+**참고:**
 
-```bash
-python backend/ragas/fuseki/automated_test_runner.py --limit 3 --debug
-```
+- `0`: 질문 개수 제한 (0 = 전체 40개)
+- `10`: 10개 조합마다 중간 저장
+- 8개 워커가 자동으로 실행되어 각각 10개 조합씩 처리 (총 80개 조합)
 
-#### 특정 조합만 테스트
+### 2. 통합 테스트 (Integrated Test Runner)
 
-```bash
-# Temporal + Outgoing Relations + Exact Match 조합만
-python backend/ragas/fuseki/automated_test_runner.py \
-  --semantic temporal \
-  --thread outgoing_relations \
-  --boost exact_match \
-  --limit 3
-```
-
-#### 특정 Semantic Expander만 테스트 (20가지)
-
-```bash
-python backend/ragas/fuseki/automated_test_runner.py \
-  --semantic temporal \
-  --save-every 5
-```
-
-#### 특정 Thread만 테스트 (16가지)
-
-```bash
-python backend/ragas/fuseki/automated_test_runner.py \
-  --thread outgoing_relations \
-  --save-every 5
-```
-
-### 2. 통합 테스트
-
-#### 기본 실행 (전체 40개 질문)
+**기본 실행 (전체 40개 질문, 단일 설정)**
 
 ```bash
 python backend/ragas/fuseki/integrated_test_runner.py
 ```
 
-#### 디버깅 (3개 질문만)
+**디버깅 (3개 질문만)**
 
 ```bash
 python backend/ragas/fuseki/integrated_test_runner.py --limit 3 --debug
 ```
-
-### 옵션 설명
-
-| 옵션              | 설명                           | 기본값        |
-| ----------------- | ------------------------------ | ------------- |
-| `--limit N`       | 테스트할 질문 개수 제한        | 0 (전체 40개) |
-| `--debug`         | 디버그 모드 (상세 로그 출력)   | False         |
-| `--save-every N`  | N개 조합마다 중간 저장         | 5             |
-| `--semantic X`    | Semantic Expander 필터링       | None          |
-| `--thread X`      | Aggregator Thread 필터링       | None          |
-| `--boost X`       | Entity Boost Mode 필터링       | None          |
-| `--worker-id N`   | 워커 ID (병렬 처리용, 0-based) | None          |
-| `--num-workers N` | 총 워커 수 (병렬 처리용)       | None          |
-
-**참고**: `--worker-id`와 `--num-workers`는 함께 사용해야 합니다. 병렬 실행 시 각 워커가 조합의 일부만 처리합니다.
 
 ---
 
