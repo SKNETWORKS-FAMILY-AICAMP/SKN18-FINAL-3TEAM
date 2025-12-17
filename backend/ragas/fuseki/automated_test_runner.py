@@ -1,11 +1,18 @@
 """
 Automated Test Runner for Fuseki RAG System
 
-20가지 조합을 자동으로 테스트하고 RAGAS 평가를 수행합니다.
+80가지 조합을 자동으로 테스트하고 RAGAS 평가를 수행합니다.
+- 4가지 Semantic Expander × 5가지 Aggregator Thread × 4가지 Entity Boost Mode = 80가지
 
 Usage:
-    python automated_test_runner.py --limit 5 --debug
-    python automated_test_runner.py --persona foreigner_culture_history --save-every 2
+    # 각 조합당 3개 질문만 테스트 (디버깅용)
+    python backend/ragas/fuseki/automated_test_runner.py --limit 3 --debug
+
+    # 전체 질문으로 80가지 조합 테스트
+    python backend/ragas/fuseki/automated_test_runner.py --persona foreigner_culture_history --save-every 10
+
+    # 특정 조합만 테스트
+    python backend/ragas/fuseki/automated_test_runner.py --semantic temporal --thread outgoing_relations --boost exact_match --limit 3
 """
 
 import sys
@@ -25,7 +32,11 @@ from typing import List, Dict, Any
 from datetime import datetime
 
 # Local imports
-from backend.ragas.fuseki.config_manager import ConfigManager
+from backend.ragas.fuseki.config_manager import (
+    ConfigurationManager,
+    TestConfiguration,
+    validate_test_config
+)
 from backend.ragas.fuseki.ragas_metrics import (
     RagasMetricsLoader,
     extract_contexts_from_evidences,
@@ -91,7 +102,8 @@ class AutomatedTestRunner:
     """
     자동화 테스트 러너
 
-    20가지 조합을 순차적으로 테스트하고 RAGAS 평가를 수행합니다.
+    80가지 조합을 순차적으로 테스트하고 RAGAS 평가를 수행합니다.
+    - 4가지 Semantic Expander × 5가지 Aggregator Thread × 4가지 Entity Boost Mode = 80가지
     """
 
     def __init__(
@@ -101,7 +113,10 @@ class AutomatedTestRunner:
         persona_id: str = "foreigner_culture_history",
         limit: int = 0,
         debug: bool = False,
-        save_every: int = 5
+        save_every: int = 10,
+        semantic_filter: str = None,
+        thread_filter: str = None,
+        boost_filter: str = None
     ):
         self.questions_path = questions_path
         self.output_dir = output_dir
@@ -111,8 +126,17 @@ class AutomatedTestRunner:
         self.save_every = save_every
 
         # Config Manager 초기화
-        self.config_manager = ConfigManager()
-        self.configs = self.config_manager.generate_all_configs()
+        self.config_manager = ConfigurationManager()
+
+        # 필터링된 조합 가져오기
+        if semantic_filter or thread_filter or boost_filter:
+            self.combinations = self.config_manager.get_combinations_by_filters(
+                semantic=semantic_filter,
+                thread=thread_filter,
+                boost=boost_filter
+            )
+        else:
+            self.combinations = self.config_manager.get_all_combinations()
 
         # RAGAS Metrics Loader 초기화
         self.ragas_loader = RagasMetricsLoader(debug=debug)
@@ -142,24 +166,24 @@ class AutomatedTestRunner:
 
     def run_single_test(
         self,
-        config: Dict,
+        test_config: TestConfiguration,
         questions: List[Dict]
     ) -> Dict:
         """
         단일 조합 테스트 실행
 
         Args:
-            config: 노드 설정
+            test_config: TestConfiguration 객체
             questions: 질문 리스트
 
         Returns:
             테스트 결과 딕셔너리
         """
-        test_id = config["test_id"]
-        combination_id = config["combination_id"]
+        combination_id = test_config.combination_id
+        description = test_config.get_description()
 
         print(f"\n{'='*70}")
-        print(f"[TEST {test_id}/20] {config['description']}")
+        print(f"[TEST {combination_id}/80] {description}")
         print(f"{'='*70}")
 
         # 그래프 생성
@@ -184,14 +208,9 @@ class AutomatedTestRunner:
                     "executed_nodes": [],
                     "thread_weights": {},
                     "node_execution_times": {},
-                    "is_history_related": True  # history_check_node를 스킵하기 위해
+                    "is_historical": True,  # 역사 관련 질문으로 간주
+                    "test_config": test_config.to_test_config()  # test_config 주입
                 }
-
-                # 설정 적용
-                initial_state = self.config_manager.apply_config_to_state(
-                    initial_state,
-                    config
-                )
 
                 # 그래프 실행
                 start_time = time.time()
@@ -199,11 +218,12 @@ class AutomatedTestRunner:
                 elapsed = time.time() - start_time
 
                 # 결과 추출
-                answer = final_state.get("answer", "")
+                answer = final_state.get("final_answer", "")
                 evidences = final_state.get("evidences", [])
                 contexts = extract_contexts_from_evidences(evidences)
 
                 # 토큰 사용량 추출 (final_state에서)
+                # TODO: LLM 호출 시 토큰 사용량 추적 필요
                 total_tokens = final_state.get("total_tokens", 0)
                 prompt_tokens = final_state.get("prompt_tokens", 0)
                 completion_tokens = final_state.get("completion_tokens", 0)
@@ -238,6 +258,9 @@ class AutomatedTestRunner:
 
             except Exception as e:
                 print(f"      ✗ Error: {e}")
+                if self.debug:
+                    import traceback
+                    traceback.print_exc()
                 raw_logs.append({
                     "idx": idx,
                     "question": question,
@@ -257,12 +280,17 @@ class AutomatedTestRunner:
                 print(f"    Scores: {scores}")
             except Exception as e:
                 print(f"    ✗ RAGAS evaluation failed: {e}")
+                if self.debug:
+                    import traceback
+                    traceback.print_exc()
 
         # 결과 정리
         result = {
-            "test_id": test_id,
             "combination_id": combination_id,
-            "config": config,
+            "semantic_expander": test_config.semantic_expander,
+            "aggregator_thread": test_config.aggregator_thread,
+            "entity_boost_mode": test_config.entity_boost_mode,
+            "short_name": test_config.get_short_name(),
             "n_questions": len(questions),
             "n_samples": len(samples),
             "scores": scores,
@@ -273,24 +301,24 @@ class AutomatedTestRunner:
         return result
 
     def run_all_tests(self):
-        """모든 20가지 조합 테스트 실행"""
+        """모든 조합 테스트 실행 (최대 80가지)"""
         questions = self.load_questions()
 
         print(f"\n{'='*70}")
         print(f"Starting Automated Tests")
         print(f"{'='*70}")
-        print(f"  - Total Combinations: {len(self.configs)}")
+        print(f"  - Total Combinations: {len(self.combinations)}")
         print(f"  - Questions per Test: {len(questions)}")
         print(f"  - Persona: {self.persona_id}")
         print(f"  - Output: {self.output_dir}")
         print()
 
-        for config in self.configs:
-            result = self.run_single_test(config, questions)
+        for test_config in self.combinations:
+            result = self.run_single_test(test_config, questions)
             self.all_results.append(result)
 
             # 중간 저장
-            if config["test_id"] % self.save_every == 0:
+            if test_config.combination_id % self.save_every == 0:
                 self.save_results()
 
         # 최종 저장
@@ -301,32 +329,45 @@ class AutomatedTestRunner:
 
     def save_results(self):
         """결과 저장"""
-        # 전체 결과 저장
-        results_path = self.output_dir / f"all_results_{self.timestamp}.json"
+        n_combos = len(self.combinations)
+
+        # 전체 결과 저장 (raw logs 포함)
+        results_path = self.output_dir / f"ragas_results_{n_combos}combos_{self.timestamp}_raw.json"
         save_json(self.all_results, results_path)
         print(f"\n[CHECKPOINT] Results saved: {results_path}")
 
         # 점수 요약 저장
-        summary_path = self.output_dir / f"summary_{self.timestamp}.json"
+        summary_path = self.output_dir / f"ragas_summary_{n_combos}combos_{self.timestamp}.json"
         summary = self.generate_summary()
         save_json(summary, summary_path)
         print(f"[CHECKPOINT] Summary saved: {summary_path}")
+
+        # 간소화된 결과 저장 (raw logs 제외)
+        simplified_results = []
+        for result in self.all_results:
+            simplified = {k: v for k, v in result.items() if k != "raw_logs"}
+            simplified_results.append(simplified)
+
+        simplified_path = self.output_dir / f"ragas_results_{n_combos}combos_{self.timestamp}.json"
+        save_json(simplified_results, simplified_path)
+        print(f"[CHECKPOINT] Simplified results saved: {simplified_path}")
 
     def generate_summary(self) -> Dict:
         """결과 요약 생성"""
         summary = {
             "timestamp": self.timestamp,
             "persona_id": self.persona_id,
-            "n_tests": len(self.all_results),
+            "n_combinations": len(self.all_results),
             "test_results": []
         }
 
         for result in self.all_results:
             summary["test_results"].append({
-                "test_id": result["test_id"],
                 "combination_id": result["combination_id"],
-                "semantic_expander": result["config"]["semantic_expander"]["active_type"],
-                "aggregator": result["config"]["aggregator"]["active_type"],
+                "semantic_expander": result["semantic_expander"],
+                "aggregator_thread": result["aggregator_thread"],
+                "entity_boost_mode": result["entity_boost_mode"],
+                "short_name": result["short_name"],
                 "n_samples": result["n_samples"],
                 "scores": result["scores"]
             })
@@ -339,17 +380,35 @@ class AutomatedTestRunner:
         print("Test Summary")
         print(f"{'='*70}")
 
+        n_combos = len(self.combinations)
+
         for result in self.all_results:
-            test_id = result["test_id"]
             combination_id = result["combination_id"]
+            short_name = result["short_name"]
             scores = result["scores"]
 
-            print(f"\n[{test_id}/20] {combination_id}")
+            print(f"\n[{combination_id}/{n_combos}] {short_name}")
             if scores:
                 for metric, score in scores.items():
                     print(f"  - {metric}: {score:.4f}")
             else:
                 print("  - No scores available")
+
+        # 평균 점수 계산 및 출력
+        print(f"\n{'='*70}")
+        print("Average Scores")
+        print(f"{'='*70}")
+
+        all_scores = {}
+        for result in self.all_results:
+            for metric, score in result.get("scores", {}).items():
+                if metric not in all_scores:
+                    all_scores[metric] = []
+                all_scores[metric].append(score)
+
+        for metric, scores_list in all_scores.items():
+            avg_score = sum(scores_list) / len(scores_list) if scores_list else 0
+            print(f"  - {metric}: {avg_score:.4f} (n={len(scores_list)})")
 
 
 # =====================================================
@@ -357,7 +416,7 @@ class AutomatedTestRunner:
 # =====================================================
 def main():
     parser = argparse.ArgumentParser(
-        description="Automated Test Runner for Fuseki RAG System"
+        description="Automated Test Runner for Fuseki RAG System (80 Combinations)"
     )
     parser.add_argument(
         "--persona",
@@ -369,7 +428,7 @@ def main():
         "--limit",
         type=int,
         default=0,
-        help="Limit number of questions per test (0 = no limit)"
+        help="Limit number of questions per combination (0 = no limit, default: 0)"
     )
     parser.add_argument(
         "--debug",
@@ -380,7 +439,25 @@ def main():
         "--save-every",
         type=int,
         default=5,
-        help="Save results every N tests (default: 5)"
+        help="Save results every N combinations (default: 10)"
+    )
+    parser.add_argument(
+        "--semantic",
+        type=str,
+        default=None,
+        help="Filter by semantic expander: temporal, category, causal_chain, pgvector"
+    )
+    parser.add_argument(
+        "--thread",
+        type=str,
+        default=None,
+        help="Filter by aggregator thread: outgoing_relations, incoming_relations, entity_properties, connected_entities, type_and_summary"
+    )
+    parser.add_argument(
+        "--boost",
+        type=str,
+        default=None,
+        help="Filter by entity boost mode: exact_match, partial_match, normalized_match, penalty_match"
     )
 
     args = parser.parse_args()
@@ -392,7 +469,10 @@ def main():
         persona_id=args.persona,
         limit=args.limit,
         debug=args.debug,
-        save_every=args.save_every
+        save_every=args.save_every,
+        semantic_filter=args.semantic,
+        thread_filter=args.thread,
+        boost_filter=args.boost
     )
 
     # 모든 테스트 실행

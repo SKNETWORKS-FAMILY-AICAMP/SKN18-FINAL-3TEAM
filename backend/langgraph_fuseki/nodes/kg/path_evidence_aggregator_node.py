@@ -24,10 +24,10 @@ from backend.langgraph_fuseki.config import (
 from langchain_openai import ChatOpenAI
 
 
-def calculate_improved_relevance_score(path_data: dict, query_entities: list = None, thread_type: str = "") -> float:
+def calculate_improved_relevance_score(path_data: dict, query_entities: list = None, thread_type: str = "", entity_boost_mode: str = None) -> float:
     """
     개선된 경로의 relevance score 계산
-    
+
     개선 사항:
     1. 쿼리 엔티티와의 직접 연결성 강화
     2. Thread 타입별 가중치 조정
@@ -36,14 +36,16 @@ def calculate_improved_relevance_score(path_data: dict, query_entities: list = N
         path_data: 경로 데이터 (binding 정보)
         query_entities: 쿼리에서 추출된 엔티티 리스트
         thread_type: Thread 타입 (outgoing_relations, incoming_relations 등)
+        entity_boost_mode: 엔티티 부스트 모드 ("exact_match", "partial_match", "normalized_match", "penalty_match", None)
 
     Returns:
-        relevance score
+        relevance score (테스트 모드에서 조건 안 맞으면 0.0 반환하여 필터링)
     """
     score = 1.0
 
     # 1. 쿼리 엔티티와의 직접 연결 여부 (강화 - 차별화를 위해)
     query_entity_match_boost = 1.0  # 기본값 (매칭 없음)
+    match_type = None  # "exact", "partial", "normalized", None
     if query_entities:
         subject = path_data.get("subject", {}).get("value", "")
         obj = path_data.get("object", {}).get("value", "")
@@ -78,17 +80,35 @@ def calculate_improved_relevance_score(path_data: dict, query_entities: list = N
             # 정확한 매칭 (매우 높은 부스트) - 차별화 강화
             if entity_name in all_entity_names or entity_name_normalized in all_entity_names_normalized:
                 query_entity_match_boost = QUERY_ENTITY_MATCH_BOOST_EXACT
+                match_type = "exact"
                 break
             # 부분 매칭 (중간 부스트)
             elif any(entity_name in name or name in entity_name for name in all_entity_names if name):
                 query_entity_match_boost = QUERY_ENTITY_MATCH_BOOST_PARTIAL
+                match_type = "partial"
                 break
             # 정규화된 부분 매칭
-            elif any(entity_name_normalized in norm_name or norm_name in entity_name_normalized 
+            elif any(entity_name_normalized in norm_name or norm_name in entity_name_normalized
                     for norm_name in all_entity_names_normalized if norm_name):
                 query_entity_match_boost = QUERY_ENTITY_MATCH_BOOST_NORMALIZED
+                match_type = "normalized"
                 break
-    
+
+    # 테스트 모드: entity_boost_mode에 따라 필터링
+    if entity_boost_mode:
+        if entity_boost_mode == "exact_match":
+            if match_type != "exact":
+                return 0.0  # 정확 매칭이 아니면 필터링
+        elif entity_boost_mode == "partial_match":
+            if match_type != "partial":
+                return 0.0  # 부분 매칭이 아니면 필터링
+        elif entity_boost_mode == "normalized_match":
+            if match_type != "normalized":
+                return 0.0  # 정규화 매칭이 아니면 필터링
+        elif entity_boost_mode == "penalty_match":
+            if match_type is not None:
+                return 0.0  # 매칭되면 필터링 (매칭 안 된 것만)
+
     score *= query_entity_match_boost
 
     # 2. Thread 타입별 추가 가중치 (환경변수로 설정 가능)
@@ -105,7 +125,8 @@ def calculate_improved_relevance_score(path_data: dict, query_entities: list = N
 
     # 3. 관계 중요도에 따른 추가 차별화
     # 쿼리 엔티티와 매칭되지 않은 경우 페널티 적용 (환경변수로 설정 가능)
-    if query_entity_match_boost == 1.0 and query_entities:
+    # 테스트 모드가 아닐 때만 적용
+    if not entity_boost_mode and query_entity_match_boost == 1.0 and query_entities:
         # 매칭되지 않은 경로는 페널티
         score *= THREAD_TYPE_PENALTY_NO_MATCH
 
@@ -180,7 +201,7 @@ def extract_label_from_uri(uri: str) -> str:
     return uri
 
 
-def extract_outgoing_relations(bindings: list, base_weight: float, query_entities: list = None) -> list:
+def extract_outgoing_relations(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None) -> list:
     """엔티티에서 나가는 모든 관계 추출 (엔티티 → ?)"""
     paths = []
     seen = set()
@@ -198,7 +219,7 @@ def extract_outgoing_relations(bindings: list, base_weight: float, query_entitie
         seen.add(key)
 
         # 개선된 Relevance score 계산
-        relevance_score = calculate_improved_relevance_score(binding, query_entities, "outgoing_relations")
+        relevance_score = calculate_improved_relevance_score(binding, query_entities, "outgoing_relations", entity_boost_mode)
 
         # 프로퍼티 이름을 읽기 좋게 변환
         predicate_display = predicate.replace("has", "").replace("_", " ")
@@ -220,7 +241,7 @@ def extract_outgoing_relations(bindings: list, base_weight: float, query_entitie
     return paths[:30]
 
 
-def extract_incoming_relations(bindings: list, base_weight: float, query_entities: list = None) -> list:
+def extract_incoming_relations(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None) -> list:
     """엔티티로 들어오는 모든 관계 추출 (? → 엔티티)"""
     paths = []
     seen = set()
@@ -238,7 +259,7 @@ def extract_incoming_relations(bindings: list, base_weight: float, query_entitie
         seen.add(key)
 
         # 개선된 Relevance score 계산
-        relevance_score = calculate_improved_relevance_score(binding, query_entities, "incoming_relations")
+        relevance_score = calculate_improved_relevance_score(binding, query_entities, "incoming_relations", entity_boost_mode)
 
         # 프로퍼티 이름을 읽기 좋게 변환
         predicate_display = predicate.replace("has", "").replace("_", " ")
@@ -260,7 +281,7 @@ def extract_incoming_relations(bindings: list, base_weight: float, query_entitie
     return paths[:30]
 
 
-def extract_entity_properties(bindings: list, base_weight: float, query_entities: list = None) -> list:
+def extract_entity_properties(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None) -> list:
     """엔티티의 모든 속성 추출 (리터럴 값)"""
     paths = []
     seen = set()
@@ -277,7 +298,7 @@ def extract_entity_properties(bindings: list, base_weight: float, query_entities
         seen.add(key)
 
         # 개선된 Relevance score 계산
-        relevance_score = calculate_improved_relevance_score(binding, query_entities, "entity_properties")
+        relevance_score = calculate_improved_relevance_score(binding, query_entities, "entity_properties", entity_boost_mode)
 
         # 값 정리 (너무 길면 자르기)
         value_display = value[:100] + "..." if len(value) > 100 else value
@@ -513,10 +534,18 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     thread_weights = state.get("thread_weights", {})
     query_type = state.get("query_type", "causal")
     query_entities = state.get("extracted_entities", [])
+    test_config = state.get("test_config")  # 테스트 설정
+
+    # 엔티티 부스트 모드 추출
+    entity_boost_mode = None
+    if test_config and "entity_boost_mode" in test_config:
+        entity_boost_mode = test_config["entity_boost_mode"]
 
     print(f"\n{'='*70}")
     print(f"[4/6] 경로 추출 및 근거 통합 (Path Extractor & Evidence Aggregator)")
     print(f"{'='*70}")
+    if entity_boost_mode:
+        print(f"  ├─ [테스트 모드] Entity Boost Mode: {entity_boost_mode}")
 
     # 1. Thread별 경로 추출
     inference_paths = {}
@@ -539,11 +568,11 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
         base_weight = thread_weights.get(thread_type, default_weights.get(thread_type, 0.3))
 
         if thread_type == "outgoing_relations":
-            paths = extract_outgoing_relations(bindings, base_weight, query_entities)
+            paths = extract_outgoing_relations(bindings, base_weight, query_entities, entity_boost_mode)
         elif thread_type == "incoming_relations":
-            paths = extract_incoming_relations(bindings, base_weight, query_entities)
+            paths = extract_incoming_relations(bindings, base_weight, query_entities, entity_boost_mode)
         elif thread_type == "entity_properties":
-            paths = extract_entity_properties(bindings, base_weight, query_entities)
+            paths = extract_entity_properties(bindings, base_weight, query_entities, entity_boost_mode)
         elif thread_type == "connected_entities":
             paths = extract_connected_entities(bindings, base_weight)
         elif thread_type == "type_and_summary":

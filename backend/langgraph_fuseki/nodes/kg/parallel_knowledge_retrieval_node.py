@@ -192,7 +192,8 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
     query_type = state.get("query_type", "causal")
     entities = state.get("extracted_entities", [])
     hypothetical_triples = state.get("hypothetical_triples", [])
-    
+    test_config = state.get("test_config")  # 테스트 설정
+
     # 질문에서 핵심 키워드 추출 (kiwipiepy 사용)
     try:
         from kiwipiepy import Kiwi
@@ -204,7 +205,7 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
         # kiwipiepy 없으면 기본 키워드 추출
         import re
         core_keywords = re.findall(r'[가-힣]{2,}', query)
-    
+
     # 엔티티를 핵심 키워드와의 관련도로 정렬
     # 핵심 키워드가 엔티티 이름에 포함되면 우선순위 높임
     def entity_priority(entity):
@@ -217,27 +218,41 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
         if entity.get("uri"):
             score += 1
         return score
-    
+
     entities_sorted = sorted(entities, key=entity_priority, reverse=True)
-    
+
     # 선택된 프로퍼티 (classify_node에서 전달)
     selected_properties = state.get("selected_properties", [])
     selected_groups = state.get("selected_property_groups", [])
-    
+
     # Thread 가중치 설정
     thread_weights = THREAD_WEIGHTS.get(query_type, THREAD_WEIGHTS["causal"])
-    
-    print(f"\n{'='*70}")
-    print(f"[3/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
-    print(f"{'='*70}")
-    print(f"  ├─ Thread 수: {len(DATA_THREADS)}개")
-    print(f"  ├─ 엔티티: {len(entities)}개")
+
+    # 실행할 Thread 선택 (test_config에 따라)
+    if test_config and "aggregator_threads" in test_config:
+        thread_config = test_config["aggregator_threads"]
+        active_threads = [t for t, enabled in thread_config.items() if enabled]
+        print(f"\n{'='*70}")
+        print(f"[3/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
+        print(f"{'='*70}")
+        print(f"  ├─ [테스트 모드] 활성화된 Thread:")
+        for thread in active_threads:
+            print(f"  │  └─ {thread}: ON")
+        print(f"  ├─ 엔티티: {len(entities)}개")
+    else:
+        active_threads = list(DATA_THREADS.keys())
+        print(f"\n{'='*70}")
+        print(f"[3/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
+        print(f"{'='*70}")
+        print(f"  ├─ [일반 모드] Thread 수: {len(DATA_THREADS)}개")
+        print(f"  ├─ 엔티티: {len(entities)}개")
+
     if selected_groups:
         print(f"  └─ 프로퍼티 필터: {', '.join(selected_groups[:3])}{'...' if len(selected_groups) > 3 else ''} ({len(selected_groups)}개)")
     start_time = time.time()
-    
+
     # ThreadPoolExecutor로 병렬 실행 (템플릿 기반 SPARQL 쿼리)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(active_threads)) as executor:
         futures = {
             executor.submit(
                 execute_unified_thread,
@@ -249,7 +264,7 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
                 thread_config=DATA_THREADS[thread_type],
                 selected_properties=selected_properties  # 프로퍼티 필터 전달
             ): thread_type
-            for thread_type in DATA_THREADS.keys()
+            for thread_type in active_threads  # 활성화된 Thread만 실행
         }
         
         # 결과 수집

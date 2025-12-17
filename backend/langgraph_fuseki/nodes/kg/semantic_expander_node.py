@@ -656,6 +656,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
     extracted_entities = state.get("extracted_entities", [])
     ttl_data = state.get("ttl_data", {})
+    test_config = state.get("test_config")  # 테스트 설정
 
     print(f"\n{'='*70}")
     print(f"[2.5/6] 의미론적 확장 (Semantic Expander)")
@@ -666,11 +667,34 @@ def semantic_expander_node(state: GraphState) -> GraphState:
         print(f"  └─ 확장할 엔티티 없음 (skip)")
         return {**state}
 
-    # 4가지 확장 방법 실행
-    temporal_expanded = expand_by_temporal_context(extracted_entities, ttl_data, window_years=10)
-    category_expanded = expand_by_category(extracted_entities, ttl_data)
-    causal_expanded = expand_by_causal_chain(extracted_entities, ttl_data, max_hops=3)
-    pgvector_expanded = expand_by_pgvector(extracted_entities, query, top_k=15)
+    # 테스트 모드 확인
+    if test_config and "semantic_expander" in test_config:
+        semantic_config = test_config["semantic_expander"]
+        print(f"  ├─ [테스트 모드] 활성화된 확장 방법:")
+        for method, enabled in semantic_config.items():
+            if enabled:
+                print(f"  │  └─ {method}: ON")
+    else:
+        print(f"  ├─ [일반 모드] 모든 확장 방법 실행")
+        semantic_config = None
+
+    # 4가지 확장 방법 실행 (test_config에 따라 선택적 실행)
+    temporal_expanded = []
+    category_expanded = []
+    causal_expanded = []
+    pgvector_expanded = []
+
+    if not semantic_config or semantic_config.get("temporal", True):
+        temporal_expanded = expand_by_temporal_context(extracted_entities, ttl_data, window_years=10)
+
+    if not semantic_config or semantic_config.get("category", True):
+        category_expanded = expand_by_category(extracted_entities, ttl_data)
+
+    if not semantic_config or semantic_config.get("causal_chain", True):
+        causal_expanded = expand_by_causal_chain(extracted_entities, ttl_data, max_hops=3)
+
+    if not semantic_config or semantic_config.get("pgvector", True):
+        pgvector_expanded = expand_by_pgvector(extracted_entities, query, top_k=15)
 
     # 결과 병합 (중복 제거)
     all_expanded = []
