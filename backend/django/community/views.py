@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.generics import DestroyAPIView
+from rest_framework.generics import DestroyAPIView, UpdateAPIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 from video.models import Video
@@ -74,9 +74,9 @@ class VideoCommentView(APIView):
         """댓글 목록 조회"""
         comments = Comment.objects.filter(
             video_id=video_id
-        ).select_related('user', 'video').order_by('-created_at')
+        ).select_related('user', 'video').prefetch_related('replies__user', 'likes').order_by('-created_at')
 
-        serializer = CommentSerializer(comments, many=True)
+        serializer = CommentSerializer(comments, many=True, context={'request': request})
         return Response({
             'data': serializer.data,
             'message': 'ok'
@@ -97,7 +97,7 @@ class VideoCommentView(APIView):
         if serializer.is_valid():
             serializer.save(user=request.user, video=video)
             return Response({
-                'data': CommentSerializer(serializer.instance).data,
+                'data': CommentSerializer(serializer.instance, context={'request': request}).data,
                 'message': '댓글이 작성되었습니다.'
             }, status=status.HTTP_201_CREATED)
 
@@ -134,12 +134,14 @@ class CommentReplyView(APIView):
         tags=["답글"]
     )
     def get(self, request, comment_id):
-        """답글 목록 조회"""
+        """답글 목록 조회 (최상위 답글만, 자식은 재귀적으로 포함)"""
+        # 최상위 답글만 가져오기 (parent_reply가 없는 것들)
         replies = Reply.objects.filter(
-            comment_id=comment_id
-        ).select_related('user', 'comment').order_by('created_at')
+            comment_id=comment_id,
+            parent_reply__isnull=True
+        ).select_related('user', 'comment').prefetch_related('child_replies__user', 'likes').order_by('created_at')
 
-        serializer = ReplySerializer(replies, many=True)
+        serializer = ReplySerializer(replies, many=True, context={'request': request})
         return Response({
             'data': serializer.data,
             'message': 'ok'
@@ -160,7 +162,7 @@ class CommentReplyView(APIView):
         if serializer.is_valid():
             serializer.save(user=request.user, comment=comment)
             return Response({
-                'data': ReplySerializer(serializer.instance).data,
+                'data': ReplySerializer(serializer.instance, context={'request': request}).data,
                 'message': '답글이 작성되었습니다.'
             }, status=status.HTTP_201_CREATED)
 
@@ -176,6 +178,32 @@ class CommentReplyView(APIView):
 # ============================================
 # 관리자 API (댓글/답글 삭제)
 # ============================================
+
+class CommentUpdateView(UpdateAPIView):
+    """
+    댓글 수정 API
+    - 작성자 본인 또는 관리자만 수정 가능
+
+    PATCH /api/community/comments/{comment_id}/
+    """
+    queryset = Comment.objects.all()
+    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    serializer_class = CommentCreateSerializer
+    lookup_url_kwarg = 'comment_id'
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        
+        # 수정된 댓글을 CommentSerializer로 반환
+        updated_comment = CommentSerializer(instance, context={'request': request})
+        return Response({
+            'data': updated_comment.data,
+            'message': '댓글이 수정되었습니다.'
+        }, status=status.HTTP_200_OK)
+
 
 class CommentDeleteView(DestroyAPIView):
     """

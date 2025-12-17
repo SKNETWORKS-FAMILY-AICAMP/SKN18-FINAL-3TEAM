@@ -3,11 +3,80 @@ import json
 import os, time
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from openai import OpenAI
 from dotenv import load_dotenv
 
+from .models import Video
+from .serializers import VideoSerializer, VideoDetailSerializer
+
 # .env 파일 로드
 load_dotenv()
+
+
+# ============================================
+# 비디오 API
+# ============================================
+
+class VideoListView(ListAPIView):
+    """
+    영상 목록 API
+    
+    GET /api/video/list/
+    - 전체 영상 목록 조회 (최신순)
+    - 조회수순 정렬 가능
+    """
+    queryset = Video.objects.all()
+    serializer_class = VideoSerializer
+    permission_classes = [AllowAny]
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # 정렬
+        sort = self.request.query_params.get('sort', 'latest')
+        if sort == 'comments':
+            queryset = queryset.order_by('-comments_count', '-upload_date')
+        else:
+            queryset = queryset.order_by('-upload_date')
+        
+        # 태그 필터
+        tag = self.request.query_params.get('tag', '')
+        if tag:
+            queryset = queryset.filter(tags__contains=[tag])
+        
+        return queryset
+    
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return Response({
+            'data': response.data,
+            'message': 'ok'
+        })
+
+
+class VideoDetailView(RetrieveAPIView):
+    """
+    영상 상세 API
+    
+    GET /api/video/<id>/
+    - 특정 영상 상세 조회
+    """
+    queryset = Video.objects.all()
+    serializer_class = VideoDetailSerializer
+    permission_classes = [AllowAny]
+    
+    def retrieve(self, request, *args, **kwargs):
+        response = super().retrieve(request, *args, **kwargs)
+        return Response({
+            'data': response.data,
+            'message': 'ok'
+        })
+
 
 # 시스템 프롬프트 (Talchum Comedy / English Mode - Final Structured Version)
 SYSTEM_PROMPT_TEMPLATE = """
