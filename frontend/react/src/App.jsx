@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { COLORS } from "./constants/theme";
 import Header from "./components/layout/Header";
 import ExpandableSearch from "./features/search/components/ExpandableSearch";
@@ -148,6 +148,11 @@ const App = () => {
     }
   };
 
+  // 프로필 업데이트 콜백 함수
+  const handleUserUpdate = useCallback((updatedUser) => {
+    setUser(updatedUser);
+  }, []);
+
   const handleNavigate = (page, videoId = null) => {
     setCurrentPage(page);
     updateURL(page, videoId);
@@ -221,7 +226,11 @@ const App = () => {
           )}
 
           {currentPage === "profile-edit" && (
-            <ProfileEditPage onNavigate={handleNavigate} user={user} />
+            <ProfileEditPage
+              onNavigate={handleNavigate}
+              user={user}
+              onUserUpdate={handleUserUpdate}
+            />
           )}
         </div>
       </div>
