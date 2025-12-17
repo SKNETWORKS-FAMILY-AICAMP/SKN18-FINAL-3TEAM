@@ -3,6 +3,8 @@ from langgraph.graph import END
 from backend.langgraph_structure1.utils import create_model
 from deep_translator import GoogleTranslator
 
+import time
+
 def is_korean(text: str) -> bool:
     """텍스트에 한글이 하나라도 포함되어 있는지 간단 체크."""
     return any("가" <= ch <= "힣" for ch in text)
@@ -28,6 +30,8 @@ def translate_en_to_ko_if_needed(text: str) -> tuple[str, str]:
 
 def classify_node(state: GraphState) -> GraphState:
     query = state.get("query")
+    # 전체 시작 시간
+    total_start_time = time.perf_counter()
 
     if not query:
         raise ValueError("classify_node: 'query' 값이 state에 없습니다.")
@@ -92,6 +96,7 @@ def classify_node(state: GraphState) -> GraphState:
 
     return {
         **state,
+        "t0":total_start_time,
         "detect_lang": src_lang,
         "translated_query": translated_query,
         "query_type": query_type,

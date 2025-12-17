@@ -10,6 +10,7 @@ class GraphState(TypedDict):
     query: str
 
     # 분류 결과
+    t0: NotRequired[float]
     detect_lang: NotRequired[str]
     translated_query: NotRequired[str]
     query_type: NotRequired[str]
@@ -27,6 +28,10 @@ class GraphState(TypedDict):
 
     # 최종 답변 및 후처리
     final_answer: NotRequired[str]
+    answer_input_tokens : NotRequired[int]
+    answer_output_tokens : NotRequired[int]
+    answer_total_tokens : NotRequired[int]
+    final_answer_elapsed: NotRequired[float]
 
     # tone 교정 결과
     tone_corrected_answer: NotRequired[str]
