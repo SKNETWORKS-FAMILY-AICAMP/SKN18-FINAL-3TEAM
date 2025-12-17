@@ -616,6 +616,12 @@ def story_generator_node(state: GraphState) -> GraphState:
 
     try:
         response = llm.invoke(story_prompt)
+        
+        # 토큰 사용량 추출 및 state에 누적
+        from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
+        token_update = extract_and_accumulate_tokens(state, response)
+        state.update(token_update)
+        
         llm_answer = response.content.strip()
 
         # LLM이 핵심 답변과 상세 설명을 생성하므로 그대로 사용

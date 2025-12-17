@@ -47,6 +47,9 @@ from backend.ragas.fuseki.ragas_metrics import (
 from backend.langgraph_fuseki.graph import create_graph_flow
 from backend.langgraph_fuseki.state import GraphState
 
+# Token tracking
+from backend.ragas.fuseki.token_tracker import track_tokens_from_events
+
 
 # =====================================================
 # Paths
@@ -119,26 +122,45 @@ class AutomatedTestRunner:
         save_every: int = 10,
         semantic_filter: str = None,
         thread_filter: str = None,
-        boost_filter: str = None
+        boost_filter: str = None,
+        worker_id: int = None,
+        num_workers: int = None
     ):
         self.questions_path = questions_path
         self.output_dir = output_dir
         self.limit = limit
         self.debug = debug
         self.save_every = save_every
+        self.worker_id = worker_id
+        self.num_workers = num_workers
 
         # Config Manager 초기화
         self.config_manager = ConfigurationManager()
 
         # 필터링된 조합 가져오기
         if semantic_filter or thread_filter or boost_filter:
-            self.combinations = self.config_manager.get_combinations_by_filters(
+            all_combinations = self.config_manager.get_combinations_by_filters(
                 semantic=semantic_filter,
                 thread=thread_filter,
                 boost=boost_filter
             )
         else:
-            self.combinations = self.config_manager.get_all_combinations()
+            all_combinations = self.config_manager.get_all_combinations()
+
+        # 워커별 조합 분할
+        if worker_id is not None and num_workers is not None:
+            # 조합을 워커 수만큼 분할
+            chunk_size = len(all_combinations) // num_workers
+            start_idx = worker_id * chunk_size
+            if worker_id == num_workers - 1:
+                # 마지막 워커는 나머지 모두 처리
+                end_idx = len(all_combinations)
+            else:
+                end_idx = start_idx + chunk_size
+            self.combinations = all_combinations[start_idx:end_idx]
+            print(f"[WORKER {worker_id}] Processing combinations {start_idx} to {end_idx-1} ({len(self.combinations)} combinations)")
+        else:
+            self.combinations = all_combinations
 
         # RAGAS Metrics Loader 초기화
         self.ragas_loader = RagasMetricsLoader(debug=debug)
@@ -149,6 +171,10 @@ class AutomatedTestRunner:
 
         # 타임스탬프
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # 워커 ID가 있으면 타임스탬프에 포함
+        if worker_id is not None:
+            self.timestamp = f"{self.timestamp}_worker{worker_id}"
 
     def load_questions(self) -> List[Dict]:
         """질문 로드 (모든 페르소나)"""
@@ -216,9 +242,17 @@ class AutomatedTestRunner:
                     "test_config": test_config.to_test_config()  # test_config 주입
                 }
 
-                # 그래프 실행
+                # 그래프 실행 및 토큰 추적
                 start_time = time.time()
-                final_state = graph.invoke(initial_state)
+                try:
+                    # 이벤트 스트리밍으로 토큰 추적 시도
+                    final_state, token_usage = track_tokens_from_events(graph, initial_state)
+                except Exception as e:
+                    # 실패 시 일반 invoke 사용
+                    print(f"      Warning: Token tracking failed ({e}), using regular invoke")
+                    final_state = graph.invoke(initial_state)
+                    token_usage = {"total_tokens": 0, "prompt_tokens": 0, "completion_tokens": 0}
+                
                 elapsed = time.time() - start_time
 
                 # 결과 추출
@@ -226,11 +260,10 @@ class AutomatedTestRunner:
                 evidences = final_state.get("evidences", [])
                 contexts = extract_contexts_from_evidences(evidences)
 
-                # 토큰 사용량 추출 (final_state에서)
-                # TODO: LLM 호출 시 토큰 사용량 추적 필요
-                total_tokens = final_state.get("total_tokens", 0)
-                prompt_tokens = final_state.get("prompt_tokens", 0)
-                completion_tokens = final_state.get("completion_tokens", 0)
+                # 토큰 사용량 추출
+                total_tokens = token_usage.get("total_tokens", 0)
+                prompt_tokens = token_usage.get("prompt_tokens", 0)
+                completion_tokens = token_usage.get("completion_tokens", 0)
 
                 # 샘플 생성
                 sample = self.ragas_loader.create_sample(
@@ -274,19 +307,40 @@ class AutomatedTestRunner:
         # RAGAS 평가
         print(f"\n  [RAGAS Evaluation]")
         scores = {}
+        individual_scores = []
         if samples:
             try:
-                scores = evaluate_with_ragas(
+                # 개별 점수도 함께 반환받기 위해 return_individual=True 사용
+                evaluation_result = evaluate_with_ragas(
                     self.ragas_loader,
                     samples,
-                    debug=self.debug
+                    debug=self.debug,
+                    return_individual=True
                 )
+                
+                # 평균 점수
+                if isinstance(evaluation_result, dict) and "average_scores" in evaluation_result:
+                    scores = evaluation_result["average_scores"]
+                    individual_scores = evaluation_result.get("individual_scores", [])
+                else:
+                    # 이전 형식 호환 (평균만 반환하는 경우)
+                    scores = evaluation_result
+                    individual_scores = []
+                
                 print(f"    Scores: {scores}")
             except Exception as e:
                 print(f"    ✗ RAGAS evaluation failed: {e}")
                 if self.debug:
                     import traceback
                     traceback.print_exc()
+
+        # raw_logs에 개별 RAGAS 점수 추가
+        for i, log in enumerate(raw_logs):
+            if i < len(individual_scores) and individual_scores[i]:
+                log["ragas_scores"] = individual_scores[i]
+            else:
+                # 개별 점수가 없으면 평균 점수 추가
+                log["ragas_scores"] = scores
 
         # 결과 정리
         result = {
@@ -313,16 +367,17 @@ class AutomatedTestRunner:
         print(f"{'='*70}")
         print(f"  - Total Combinations: {len(self.combinations)}")
         print(f"  - Questions per Test: {len(questions)}")
-        print(f"  - Persona: {self.persona_id}")
+        if self.worker_id is not None:
+            print(f"  - Worker ID: {self.worker_id}/{self.num_workers}")
         print(f"  - Output: {self.output_dir}")
         print()
 
-        for test_config in self.combinations:
+        for idx, test_config in enumerate(self.combinations, start=1):
             result = self.run_single_test(test_config, questions)
             self.all_results.append(result)
 
-            # 중간 저장
-            if test_config.combination_id % self.save_every == 0:
+            # 중간 저장 (워커별 인덱스 기반)
+            if idx % self.save_every == 0:
                 self.save_results()
 
         # 최종 저장
@@ -332,51 +387,17 @@ class AutomatedTestRunner:
         self.print_summary()
 
     def save_results(self):
-        """결과 저장"""
+        """결과 저장 (상세 파일 하나만 저장)"""
         n_combos = len(self.combinations)
+        
+        # 워커 ID가 있으면 파일명에 포함
+        worker_suffix = f"_worker{self.worker_id}" if self.worker_id is not None else ""
 
-        # 전체 결과 저장 (raw logs 포함)
-        results_path = self.output_dir / f"ragas_results_{n_combos}combos_{self.timestamp}_raw.json"
+        # 전체 결과 저장 (raw logs 포함) - 상세 파일 하나만 저장
+        results_path = self.output_dir / f"ragas_results_{n_combos}combos_{self.timestamp}_raw{worker_suffix}.json"
         save_json(self.all_results, results_path)
         print(f"\n[CHECKPOINT] Results saved: {results_path}")
 
-        # 점수 요약 저장
-        summary_path = self.output_dir / f"ragas_summary_{n_combos}combos_{self.timestamp}.json"
-        summary = self.generate_summary()
-        save_json(summary, summary_path)
-        print(f"[CHECKPOINT] Summary saved: {summary_path}")
-
-        # 간소화된 결과 저장 (raw logs 제외)
-        simplified_results = []
-        for result in self.all_results:
-            simplified = {k: v for k, v in result.items() if k != "raw_logs"}
-            simplified_results.append(simplified)
-
-        simplified_path = self.output_dir / f"ragas_results_{n_combos}combos_{self.timestamp}.json"
-        save_json(simplified_results, simplified_path)
-        print(f"[CHECKPOINT] Simplified results saved: {simplified_path}")
-
-    def generate_summary(self) -> Dict:
-        """결과 요약 생성"""
-        summary = {
-            "timestamp": self.timestamp,
-            "persona_id": self.persona_id,
-            "n_combinations": len(self.all_results),
-            "test_results": []
-        }
-
-        for result in self.all_results:
-            summary["test_results"].append({
-                "combination_id": result["combination_id"],
-                "semantic_expander": result["semantic_expander"],
-                "aggregator_thread": result["aggregator_thread"],
-                "entity_boost_mode": result["entity_boost_mode"],
-                "short_name": result["short_name"],
-                "n_samples": result["n_samples"],
-                "scores": result["scores"]
-            })
-
-        return summary
 
     def print_summary(self):
         """결과 요약 출력"""
@@ -457,8 +478,28 @@ def main():
         default=None,
         help="Filter by entity boost mode: exact_match, partial_match, normalized_match, penalty_match"
     )
+    parser.add_argument(
+        "--worker-id",
+        type=int,
+        default=None,
+        help="Worker ID for parallel processing (0-based, e.g., 0-7 for 8 workers)"
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=None,
+        help="Total number of workers for parallel processing (e.g., 8)"
+    )
 
     args = parser.parse_args()
+
+    # 워커 인자 검증
+    if (args.worker_id is not None) != (args.num_workers is not None):
+        parser.error("--worker-id and --num-workers must be specified together")
+
+    if args.worker_id is not None:
+        if args.worker_id < 0 or args.worker_id >= args.num_workers:
+            parser.error(f"--worker-id must be between 0 and {args.num_workers - 1}")
 
     # 테스트 러너 생성
     runner = AutomatedTestRunner(
@@ -469,7 +510,9 @@ def main():
         save_every=args.save_every,
         semantic_filter=args.semantic,
         thread_filter=args.thread,
-        boost_filter=args.boost
+        boost_filter=args.boost,
+        worker_id=args.worker_id,
+        num_workers=args.num_workers
     )
 
     # 모든 테스트 실행

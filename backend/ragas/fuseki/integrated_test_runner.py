@@ -42,6 +42,9 @@ from backend.ragas.fuseki.ragas_metrics import (
 from backend.langgraph_fuseki.graph import create_graph_flow
 from backend.langgraph_fuseki.state import GraphState
 
+# Token tracking
+from backend.ragas.fuseki.token_tracker import track_tokens_from_events
+
 
 # =====================================================
 # Custom Weights (분석 기반 최적화)
@@ -220,6 +223,9 @@ class IntegratedTestRunner:
     def run_test(self, questions: List[Dict]) -> Dict:
         """
         통합 테스트 실행
+        
+        주의: 모든 질문(40개)을 처리한 후 마지막에 한 번만 저장됩니다.
+        중간 저장은 하지 않습니다.
 
         Args:
             questions: 질문 리스트
@@ -243,6 +249,7 @@ class IntegratedTestRunner:
         samples = []
         raw_logs = []
 
+        # 모든 질문 처리 (중간 저장 없음 - 마지막에 한 번만 저장)
         for idx, item in enumerate(questions, start=1):
             question = pick_question(item)
             if not question:
@@ -266,9 +273,17 @@ class IntegratedTestRunner:
                     "test_config": test_config
                 }
 
-                # 그래프 실행
+                # 그래프 실행 및 토큰 추적
                 start_time = time.time()
-                final_state = graph.invoke(initial_state)
+                try:
+                    # 이벤트 스트리밍으로 토큰 추적 시도
+                    final_state, token_usage = track_tokens_from_events(graph, initial_state)
+                except Exception as e:
+                    # 실패 시 일반 invoke 사용
+                    print(f"      Warning: Token tracking failed ({e}), using regular invoke")
+                    final_state = graph.invoke(initial_state)
+                    token_usage = {"total_tokens": 0, "prompt_tokens": 0, "completion_tokens": 0}
+                
                 elapsed = time.time() - start_time
 
                 # 결과 추출
@@ -277,9 +292,9 @@ class IntegratedTestRunner:
                 contexts = extract_contexts_from_evidences(evidences)
 
                 # 토큰 사용량 추출
-                total_tokens = final_state.get("total_tokens", 0)
-                prompt_tokens = final_state.get("prompt_tokens", 0)
-                completion_tokens = final_state.get("completion_tokens", 0)
+                total_tokens = token_usage.get("total_tokens", 0)
+                prompt_tokens = token_usage.get("prompt_tokens", 0)
+                completion_tokens = token_usage.get("completion_tokens", 0)
 
                 # 샘플 생성
                 sample = self.ragas_loader.create_sample(
@@ -326,19 +341,40 @@ class IntegratedTestRunner:
         # RAGAS 평가
         print(f"\n  [RAGAS Evaluation]")
         scores = {}
+        individual_scores = []
         if samples:
             try:
-                scores = evaluate_with_ragas(
+                # 개별 점수도 함께 반환받기 위해 return_individual=True 사용
+                evaluation_result = evaluate_with_ragas(
                     self.ragas_loader,
                     samples,
-                    debug=self.debug
+                    debug=self.debug,
+                    return_individual=True
                 )
+                
+                # 평균 점수
+                if isinstance(evaluation_result, dict) and "average_scores" in evaluation_result:
+                    scores = evaluation_result["average_scores"]
+                    individual_scores = evaluation_result.get("individual_scores", [])
+                else:
+                    # 이전 형식 호환 (평균만 반환하는 경우)
+                    scores = evaluation_result
+                    individual_scores = []
+                
                 print(f"    Scores: {scores}")
             except Exception as e:
                 print(f"    ✗ RAGAS evaluation failed: {e}")
                 if self.debug:
                     import traceback
                     traceback.print_exc()
+
+        # raw_logs에 개별 RAGAS 점수 추가
+        for i, log in enumerate(raw_logs):
+            if i < len(individual_scores) and individual_scores[i]:
+                log["ragas_scores"] = individual_scores[i]
+            else:
+                # 개별 점수가 없으면 평균 점수 추가
+                log["ragas_scores"] = scores
 
         # 결과 정리
         result = {
@@ -367,58 +403,35 @@ class IntegratedTestRunner:
         return counts
 
     def run_all_tests(self):
-        """모든 테스트 실행 (40개 질문 한번에)"""
+        """
+        모든 테스트 실행 (40개 질문 한번에)
+        
+        주의: 모든 질문을 처리한 후 마지막에 한 번만 저장됩니다.
+        중간 저장은 하지 않습니다.
+        """
         questions = self.load_questions()
 
-        # 모든 질문을 한번에 테스트
+        # 모든 질문을 한번에 테스트 (중간 저장 없음)
         self.result = self.run_test(questions)
 
-        # 결과 저장
+        # 모든 질문 처리 완료 후 결과 저장 (한 번만)
         self.save_results()
 
         # 요약 출력
         self.print_summary()
 
     def save_results(self):
-        """결과 저장"""
-        # 전체 결과 저장 (raw logs 포함)
+        """
+        결과 저장 (raw 파일만 저장)
+        
+        주의: 모든 질문(40개) 처리 완료 후 한 번만 호출됩니다.
+        중간 저장은 하지 않습니다.
+        """
+        # 전체 결과 저장 (raw logs 포함) - raw 파일만 저장
+        # 모든 질문 처리 완료 후 한 번만 저장됨
         results_path = self.output_dir / f"integrated_results_all_{self.timestamp}_raw.json"
         save_json(self.result, results_path)
         print(f"\n[SAVE] Results saved: {results_path}")
-
-        # 간소화된 결과 저장 (raw logs 제외)
-        simplified = {k: v for k, v in self.result.items() if k != "raw_logs"}
-
-        # 기본 통계 추가
-        if self.result.get("raw_logs"):
-            raw_logs = self.result["raw_logs"]
-            simplified["avg_contexts"] = sum(
-                log.get("n_contexts", 0) for log in raw_logs
-            ) / len(raw_logs) if raw_logs else 0
-            simplified["avg_elapsed"] = sum(
-                log.get("elapsed_seconds", 0) for log in raw_logs
-            ) / len(raw_logs) if raw_logs else 0
-
-            # 페르소나별 통계
-            persona_stats = {}
-            for log in raw_logs:
-                persona = log.get("persona", "unknown")
-                if persona not in persona_stats:
-                    persona_stats[persona] = {"count": 0, "contexts": []}
-                persona_stats[persona]["count"] += 1
-                persona_stats[persona]["contexts"].append(log.get("n_contexts", 0))
-
-            simplified["persona_stats"] = {
-                p: {
-                    "count": stats["count"],
-                    "avg_contexts": sum(stats["contexts"]) / len(stats["contexts"]) if stats["contexts"] else 0
-                }
-                for p, stats in persona_stats.items()
-            }
-
-        simplified_path = self.output_dir / f"integrated_results_all_{self.timestamp}.json"
-        save_json(simplified, simplified_path)
-        print(f"[SAVE] Simplified results saved: {simplified_path}")
 
     def print_summary(self):
         """결과 요약 출력"""

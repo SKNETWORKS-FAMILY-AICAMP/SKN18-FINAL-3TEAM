@@ -10,7 +10,12 @@ Fuseki RAG System - Automated RAGAS Evaluation
 - results_analyzer: 결과 분석 및 리포트 생성
 """
 
-from .config_manager import ConfigManager, get_config_manager, get_all_test_configs
+from .config_manager import (
+    ConfigurationManager,
+    TestConfiguration,
+    create_test_config,
+    validate_test_config
+)
 from .ragas_metrics import (
     RagasMetricsLoader,
     ensure_str_contexts,
@@ -19,9 +24,10 @@ from .ragas_metrics import (
 )
 
 __all__ = [
-    "ConfigManager",
-    "get_config_manager",
-    "get_all_test_configs",
+    "ConfigurationManager",
+    "TestConfiguration",
+    "create_test_config",
+    "validate_test_config",
     "RagasMetricsLoader",
     "ensure_str_contexts",
     "extract_contexts_from_evidences",
