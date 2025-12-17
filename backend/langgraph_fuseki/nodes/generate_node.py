@@ -658,8 +658,8 @@ def story_generator_node(state: GraphState) -> GraphState:
         # 메타 정보
         "executed_nodes": state.get("executed_nodes", []) + ["story_generator"],
         "node_execution_times": node_times,
-        
+
         # 필요한 경우에만 포함 (선택적)
         "extracted_entities": extracted_entities[:10] if extracted_entities else [],  # 최대 10개만
-        "evidences": evidences[:5] if evidences else [],  # 최대 5개만 (실제 사용)
+        "evidences": evidences if evidences else [],  # 전체 evidences 사용
     }

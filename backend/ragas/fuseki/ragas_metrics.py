@@ -221,8 +221,9 @@ def extract_contexts_from_evidences(evidences: List[Dict]) -> List[str]:
 def evaluate_with_ragas(
     loader: RagasMetricsLoader,
     samples: List,
-    debug: bool = False
-) -> Dict[str, float]:
+    debug: bool = False,
+    return_individual: bool = False
+) -> Dict:
     """
     RAGAS 평가 실행
 
@@ -230,9 +231,14 @@ def evaluate_with_ragas(
         loader: RagasMetricsLoader 인스턴스
         samples: SingleTurnSample 리스트
         debug: 디버그 모드
+        return_individual: True면 개별 점수 포함, False면 평균만
 
     Returns:
-        메트릭별 점수 딕셔너리
+        return_individual=False: {"metric_name": avg_score, ...}
+        return_individual=True: {
+            "average_scores": {"metric_name": avg_score, ...},
+            "individual_scores": [{"metric_name": score, ...}, ...]
+        }
     """
     if not samples:
         print("[WARNING] No samples to evaluate")
@@ -253,13 +259,31 @@ def evaluate_with_ragas(
     # pandas DataFrame으로 변환
     df = result.to_pandas()
 
-    # 평균 점수 계산
-    scores = {}
-    for col in df.columns:
-        if col not in ["user_input", "response", "retrieved_contexts", "reference"]:
-            scores[col] = df[col].mean()
+    # 메트릭 컬럼 확인
+    metric_columns = [col for col in df.columns
+                     if col not in ["user_input", "response", "retrieved_contexts", "reference"]]
 
-    return scores
+    # 평균 점수 계산
+    average_scores = {}
+    for col in metric_columns:
+        average_scores[col] = df[col].mean()
+
+    if not return_individual:
+        # 평균만 반환 (기존 호환성)
+        return average_scores
+
+    # 개별 점수 추출
+    individual_scores = []
+    for idx, row in df.iterrows():
+        score_dict = {}
+        for col in metric_columns:
+            score_dict[col] = row[col]
+        individual_scores.append(score_dict)
+
+    return {
+        "average_scores": average_scores,
+        "individual_scores": individual_scores
+    }
 
 
 if __name__ == "__main__":

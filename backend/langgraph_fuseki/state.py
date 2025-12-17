@@ -88,3 +88,11 @@ class GraphState(TypedDict):
     executed_nodes: NotRequired[List[str]]  # 실행된 노드 추적
     execution_time: NotRequired[float]  # 실행 시간 (초)
     node_execution_times: NotRequired[Dict[str, float]]  # 노드별 실행 시간 (초)
+
+    # ========== 테스트 설정 (RAGAS 평가용) ==========
+    test_config: NotRequired[Dict[str, Any]]  # 테스트 모드 설정
+    # {
+    #     "semantic_expander": {"temporal": True, "category": False, "causal_chain": False, "pgvector": False},
+    #     "aggregator_threads": {"outgoing_relations": True, "incoming_relations": False, ...},
+    #     "entity_boost_mode": "exact_match"  # "exact_match" | "partial_match" | "normalized_match" | "penalty_match"
+    # }
