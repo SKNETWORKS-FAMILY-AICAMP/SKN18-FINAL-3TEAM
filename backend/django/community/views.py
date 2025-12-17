@@ -47,6 +47,15 @@ class IsOwnerOrAdmin(BasePermission):
         return obj.user == request.user
 
 
+class IsOwner(BasePermission):
+    """
+    작성자 본인만 수정 가능 (관리자도 불가)
+    """
+    def has_object_permission(self, request, view, obj):
+        # 작성자 본인만 수정 가능
+        return obj.user == request.user
+
+
 # ============================================
 # 댓글 API
 # ============================================
@@ -182,12 +191,12 @@ class CommentReplyView(APIView):
 class CommentUpdateView(UpdateAPIView):
     """
     댓글 수정 API
-    - 작성자 본인 또는 관리자만 수정 가능
+    - 작성자 본인만 수정 가능
 
     PATCH /api/community/comments/{comment_id}/
     """
     queryset = Comment.objects.all()
-    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, IsOwner]
     serializer_class = CommentCreateSerializer
     lookup_url_kwarg = 'comment_id'
 
@@ -222,6 +231,32 @@ class CommentDeleteView(DestroyAPIView):
         return Response({
             'data': None,
             'message': '댓글이 삭제되었습니다.'
+        }, status=status.HTTP_200_OK)
+
+
+class ReplyUpdateView(UpdateAPIView):
+    """
+    답글 수정 API
+    - 작성자 본인만 수정 가능
+
+    PATCH /api/community/replies/{reply_id}/
+    """
+    queryset = Reply.objects.all()
+    permission_classes = [IsAuthenticated, IsOwner]
+    serializer_class = ReplyCreateSerializer
+    lookup_url_kwarg = 'reply_id'
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        # 수정된 답글을 ReplySerializer로 반환
+        updated_reply = ReplySerializer(instance, context={'request': request})
+        return Response({
+            'data': updated_reply.data,
+            'message': '답글이 수정되었습니다.'
         }, status=status.HTTP_200_OK)
 
 
