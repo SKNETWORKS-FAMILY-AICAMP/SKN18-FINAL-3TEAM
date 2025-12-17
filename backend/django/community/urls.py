@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     VideoCommentView,
     CommentReplyView,
+    CommentUpdateView,
     CommentDeleteView,
     ReplyDeleteView,
     VideoLikeView,
@@ -29,10 +30,12 @@ urlpatterns = [
     path('comments/<int:comment_id>/replies/', CommentReplyView.as_view(), name='comment-replies'),
 
     # ============================================
-    # 댓글/답글 삭제 API (작성자 본인 또는 관리자)
+    # 댓글 수정/삭제 API (작성자 본인 또는 관리자)
     # ============================================
-    # DELETE /api/community/comments/<comment_id>/ - 댓글 삭제
-    path('comments/<int:comment_id>/', CommentDeleteView.as_view(), name='comment-delete'),
+    # PATCH /api/community/comments/<comment_id>/ - 댓글 수정
+    # DELETE /api/community/comments/<comment_id>/delete/ - 댓글 삭제
+    path('comments/<int:comment_id>/', CommentUpdateView.as_view(), name='comment-update'),
+    path('comments/<int:comment_id>/delete/', CommentDeleteView.as_view(), name='comment-delete'),
 
     # DELETE /api/community/replies/<reply_id>/ - 답글 삭제
     path('replies/<int:reply_id>/', ReplyDeleteView.as_view(), name='reply-delete'),
