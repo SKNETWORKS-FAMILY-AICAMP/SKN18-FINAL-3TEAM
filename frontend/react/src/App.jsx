@@ -7,6 +7,7 @@ import VideoDetailPage from "./pages/VideoDetailPage";
 import MyPage from "./pages/MyPage";
 import AllCommentsPage from "./pages/AllCommentsPage";
 import ProfileEditPage from "./pages/ProfileEditPage";
+import AdminPage from "./pages/AdminPage";
 import {
   checkAuth,
   getGoogleLoginUrl,
@@ -231,6 +232,10 @@ const App = () => {
               user={user}
               onUserUpdate={handleUserUpdate}
             />
+          )}
+
+          {currentPage === "admin" && (
+            <AdminPage onNavigate={handleNavigate} user={user} />
           )}
         </div>
       </div>
