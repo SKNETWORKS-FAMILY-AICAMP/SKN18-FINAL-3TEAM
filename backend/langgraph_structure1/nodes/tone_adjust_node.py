@@ -16,24 +16,21 @@ def tone_adjust_node(state: GraphState) -> GraphState:
     # LLM 호출(모델 GPT-5-mini) -> 추후 파인튜닝 모델로 교체 예정
     TRANSLATE_TONE_PROMPT = f"""
     SYSTEM:
-    You transform a Korean answer or explanation text into simple English for foreign audiences.
-    The content is about Korean history, so the explanation must be easy, culturally clear, and friendly to readers who are not familiar with Korea.
+    You transform a Korean answer or explanation text into simple English for foreign audiences. The topic is Korean history, so explanations must be easy, culturally clear, and friendly for readers with no background knowledge of Korea.
 
     [RULES]
-    1. Translate all sentences into simple English (B1–B2 level).
-    2. Keep the original meaning, facts, and logical order. Do NOT add or remove content.
-    3. Because the topic is Korean history, explain in a way that a foreign reader with no background knowledge can understand.
-    4. For people, places, and historical events, output both the Romanized Korean and its English meaning.
-        Example:
-        - 세종대왕 → Sejong Daewang (King Sejong)
-        - 조선 → Joseon (the Joseon Dynasty)
-        - 한강 → Hangang (Han River)
-    5. For any Korean text inside parentheses, translate it into natural English.
-    - Example: (조용히 속삭이며) → (whispering quietly)
-    6. Keep the tone: clear, friendly, and suitable for people learning about Korea for the first time.
-    7. Do NOT format as scenes, narration, or dialogue yet. Just produce a coherent simple-English answer.
-    8. Do NOT add explanations about your changes. Output only the transformed text.
-
+    1. Translate all content into simple English (CEFR B1–B2 level).
+    2. Preserve the original meaning, factual accuracy, and logical order exactly. Do NOT add, remove, or reinterpret content.
+    3. Explain in a way that foreign readers with no prior knowledge of Korea can understand.
+    4. For people, places, and historical events, provide the Romanized Korean name followed by its English meaning.
+    - Example: Sejong Daewang (King Sejong)
+    - Example: Joseon (the Joseon Dynasty)
+    - Example: Hangang (Han River)
+    5. If the source text contains Korean inside parentheses, translate that content into natural English and output English only inside the parentheses.
+    6. The final output must contain ENGLISH ONLY. Do NOT include Korean characters anywhere in the response under any circumstances.
+    7. Maintain a clear, friendly, and educational tone suitable for first-time learners of Korean history.
+    8. Do NOT format the output as dialogue, narration, or scenes. Produce a coherent explanatory text only.
+    9. Do NOT explain your changes or mention these rules. Output only the transformed English text.
     """.strip()
 
     # user 메시지: 번역 대상 텍스트를 [Answer] 블록으로 감싸서 전달
@@ -83,15 +80,7 @@ def route_tone_adjust_node(state: GraphState) -> str:
 if __name__ == "__main__":
     # 예시 final_answer (한국어 한국사 설명 텍스트)
     final_answer = """
-    임진왜란은 1592년부터 1598년까지 일본이 조선을 침략하면서 벌어진 전쟁이다.
-    이 전쟁의 주요 원인은 일본의 팽창주의와 조선 내부의 분열로 요약할 수 있다.
-    일본의 대외적 팽창 의도와 함께 조선 사회의 내부 갈등이 맞물리며 외부 침략을 막아내기 어려운 상황을 만들었다는 점이 배경이 된다.
-    전쟁은 일본의 침략으로 본격적으로 시작되어 조선은 국토 방어와 군사적 대응을 펼쳐야 했다.
-    이 시기 조선 수군을 이끈 이순신 장군은 여러 차례 승리를 거두며 해상에서 중요한 역할을 수행했다.
-    이순신의 지휘 아래 조선 수군은 적의 해상 세력을 제어하거나 격파하는 성과를 올렸고, 이는 전쟁의 전개에 중 요한 영향을 미쳤다.
-    임진왜란은 여러 해에 걸쳐 지속되었고 전쟁 기간 동안 조선 사회와 군사에 큰 영향을 남겼다.
-    특히 이순신과 같은 핵심 인물들의 군사적 업적은 전쟁사의 중요한 부분으로 남아 후대에 평가되었다.
-    전반적으로 임진왜란은 외세의 침략과 내부 문제가 결합될 때 국가가 얼마나 취약해지는지를 보여준 사건으로, 역사적 교훈과 평가의 대상이 되고 있다.
+    위화도 회군은 1388년 고려 말, 이성계가 최영과 우왕의 명을 받아 요동 정벌에 나섰다가 위화도에서 군대를 돌려 개경으로 진격한 사건으로, 이후 권력 장악과 조선 건국으로 이어지는 결정적 계기가 되었습니다. 이 사건의 원인은 단일하지 않으며, 군사적 판단, 국제 정세 인식, 국내 정치 갈등, 그리고 개인적·정파적 이해관계가 복합적으로 작용한 결과로 이해됩니다. 당시 요동 지역은 명나라의 세력권 아래에 있었고, 원·명 교체기라는 국제 질서의 변화 속에서 고려가 요동을 공격할 경우 명과의 정면 충돌은 불가피했습니다. 이성계는 이러한 외교·군사적 현실을 인식하고, 국력에 비해 지나치게 무리한 원정이며 장기전으로 확대될 경우 막대한 인명 피해와 국가적 손실이 발생할 가능성이 크다고 판단한 것으로 해석됩니다. 국내 정치 상황 또한 회군 결정에 중요한 배경이 되었습니다. 최영과 우왕은 대외 강경 노선을 유지하며 요동 정벌을 추진했으나, 이는 친원적 정책 기조와도 맞닿아 있었습니다. 반면 이성계는 이러한 노선에 비판적이었고, 출병 명령 자체를 권력 투쟁의 연장선으로 인식했을 가능성이 큽니다. 요동 정벌은 단순한 대외 전쟁이 아니라, 고려 말 정치 권력의 향방을 둘러싼 갈등이 외부로 표출된 사건이기도 했습니다. 현실적인 군사 여건 역시 무시할 수 없는 요소였습니다. 장거리 원정에 따른 보급의 어려움, 병력의 피로 누적, 계절과 지형상의 불리함, 그리고 병사들의 낮은 사기와 귀향 의지는 회군을 정당화하는 실질적 이유로 작용했습니다. 일부 사료에서는 군 내부에서 원정에 대한 반발과 불만이 적지 않았음을 전하고 있습니다. 결과적으로 위화도 회군은 단순한 철군이 아니라, 이성계가 권력을 장악할 수 있는 결정적 기회가 되었습니다. 회군 직후 개경으로 진격한 이성계는 최영을 숙청하고 우왕을 폐위한 뒤 공양왕을 옹립하였으며, 이는 1392년 조선 건국으로 이어졌습니다. 따라서 이 사건에는 국가와 백성을 보호하려는 명분과 함께, 정치적 야심과 권력 재편을 향한 전략적 판단이 결합되어 있었다고 볼 수 있습니다. 역사적 평가는 관점에 따라 엇갈립니다. 조선왕조실록을 비롯한 조선 초기의 유교적 사관에서는 위화도 회군을 국가를 위기에서 구한 정당한 결단으로 서술하는 경향이 강한 반면, 다른 시각에서는 이를 군사 쿠데타이자 권력 찬탈로 비판하기도 합니다. 오늘날에는 어느 한 가지 이유로 단정하기보다는, 국제 정세, 국내 정치, 군사 현실, 개인적 선택이 복합적으로 작용한 역사적 전환점으로 이해하는 것이 일반적입니다.
     """
 
     # GraphState 형태로 감싸서 전달

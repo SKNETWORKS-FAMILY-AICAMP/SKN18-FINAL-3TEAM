@@ -4,8 +4,8 @@ import time
 from typing import Any, Dict, List
 
 from backend.langgraph_structure1.state import GraphState
-from backend.db_pipeline.vectordb.ETL.load_to_pgvector import get_embedding
-from backend.db_pipeline.vectordb.services.custom_pgvector import CustomPGVector
+from backend.db_pipeline.postgres.ETL.load_to_pgvector import get_embedding
+from backend.db_pipeline.postgres.services.custom_pgvector import CustomPGVector
 from backend.db_pipeline.common.config import POSTGRES_CONN_STR, HISTORY_TABLE_NAME
 from backend.langgraph_structure1.rag.rag_config import (
     RETRIEVAL_TOP_K,

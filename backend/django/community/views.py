@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.generics import DestroyAPIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
+from community.background_task import generate_reply_for_comment
 from video.models import Video
 from .models import Comment, Reply, Likes
 from .serializers import (
@@ -96,6 +97,10 @@ class VideoCommentView(APIView):
 
         if serializer.is_valid():
             serializer.save(user=request.user, video=video)
+
+            # 댓글 저장 후 인플루언서 답글 자동 생성(백그라운드 동작)
+            generate_reply_for_comment.delay(serializer.instance.id)
+
             return Response({
                 'data': CommentSerializer(serializer.instance).data,
                 'message': '댓글이 작성되었습니다.'

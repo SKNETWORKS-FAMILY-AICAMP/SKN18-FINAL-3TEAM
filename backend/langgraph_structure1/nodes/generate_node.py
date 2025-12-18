@@ -121,6 +121,8 @@ def generate_node(state: GraphState) -> GraphState:
 
         total_elapsed = time.perf_counter() - t0
 
+
+        print(f"질문을 입력하세요 (종료하려면 'exit' 입력): {question}")
         print("[최종 답변]")
         print(final_answer)
         print(f"[DEBUG] 최종 답변 생성 시간: {total_elapsed:.2f}초")

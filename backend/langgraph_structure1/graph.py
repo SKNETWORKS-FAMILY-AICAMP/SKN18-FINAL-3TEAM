@@ -36,16 +36,16 @@ def create_graph_flow():
     workflow.add_edge("hybrid_node", "generate_node")
 
     # 말투 및 scene 분리 노드 연결
-    # workflow.add_edge("generate_node", "tone_adjust_node")
+    workflow.add_edge("generate_node", "tone_adjust_node")
 
-    # workflow.add_conditional_edges(
-    #     "tone_adjust_node",
-    #     route_tone_adjust_node,
-    #     { 
-    #         "scene_split_node": "scene_split_node",
-    #         END: END,
-    #     },
-    # )
+    workflow.add_conditional_edges(
+        "tone_adjust_node",
+        route_tone_adjust_node,
+        { 
+            "scene_split_node": "scene_split_node",
+            END: END,
+        },
+    )
 
     # workflow.add_edge("scene_split_node", END)
 

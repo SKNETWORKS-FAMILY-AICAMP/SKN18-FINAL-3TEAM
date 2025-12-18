@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     'video',         # 영상 관리
     'activity',      # 검색 + 시청 기록
     'community',     # 댓글 + 답글 + 좋아요
+    'chatbot',       # 챗봇
 ]
 
 SITE_ID = 1
