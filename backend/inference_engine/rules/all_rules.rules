@@ -1,0 +1,1157 @@
+# ============================================================
+# Causal Inference Rules (인과관계 추론)
+# ============================================================
+#
+# 목적: What-if 시뮬레이터 (Stage 2)
+# CSV 추출: leadsTo, causedBy (LLM이 "이로 인해", "계기로" 키워드로 추출)
+# 추론 결과: indirectlyCausedBy (2-3단계 인과관계 체인)
+#
+
+@prefix hist: <http://www.example.org/korean-history#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+
+# ============================================================
+# Rule 1: 간접 인과관계 추론 (2단계)
+# ============================================================
+[causal_chain_2hop:
+    (?event1 hist:leadsTo ?event2)
+    (?event2 hist:leadsTo ?event3)
+    noValue(?event1 hist:indirectlyCausedBy ?event3)
+    ->
+    (?event1 hist:indirectlyCausedBy ?event3)
+]
+
+
+# ============================================================
+# Rule 2: 간접 인과관계 추론 (3단계)
+# ============================================================
+[causal_chain_3hop:
+    (?event1 hist:leadsTo ?event2)
+    (?event2 hist:leadsTo ?event3)
+    (?event3 hist:leadsTo ?event4)
+    noValue(?event1 hist:indirectlyCausedBy ?event4)
+    ->
+    (?event1 hist:indirectlyCausedBy ?event4)
+]
+
+
+# ============================================================
+# Rule 3: 전투 승리 → 전쟁 승리
+# ============================================================
+[battle_victory_to_war:
+    (?battle1 rdf:type hist:Battle)
+    (?battle2 rdf:type hist:Battle)
+    (?battle1 hist:partOf ?war)
+    (?battle2 hist:partOf ?war)
+    (?battle1 hist:hasVictor ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    notEqual(?battle1, ?battle2)
+    noValue(?war hist:hasVictor ?nation)
+    ->
+    (?war hist:hasVictor ?nation)
+]
+
+
+# ============================================================
+# Rule 4: 전투 패배 → 국가 약화
+# ============================================================
+[multiple_defeats_weakens_nation:
+    (?battle1 hist:hasDefeated ?nation)
+    (?battle2 hist:hasDefeated ?nation)
+    notEqual(?battle1, ?battle2)
+    noValue(?nation hist:hasStatus "weakened")
+    ->
+    (?nation hist:hasStatus "weakened")
+]
+
+
+# ============================================================
+# Rule 5: 연속 승리 → 전략적 우위
+# ============================================================
+[consecutive_victories_strategic_advantage:
+    (?person hist:commands ?battle1)
+    (?person hist:commands ?battle2)
+    (?battle1 hist:hasVictor ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    (?person hist:affiliatedWith ?nation)
+    notEqual(?battle1, ?battle2)
+    noValue(?person hist:hasStrategicAdvantage "high")
+    ->
+    (?person hist:hasStrategicAdvantage "high")
+]
+
+
+# ============================================================
+# Rule 6: 여러 전투 발생 → 전략적 요충지
+# ============================================================
+[strategic_location_inference:
+    (?battle1 hist:occursAt ?place)
+    (?battle2 hist:occursAt ?place)
+    (?battle3 hist:occursAt ?place)
+    notEqual(?battle1, ?battle2)
+    notEqual(?battle2, ?battle3)
+    notEqual(?battle1, ?battle3)
+    noValue(?place hist:strategicImportance "high")
+    ->
+    (?place hist:strategicImportance "high")
+]
+
+
+# ============================================================
+# Rule 7: 전쟁 참여 → 국가 간 적대 관계
+# ============================================================
+[war_creates_hostility:
+    (?battle hist:hasVictor ?nation1)
+    (?battle hist:hasDefeated ?nation2)
+    notEqual(?nation1, ?nation2)
+    noValue(?nation1 hist:atWarWith ?nation2)
+    ->
+    (?nation1 hist:atWarWith ?nation2)
+    (?nation2 hist:atWarWith ?nation1)
+]
+
+
+# ============================================================
+# Rule 8: 전투 승리 → 영토 통제
+# ============================================================
+[battle_victory_controls_territory:
+    (?battle hist:occursAt ?place)
+    (?battle hist:hasVictor ?nation)
+    noValue(?place hist:controlledBy ?nation)
+    ->
+    (?place hist:controlledBy ?nation)
+]
+
+
+# ============================================================
+# Rule 9: 인과관계 역방향 추론
+# ============================================================
+[inverse_causality:
+    (?event1 hist:leadsTo ?event2)
+    noValue(?event2 hist:causedBy ?event1)
+    ->
+    (?event2 hist:causedBy ?event1)
+]
+
+
+# ============================================================
+# Rule 10: 정책 → 사건 인과관계
+# ============================================================
+[policy_leads_to_event:
+    (?policy rdf:type hist:Policy)
+    (?policy hist:leadsTo ?event)
+    (?event rdf:type hist:Event)
+    noValue(?event hist:causedBy ?policy)
+    ->
+    (?event hist:causedBy ?policy)
+]
+
+
+# ============================================================
+# Rule 11: 제도 설립 → 정책 연계
+# ============================================================
+[institution_policy_connection:
+    (?institution rdf:type hist:Institution)
+    (?policy rdf:type hist:Policy)
+    (?institution hist:establishedBy ?person)
+    (?policy hist:initiatedBy ?person)
+    noValue(?institution hist:relatedToPolicy ?policy)
+    ->
+    (?institution hist:relatedToPolicy ?policy)
+]
+
+
+# ============================================================
+# Rule 12: 정책 시행 → 국가 관계
+# ============================================================
+[policy_affects_nation_relations:
+    (?policy rdf:type hist:Policy)
+    (?policy hist:involves ?nation)
+    (?policy hist:hasImpact ?impact)
+    noValue(?nation hist:hasStatus ?impact)
+    ->
+    (?nation hist:hasStatus ?impact)
+]
+# ============================================================
+# Person Inference Rules (인물 추론)
+# ============================================================
+#
+# 목적: 비하인드 스토리 (Stage 1) + 인물 분석 (Stage 3)
+# CSV 추출: commands, participatesIn, affiliatedWith, bornIn, diedIn
+# 추론 결과: hasRole, hasRelationshipWith, hasEnemyRelationship 등
+#
+
+@prefix hist: <http://www.example.org/korean-history#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+
+# ============================================================
+# Rule 1: 여러 전투 지휘 → 명장
+# ============================================================
+[multiple_battles_implies_great_general:
+    (?person hist:commands ?battle1)
+    (?person hist:commands ?battle2)
+    (?person hist:commands ?battle3)
+    notEqual(?battle1, ?battle2)
+    notEqual(?battle2, ?battle3)
+    notEqual(?battle1, ?battle3)
+    noValue(?person hist:hasRole "great_general")
+    ->
+    (?person hist:hasRole "great_general")
+]
+
+
+# ============================================================
+# Rule 2: 전투 승리 → 업적 추론
+# ============================================================
+[battle_victory_achievement:
+    (?person hist:commands ?battle)
+    (?battle hist:hasVictor ?nation)
+    (?person hist:affiliatedWith ?nation)
+    noValue(?person hist:hasAchievement "battle_victory")
+    ->
+    (?person hist:hasAchievement "battle_victory")
+]
+
+
+# ============================================================
+# Rule 3: 같은 전투 참여 → 동료 관계
+# ============================================================
+[same_battle_implies_comrade:
+    (?person1 hist:participatesIn ?battle)
+    (?person2 hist:participatesIn ?battle)
+    (?person1 hist:affiliatedWith ?nation)
+    (?person2 hist:affiliatedWith ?nation)
+    notEqual(?person1, ?person2)
+    noValue(?person1 hist:hasRelationshipWith ?person2)
+    ->
+    (?person1 hist:hasRelationshipWith ?person2)
+    (?person2 hist:hasRelationshipWith ?person1)
+]
+
+
+# ============================================================
+# Rule 4: 반대편 전투 → 적대 관계
+# ============================================================
+[opposite_sides_implies_enemy:
+    (?person1 hist:commands ?battle)
+    (?battle hist:hasVictor ?nation1)
+    (?battle hist:hasDefeated ?nation2)
+    (?person1 hist:affiliatedWith ?nation1)
+    (?person2 hist:affiliatedWith ?nation2)
+    (?person2 hist:participatesIn ?battle)
+    notEqual(?person1, ?person2)
+    noValue(?person1 hist:hasEnemyRelationship ?person2)
+    ->
+    (?person1 hist:hasEnemyRelationship ?person2)
+    (?person2 hist:hasEnemyRelationship ?person1)
+]
+
+
+# ============================================================
+# Rule 5: 국가 지도자 → 정치적 역할
+# ============================================================
+[leader_implies_political_role:
+    (?nation hist:hasLeader ?person)
+    noValue(?person hist:hasRole "political_leader")
+    ->
+    (?person hist:hasRole "political_leader")
+]
+
+
+# ============================================================
+# Rule 6: 전투 중 사망 → 전사
+# ============================================================
+[died_in_battle_implies_war_death:
+    (?person hist:commands ?battle)
+    (?battle hist:occursAt ?place)
+    (?person hist:diedIn ?place)
+    noValue(?person hist:causeOfDeath "killed_in_battle")
+    ->
+    (?person hist:causeOfDeath "killed_in_battle")
+]
+
+
+# ============================================================
+# Rule 7: 여러 사건 참여 → 영향력 있는 인물
+# ============================================================
+[multiple_events_implies_influential:
+    (?person hist:participatesIn ?event1)
+    (?person hist:participatesIn ?event2)
+    (?person hist:participatesIn ?event3)
+    (?person hist:participatesIn ?event4)
+    (?person hist:participatesIn ?event5)
+    notEqual(?event1, ?event2)
+    notEqual(?event2, ?event3)
+    notEqual(?event3, ?event4)
+    notEqual(?event4, ?event5)
+    noValue(?person hist:hasInfluence "high")
+    ->
+    (?person hist:hasInfluence "high")
+]
+
+
+# ============================================================
+# Rule 8: 동일 장소 출생/사망 → 지역 연고
+# ============================================================
+[same_birthplace_deathplace_implies_local_ties:
+    (?person hist:bornIn ?place)
+    (?person hist:diedIn ?place)
+    noValue(?person hist:hasLocalTies ?place)
+    ->
+    (?person hist:hasLocalTies ?place)
+]
+
+
+# ============================================================
+# Rule 9: 전투 패배 → 책임 추론
+# ============================================================
+[battle_defeat_implies_responsibility:
+    (?person hist:commands ?battle)
+    (?battle hist:hasDefeated ?nation)
+    (?person hist:affiliatedWith ?nation)
+    noValue(?person hist:hasResponsibility "defeat_responsibility")
+    ->
+    (?person hist:hasResponsibility "defeat_responsibility")
+]
+
+
+# ============================================================
+# Rule 10: 국가 소속 + 여러 전투 → 충성도 높음
+# ============================================================
+[affiliation_and_participation_implies_loyalty:
+    (?person hist:affiliatedWith ?nation)
+    (?person hist:participatesIn ?event1)
+    (?person hist:participatesIn ?event2)
+    (?event1 hist:involves ?nation)
+    (?event2 hist:involves ?nation)
+    notEqual(?event1, ?event2)
+    noValue(?person hist:hasLoyalty "high")
+    ->
+    (?person hist:hasLoyalty "high")
+]
+
+
+# ============================================================
+# Rule 11: 동기 추론 - 국가 방어
+# ============================================================
+[defending_homeland_implies_defensive_motive:
+    (?person hist:commands ?battle)
+    (?battle hist:occursAt ?place)
+    (?place hist:controlledBy ?nation)
+    (?person hist:affiliatedWith ?nation)
+    noValue(?person hist:hasMotive "defend_homeland")
+    ->
+    (?person hist:hasMotive "defend_homeland")
+]
+
+
+# ============================================================
+# Rule 12: 동기 추론 - 침략
+# ============================================================
+[attacking_foreign_land_implies_aggressive_motive:
+    (?person hist:commands ?battle)
+    (?battle hist:occursAt ?place)
+    (?place hist:controlledBy ?nation1)
+    (?person hist:affiliatedWith ?nation2)
+    notEqual(?nation1, ?nation2)
+    noValue(?person hist:hasMotive "invade_territory")
+    ->
+    (?person hist:hasMotive "invade_territory")
+]
+
+
+# ============================================================
+# Rule 13: 정책 시행 인물 → 정치적 업적
+# ============================================================
+[policy_initiator_achievement:
+    (?person rdf:type hist:Person)
+    (?policy rdf:type hist:Policy)
+    (?policy hist:initiatedBy ?person)
+    noValue(?person hist:hasAchievement "policy_initiator")
+    ->
+    (?person hist:hasAchievement "policy_initiator")
+]
+
+
+# ============================================================
+# Rule 14: 제도 설립자 → 문화적 업적
+# ============================================================
+[institution_founder_achievement:
+    (?person rdf:type hist:Person)
+    (?institution rdf:type hist:Institution)
+    (?institution hist:establishedBy ?person)
+    noValue(?person hist:hasAchievement "institution_founder")
+    ->
+    (?person hist:hasAchievement "institution_founder")
+]
+
+
+# ============================================================
+# Rule 15: 여러 정책 시행 → 개혁가 역할
+# ============================================================
+[multiple_policies_implies_reformer:
+    (?person hist:initiatedBy ?policy1)
+    (?person hist:initiatedBy ?policy2)
+    (?person hist:initiatedBy ?policy3)
+    (?policy1 rdf:type hist:Policy)
+    (?policy2 rdf:type hist:Policy)
+    (?policy3 rdf:type hist:Policy)
+    notEqual(?policy1, ?policy2)
+    notEqual(?policy2, ?policy3)
+    notEqual(?policy1, ?policy3)
+    noValue(?person hist:hasRole "reformer")
+    ->
+    (?person hist:hasRole "reformer")
+]
+
+
+# ============================================================
+# Rule 16: 제도 설립 + 정책 시행 → 국가 개혁자
+# ============================================================
+[institution_and_policy_implies_nation_reformer:
+    (?person hist:establishedBy ?institution)
+    (?person hist:initiatedBy ?policy)
+    (?institution rdf:type hist:Institution)
+    (?policy rdf:type hist:Policy)
+    noValue(?person hist:hasRole "nation_reformer")
+    ->
+    (?person hist:hasRole "nation_reformer")
+]
+# ============================================================
+# Temporal Inference Rules (시간 추론)
+# ============================================================
+#
+# 목적: 시대적 배경 분석 (Stage 4)
+# CSV 추출: hasYear, hasBirthYear, hasDeathYear
+# 추론 결과: occursBefore, contemporaryWith, hasLifespan 등
+#
+
+@prefix hist: <http://www.example.org/korean-history#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+
+# ============================================================
+# Rule 1: 사건 시간 순서 추론
+# ============================================================
+[temporal_order_events:
+    (?event1 hist:hasYear ?year1)
+    (?event2 hist:hasYear ?year2)
+    lessThan(?year1, ?year2)
+    noValue(?event1 hist:occursBefore ?event2)
+    ->
+    (?event1 hist:occursBefore ?event2)
+    (?event2 hist:occursAfter ?event1)
+]
+
+
+# ============================================================
+# Rule 2: 동시대 인물 추론
+# ============================================================
+[contemporary_persons:
+    (?person1 hist:hasBirthYear ?birth1)
+    (?person1 hist:hasDeathYear ?death1)
+    (?person2 hist:hasBirthYear ?birth2)
+    (?person2 hist:hasDeathYear ?death2)
+    lessThan(?birth1, ?death2)
+    lessThan(?birth2, ?death1)
+    notEqual(?person1, ?person2)
+    noValue(?person1 hist:contemporaryWith ?person2)
+    ->
+    (?person1 hist:contemporaryWith ?person2)
+    (?person2 hist:contemporaryWith ?person1)
+]
+
+
+# ============================================================
+# Rule 3: 선배/후배 관계 추론
+# ============================================================
+[senior_junior_relationship:
+    (?person1 hist:hasBirthYear ?birth1)
+    (?person2 hist:hasBirthYear ?birth2)
+    lessThan(?birth1, ?birth2)
+    notEqual(?person1, ?person2)
+    noValue(?person1 hist:seniorTo ?person2)
+    ->
+    (?person1 hist:seniorTo ?person2)
+    (?person2 hist:juniorTo ?person1)
+]
+
+
+# ============================================================
+# Rule 4: 세대 차이 추론 (30년 기준)
+# ============================================================
+[different_generation:
+    (?person1 hist:hasBirthYear ?birth1)
+    (?person2 hist:hasBirthYear ?birth2)
+    difference(?diff, ?birth2, ?birth1)
+    greaterThan(?diff, 30)
+    notEqual(?person1, ?person2)
+    noValue(?person1 hist:differentGenerationFrom ?person2)
+    ->
+    (?person1 hist:differentGenerationFrom ?person2)
+    (?person2 hist:differentGenerationFrom ?person1)
+]
+
+
+# ============================================================
+# Rule 5: 같은 시기 사건 추론 (동일 연도)
+# ============================================================
+[simultaneous_events:
+    (?event1 hist:hasYear ?year)
+    (?event2 hist:hasYear ?year)
+    notEqual(?event1, ?event2)
+    noValue(?event1 hist:simultaneousWith ?event2)
+    ->
+    (?event1 hist:simultaneousWith ?event2)
+    (?event2 hist:simultaneousWith ?event1)
+]
+
+
+# ============================================================
+# Rule 6: 수명 추론
+# ============================================================
+[calculate_lifespan:
+    (?person hist:hasBirthYear ?birth)
+    (?person hist:hasDeathYear ?death)
+    difference(?lifespan, ?death, ?birth)
+    noValue(?person hist:hasLifespan ?lifespan)
+    ->
+    (?person hist:hasLifespan ?lifespan)
+]
+
+
+# ============================================================
+# Rule 7: 전쟁 기간 추론
+# ============================================================
+[war_duration_inference:
+    (?battle1 hist:partOf ?war)
+    (?battle2 hist:partOf ?war)
+    (?battle1 hist:hasYear ?year1)
+    (?battle2 hist:hasYear ?year2)
+    lessThan(?year1, ?year2)
+    difference(?duration, ?year2, ?year1)
+    noValue(?war hist:hasDuration ?duration)
+    ->
+    (?war hist:hasDuration ?duration)
+]
+
+
+# ============================================================
+# Rule 8: 역사적 시대 분류 - 임진왜란 시기
+# ============================================================
+# DISABLED: greaterThanOrEqual/lessThanOrEqual not implemented in Jena
+# [classify_imjin_war_period:
+#     (?event hist:hasYear ?year)
+#     greaterThanOrEqual(?year, 1592)
+#     lessThanOrEqual(?year, 1598)
+#     noValue(?event hist:belongsToPeriod ?period)
+#     ->
+#     (?event hist:belongsToPeriod "imjin_war_period")
+# ]
+
+
+# ============================================================
+# Rule 9: 인물 생존 여부 추론
+# ============================================================
+# DISABLED: greaterThanOrEqual/lessThanOrEqual not implemented in Jena
+# [person_alive_during_event:
+#     (?person hist:participatesIn ?event)
+#     (?event hist:hasYear ?eventYear)
+#     (?person hist:hasBirthYear ?birth)
+#     (?person hist:hasDeathYear ?death)
+#     greaterThanOrEqual(?eventYear, ?birth)
+#     lessThanOrEqual(?eventYear, ?death)
+#     noValue(?person hist:aliveDuring ?event)
+#     ->
+#     (?person hist:aliveDuring ?event)
+# ]
+
+
+# ============================================================
+# Rule 10: 장기 전쟁 추론 (5년 이상)
+# ============================================================
+# DISABLED: greaterThanOrEqual not implemented in Jena
+# [long_war_classification:
+#     (?war hist:hasDuration ?duration)
+#     greaterThanOrEqual(?duration, 5)
+#     noValue(?war hist:warType ?type)
+#     ->
+#     (?war hist:warType "prolonged_war")
+# ]
+
+
+# ============================================================
+# Rule 11: 연속 사건 추론
+# ============================================================
+[consecutive_events:
+    (?event1 hist:hasYear ?year1)
+    (?event2 hist:hasYear ?year2)
+    sum(?nextYear, ?year1, 1)
+    equal(?year2, ?nextYear)
+    noValue(?event1 hist:followedBy ?event2)
+    ->
+    (?event1 hist:followedBy ?event2)
+    (?event2 hist:precededBy ?event1)
+]
+
+
+# ============================================================
+# Rule 12: 인물 나이 추론 (사건 발생 시)
+# ============================================================
+[person_age_during_event:
+    (?person hist:participatesIn ?event)
+    (?event hist:hasYear ?eventYear)
+    (?person hist:hasBirthYear ?birth)
+    difference(?age, ?eventYear, ?birth)
+    noValue(?person hist:ageAt ?event)
+    ->
+    (?person hist:ageAt ?event)
+]
+
+
+# ============================================================
+# Rule 13: 정책 시간 순서 추론
+# ============================================================
+[temporal_order_policies:
+    (?policy1 rdf:type hist:Policy)
+    (?policy2 rdf:type hist:Policy)
+    (?policy1 hist:hasYear ?year1)
+    (?policy2 hist:hasYear ?year2)
+    lessThan(?year1, ?year2)
+    noValue(?policy1 hist:occursBefore ?policy2)
+    ->
+    (?policy1 hist:occursBefore ?policy2)
+    (?policy2 hist:occursAfter ?policy1)
+]
+
+
+# ============================================================
+# Rule 14: 제도 설립 시대 분류 - 세종대왕 시기
+# ============================================================
+# DISABLED: greaterThanOrEqual/lessThanOrEqual not implemented in Jena
+# [classify_sejong_period:
+#     (?institution rdf:type hist:Institution)
+#     (?institution hist:hasYear ?year)
+#     greaterThanOrEqual(?year, 1418)
+#     lessThanOrEqual(?year, 1450)
+#     noValue(?institution hist:belongsToPeriod ?period)
+#     ->
+#     (?institution hist:belongsToPeriod "sejong_period")
+# ]
+
+
+# ============================================================
+# Rule 15: 정책과 사건 동시성 추론
+# ============================================================
+[policy_event_simultaneity:
+    (?policy rdf:type hist:Policy)
+    (?event rdf:type hist:Event)
+    (?policy hist:hasYear ?year)
+    (?event hist:hasYear ?year)
+    noValue(?policy hist:simultaneousWith ?event)
+    ->
+    (?policy hist:simultaneousWith ?event)
+    (?event hist:simultaneousWith ?policy)
+]
+
+
+# ============================================================
+# Rule 16: 제도 존속 기간 추론 (설립-폐지)
+# ============================================================
+[institution_duration:
+    (?institution rdf:type hist:Institution)
+    (?institution hist:establishedBy ?person)
+    (?person hist:hasBirthYear ?birth)
+    (?person hist:hasDeathYear ?death)
+    difference(?duration, ?death, ?birth)
+    noValue(?institution hist:hasDuration ?duration)
+    ->
+    (?institution hist:hasDuration ?duration)
+]
+# ============================================================
+# Pattern Inference Rules (패턴 추론)
+# ============================================================
+#
+# 목적: 심화 분석 (Stage 5)
+# CSV 추출: commands, occursAt, hasVictor
+# 추론 결과: hasStrategyPattern, hasWinningStreak 등
+#
+
+@prefix hist: <http://www.example.org/korean-history#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+
+# ============================================================
+# Rule 1: 방어 전략 패턴
+# ============================================================
+[defensive_strategy_pattern:
+    (?battle1 hist:occursAt ?place)
+    (?battle2 hist:occursAt ?place)
+    (?battle1 hist:hasVictor ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    (?place hist:controlledBy ?nation)
+    notEqual(?battle1, ?battle2)
+    noValue(?nation hist:hasStrategyPattern "defensive_warfare")
+    ->
+    (?nation hist:hasStrategyPattern "defensive_warfare")
+]
+
+
+# ============================================================
+# Rule 2: 기동 전략 패턴
+# ============================================================
+[mobile_strategy_pattern:
+    (?person hist:commands ?battle1)
+    (?person hist:commands ?battle2)
+    (?person hist:commands ?battle3)
+    (?battle1 hist:occursAt ?place1)
+    (?battle2 hist:occursAt ?place2)
+    (?battle3 hist:occursAt ?place3)
+    (?battle1 hist:hasVictor ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    (?battle3 hist:hasVictor ?nation)
+    notEqual(?place1, ?place2)
+    notEqual(?place2, ?place3)
+    notEqual(?place1, ?place3)
+    noValue(?person hist:hasStrategyPattern "mobile_warfare")
+    ->
+    (?person hist:hasStrategyPattern "mobile_warfare")
+]
+
+
+# ============================================================
+# Rule 3: 연합 전략 패턴
+# ============================================================
+[alliance_pattern:
+    (?battle hist:hasVictor ?nation1)
+    (?battle hist:involves ?nation2)
+    (?person1 hist:affiliatedWith ?nation1)
+    (?person2 hist:affiliatedWith ?nation2)
+    (?person1 hist:participatesIn ?battle)
+    (?person2 hist:participatesIn ?battle)
+    notEqual(?nation1, ?nation2)
+    noValue(?nation1 hist:alliedWith ?nation2)
+    ->
+    (?nation1 hist:alliedWith ?nation2)
+    (?nation2 hist:alliedWith ?nation1)
+]
+
+
+# ============================================================
+# Rule 4: 승리 패턴 - 연속 승리
+# ============================================================
+[winning_streak_pattern:
+    (?person hist:commands ?battle1)
+    (?person hist:commands ?battle2)
+    (?person hist:commands ?battle3)
+    (?battle1 hist:hasVictor ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    (?battle3 hist:hasVictor ?nation)
+    (?person hist:affiliatedWith ?nation)
+    (?battle1 hist:occursBefore ?battle2)
+    (?battle2 hist:occursBefore ?battle3)
+    noValue(?person hist:hasWinningStreak "three_consecutive_wins")
+    ->
+    (?person hist:hasWinningStreak "three_consecutive_wins")
+]
+
+
+# ============================================================
+# Rule 5: 패배 후 반전 패턴
+# ============================================================
+[comeback_pattern:
+    (?person hist:commands ?battle1)
+    (?person hist:commands ?battle2)
+    (?battle1 hist:hasDefeated ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    (?person hist:affiliatedWith ?nation)
+    (?battle1 hist:occursBefore ?battle2)
+    noValue(?person hist:hasComebackPattern "comeback_victory")
+    ->
+    (?person hist:hasComebackPattern "comeback_victory")
+]
+
+
+# ============================================================
+# Rule 6: 장소 재점령 패턴
+# ============================================================
+[territory_recapture_pattern:
+    (?battle1 hist:occursAt ?place)
+    (?battle2 hist:occursAt ?place)
+    (?battle1 hist:hasVictor ?nation1)
+    (?battle2 hist:hasVictor ?nation2)
+    (?battle1 hist:occursBefore ?battle2)
+    notEqual(?nation1, ?nation2)
+    noValue(?place hist:hasContestedStatus "contested_territory")
+    ->
+    (?place hist:hasContestedStatus "contested_territory")
+]
+
+
+# ============================================================
+# Rule 7: 지휘관 교체 패턴
+# ============================================================
+[commander_rotation_pattern:
+    (?person1 hist:commands ?battle1)
+    (?person2 hist:commands ?battle2)
+    (?battle1 hist:partOf ?war)
+    (?battle2 hist:partOf ?war)
+    (?battle1 hist:occursBefore ?battle2)
+    notEqual(?person1, ?person2)
+    noValue(?war hist:hasCommandPattern "commander_rotation")
+    ->
+    (?war hist:hasCommandPattern "commander_rotation")
+]
+
+
+# ============================================================
+# Rule 8: 연속 정책 시행 → 개혁 전략 패턴
+# ============================================================
+[reform_policy_pattern:
+    (?person hist:initiatedBy ?policy1)
+    (?person hist:initiatedBy ?policy2)
+    (?person hist:initiatedBy ?policy3)
+    (?policy1 rdf:type hist:Policy)
+    (?policy2 rdf:type hist:Policy)
+    (?policy3 rdf:type hist:Policy)
+    (?policy1 hist:occursBefore ?policy2)
+    (?policy2 hist:occursBefore ?policy3)
+    noValue(?person hist:hasStrategyPattern "systematic_reform")
+    ->
+    (?person hist:hasStrategyPattern "systematic_reform")
+]
+
+
+# ============================================================
+# Rule 9: 제도 설립 → 문화 발전 패턴
+# ============================================================
+[institution_culture_pattern:
+    (?institution1 rdf:type hist:Institution)
+    (?institution2 rdf:type hist:Institution)
+    (?person hist:establishedBy ?institution1)
+    (?person hist:establishedBy ?institution2)
+    notEqual(?institution1, ?institution2)
+    noValue(?person hist:hasStrategyPattern "cultural_advancement")
+    ->
+    (?person hist:hasStrategyPattern "cultural_advancement")
+]
+
+
+# ============================================================
+# Rule 10: 정책 → 제도 설립 → 시스템 구축 패턴
+# ============================================================
+[systemic_building_pattern:
+    (?policy rdf:type hist:Policy)
+    (?institution rdf:type hist:Institution)
+    (?policy hist:initiatedBy ?person)
+    (?institution hist:establishedBy ?person)
+    (?institution hist:relatedToPolicy ?policy)
+    noValue(?person hist:hasStrategyPattern "systemic_building")
+    ->
+    (?person hist:hasStrategyPattern "systemic_building")
+]
+# ============================================================
+# Motive Inference Rules (동기 추론)
+# ============================================================
+#
+# 목적: 비하인드 스토리 (Stage 1)
+# CSV 추출: commands, bornIn, affiliatedWith
+# 추론 결과: hasMotive (복수, 방어, 침략, 충성 등)
+#
+
+@prefix hist: <http://www.example.org/korean-history#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+
+# ============================================================
+# Rule 1: 복수 동기 추론
+# ============================================================
+[revenge_motive:
+    (?person1 hist:commands ?battle1)
+    (?person1 hist:commands ?battle2)
+    (?battle1 hist:hasDefeated ?nation1)
+    (?battle2 hist:hasVictor ?nation1)
+    (?person1 hist:affiliatedWith ?nation1)
+    (?battle1 hist:occursBefore ?battle2)
+    noValue(?person1 hist:hasMotive "revenge")
+    ->
+    (?person1 hist:hasMotive "revenge")
+]
+
+
+# ============================================================
+# Rule 2: 국가 방어 동기
+# ============================================================
+[national_defense_motive:
+    (?person hist:commands ?battle)
+    (?battle hist:occursAt ?place)
+    (?place hist:controlledBy ?nation)
+    (?person hist:affiliatedWith ?nation)
+    (?battle hist:hasVictor ?nation)
+    noValue(?person hist:hasMotive "national_defense")
+    ->
+    (?person hist:hasMotive "national_defense")
+]
+
+
+# ============================================================
+# Rule 3: 침략 동기
+# ============================================================
+[invasion_motive:
+    (?person hist:commands ?battle)
+    (?battle hist:occursAt ?place)
+    (?place hist:controlledBy ?nation1)
+    (?person hist:affiliatedWith ?nation2)
+    notEqual(?nation1, ?nation2)
+    noValue(?person hist:hasMotive "invasion")
+    ->
+    (?person hist:hasMotive "invasion")
+]
+
+
+# ============================================================
+# Rule 4: 명예 회복 동기
+# ============================================================
+[honor_restoration_motive:
+    (?person hist:commands ?battle1)
+    (?person hist:commands ?battle2)
+    (?battle1 hist:hasDefeated ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    (?person hist:affiliatedWith ?nation)
+    (?battle1 hist:occursBefore ?battle2)
+    noValue(?person hist:hasMotive "honor_restoration")
+    ->
+    (?person hist:hasMotive "honor_restoration")
+]
+
+
+# ============================================================
+# Rule 5: 동맹 지원 동기
+# ============================================================
+[alliance_support_motive:
+    (?person hist:participatesIn ?battle)
+    (?person hist:affiliatedWith ?nation1)
+    (?battle hist:involves ?nation2)
+    (?nation1 hist:alliedWith ?nation2)
+    notEqual(?nation1, ?nation2)
+    noValue(?person hist:hasMotive "alliance_support")
+    ->
+    (?person hist:hasMotive "alliance_support")
+]
+
+
+# ============================================================
+# Rule 6: 생존 동기
+# ============================================================
+[survival_motive:
+    (?person hist:commands ?battle)
+    (?battle hist:occursAt ?place)
+    (?person hist:bornIn ?place)
+    (?battle hist:hasVictor ?nation)
+    (?person hist:affiliatedWith ?nation)
+    noValue(?person hist:hasMotive "survival")
+    ->
+    (?person hist:hasMotive "survival")
+]
+
+
+# ============================================================
+# Rule 7: 가족 보호 동기
+# ============================================================
+[family_protection_motive:
+    (?person hist:commands ?battle)
+    (?battle hist:occursAt ?place)
+    (?person hist:bornIn ?place)
+    (?person hist:hasLocalTies ?place)
+    noValue(?person hist:hasMotive "family_protection")
+    ->
+    (?person hist:hasMotive "family_protection")
+]
+
+
+# ============================================================
+# Rule 8: 충성심 동기
+# ============================================================
+[loyalty_motive:
+    (?person hist:commands ?battle)
+    (?person hist:affiliatedWith ?nation)
+    (?nation hist:hasLeader ?leader)
+    noValue(?person hist:hasMotive "loyalty_to_leader")
+    ->
+    (?person hist:hasMotive "loyalty_to_leader")
+]
+
+
+# ============================================================
+# Rule 9: 보복 동기
+# ============================================================
+[retaliation_motive:
+    (?battle1 hist:hasDefeated ?nation)
+    (?battle2 hist:hasVictor ?nation)
+    (?battle1 hist:leadsTo ?battle2)
+    (?person hist:commands ?battle2)
+    (?person hist:affiliatedWith ?nation)
+    noValue(?person hist:hasMotive "retaliation")
+    ->
+    (?person hist:hasMotive "retaliation")
+]
+
+
+# ============================================================
+# Rule 10: 정책 시행 동기 - 국가 발전
+# ============================================================
+[national_development_motive:
+    (?person rdf:type hist:Person)
+    (?policy rdf:type hist:Policy)
+    (?policy hist:initiatedBy ?person)
+    (?policy hist:hasObjective ?objective)
+    noValue(?person hist:hasMotive "national_development")
+    ->
+    (?person hist:hasMotive "national_development")
+]
+
+
+# ============================================================
+# Rule 11: 제도 설립 동기 - 문화 진흥
+# ============================================================
+[cultural_promotion_motive:
+    (?person rdf:type hist:Person)
+    (?institution rdf:type hist:Institution)
+    (?institution hist:establishedBy ?person)
+    (?institution hist:hasPurpose ?purpose)
+    noValue(?person hist:hasMotive "cultural_promotion")
+    ->
+    (?person hist:hasMotive "cultural_promotion")
+]
+
+
+# ============================================================
+# Rule 12: 정책 시행 동기 - 외교적 목적
+# ============================================================
+[diplomatic_policy_motive:
+    (?person rdf:type hist:Person)
+    (?policy rdf:type hist:Policy)
+    (?policy hist:initiatedBy ?person)
+    (?policy hist:involves ?nation1)
+    (?policy hist:involves ?nation2)
+    (?person hist:affiliatedWith ?nation1)
+    notEqual(?nation1, ?nation2)
+    noValue(?person hist:hasMotive "diplomatic_strategy")
+    ->
+    (?person hist:hasMotive "diplomatic_strategy")
+]
+
+
+# ============================================================
+# Rule 13: 쇄국정책 동기 - 국가 보호
+# ============================================================
+[isolationist_policy_motive:
+    (?person rdf:type hist:Person)
+    (?policy rdf:type hist:Policy)
+    (?policy hist:initiatedBy ?person)
+    (?nation hist:atWarWith ?foreignNation)
+    (?person hist:affiliatedWith ?nation)
+    noValue(?person hist:hasMotive "national_protection")
+    ->
+    (?person hist:hasMotive "national_protection")
+]
+
+
+# ============================================================
+# Rule 14: 학문 추구 동기 - 저술 활동
+# ============================================================
+[scholarly_pursuit_motive:
+    (?person rdf:type hist:Person)
+    (?document rdf:type hist:Document)
+    (?person hist:authored ?document)
+    noValue(?person hist:hasMotive "scholarly_pursuit")
+    ->
+    (?person hist:hasMotive "scholarly_pursuit")
+]
+
+
+# ============================================================
+# Rule 15: 교육 진흥 동기 - 스승 역할
+# ============================================================
+[education_promotion_motive:
+    (?person rdf:type hist:Person)
+    (?student rdf:type hist:Person)
+    (?person hist:teacherOf ?student)
+    noValue(?person hist:hasMotive "education_promotion")
+    ->
+    (?person hist:hasMotive "education_promotion")
+]
+
+
+# ============================================================
+# Rule 16: 민생 개혁 동기 - 제도 개혁
+# ============================================================
+[public_welfare_motive:
+    (?person rdf:type hist:Person)
+    (?institution rdf:type hist:Institution)
+    (?person hist:reformed ?institution)
+    noValue(?person hist:hasMotive "public_welfare")
+    ->
+    (?person hist:hasMotive "public_welfare")
+]
+
+
+# ============================================================
+# Rule 17: 지식 전파 동기 - 편찬 활동
+# ============================================================
+[knowledge_dissemination_motive:
+    (?person rdf:type hist:Person)
+    (?document rdf:type hist:Document)
+    (?person hist:compiled ?document)
+    noValue(?person hist:hasMotive "knowledge_dissemination")
+    ->
+    (?person hist:hasMotive "knowledge_dissemination")
+]
+
+
+# ============================================================
+# Rule 18: 충절 동기 - 군주 섬김
+# ============================================================
+[loyalty_to_monarch_motive:
+    (?person rdf:type hist:Person)
+    (?monarch rdf:type hist:Person)
+    (?person hist:servedUnder ?monarch)
+    noValue(?person hist:hasMotive "loyalty_to_monarch")
+    ->
+    (?person hist:hasMotive "loyalty_to_monarch")
+]
+
+
+# ============================================================
+# Rule 19: 학문 계승 동기 - 제자로서 학문 전승
+# ============================================================
+[scholarly_succession_motive:
+    (?person rdf:type hist:Person)
+    (?teacher rdf:type hist:Person)
+    (?person hist:studentOf ?teacher)
+    (?teacher hist:hasField ?field)
+    noValue(?person hist:hasMotive "scholarly_succession")
+    ->
+    (?person hist:hasMotive "scholarly_succession")
+]
+
+
+# ============================================================
+# Rule 20: 기관 설립 동기 - 사회 발전
+# ============================================================
+[institutional_building_motive:
+    (?person rdf:type hist:Person)
+    (?institution rdf:type hist:Institution)
+    (?person hist:founded ?institution)
+    noValue(?person hist:hasMotive "institutional_building")
+    ->
+    (?person hist:hasMotive "institutional_building")
+]
