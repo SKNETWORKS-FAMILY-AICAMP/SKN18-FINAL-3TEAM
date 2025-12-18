@@ -1,9 +1,6 @@
 from django.urls import path
-
-# Search app URLs
-# React frontend handles the search page UI
-# Add API endpoints here for search functionality
+from .views import VideoSearchView
 
 urlpatterns = [
-    # API endpoints will be added here
+    path('videos/', VideoSearchView.as_view(), name='video-search'),
 ]

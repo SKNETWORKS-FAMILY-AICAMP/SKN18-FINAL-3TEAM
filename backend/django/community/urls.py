@@ -4,6 +4,7 @@ from .views import (
     CommentReplyView,
     CommentUpdateView,
     CommentDeleteView,
+    ReplyUpdateView,
     ReplyDeleteView,
     VideoLikeView,
     CommentLikeView,
@@ -37,7 +38,9 @@ urlpatterns = [
     path('comments/<int:comment_id>/', CommentUpdateView.as_view(), name='comment-update'),
     path('comments/<int:comment_id>/delete/', CommentDeleteView.as_view(), name='comment-delete'),
 
+    # PATCH /api/community/replies/<reply_id>/update/ - 답글 수정
     # DELETE /api/community/replies/<reply_id>/ - 답글 삭제
+    path('replies/<int:reply_id>/update/', ReplyUpdateView.as_view(), name='reply-update'),
     path('replies/<int:reply_id>/', ReplyDeleteView.as_view(), name='reply-delete'),
 
     # ============================================

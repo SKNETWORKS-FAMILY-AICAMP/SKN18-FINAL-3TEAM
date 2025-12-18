@@ -33,7 +33,7 @@ export const updateComment = async (commentId, commentContent) => {
   return response.data;
 };
 
-// 댓글 삭제 (작성자 본인만)
+// 댓글 삭제 (작성자 본인 또는 관리자)
 export const deleteComment = async (commentId) => {
   const response = await api.delete(`/api/community/comments/${commentId}/delete/`);
   return response.data;
@@ -67,6 +67,20 @@ export const createReply = async (
     `/api/community/comments/${commentId}/replies/`,
     data
   );
+  return response.data;
+};
+
+// 답글 수정 (작성자 본인만)
+export const updateReply = async (replyId, replyContent) => {
+  const response = await api.patch(`/api/community/replies/${replyId}/update/`, {
+    reply_content: replyContent,
+  });
+  return response.data;
+};
+
+// 답글 삭제 (작성자 본인 또는 관리자)
+export const deleteReply = async (replyId) => {
+  const response = await api.delete(`/api/community/replies/${replyId}/`);
   return response.data;
 };
 
@@ -119,15 +133,5 @@ export const unlikeReply = async (replyId) => {
 // 내 커뮤니티 활동 내역 조회
 export const getMyActivity = async () => {
   const response = await api.get("/api/community/me/activities/");
-  return response.data;
-};
-
-// ============================================
-// 답글 삭제 API (작성자 본인 또는 관리자)
-// ============================================
-
-// 답글 삭제
-export const deleteReply = async (replyId) => {
-  const response = await api.delete(`/api/community/replies/${replyId}/`);
   return response.data;
 };
