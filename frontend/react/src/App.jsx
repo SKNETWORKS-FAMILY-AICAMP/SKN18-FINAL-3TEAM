@@ -163,12 +163,28 @@ const App = () => {
       setIsLoggedIn(false);
       setUser(null);
       setShowUserDropdown(false);
+
+      // 인증이 필요한 페이지에서 로그아웃 시 메인으로 이동
+      const authRequiredPages = ['mypage', 'profile-edit', 'all-comments', 'admin'];
+      if (authRequiredPages.includes(currentPage)) {
+        setCurrentPage("main");
+        updateURL("main");
+        window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+      }
     } catch (error) {
       console.error("로그아웃 실패:", error);
       // 에러가 발생해도 로컬 상태는 초기화
       setIsLoggedIn(false);
       setUser(null);
       setShowUserDropdown(false);
+
+      // 에러가 발생해도 인증 필요 페이지면 메인으로 이동
+      const authRequiredPages = ['mypage', 'profile-edit', 'all-comments', 'admin'];
+      if (authRequiredPages.includes(currentPage)) {
+        setCurrentPage("main");
+        updateURL("main");
+        window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+      }
     }
   };
 
