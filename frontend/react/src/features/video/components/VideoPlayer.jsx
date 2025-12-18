@@ -81,7 +81,6 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
 
   // videoUrl이 변경되면 에러 상태 초기화
   useEffect(() => {
-    console.log("VideoPlayer - videoUrl 변경:", videoUrl);
     setError(null);
     setPlaying(false); // 재생 중단
     setPlayed(0);
@@ -237,7 +236,6 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
         onLoadedMetadata={(e) => {
           setError(null);
           const dur = e.target.duration;
-          console.log("영상 준비 완료. Duration:", dur);
           setDuration(dur);
         }}
         onTimeUpdate={(e) => {
@@ -251,7 +249,7 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
           setPlaying(false);
         }}
         onCanPlay={() => {
-          console.log("영상 재생 가능 상태");
+          // 영상 재생 가능 상태
         }}
       />
 

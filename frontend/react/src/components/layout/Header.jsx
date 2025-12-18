@@ -22,6 +22,8 @@ const Header = ({
   onMyPageClick,
   onLogin,
   onLogout,
+  onAdminClick,
+  currentPage,
 }) => {
   const [showLangDropdown, setShowLangDropdown] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -84,9 +86,10 @@ const Header = ({
           alignItems: "center",
           justifyContent: "space-between",
           padding: isScrolled ? "12px 60px" : "20px 60px",
-          background: "transparent",
+          background:
+            currentPage === "question" ? COLORS.background : "transparent",
           pointerEvents: "none",
-          transition: "padding 0.3s ease",
+          transition: "padding 0.3s ease, background 0.3s ease",
           boxSizing: "border-box",
         }}
       >
@@ -357,6 +360,30 @@ const Header = ({
             transition: "top 0.3s ease",
           }}
         >
+          {user?.permission === "admin" && (
+            <div
+              onClick={() => {
+                onAdminClick();
+                setShowUserDropdown(false);
+              }}
+              style={{
+                padding: "12px 20px",
+                color: COLORS.dark,
+                fontSize: "14px",
+                fontWeight: "500",
+                cursor: "pointer",
+                transition: "background 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(0, 0, 0, 0.05)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
+            >
+              관리하기
+            </div>
+          )}
           <div
             onClick={() => {
               onMyPageClick();

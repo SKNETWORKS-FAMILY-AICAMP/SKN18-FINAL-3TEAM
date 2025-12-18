@@ -25,6 +25,7 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
             tags: video.tags ? video.tags.map((t) => `#${t}`).join(" ") : "",
             likes_count: video.likes_count,
             comments_count: video.comments_count,
+            thumbnail_url: video.thumbnail_url,
           }));
           setVideos(formattedVideos);
         }
