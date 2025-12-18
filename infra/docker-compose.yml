@@ -82,6 +82,25 @@ services:
       timeout: 5s
       retries: 5
 
+  # Django Backend
+  web:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: django_web
+    env_file:
+      - ../.env
+    command: ["/app/backend/django/entrypoint.sh", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app/backend
+    depends_on:
+      - postgres
+      - redis
+      - neo4j
+      - fuseki
+
 volumes:
   fuseki-data:
     driver: local
