@@ -12,15 +12,16 @@ from frontend.video_pipeline.services import (
 def background_gen_node(state: GraphState) -> GraphState:
     """
     배경 이미지 및 영상 생성 노드
-    1. Gemini로 배경 이미지 생성
-    2. 생성된 이미지를 바탕으로 Fal.ai로 배경 영상(MP4) 생성
-    3. 영상 URL을 scene['location']에 등록
     """
     print("🎨 [Background Node] 배경 이미지 및 영상 생성 시작...")
     
     script_json = state.get("scene_script", {})
     scenes = script_json.get("scenes", [])
     
+    # [수정 1] 타임스탬프를 루프 돌기 '전'에 미리 만들어둡니다. (파일 이름에 붙이기 위해)
+    # 예: 20251218_103055
+    current_time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     # 저장할 기본 경로 (Django media/backgrounds)
     save_dir = os.path.join(settings.MEDIA_ROOT, "backgrounds")
     os.makedirs(save_dir, exist_ok=True)
@@ -33,12 +34,14 @@ def background_gen_node(state: GraphState) -> GraphState:
             print(f"⚠️ Scene {scene_id}: image_prompt 없음. 스킵.")
             continue
             
-        # 1. 이미지 파일 경로 설정
-        image_file_name = f"bg_{state.get('query_type', 'gen')}_{scene_id}.png"
+        # [수정 2] 파일 이름에 시간(current_time_str)을 추가해서 절대 안 겹치게 만듦!
+        # 결과 예: bg_gen_0_20251218_103055.png
+        query_type = state.get('query_type', 'gen')
+        
+        image_file_name = f"bg_{query_type}_{scene_id}_{current_time_str}.png"
         image_full_path = os.path.join(save_dir, image_file_name)
         
-        # 2. 영상 파일 경로 설정
-        video_file_name = f"bg_{state.get('query_type', 'gen')}_{scene_id}.mp4"
+        video_file_name = f"bg_{query_type}_{scene_id}_{current_time_str}.mp4"
         video_full_path = os.path.join(save_dir, video_file_name)
         
         # 3. 프롬프트 강화
@@ -56,7 +59,6 @@ def background_gen_node(state: GraphState) -> GraphState:
             # ---------------------------------------------------------
             # [단계 2] 영상 생성 (이미지 -> 영상)
             # ---------------------------------------------------------
-            # 비디오 프롬프트가 따로 없으면 이미지 프롬프트 재사용 + 카메라 무빙 추가
             video_prompt = enhanced_prompt + ", slow camera movement, cinematic atmosphere"
             
             print(f"      👉 영상 변환 시작 (Fal.ai)...")
@@ -64,12 +66,12 @@ def background_gen_node(state: GraphState) -> GraphState:
                 image_path=image_full_path,
                 output_path=video_full_path,
                 prompt=video_prompt,
-                resolution="1080p", # 필요시 720p 등으로 조정
+                resolution="1080p", 
                 duration=5
             )
 
             # ---------------------------------------------------------
-            # [단계 3] URL 등록 (영상이 성공했으면 영상 URL, 아니면 이미지 URL)
+            # [단계 3] URL 등록
             # ---------------------------------------------------------
             base_url = settings.MY_SERVER_URL.rstrip('/')
             media_url = settings.MEDIA_URL.strip('/')
@@ -79,7 +81,7 @@ def background_gen_node(state: GraphState) -> GraphState:
                 final_url = f"{base_url}/{media_url}/backgrounds/{video_file_name}"
                 print(f"      ✅ 영상 URL 적용: {final_url}")
             else:
-                # 영상 실패 시 이미지라도 사용
+                # 영상 실패 시
                 final_url = f"{base_url}/{media_url}/backgrounds/{image_file_name}"
                 print(f"      ⚠️ 영상 실패, 이미지 URL 적용: {final_url}")
 
@@ -91,15 +93,15 @@ def background_gen_node(state: GraphState) -> GraphState:
             import traceback
             print(traceback.format_exc())
     
-    # 대본 저장 로직
+    # 대본 저장 로직 (이미 위에서 타임스탬프를 만들었으니 재활용)
     try:
         base_dir = getattr(settings, 'BASE_DIR', os.getcwd())
         log_dir = os.path.join(base_dir, "Created_Acts")
         os.makedirs(log_dir, exist_ok=True)
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # 위에서 만든 시간 값 사용
         q_type = state.get("query_type", "unknown")
-        filename = f"script_{timestamp}_{q_type}.json"
+        filename = f"script_{current_time_str}_{q_type}.json"
         filepath = os.path.join(log_dir, filename)
 
         with open(filepath, 'w', encoding='utf-8') as f:
