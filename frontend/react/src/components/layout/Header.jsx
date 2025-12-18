@@ -23,6 +23,7 @@ const Header = ({
   onLogin,
   onLogout,
   onAdminClick,
+  currentPage,
 }) => {
   const [showLangDropdown, setShowLangDropdown] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -85,9 +86,10 @@ const Header = ({
           alignItems: "center",
           justifyContent: "space-between",
           padding: isScrolled ? "12px 60px" : "20px 60px",
-          background: "transparent",
+          background:
+            currentPage === "question" ? COLORS.background : "transparent",
           pointerEvents: "none",
-          transition: "padding 0.3s ease",
+          transition: "padding 0.3s ease, background 0.3s ease",
           boxSizing: "border-box",
         }}
       >

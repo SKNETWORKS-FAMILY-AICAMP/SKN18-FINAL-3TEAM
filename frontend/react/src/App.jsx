@@ -8,6 +8,9 @@ import MyPage from "./pages/MyPage";
 import AllCommentsPage from "./pages/AllCommentsPage";
 import ProfileEditPage from "./pages/ProfileEditPage";
 import AdminPage from "./pages/AdminPage";
+import Chatbot from "./pages/Chatbot";
+import VideoCreatePage from "./pages/VideoCreatePage";
+import ChatbotButton from "./components/common/ChatbotButton";
 import {
   checkAuth,
   getGoogleLoginUrl,
@@ -207,6 +210,7 @@ const App = () => {
           onLogin={handleLogin}
           onLogout={handleLogout}
           onAdminClick={handleAdminClick}
+          currentPage={currentPage}
         />
 
         <ExpandableSearch
@@ -247,7 +251,20 @@ const App = () => {
           {currentPage === "admin" && (
             <AdminPage onNavigate={handleNavigate} user={user} />
           )}
+
+          {currentPage === "question" && (
+            <div style={{ overflow: "hidden", height: "calc(100vh - 76px)" }}>
+              <Chatbot onNavigate={handleNavigate} user={user} />
+            </div>
+          )}
+
+          {currentPage === "video-create" && (
+            <VideoCreatePage onNavigate={handleNavigate} />
+          )}
         </div>
+
+        {/* 챗봇 버튼 (모든 페이지에서 표시) */}
+        <ChatbotButton onNavigate={handleNavigate} />
       </div>
     </>
   );
