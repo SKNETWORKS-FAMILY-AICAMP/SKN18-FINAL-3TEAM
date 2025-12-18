@@ -14,6 +14,7 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
   const [video, setVideo] = useState(null);
   const [comments, setComments] = useState([]);
   const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const watchHistorySaved = useRef(false);
 
@@ -83,6 +84,18 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
             ? getVideoUrl(videoResponse.data.video_url)
             : "/videos/selected_scene_1_video.mp4";
           setVideo(videoResponse.data);
+          setLikesCount(videoResponse.data.likes_count || 0);
+          
+          // 로그인한 경우 좋아요 상태 확인 (localStorage에서 확인)
+          if (isLoggedIn) {
+            try {
+              const likedVideos = JSON.parse(localStorage.getItem('likedVideos') || '[]');
+              setIsLiked(likedVideos.includes(actualVideoId));
+            } catch (error) {
+              console.error("좋아요 상태 확인 실패:", error);
+              setIsLiked(false);
+            }
+          }
         }
 
         // 댓글 로드 (로그인한 경우만)
@@ -150,14 +163,46 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
 
     try {
       if (isLiked) {
+        // 좋아요 취소
         await unlikeVideo(actualVideoId);
         setIsLiked(false);
+        setLikesCount(prev => Math.max(0, prev - 1));
+        
+        // localStorage에서 제거
+        const likedVideos = JSON.parse(localStorage.getItem('likedVideos') || '[]');
+        const updatedLikedVideos = likedVideos.filter(id => id !== actualVideoId);
+        localStorage.setItem('likedVideos', JSON.stringify(updatedLikedVideos));
       } else {
+        // 좋아요 추가
         await likeVideo(actualVideoId);
         setIsLiked(true);
+        setLikesCount(prev => prev + 1);
+        
+        // localStorage에 추가
+        const likedVideos = JSON.parse(localStorage.getItem('likedVideos') || '[]');
+        if (!likedVideos.includes(actualVideoId)) {
+          likedVideos.push(actualVideoId);
+          localStorage.setItem('likedVideos', JSON.stringify(likedVideos));
+        }
       }
     } catch (error) {
       console.error("좋아요 처리 실패:", error);
+      // 에러 발생 시 사용자에게 알림
+      if (error.response?.status === 400 && error.response?.data?.error?.code === 'ALREADY_LIKED') {
+        // 이미 좋아요가 있는 경우 (다른 탭에서 좋아요를 눌렀을 수 있음)
+        setIsLiked(true);
+        const likedVideos = JSON.parse(localStorage.getItem('likedVideos') || '[]');
+        if (!likedVideos.includes(actualVideoId)) {
+          likedVideos.push(actualVideoId);
+          localStorage.setItem('likedVideos', JSON.stringify(likedVideos));
+        }
+      } else if (error.response?.status === 404) {
+        // 좋아요가 없는 경우 (다른 탭에서 좋아요를 취소했을 수 있음)
+        setIsLiked(false);
+        const likedVideos = JSON.parse(localStorage.getItem('likedVideos') || '[]');
+        const updatedLikedVideos = likedVideos.filter(id => id !== actualVideoId);
+        localStorage.setItem('likedVideos', JSON.stringify(updatedLikedVideos));
+      }
     }
   };
 
@@ -195,7 +240,7 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
           date={formatKoreanDate(video?.upload_date)}
           isLiked={isLiked}
           onLikeClick={handleLikeClick}
-          likesCount={video?.likes_count || 0}
+          likesCount={likesCount}
         />
       </div>
 
