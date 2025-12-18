@@ -11,7 +11,7 @@ import {
 } from "../../../api/activityApi";
 import { getPopularTags, getPopularVideos } from "../../../api/videoApi";
 
-const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
+const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVideoClick }) => {
   const [searchValue, setSearchValue] = useState("");
   const [phase, setPhase] = useState(0); // 0: closed, 1: expanding width, 2: expanding height, 3: content visible
   const [hasBeenOpened, setHasBeenOpened] = useState(false); // 한 번이라도 열렸는지 추적
@@ -62,7 +62,7 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
     }
   }, [isOpen, isLoggedIn]);
 
-  // 검색 실행 시 검색 기록 저장
+  // 검색 실행 시 검색 기록 저장 및 검색 페이지로 이동
   const handleSearch = async () => {
     if (!searchValue.trim()) return;
 
@@ -77,7 +77,11 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
           ].slice(0, 5)
         );
       }
-      // 여기서 실제 검색 로직 실행
+      // 검색 페이지로 이동
+      if (onSearch) {
+        onSearch(searchValue.trim());
+      }
+      onClose();
     } catch (error) {
       console.error("검색 기록 저장 실패:", error);
     }
@@ -300,7 +304,13 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
                                 : "translateX(-15px)",
                             transition: `all 0.3s ease ${0.15 + idx * 0.05}s`,
                           }}
-                          onClick={() => setSearchValue(item)}
+                          onClick={() => {
+                            setSearchValue(item);
+                            if (onSearch) {
+                              onSearch(item);
+                            }
+                            onClose();
+                          }}
                         >
                           <span
                             style={{ fontSize: "13px", color: COLORS.gray }}
@@ -355,7 +365,14 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
                       tags.map((tag, idx) => (
                         <button
                           key={idx}
-                          onClick={() => setSearchValue(tag.replace("# ", ""))}
+                          onClick={() => {
+                            const tagValue = tag.replace("# ", "");
+                            setSearchValue(tagValue);
+                            if (onSearch) {
+                              onSearch(tagValue);
+                            }
+                            onClose();
+                          }}
                           style={{
                             padding: "8px 16px",
                             backgroundColor: "transparent",
@@ -418,6 +435,12 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
                   suggestedVideos.map((video, idx) => (
                     <div
                       key={video.id}
+                      onClick={() => {
+                        if (onVideoClick) {
+                          onVideoClick(video);
+                        }
+                        onClose();
+                      }}
                       style={{
                         minWidth: "140px",
                         cursor: "pointer",

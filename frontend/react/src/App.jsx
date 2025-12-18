@@ -22,18 +22,39 @@ const App = () => {
   const getInitialPage = () => {
     const hash = window.location.hash.replace("#", "");
     if (hash) {
-      const [page, videoId] = hash.split("/");
+      const [page, param] = hash.split("/");
+
+      // 영상 상세 페이지
+      if (page === "video" && param) {
+        return {
+          page: "video",
+          videoId: parseInt(param),
+          searchQuery: "",
+        };
+      }
+
+      // 검색 결과 페이지
+      if (page === "search" && param) {
+        return {
+          page: "search",
+          videoId: null,
+          searchQuery: decodeURIComponent(param),
+        };
+      }
+
       return {
         page: page || "main",
-        videoId: videoId ? parseInt(videoId) : null,
+        videoId: null,
+        searchQuery: "",
       };
     }
-    return { page: "main", videoId: null };
+    return { page: "main", videoId: null, searchQuery: "" };
   };
 
   const initial = getInitialPage();
   const [currentPage, setCurrentPage] = useState(initial.page);
   const [selectedVideoId, setSelectedVideoId] = useState(initial.videoId);
+  const [searchQuery, setSearchQuery] = useState(initial.searchQuery || "");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -46,6 +67,7 @@ const App = () => {
       const initial = getInitialPage();
       setCurrentPage(initial.page);
       setSelectedVideoId(initial.videoId);
+      setSearchQuery(initial.searchQuery || "");
     };
 
     window.addEventListener("hashchange", handleHashChange);
@@ -152,12 +174,38 @@ const App = () => {
       setIsLoggedIn(false);
       setUser(null);
       setShowUserDropdown(false);
+
+      // 인증이 필요한 페이지에서 로그아웃 시 메인으로 이동
+      const authRequiredPages = [
+        "mypage",
+        "profile-edit",
+        "all-comments",
+        "admin",
+      ];
+      if (authRequiredPages.includes(currentPage)) {
+        setCurrentPage("main");
+        updateURL("main");
+        window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+      }
     } catch (error) {
       console.error("로그아웃 실패:", error);
       // 에러가 발생해도 로컬 상태는 초기화
       setIsLoggedIn(false);
       setUser(null);
       setShowUserDropdown(false);
+
+      // 에러가 발생해도 인증 필요 페이지면 메인으로 이동
+      const authRequiredPages = [
+        "mypage",
+        "profile-edit",
+        "all-comments",
+        "admin",
+      ];
+      if (authRequiredPages.includes(currentPage)) {
+        setCurrentPage("main");
+        updateURL("main");
+        window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+      }
     }
   };
 
@@ -170,6 +218,13 @@ const App = () => {
     setCurrentPage(page);
     updateURL(page, videoId);
     // 페이지 전환 시 스크롤을 맨 위로 이동
+    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  };
+
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    setCurrentPage("search");
+    window.location.hash = `search/${encodeURIComponent(query)}`;
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   };
 
@@ -217,6 +272,8 @@ const App = () => {
           isOpen={isSearchOpen}
           isLoggedIn={isLoggedIn}
           onClose={() => setIsSearchOpen(false)}
+          onSearch={handleSearch}
+          onVideoClick={handleVideoClick}
         />
 
         <div style={{ paddingTop: "76px" }}>
