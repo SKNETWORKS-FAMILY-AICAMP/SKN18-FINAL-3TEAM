@@ -1,5 +1,5 @@
 from kiwipiepy import Kiwi
-from backend.langgraph_structure2.state import GraphState
+from backend.langgraph_structure1.state import GraphState
 
 def extract_keywords_node(state: GraphState) -> GraphState:
     query = state.get("query")
@@ -162,16 +162,39 @@ def extract_keywords_node(state: GraphState) -> GraphState:
         keywords.append(w)
         break
 
-    # 2) 행위어 후보: 토큰에서 용언/사건 분해 조각
+    # 2) 행위어 후보: 용언 + 사건/행위 명사까지 포함
     action_candidates = set()
+
+    ACTION_VERB_STOP = {"알리", "알", "말하", "설명하", "가르치", "알려", "알려주", "주"}  # 필요 시 조정
+    ACTION_NOUNS = set(USER_NOUNS) | {"시해", "암살", "살인", "은폐"}  # 필요 시 확장
+
     for t in tokens:
-        if t.tag.startswith(("VV", "VA", "MAG")) and len(t.form) > 1:
+        # (a) 용언 기반 action
+        if t.tag.startswith(("VV", "VA")) and len(t.form) > 1:
+            if t.form in ACTION_VERB_STOP:
+                continue
             action_candidates.add(t.form)
+
+        # (b) 사건/행위 명사 기반 action (원하시는 '시해' 같은 케이스)
+        if t.tag in ("NNG", "NNP") and t.form in ACTION_NOUNS:
+            action_candidates.add(t.form)
+
+    # (c) '...사건'이 붙은 합성 후보에서 사건 접미사를 제거한 조각도 action 후보로 추가
     for c in normalized_compounds:
         for suf in EVENT_SUFFIX:
             if c.endswith(suf) and len(c) > len(suf) + 1:
                 action_candidates.add(c[: -len(suf)])
-    action_sorted = sorted(action_candidates, key=lambda w: scored.get(w, 0), reverse=True)
+
+    # action 정렬: scored에 있으면 그 점수, 없으면 0점.
+    # 단, ACTION_NOUNS는 가산점으로 우선시키기(시해 우선)
+    def action_rank(w: str) -> float:
+        base = scored.get(w, 0.0)
+        if w in ACTION_NOUNS:
+            base += 30.0
+        return base
+
+    action_sorted = sorted(action_candidates, key=action_rank, reverse=True)
+
     for w in action_sorted:
         if w in keywords:
             continue
