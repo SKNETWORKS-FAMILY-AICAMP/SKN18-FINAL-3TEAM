@@ -1,4 +1,6 @@
 import { COLORS } from "../../../constants/theme";
+import { UserIcon } from "../../../components/common/Icons";
+import { getProfileImageUrl } from "../../../utils/imageUtils";
 
 const UserComments = ({
   comments: commentsProp = [],
@@ -9,8 +11,9 @@ const UserComments = ({
   const comments = commentsProp.map((c) => ({
     id: c.id,
     title: c.videoTitle || "영상",
-    question: c.text,
-    answer: null, // 답글은 별도로 로드해야 함
+    text: c.text || c.comment_content,
+    repliesCount: c.repliesCount || (c.replies?.length || 0),
+    user: c.user || null,
   }));
 
   return (
@@ -115,56 +118,57 @@ const UserComments = ({
                 >
                   {comment.title}
                 </div>
-                <div style={{ marginLeft: "12px" }}>
+                <div style={{ display: "flex", gap: "12px" }}>
+                  {/* 프로필 사진 */}
                   <div
                     style={{
-                      fontSize: "13px",
-                      color: COLORS.gray,
-                      position: "relative",
-                      paddingLeft: "16px",
-                      marginBottom: comment.answer ? "8px" : "0",
+                      width: "32px",
+                      height: "32px",
+                      borderRadius: "50%",
+                      backgroundColor: comment.user?.profile_image
+                        ? "transparent"
+                        : COLORS.lightGray,
+                      backgroundImage: comment.user?.profile_image
+                        ? `url(${getProfileImageUrl(comment.user.profile_image)})`
+                        : "none",
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
                     }}
                   >
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: "0",
-                        top: "0",
-                        width: "10px",
-                        height: "100%",
-                        borderLeft: "1.5px solid #ccc",
-                        borderBottom: "1.5px solid #ccc",
-                        borderBottomLeftRadius: "8px",
-                      }}
-                    ></div>
-                    {comment.question}
+                    {!comment.user?.profile_image && (
+                      <UserIcon size={16} color={COLORS.gray} />
+                    )}
                   </div>
-                  {comment.answer && (
+                  {/* 댓글 내용 */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
                         fontSize: "13px",
-                        color: COLORS.gray,
-                        position: "relative",
-                        paddingLeft: "16px",
-                        marginLeft: "16px",
-                        whiteSpace: "pre-line",
+                        color: COLORS.dark,
+                        lineHeight: "1.6",
+                        wordWrap: "break-word",
+                        marginBottom: "6px",
                       }}
                     >
+                      {comment.text}
+                    </div>
+                    {/* 답글 개수 표시 */}
+                    {comment.repliesCount > 0 && (
                       <div
                         style={{
-                          position: "absolute",
-                          left: "0",
-                          top: "0",
-                          width: "10px",
-                          height: "100%",
-                          borderLeft: "1.5px solid #ccc",
-                          borderBottom: "1.5px solid #ccc",
-                          borderBottomLeftRadius: "8px",
+                          fontSize: "12px",
+                          color: COLORS.gray,
+                          marginTop: "4px",
                         }}
-                      ></div>
-                      {comment.answer}
-                    </div>
-                  )}
+                      >
+                        답글 {comment.repliesCount}개
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))

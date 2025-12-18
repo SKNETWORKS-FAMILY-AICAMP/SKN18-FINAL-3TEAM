@@ -475,8 +475,8 @@ class UserActivityView(APIView):
         # 내가 작성한 댓글
         comments = Comment.objects.filter(user=user).select_related('video').order_by('-created_at')
 
-        # 내가 작성한 답글
-        replies = Reply.objects.filter(user=user).select_related('comment').order_by('-created_at')
+        # 내가 작성한 답글 (comment와 video 정보 포함)
+        replies = Reply.objects.filter(user=user).select_related('comment', 'comment__video').order_by('-created_at')
 
         # 내가 누른 좋아요
         likes = Likes.objects.filter(user=user).select_related('video', 'comment', 'reply').order_by('-created_at')
