@@ -111,6 +111,9 @@ const App = () => {
   };
 
   const handleVideoClick = (video) => {
+    if (!video || !video.id) {
+      return;
+    }
     setSelectedVideoId(video.id);
     setCurrentPage("video");
     updateURL("video", video.id);
@@ -126,6 +129,12 @@ const App = () => {
   const handleMyPageClick = () => {
     setCurrentPage("mypage");
     updateURL("mypage");
+    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  };
+
+  const handleAdminClick = () => {
+    setCurrentPage("admin");
+    updateURL("admin");
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   };
 
@@ -197,6 +206,7 @@ const App = () => {
           onMyPageClick={handleMyPageClick}
           onLogin={handleLogin}
           onLogout={handleLogout}
+          onAdminClick={handleAdminClick}
         />
 
         <ExpandableSearch
