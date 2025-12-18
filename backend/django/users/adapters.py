@@ -10,6 +10,17 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
     Generates JWT tokens and redirects to React frontend with tokens as URL parameters.
     """
 
+    def authentication_error(
+        self, request, provider_id, error=None, exception=None, extra_context=None
+    ):
+        """
+        OAuth 인증 실패 시 처리 (취소 버튼 클릭, 에러 발생 등)
+        기본 에러 페이지 대신 프론트엔드로 리다이렉트
+        """
+        # 프론트엔드 메인 페이지로 리다이렉트 (에러 파라미터 없이)
+        from django.shortcuts import redirect
+        return redirect("http://localhost:3000/")
+
     def populate_user(self, request, sociallogin, data):
         """
         소셜 로그인 시 사용자 정보 채우기
