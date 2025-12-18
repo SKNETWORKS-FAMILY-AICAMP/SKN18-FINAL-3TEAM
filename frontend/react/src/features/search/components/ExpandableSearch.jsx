@@ -66,21 +66,25 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
   const handleSearch = async () => {
     if (!searchValue.trim()) return;
 
+    const searchQuery = searchValue.trim();
+
     try {
       if (isLoggedIn) {
-        await createSearchHistory(searchValue.trim());
-        // 검색 기록 업데이트
+        await createSearchHistory(searchQuery);
+        // 검색 기록 업데이트 (최대 10개)
         setSearchHistory((prev) =>
           [
-            searchValue.trim(),
-            ...prev.filter((h) => h !== searchValue.trim()),
-          ].slice(0, 5)
+            searchQuery,
+            ...prev.filter((h) => h !== searchQuery),
+          ].slice(0, 10)
         );
       }
       // 검색 페이지로 이동
       if (onSearch) {
-        onSearch(searchValue.trim());
+        onSearch(searchQuery);
       }
+      // 입력창 초기화
+      setSearchValue("");
       onClose();
     } catch (error) {
       console.error("검색 기록 저장 실패:", error);
@@ -281,7 +285,15 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
                     검색 기록
                   </h3>
 
-                  <div style={{ display: "flex", flexDirection: "column" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      maxHeight: "135px",
+                      overflowY: "auto",
+                      paddingRight: "8px",
+                    }}
+                  >
                     {searchHistory.length === 0 ? (
                       <p style={{ fontSize: "13px", color: COLORS.gray }}>
                         검색 기록이 없습니다.
@@ -296,7 +308,6 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
                             justifyContent: "space-between",
                             padding: "10px 0",
                             borderBottom: "1px solid #f0f0f0",
-                            cursor: "pointer",
                             opacity: phase >= 3 ? 1 : 0,
                             transform:
                               phase >= 3
@@ -304,16 +315,22 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
                                 : "translateX(-15px)",
                             transition: `all 0.3s ease ${0.15 + idx * 0.05}s`,
                           }}
-                          onClick={() => {
-                            setSearchValue(item);
-                            if (onSearch) {
-                              onSearch(item);
-                            }
-                            onClose();
-                          }}
                         >
                           <span
-                            style={{ fontSize: "13px", color: COLORS.gray }}
+                            style={{
+                              fontSize: "13px",
+                              color: COLORS.gray,
+                              cursor: "pointer",
+                              flex: 1,
+                            }}
+                            onClick={() => {
+                              setSearchValue(item);
+                              if (onSearch) {
+                                onSearch(item);
+                              }
+                              setSearchValue("");
+                              onClose();
+                            }}
                           >
                             {item}
                           </span>
@@ -325,6 +342,12 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
                               padding: "2px",
                               opacity: 0.4,
                               transition: "opacity 0.2s",
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSearchHistory((prev) =>
+                                prev.filter((h) => h !== item)
+                              );
                             }}
                             onMouseEnter={(e) =>
                               (e.currentTarget.style.opacity = 1)
