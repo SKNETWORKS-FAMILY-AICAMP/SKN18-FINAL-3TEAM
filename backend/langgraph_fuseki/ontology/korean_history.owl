@@ -1,0 +1,865 @@
+<?xml version="1.0"?>
+<rdf:RDF xmlns="http://www.example.org/korean-history#"
+     xml:base="http://www.example.org/korean-history"
+     xmlns:owl="http://www.w3.org/2002/07/owl#"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     xmlns:hist="http://www.example.org/korean-history#">
+    <owl:Ontology rdf:about="http://www.example.org/korean-history">
+        <rdfs:label>Korean History Ontology</rdfs:label>
+        <rdfs:comment>조선시대 역사 온톨로지 - 인물, 사건, 제도, 문헌, 장소, 국가 등</rdfs:comment>
+        <owl:versionInfo>2.0.0</owl:versionInfo>
+    </owl:Ontology>
+
+
+    <!--
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Classes (클래스) - TTL 인스턴스 기반
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    <!-- Person (인물) - 106,122개 인스턴스 -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Person">
+        <rdfs:label>Person</rdfs:label>
+        <rdfs:comment>역사적 인물 (왕, 신하, 학자, 장군 등)</rdfs:comment>
+    </owl:Class>
+
+    <!-- Event (사건) - 63,947개 인스턴스 -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Event">
+        <rdfs:label>Event</rdfs:label>
+        <rdfs:comment>역사적 사건 (환국, 사화, 전쟁 등)</rdfs:comment>
+    </owl:Class>
+
+    <!-- Institution (제도/기관) - 60,067개 인스턴스 -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Institution">
+        <rdfs:label>Institution</rdfs:label>
+        <rdfs:comment>국가 제도 및 기관 (집현전, 의금부, 당파 등)</rdfs:comment>
+    </owl:Class>
+
+    <!-- Document (문헌) - 9,098개 인스턴스 -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Document">
+        <rdfs:label>Document</rdfs:label>
+        <rdfs:comment>역사적 문헌 (실록, 의궤, 고서 등)</rdfs:comment>
+    </owl:Class>
+
+    <!-- Nation (국가) - 6,809개 인스턴스 -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Nation">
+        <rdfs:label>Nation</rdfs:label>
+        <rdfs:comment>국가 (조선, 명, 청, 일본 등)</rdfs:comment>
+    </owl:Class>
+
+    <!-- Place (장소) - 1,769개 인스턴스 -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Place">
+        <rdfs:label>Place</rdfs:label>
+        <rdfs:comment>지리적 장소 (궁궐, 지역, 전쟁터 등)</rdfs:comment>
+    </owl:Class>
+
+    <!-- Battle (전투) - 1,446개 인스턴스, Event의 하위 클래스 -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Battle">
+        <rdfs:subClassOf rdf:resource="http://www.example.org/korean-history#Event"/>
+        <rdfs:label>Battle</rdfs:label>
+        <rdfs:comment>전투/해전 (명량해전, 행주대첩 등)</rdfs:comment>
+    </owl:Class>
+
+    <!-- Policy (정책) - 1,028개 인스턴스, Event의 하위 클래스 -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Policy">
+        <rdfs:subClassOf rdf:resource="http://www.example.org/korean-history#Event"/>
+        <rdfs:label>Policy</rdfs:label>
+        <rdfs:comment>국가 정책 (대동법, 균역법, 공신 제도 등)</rdfs:comment>
+    </owl:Class>
+
+    <!-- Object (물품) - 8개 인스턴스 -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Object">
+        <rdfs:label>Object</rdfs:label>
+        <rdfs:comment>역사적 물품 (형구, 의복, 무기 등)</rdfs:comment>
+    </owl:Class>
+
+    <!-- Role (역할) - 4개 인스턴스 -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#Role">
+        <rdfs:label>Role</rdfs:label>
+        <rdfs:comment>인물의 역할 (관직, 직책 등)</rdfs:comment>
+    </owl:Class>
+
+    <!-- SocialClass (사회계층) - 4개 인스턴스 -->
+    <owl:Class rdf:about="http://www.example.org/korean-history#SocialClass">
+        <rdfs:label>SocialClass</rdfs:label>
+        <rdfs:comment>사회 계층 (양반, 중인, 상민, 천민 등)</rdfs:comment>
+    </owl:Class>
+
+
+    <!--
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Object Properties (객체 속성) - TTL에서 실제 사용되는 프로퍼티
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    <!-- ========== 참여/관계 (가장 많이 사용됨) ========== -->
+
+    <!-- participatesIn (12,751회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#participatesIn">
+        <rdfs:label>participatesIn</rdfs:label>
+        <rdfs:comment>인물이 사건에 참여하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- affiliatedWith (11,791회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#affiliatedWith">
+        <rdfs:label>affiliatedWith</rdfs:label>
+        <rdfs:comment>인물/기관이 국가/당파에 소속되다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- servedUnder (1,047회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#servedUnder">
+        <rdfs:label>servedUnder</rdfs:label>
+        <rdfs:comment>인물이 다른 인물(군주) 아래에서 섬기다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- contemporaryWith (1,168회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#contemporaryWith">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#SymmetricProperty"/>
+        <rdfs:label>contemporaryWith</rdfs:label>
+        <rdfs:comment>인물이 다른 인물과 동시대를 살다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- attendedBy (4회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#attendedBy">
+        <rdfs:label>attendedBy</rdfs:label>
+        <rdfs:comment>사건에 참석한 인물</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- involvesPerson (2회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#involvesPerson">
+        <rdfs:label>involvesPerson</rdfs:label>
+        <rdfs:comment>사건이 인물을 포함하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+
+    <!-- ========== 학문/교육 관계 ========== -->
+
+    <!-- authored (1,258회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#authored">
+        <rdfs:label>authored</rdfs:label>
+        <rdfs:comment>인물이 문헌을 저술하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- studentOf (921회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#studentOf">
+        <rdfs:label>studentOf</rdfs:label>
+        <rdfs:comment>인물이 다른 인물의 제자이다</rdfs:comment>
+        <owl:inverseOf rdf:resource="http://www.example.org/korean-history#teacherOf"/>
+    </owl:ObjectProperty>
+
+    <!-- teacherOf (203회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#teacherOf">
+        <rdfs:label>teacherOf</rdfs:label>
+        <rdfs:comment>인물이 다른 인물의 스승이다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- compiled (613회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#compiled">
+        <rdfs:label>compiled</rdfs:label>
+        <rdfs:comment>인물이 문헌을 편찬하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+
+    <!-- ========== 인과관계 ========== -->
+
+    <!-- leadsTo (928회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#leadsTo">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#TransitiveProperty"/>
+        <rdfs:label>leadsTo</rdfs:label>
+        <rdfs:comment>사건이 다른 사건으로 이어지다 (인과관계)</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- ledTo (5회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#ledTo">
+        <rdfs:label>ledTo</rdfs:label>
+        <rdfs:comment>사건이 다른 사건으로 이어지다 (과거형)</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- causes (77회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#causes">
+        <rdfs:label>causes</rdfs:label>
+        <rdfs:comment>원인이 되다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- derivedFrom (3회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#derivedFrom">
+        <rdfs:label>derivedFrom</rdfs:label>
+        <rdfs:comment>~에서 유래하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+
+    <!-- ========== 설립/제도 관련 ========== -->
+
+    <!-- establishedBy (326회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#establishedBy">
+        <rdfs:label>establishedBy</rdfs:label>
+        <rdfs:comment>제도/기관이 인물에 의해 설립되다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- founded (138회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#founded">
+        <rdfs:label>founded</rdfs:label>
+        <rdfs:comment>인물이 기관을 설립하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- reformed (141회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#reformed">
+        <rdfs:label>reformed</rdfs:label>
+        <rdfs:comment>인물이 제도를 개혁하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- initiatedBy (175회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#initiatedBy">
+        <rdfs:label>initiatedBy</rdfs:label>
+        <rdfs:comment>정책이 인물에 의해 시작되다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- registeredThrough (2회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#registeredThrough">
+        <rdfs:label>registeredThrough</rdfs:label>
+        <rdfs:comment>~을 통해 등록되다</rdfs:comment>
+    </owl:ObjectProperty>
+
+
+    <!-- ========== 전투/지휘 관련 ========== -->
+
+    <!-- commands (239회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#commands">
+        <rdfs:label>commands</rdfs:label>
+        <rdfs:comment>인물이 전투를 지휘하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- supervises (4회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#supervises">
+        <rdfs:label>supervises</rdfs:label>
+        <rdfs:comment>감독하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+
+    <!-- ========== 장소/위치 관련 ========== -->
+
+    <!-- hasLocation (293회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#hasLocation">
+        <rdfs:label>hasLocation</rdfs:label>
+        <rdfs:comment>위치를 갖다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- storedAt (2회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#storedAt">
+        <rdfs:label>storedAt</rdfs:label>
+        <rdfs:comment>~에 보관되다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- originatedIn (2회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#originatedIn">
+        <rdfs:label>originatedIn</rdfs:label>
+        <rdfs:comment>~에서 유래하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- heldAt (2회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#heldAt">
+        <rdfs:label>heldAt</rdfs:label>
+        <rdfs:comment>~에서 개최되다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- occursAt (2회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#occursAt">
+        <rdfs:label>occursAt</rdfs:label>
+        <rdfs:comment>사건이 장소에서 발생하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+
+    <!-- ========== 부분/포함 관계 ========== -->
+
+    <!-- partOf (239회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#partOf">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#TransitiveProperty"/>
+        <rdfs:label>partOf</rdfs:label>
+        <rdfs:comment>~의 일부이다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- hasPart (3회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#hasPart">
+        <rdfs:label>hasPart</rdfs:label>
+        <rdfs:comment>부분을 갖다</rdfs:comment>
+        <owl:inverseOf rdf:resource="http://www.example.org/korean-history#partOf"/>
+    </owl:ObjectProperty>
+
+    <!-- contains (동적) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#contains">
+        <rdfs:label>contains</rdfs:label>
+        <rdfs:comment>포함하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- includesPositions (6회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#includesPositions">
+        <rdfs:label>includesPositions</rdfs:label>
+        <rdfs:comment>직위를 포함하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+
+    <!-- ========== 문서/기록 관련 ========== -->
+
+    <!-- documents (6회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#documents">
+        <rdfs:label>documents</rdfs:label>
+        <rdfs:comment>기록하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- documentsEvent (4회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#documentsEvent">
+        <rdfs:label>documentsEvent</rdfs:label>
+        <rdfs:comment>사건을 기록하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- records (2회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#records">
+        <rdfs:label>records</rdfs:label>
+        <rdfs:comment>기록하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- lists (2회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#lists">
+        <rdfs:label>lists</rdfs:label>
+        <rdfs:comment>목록에 포함하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+
+    <!-- ========== 재위/통치 관련 ========== -->
+
+    <!-- reignedDuring (3회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#reignedDuring">
+        <rdfs:label>reignedDuring</rdfs:label>
+        <rdfs:comment>~의 재위 기간에 있었다</rdfs:comment>
+    </owl:ObjectProperty>
+
+
+    <!-- ========== 연결관계/기타 ========== -->
+
+    <!-- originatedFrom (3회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#originatedFrom">
+        <rdfs:label>originatedFrom</rdfs:label>
+        <rdfs:comment>~에서 유래하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- pairedWith (2회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#pairedWith">
+        <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#SymmetricProperty"/>
+        <rdfs:label>pairedWith</rdfs:label>
+        <rdfs:comment>~과 짝을 이루다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- usedBy (2회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#usedBy">
+        <rdfs:label>usedBy</rdfs:label>
+        <rdfs:comment>~에 의해 사용되다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- usedIn (14회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#usedIn">
+        <rdfs:label>usedIn</rdfs:label>
+        <rdfs:comment>~에서 사용되다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- wasMostlyAffiliatedWith (동적) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#wasMostlyAffiliatedWith">
+        <rdfs:label>wasMostlyAffiliatedWith</rdfs:label>
+        <rdfs:comment>주로 ~에 소속되었다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- restoredPowerTo (동적) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#restoredPowerTo">
+        <rdfs:label>restoredPowerTo</rdfs:label>
+        <rdfs:comment>~에게 권력을 회복시키다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- investigatedBy (2회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#investigatedBy">
+        <rdfs:label>investigatedBy</rdfs:label>
+        <rdfs:comment>~에 의해 조사되다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- commonInstitutions (15회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#commonInstitutions">
+        <rdfs:label>commonInstitutions</rdfs:label>
+        <rdfs:comment>공통 기관</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- subjects (6회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#subjects">
+        <rdfs:label>subjects</rdfs:label>
+        <rdfs:comment>주제/대상</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- containsTopic (5회) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#containsTopic">
+        <rdfs:label>containsTopic</rdfs:label>
+        <rdfs:comment>주제를 포함하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- designatesWornPrisonerAs (동적) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#designatesWornPrisonerAs">
+        <rdfs:label>designatesWornPrisonerAs</rdfs:label>
+        <rdfs:comment>착용한 죄수를 ~로 지칭하다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- prohibitedFor (동적) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#prohibitedFor">
+        <rdfs:label>prohibitedFor</rdfs:label>
+        <rdfs:comment>~에 대해 금지되다</rdfs:comment>
+    </owl:ObjectProperty>
+
+    <!-- isStoredAt (동적) -->
+    <owl:ObjectProperty rdf:about="http://www.example.org/korean-history#isStoredAt">
+        <rdfs:label>isStoredAt</rdfs:label>
+        <rdfs:comment>~에 보관되다</rdfs:comment>
+    </owl:ObjectProperty>
+
+
+    <!--
+    ///////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Data Properties (데이터 속성) - TTL에서 실제 사용되는 프로퍼티
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////
+     -->
+
+    <!-- ========== 연도/날짜 관련 (가장 많이 사용됨) ========== -->
+
+    <!-- hasYear (16,903회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasYear">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#integer"/>
+        <rdfs:label>hasYear</rdfs:label>
+        <rdfs:comment>연도</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasBirthYear (451회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasBirthYear">
+        <rdfs:domain rdf:resource="http://www.example.org/korean-history#Person"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#integer"/>
+        <rdfs:label>hasBirthYear</rdfs:label>
+        <rdfs:comment>출생년도</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasDeathYear (1,048회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasDeathYear">
+        <rdfs:domain rdf:resource="http://www.example.org/korean-history#Person"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#integer"/>
+        <rdfs:label>hasDeathYear</rdfs:label>
+        <rdfs:comment>사망년도</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasStartYear (622회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasStartYear">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#integer"/>
+        <rdfs:label>hasStartYear</rdfs:label>
+        <rdfs:comment>시작년도</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasEndYear (521회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasEndYear">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#integer"/>
+        <rdfs:label>hasEndYear</rdfs:label>
+        <rdfs:comment>종료년도</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasReignStart (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasReignStart">
+        <rdfs:domain rdf:resource="http://www.example.org/korean-history#Person"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#integer"/>
+        <rdfs:label>hasReignStart</rdfs:label>
+        <rdfs:comment>재위 시작년도</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasReignEnd (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasReignEnd">
+        <rdfs:domain rdf:resource="http://www.example.org/korean-history#Person"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#integer"/>
+        <rdfs:label>hasReignEnd</rdfs:label>
+        <rdfs:comment>재위 종료년도</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasCreationYear (3회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasCreationYear">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#integer"/>
+        <rdfs:label>hasCreationYear</rdfs:label>
+        <rdfs:comment>제작년도</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasCreationMonth (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasCreationMonth">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasCreationMonth</rdfs:label>
+        <rdfs:comment>제작월</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasMonth (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasMonth">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#integer"/>
+        <rdfs:label>hasMonth</rdfs:label>
+        <rdfs:comment>월</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- occurredInYear (5회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#occurredInYear">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#integer"/>
+        <rdfs:label>occurredInYear</rdfs:label>
+        <rdfs:comment>발생년도</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- executedInYear (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#executedInYear">
+        <rdfs:domain rdf:resource="http://www.example.org/korean-history#Person"/>
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#integer"/>
+        <rdfs:label>executedInYear</rdfs:label>
+        <rdfs:comment>처형년도</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasDesignationYear (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasDesignationYear">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#integer"/>
+        <rdfs:label>hasDesignationYear</rdfs:label>
+        <rdfs:comment>지정년도</rdfs:comment>
+    </owl:DatatypeProperty>
+
+
+    <!-- ========== 인물 속성 ========== -->
+
+    <!-- hasRank (16,522회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasRank">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasRank</rdfs:label>
+        <rdfs:comment>직위/관직/품계</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasAchievement (7,614회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasAchievement">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasAchievement</rdfs:label>
+        <rdfs:comment>업적</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasField (4,013회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasField">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasField</rdfs:label>
+        <rdfs:comment>학문 분야</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasMotive (1,444회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasMotive">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasMotive</rdfs:label>
+        <rdfs:comment>동기</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasAlias (22회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasAlias">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasAlias</rdfs:label>
+        <rdfs:comment>별칭</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasTitle (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasTitle">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasTitle</rdfs:label>
+        <rdfs:comment>작위/칭호</rdfs:comment>
+    </owl:DatatypeProperty>
+
+
+    <!-- ========== 기관/제도 속성 ========== -->
+
+    <!-- hasFunction (6,553회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasFunction">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasFunction</rdfs:label>
+        <rdfs:comment>기능/역할</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasPurpose (1,851회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasPurpose">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasPurpose</rdfs:label>
+        <rdfs:comment>목적</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasFocusTopics (6회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasFocusTopics">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasFocusTopics</rdfs:label>
+        <rdfs:comment>주요 주제</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasStaffCountFor (7회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasStaffCountFor">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasStaffCountFor</rdfs:label>
+        <rdfs:comment>인원 구성</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- servantRoleName (9회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#servantRoleName">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>servantRoleName</rdfs:label>
+        <rdfs:comment>하인 역할명</rdfs:comment>
+    </owl:DatatypeProperty>
+
+
+    <!-- ========== 문서/문헌 속성 ========== -->
+
+    <!-- description (23회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#description">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>description</rdfs:label>
+        <rdfs:comment>설명</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasDescription (5회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasDescription">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasDescription</rdfs:label>
+        <rdfs:comment>설명을 갖다</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasSummary (4회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasSummary">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasSummary</rdfs:label>
+        <rdfs:comment>요약</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasFormat (3회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasFormat">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasFormat</rdfs:label>
+        <rdfs:comment>형식</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasDimensions (3회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasDimensions">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasDimensions</rdfs:label>
+        <rdfs:comment>크기</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasVolumes (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasVolumes">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasVolumes</rdfs:label>
+        <rdfs:comment>권수</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasDesignation (3회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasDesignation">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasDesignation</rdfs:label>
+        <rdfs:comment>지정 (보물, 국보 등)</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasDesignations (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasDesignations">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasDesignations</rdfs:label>
+        <rdfs:comment>지정들</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasCurrentLocation (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasCurrentLocation">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasCurrentLocation</rdfs:label>
+        <rdfs:comment>현재 소장 위치</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasSignificance (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasSignificance">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasSignificance</rdfs:label>
+        <rdfs:comment>의의</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- notes (3회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#notes">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>notes</rdfs:label>
+        <rdfs:comment>참고사항</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- notedProblems (4회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#notedProblems">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>notedProblems</rdfs:label>
+        <rdfs:comment>기록된 문제점</rdfs:comment>
+    </owl:DatatypeProperty>
+
+
+    <!-- ========== 물품/물체 속성 ========== -->
+
+    <!-- hasWeight (2회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasWeight">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasWeight</rdfs:label>
+        <rdfs:comment>무게</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasCategory (5회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasCategory">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasCategory</rdfs:label>
+        <rdfs:comment>분류</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- category (4회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#category">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>category</rdfs:label>
+        <rdfs:comment>분류</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasCharacteristics (4회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasCharacteristics">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasCharacteristics</rdfs:label>
+        <rdfs:comment>특징</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasVariant (5회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasVariant">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasVariant</rdfs:label>
+        <rdfs:comment>변형</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- typicalUsage (3회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#typicalUsage">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>typicalUsage</rdfs:label>
+        <rdfs:comment>일반적 용도</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- usedSince (3회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#usedSince">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>usedSince</rdfs:label>
+        <rdfs:comment>사용 시작 시기</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- examplesRegularizedLater (3회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#examplesRegularizedLater">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>examplesRegularizedLater</rdfs:label>
+        <rdfs:comment>후에 정규화된 예시</rdfs:comment>
+    </owl:DatatypeProperty>
+
+
+    <!-- ========== 위치/장소 속성 ========== -->
+
+    <!-- location (3회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#location">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>location</rdfs:label>
+        <rdfs:comment>위치</rdfs:comment>
+    </owl:DatatypeProperty>
+
+
+    <!-- ========== 정책/제도 속성 ========== -->
+
+    <!-- permitted (4회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#permitted">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>permitted</rdfs:label>
+        <rdfs:comment>허용된</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- promotionCondition (2회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#promotionCondition">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>promotionCondition</rdfs:label>
+        <rdfs:comment>승진 조건</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasQuota (2회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasQuota">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasQuota</rdfs:label>
+        <rdfs:comment>할당량</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- period (2회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#period">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>period</rdfs:label>
+        <rdfs:comment>기간</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- practicedDuring (2회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#practicedDuring">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>practicedDuring</rdfs:label>
+        <rdfs:comment>시행 기간</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- usedAsTemporaryReplacementIn (3회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#usedAsTemporaryReplacementIn">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>usedAsTemporaryReplacementIn</rdfs:label>
+        <rdfs:comment>임시 대체로 사용된</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- parts (4회) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#parts">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>parts</rdfs:label>
+        <rdfs:comment>부분들</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- designatedAs (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#designatedAs">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>designatedAs</rdfs:label>
+        <rdfs:comment>~로 지정되다</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- wasAnnouncedAt (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#wasAnnouncedAt">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>wasAnnouncedAt</rdfs:label>
+        <rdfs:comment>~에서 발표되다</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- revisedDimension (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#revisedDimension">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>revisedDimension</rdfs:label>
+        <rdfs:comment>수정된 규격</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- hasDimension (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#hasDimension">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>hasDimension</rdfs:label>
+        <rdfs:comment>규격</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- regulated (동적) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#regulated">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>regulated</rdfs:label>
+        <rdfs:comment>규제하다</rdfs:comment>
+    </owl:DatatypeProperty>
+
+    <!-- caused (데이터 속성 버전) -->
+    <owl:DatatypeProperty rdf:about="http://www.example.org/korean-history#caused">
+        <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+        <rdfs:label>caused</rdfs:label>
+        <rdfs:comment>야기하다 (결과 문자열)</rdfs:comment>
+    </owl:DatatypeProperty>
+
+</rdf:RDF>
