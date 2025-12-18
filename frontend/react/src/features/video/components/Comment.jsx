@@ -60,8 +60,14 @@ const ReplyItem = ({
   onReplyAdd,
   onReplyDelete,
   hasMoreSiblings = false,
+  activeReplyId,
+  activeEditId,
+  onSetActiveReply,
+  onSetActiveEdit,
+  onClearActive,
 }) => {
-  const [showReplyInput, setShowReplyInput] = useState(false);
+  const replyId = `reply-${reply.id}`;
+  const showReplyInput = activeReplyId === replyId;
   const [replyText, setReplyText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [childReplies, setChildReplies] = useState(reply.child_replies || []);
@@ -69,7 +75,7 @@ const ReplyItem = ({
   const [likesCount, setLikesCount] = useState(reply.likes_count || 0);
 
   // 수정 기능 상태
-  const [isEditing, setIsEditing] = useState(false);
+  const isEditing = activeEditId === replyId;
   const [editText, setEditText] = useState(reply.reply_content || "");
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
@@ -105,7 +111,9 @@ const ReplyItem = ({
         }
       }
       setReplyText("");
-      setShowReplyInput(false);
+      if (onClearActive) {
+        onClearActive();
+      }
     } catch (error) {
       console.error("답글 작성 실패:", error);
       alert("답글 작성에 실패했습니다.");
@@ -129,7 +137,9 @@ const ReplyItem = ({
   };
 
   const handleEdit = () => {
-    setIsEditing(true);
+    if (onSetActiveEdit) {
+      onSetActiveEdit(replyId);
+    }
     setEditText(reply.reply_content || "");
   };
 
@@ -142,7 +152,9 @@ const ReplyItem = ({
       if (response?.data) {
         // 답글 내용 업데이트
         reply.reply_content = response.data.reply_content;
-        setIsEditing(false);
+        if (onClearActive) {
+          onClearActive();
+        }
       }
     } catch (error) {
       console.error("답글 수정 실패:", error);
@@ -153,7 +165,9 @@ const ReplyItem = ({
   };
 
   const handleCancelEdit = () => {
-    setIsEditing(false);
+    if (onClearActive) {
+      onClearActive();
+    }
     setEditText(reply.reply_content || "");
   };
 
@@ -349,12 +363,16 @@ const ReplyItem = ({
                 }}
                 style={{
                   width: "100%",
-                  padding: "8px 10px",
+                  padding: "10px 14px",
                   border: "2px solid",
                   borderColor: COLORS.primary,
-                  borderRadius: "6px",
+                  borderRadius: "8px",
                   fontSize: "11px",
+                  color: COLORS.dark,
+                  backgroundColor: COLORS.white,
                   outline: "none",
+                  boxSizing: "border-box",
+                  boxShadow: `0 0 0 2px ${COLORS.primary}20`,
                 }}
                 autoFocus
               />
@@ -434,7 +452,18 @@ const ReplyItem = ({
 
             {currentUser && depth < maxDepth && (
               <button
-                onClick={() => setShowReplyInput(!showReplyInput)}
+                onClick={() => {
+                  if (showReplyInput) {
+                    if (onClearActive) {
+                      onClearActive();
+                    }
+                    setReplyText("");
+                  } else {
+                    if (onSetActiveReply) {
+                      onSetActiveReply(replyId);
+                    }
+                  }
+                }}
                 style={{
                   background: "none",
                   border: "none",
@@ -471,31 +500,46 @@ const ReplyItem = ({
                 }}
                 style={{
                   flex: 1,
-                  padding: "6px 10px",
-                  border: "1px solid #ddd",
-                  borderRadius: "12px",
-                  fontSize: "11px",
+                  padding: "8px 12px",
+                  border: "1.5px solid #ddd",
+                  borderRadius: "20px",
+                  fontSize: "12px",
+                  backgroundColor: COLORS.white,
+                  color: COLORS.dark,
                   outline: "none",
+                  transition: "border-color 0.2s ease",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = COLORS.primary;
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "#ddd";
                 }}
               />
               <button
                 onClick={handleReplySubmit}
                 disabled={!replyText.trim() || isSubmitting}
                 style={{
-                  width: "24px",
-                  height: "24px",
+                  width: "32px",
+                  height: "32px",
+                  minWidth: "32px",
+                  minHeight: "32px",
                   borderRadius: "50%",
-                  backgroundColor: replyText.trim() ? COLORS.primary : "#ddd",
+                  backgroundColor: replyText.trim() && !isSubmitting ? COLORS.primary : COLORS.lightGray,
                   border: "none",
-                  cursor: replyText.trim() ? "pointer" : "not-allowed",
+                  cursor: replyText.trim() && !isSubmitting ? "pointer" : "not-allowed",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  flexShrink: 0,
+                  overflow: "hidden",
+                  transition: "all 0.2s ease",
+                  padding: 0,
                 }}
               >
                 <SendIcon
-                  size={10}
-                  color={replyText.trim() ? COLORS.dark : "#999"}
+                  size={16}
+                  color={replyText.trim() && !isSubmitting ? COLORS.dark : COLORS.textMuted}
                 />
               </button>
             </div>
@@ -525,6 +569,11 @@ const ReplyItem = ({
                   );
                 }}
                 hasMoreSiblings={index < childReplies.length - 1}
+                activeReplyId={activeReplyId}
+                activeEditId={activeEditId}
+                onSetActiveReply={onSetActiveReply}
+                onSetActiveEdit={onSetActiveEdit}
+                onClearActive={onClearActive}
               />
             ))}
           </div>
@@ -541,8 +590,14 @@ const Comment = ({
   onDelete,
   onReplyAdd,
   isLast = false,
+  activeReplyId,
+  activeEditId,
+  onSetActiveReply,
+  onSetActiveEdit,
+  onClearActive,
 }) => {
-  const [showReplyInput, setShowReplyInput] = useState(false);
+  const commentId = `comment-${comment.id}`;
+  const showReplyInput = activeReplyId === commentId;
   const [replyText, setReplyText] = useState("");
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
   const [replies, setReplies] = useState(comment.replies || []);
@@ -550,7 +605,7 @@ const Comment = ({
   const [likesCount, setLikesCount] = useState(
     comment.comment_likes_count || comment.likes_count || 0
   );
-  const [isEditing, setIsEditing] = useState(false);
+  const isEditing = activeEditId === commentId;
   const [editText, setEditText] = useState(comment.comment_content || comment.text || "");
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
@@ -577,7 +632,9 @@ const Comment = ({
   }, [hasReplies, replies.length, showReplyInput, replyText]);
 
   const handleEdit = () => {
-    setIsEditing(true);
+    if (onSetActiveEdit) {
+      onSetActiveEdit(commentId);
+    }
     setEditText(comment.comment_content || comment.text || "");
   };
 
@@ -591,7 +648,9 @@ const Comment = ({
         // 댓글 내용 업데이트
         comment.comment_content = response.data.comment_content;
         comment.text = response.data.comment_content;
-        setIsEditing(false);
+        if (onClearActive) {
+          onClearActive();
+        }
       }
     } catch (error) {
       console.error("댓글 수정 실패:", error);
@@ -602,7 +661,9 @@ const Comment = ({
   };
 
   const handleCancelEdit = () => {
-    setIsEditing(false);
+    if (onClearActive) {
+      onClearActive();
+    }
     setEditText(comment.comment_content || comment.text || "");
   };
 
@@ -663,7 +724,9 @@ const Comment = ({
         }
       }
       setReplyText("");
-      setShowReplyInput(false);
+      if (onClearActive) {
+        onClearActive();
+      }
     } catch (error) {
       console.error("답글 작성 실패:", error);
       alert("답글 작성에 실패했습니다.");
@@ -927,7 +990,18 @@ const Comment = ({
 
               {currentUser && (
                 <button
-                  onClick={() => setShowReplyInput(!showReplyInput)}
+                  onClick={() => {
+                    if (showReplyInput) {
+                      if (onClearActive) {
+                        onClearActive();
+                      }
+                      setReplyText("");
+                    } else {
+                      if (onSetActiveReply) {
+                        onSetActiveReply(commentId);
+                      }
+                    }
+                  }}
                   style={{
                     background: "none",
                     border: "none",
@@ -964,31 +1038,47 @@ const Comment = ({
                   }}
                   style={{
                     flex: 1,
-                    padding: "8px 12px",
-                    border: "1px solid #ddd",
-                    borderRadius: "16px",
-                    fontSize: "12px",
+                    padding: "10px 40px 10px 14px",
+                    border: "1.5px solid #ddd",
+                    borderRadius: "20px",
+                    fontSize: "13px",
+                    backgroundColor: COLORS.white,
+                    color: COLORS.dark,
                     outline: "none",
+                    transition: "border-color 0.2s ease",
+                    boxSizing: "border-box",
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = COLORS.primary;
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#ddd";
                   }}
                 />
                 <button
                   onClick={handleReplySubmit}
                   disabled={!replyText.trim() || isSubmittingReply}
                   style={{
-                    width: "28px",
-                    height: "28px",
+                    width: "32px",
+                    height: "32px",
+                    minWidth: "32px",
+                    minHeight: "32px",
                     borderRadius: "50%",
-                    backgroundColor: replyText.trim() ? COLORS.primary : "#ddd",
+                    backgroundColor: replyText.trim() && !isSubmittingReply ? COLORS.primary : COLORS.lightGray,
                     border: "none",
-                    cursor: replyText.trim() ? "pointer" : "not-allowed",
+                    cursor: replyText.trim() && !isSubmittingReply ? "pointer" : "not-allowed",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    flexShrink: 0,
+                    overflow: "hidden",
+                    transition: "all 0.2s ease",
+                    padding: 0,
                   }}
                 >
                   <SendIcon
-                    size={12}
-                    color={replyText.trim() ? COLORS.dark : "#999"}
+                    size={16}
+                    color={replyText.trim() && !isSubmittingReply ? COLORS.dark : COLORS.textMuted}
                   />
                 </button>
               </div>
@@ -1018,6 +1108,11 @@ const Comment = ({
                     );
                   }}
                   hasMoreSiblings={index < replies.length - 1}
+                  activeReplyId={activeReplyId}
+                  activeEditId={activeEditId}
+                  onSetActiveReply={onSetActiveReply}
+                  onSetActiveEdit={onSetActiveEdit}
+                  onClearActive={onClearActive}
                 />
               ))}
             </div>
