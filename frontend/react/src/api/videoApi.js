@@ -31,3 +31,11 @@ export const getPopularTags = async () => {
   const response = await api.get("/api/video/tags/popular/");
   return response.data;
 };
+
+// 영상 생성 요청
+export const createVideo = async (description) => {
+  const response = await api.post("/api/video/create/", {
+    description: description,
+  });
+  return response.data;
+};

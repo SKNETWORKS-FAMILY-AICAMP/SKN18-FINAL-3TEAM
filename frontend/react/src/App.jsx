@@ -316,7 +316,7 @@ const App = () => {
           )}
 
           {currentPage === "video-create" && (
-            <VideoCreatePage onNavigate={handleNavigate} />
+            <VideoCreatePage onNavigate={handleNavigate} user={user} />
           )}
         </div>
 
