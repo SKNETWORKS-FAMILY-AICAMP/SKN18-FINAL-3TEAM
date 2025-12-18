@@ -8,7 +8,9 @@ import MyPage from "./pages/MyPage";
 import AllCommentsPage from "./pages/AllCommentsPage";
 import ProfileEditPage from "./pages/ProfileEditPage";
 import AdminPage from "./pages/AdminPage";
-import SearchResultPage from "./pages/SearchResultPage";
+import Chatbot from "./pages/Chatbot";
+import VideoCreatePage from "./pages/VideoCreatePage";
+import ChatbotButton from "./components/common/ChatbotButton";
 import {
   checkAuth,
   getGoogleLoginUrl,
@@ -134,6 +136,9 @@ const App = () => {
   };
 
   const handleVideoClick = (video) => {
+    if (!video || !video.id) {
+      return;
+    }
     setSelectedVideoId(video.id);
     setCurrentPage("video");
     updateURL("video", video.id);
@@ -152,6 +157,12 @@ const App = () => {
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   };
 
+  const handleAdminClick = () => {
+    setCurrentPage("admin");
+    updateURL("admin");
+    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  };
+
   const handleLogin = () => {
     // Google 로그인 페이지로 리다이렉트
     window.location.href = getGoogleLoginUrl();
@@ -165,7 +176,12 @@ const App = () => {
       setShowUserDropdown(false);
 
       // 인증이 필요한 페이지에서 로그아웃 시 메인으로 이동
-      const authRequiredPages = ['mypage', 'profile-edit', 'all-comments', 'admin'];
+      const authRequiredPages = [
+        "mypage",
+        "profile-edit",
+        "all-comments",
+        "admin",
+      ];
       if (authRequiredPages.includes(currentPage)) {
         setCurrentPage("main");
         updateURL("main");
@@ -179,7 +195,12 @@ const App = () => {
       setShowUserDropdown(false);
 
       // 에러가 발생해도 인증 필요 페이지면 메인으로 이동
-      const authRequiredPages = ['mypage', 'profile-edit', 'all-comments', 'admin'];
+      const authRequiredPages = [
+        "mypage",
+        "profile-edit",
+        "all-comments",
+        "admin",
+      ];
       if (authRequiredPages.includes(currentPage)) {
         setCurrentPage("main");
         updateURL("main");
@@ -243,6 +264,8 @@ const App = () => {
           onMyPageClick={handleMyPageClick}
           onLogin={handleLogin}
           onLogout={handleLogout}
+          onAdminClick={handleAdminClick}
+          currentPage={currentPage}
         />
 
         <ExpandableSearch
@@ -286,14 +309,19 @@ const App = () => {
             <AdminPage onNavigate={handleNavigate} user={user} />
           )}
 
-          {currentPage === "search" && (
-            <SearchResultPage
-              query={searchQuery}
-              onVideoClick={handleVideoClick}
-              isLoggedIn={isLoggedIn}
-            />
+          {currentPage === "question" && (
+            <div style={{ overflow: "hidden", height: "calc(100vh - 76px)" }}>
+              <Chatbot onNavigate={handleNavigate} user={user} />
+            </div>
+          )}
+
+          {currentPage === "video-create" && (
+            <VideoCreatePage onNavigate={handleNavigate} user={user} />
           )}
         </div>
+
+        {/* 챗봇 버튼 (모든 페이지에서 표시) */}
+        <ChatbotButton onNavigate={handleNavigate} />
       </div>
     </>
   );

@@ -16,6 +16,10 @@ const CommentSection = ({
   const [commentText, setCommentText] = useState("");
   const [commentsList, setCommentsList] = useState(comments);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // 하나의 동작만 가능하도록 전역 상태 관리
+  const [activeReplyId, setActiveReplyId] = useState(null); // 'comment-{id}' 또는 'reply-{id}' 형식
+  const [activeEditId, setActiveEditId] = useState(null); // 'comment-{id}' 또는 'reply-{id}' 형식
 
   // comments prop이 변경되면 상태 업데이트
   useEffect(() => {
@@ -125,6 +129,20 @@ const CommentSection = ({
                 comment={comment}
                 currentUser={user}
                 isLast={index === commentsList.length - 1}
+                activeReplyId={activeReplyId}
+                activeEditId={activeEditId}
+                onSetActiveReply={(id) => {
+                  setActiveReplyId(id);
+                  setActiveEditId(null); // 답글하기를 누르면 수정하기는 취소
+                }}
+                onSetActiveEdit={(id) => {
+                  setActiveEditId(id);
+                  setActiveReplyId(null); // 수정하기를 누르면 답글하기는 취소
+                }}
+                onClearActive={() => {
+                  setActiveReplyId(null);
+                  setActiveEditId(null);
+                }}
                 onDelete={(commentId) => {
                   setCommentsList((prev) =>
                     prev.filter((c) => c.id !== commentId)

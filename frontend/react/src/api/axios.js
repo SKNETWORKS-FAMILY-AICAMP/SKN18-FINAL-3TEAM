@@ -51,9 +51,13 @@ api.interceptors.response.use(
     }
 
     // 401 또는 403 에러 (인증/권한 실패) && 아직 재시도하지 않은 경우
+    // 단, 시청 기록 저장 API는 403이 정상일 수 있으므로 제외
+    const isWatchLogsRequest = originalRequest.url?.includes('/api/activity/watch-logs/');
+    
     if (
       (error.response?.status === 401 || error.response?.status === 403) &&
-      !originalRequest._retry
+      !originalRequest._retry &&
+      !isWatchLogsRequest // 시청 기록 저장 API는 제외
     ) {
       originalRequest._retry = true;
 
