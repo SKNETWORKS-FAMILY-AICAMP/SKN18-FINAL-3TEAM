@@ -1,9 +1,15 @@
 import { useState, useRef, useEffect } from "react";
 import { COLORS } from "../constants/theme";
 import { SendIcon, ThinkingIcon, CloseIcon } from "../components/common/Icons";
-import { sendQuestion, getChatHistory } from "../api/chatApi";
+import {
+  sendQuestion,
+  getChatHistory,
+  getChatSession,
+  createChatSession,
+  deleteChatSession,
+} from "../api/chatApi";
 
-const Chatbot = ({ onNavigate, user }) => {
+const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [isThinking, setIsThinking] = useState(false);
@@ -23,11 +29,28 @@ const Chatbot = ({ onNavigate, user }) => {
     user?.email?.split("@")[0] ||
     "사용자";
 
+  const hydrateMessages = (sessionMessages = []) => {
+    const normalized = sessionMessages.map((msg) => ({
+      type: msg.role === "assistant" ? "assistant" : "user",
+      text: msg.content,
+    }));
+    setMessages(normalized);
+  };
+
   useEffect(() => {
     const loadChatHistory = async () => {
       try {
-        const history = await getChatHistory();
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+          setChatHistory([]);
+          return;
+        }
+        const raw = await getChatHistory();
+        const history = Array.isArray(raw) ? raw : raw?.sessions || [];
         setChatHistory(history || []);
+        // 세션 자동 로드는 하지 않음. 사용자가 히스토리에서 선택할 때만 불러온다.
+        setSelectedSessionId(null);
+        setMessages([]);
       } catch (error) {
         if (error.response?.status === 404) {
           console.warn("대화 기록 API가 아직 구현되지 않았습니다.");
@@ -40,6 +63,32 @@ const Chatbot = ({ onNavigate, user }) => {
     };
     loadChatHistory();
   }, []);
+
+  useEffect(() => {
+    const startNewSession = async () => {
+      try {
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+          setSelectedSessionId(null);
+          setMessages([]);
+          return;
+        }
+        const newSession = await createChatSession();
+        setSelectedSessionId(newSession.id);
+        setMessages([]);
+        const raw = await getChatHistory();
+        const history = Array.isArray(raw) ? raw : raw?.sessions || [];
+        setChatHistory(history || []);
+        setShowHistory(false);
+      } catch (error) {
+        console.error("새 세션 생성 실패:", error);
+      }
+    };
+
+    if (newChatTrigger) {
+      startNewSession();
+    }
+  }, [newChatTrigger]);
 
   useEffect(() => {
     if (inputRef.current && messages.length === 0) {
@@ -89,7 +138,26 @@ const Chatbot = ({ onNavigate, user }) => {
     });
 
     try {
-      const response = await sendQuestion(userMessage);
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        simulateStreamingResponse("로그인 후에 질문할 수 있어요.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 세션이 없으면 새 세션 생성
+      let sessionId = selectedSessionId;
+      if (!sessionId) {
+        const newSession = await createChatSession();
+        sessionId = newSession.id;
+        setSelectedSessionId(sessionId);
+        // 히스토리도 갱신
+        const raw = await getChatHistory();
+        const history = Array.isArray(raw) ? raw : raw?.sessions || [];
+        setChatHistory(history || []);
+      }
+
+      const response = await sendQuestion(userMessage, sessionId);
 
       if (response.answer) {
         simulateStreamingResponse(response.answer);
@@ -195,7 +263,7 @@ const Chatbot = ({ onNavigate, user }) => {
       }}
     >
       {/* 사이드바 (메시지가 있을 때만) */}
-      {messages.length > 0 && (
+      {chatHistory.length > 0 && (
         <>
           {/* 사이드바 토글 버튼 */}
           <button
@@ -278,75 +346,107 @@ const Chatbot = ({ onNavigate, user }) => {
                 padding: "0",
               }}
             >
-              {chatHistory.length === 0 ? (
-                <div
-                  style={{
-                    padding: "20px",
-                    textAlign: "center",
-                    color: COLORS.gray,
-                    fontSize: "14px",
-                  }}
-                >
-                  대화 기록이 없습니다.
-                </div>
-              ) : (
-                chatHistory.map((session) => (
-                  <div
-                    key={session.id}
-                    onClick={() => {
-                      setSelectedSessionId(session.id);
-                    }}
-                    style={{
-                      padding: "12px",
-                      marginBottom: "8px",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      backgroundColor:
-                        selectedSessionId === session.id
-                          ? COLORS.tertiary
-                          : "transparent",
-                      transition: "background 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      if (selectedSessionId !== session.id) {
-                        e.currentTarget.style.backgroundColor =
-                          COLORS.lightGray;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (selectedSessionId !== session.id) {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                      }
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "13px",
-                        fontWeight: "500",
-                        color: COLORS.dark,
-                        marginBottom: "4px",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {session.title || session.first_message || "대화"}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: COLORS.gray,
-                      }}
-                    >
-                      {session.created_at
-                        ? new Date(session.created_at).toLocaleDateString(
-                            "ko-KR"
-                          )
-                        : ""}
-                    </div>
-                  </div>
-                ))
-              )}
+          {chatHistory.map((session) => (
+            <div
+              key={session.id}
+              onClick={async () => {
+                setSelectedSessionId(session.id);
+                setMessages([]);
+                try {
+                  const sessionData = await getChatSession(session.id);
+                  hydrateMessages(sessionData?.messages || []);
+                } catch (error) {
+                  console.error("세션 불러오기 실패:", error);
+                }
+              }}
+              style={{
+                position: "relative",
+                padding: "12px",
+                marginBottom: "8px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                backgroundColor:
+                  selectedSessionId === session.id
+                    ? COLORS.tertiary
+                    : "transparent",
+                transition: "background 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                if (selectedSessionId !== session.id) {
+                  e.currentTarget.style.backgroundColor = COLORS.lightGray;
+                }
+                const btn = e.currentTarget.querySelector(".session-delete-btn");
+                if (btn) btn.style.opacity = 1;
+              }}
+              onMouseLeave={(e) => {
+                if (selectedSessionId !== session.id) {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }
+                const btn = e.currentTarget.querySelector(".session-delete-btn");
+                if (btn) btn.style.opacity = 0;
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: "500",
+                  color: COLORS.dark,
+                  marginBottom: "4px",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {session.title || session.first_message || "대화"}
+              </div>
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: COLORS.gray,
+                }}
+              >
+                {session.created_at
+                  ? new Date(session.created_at).toLocaleDateString("ko-KR")
+                  : ""}
+              </div>
+              <button
+                className="session-delete-btn"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  try {
+                    await deleteChatSession(session.id);
+                    const filtered = (chatHistory || []).filter(
+                      (s) => s.id !== session.id
+                    );
+                    setChatHistory(filtered);
+                    if (selectedSessionId === session.id) {
+                      setSelectedSessionId(null);
+                      setMessages([]);
+                    }
+                  } catch (error) {
+                    console.error("세션 삭제 실패:", error);
+                  }
+                }}
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  right: "16px",
+                  transform: "translateY(-50%)",
+                  width: "20px",
+                  height: "20px",
+                  borderRadius: "50%",
+                  border: "none",
+                  background: "transparent",
+                  color: COLORS.gray,
+                  cursor: "pointer",
+                  opacity: 0,
+                  transition: "opacity 0.2s",
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
             </div>
           </div>
         </>
@@ -426,7 +526,7 @@ const Chatbot = ({ onNavigate, user }) => {
               width: "100%",
               marginLeft: "auto",
               marginRight: "auto",
-              paddingLeft: "280px",
+              paddingLeft: showHistory ? "280px" : "0px",
               height: "100%",
               minHeight: 0,
               position: "relative",
@@ -461,31 +561,31 @@ const Chatbot = ({ onNavigate, user }) => {
                 }}
               >
                 {messages.map((msg, index) => (
-                  <div key={index}>
-                    {msg.type === "user" && (
+                  <div
+                    key={index}
+                    style={{
+                      display: "flex",
+                      justifyContent:
+                        msg.type === "user" ? "flex-end" : "flex-start",
+                    }}
+                  >
+                    {msg.type === "user" ? (
                       <div
                         style={{
                           marginBottom: "16px",
+                          padding: "12px 16px",
+                          backgroundColor: COLORS.lightGray,
+                          borderRadius: "12px",
+                          fontSize: "14px",
+                          color: COLORS.dark,
+                          display: "inline-block",
+                          maxWidth: "70%",
+                          wordWrap: "break-word",
                         }}
                       >
-                        <div
-                          style={{
-                            padding: "12px 16px",
-                            backgroundColor: COLORS.lightGray,
-                            borderRadius: "12px",
-                            fontSize: "14px",
-                            color: COLORS.dark,
-                            display: "inline-block",
-                            maxWidth: "70%",
-                            wordWrap: "break-word",
-                          }}
-                        >
-                          {msg.text}
-                        </div>
+                        {msg.text}
                       </div>
-                    )}
-
-                    {msg.type === "assistant" && (
+                    ) : (
                       <div
                         style={{
                           fontSize: "14px",
@@ -493,6 +593,7 @@ const Chatbot = ({ onNavigate, user }) => {
                           lineHeight: "1.8",
                           whiteSpace: "pre-wrap",
                           wordWrap: "break-word",
+                          marginBottom: "16px",
                         }}
                       >
                         {msg.text}
@@ -541,11 +642,12 @@ const Chatbot = ({ onNavigate, user }) => {
               style={{
                 position: "fixed",
                 bottom: "40px",
-                left: "50%",
+                left: showHistory ? "calc(50% + 140px)" : "50%",
                 transform: "translateX(-50%)",
-                width: "calc(100% - 420px)",
+                width: "100%",
                 maxWidth: "900px",
-                marginLeft: "120px",
+                marginLeft: "auto",
+                marginRight: "auto",
                 zIndex: 998,
               }}
             >
