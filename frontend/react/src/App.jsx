@@ -4,6 +4,7 @@ import Header from "./components/layout/Header";
 import ExpandableSearch from "./features/search/components/ExpandableSearch";
 import MainPage from "./pages/MainPage";
 import VideoDetailPage from "./pages/VideoDetailPage";
+import SearchResultPage from "./pages/SearchResultPage";
 import MyPage from "./pages/MyPage";
 import AllCommentsPage from "./pages/AllCommentsPage";
 import ProfileEditPage from "./pages/ProfileEditPage";
@@ -286,6 +287,14 @@ const App = () => {
               videoId={selectedVideoId}
               isLoggedIn={isLoggedIn}
               user={user}
+            />
+          )}
+
+          {currentPage === "search" && (
+            <SearchResultPage
+              query={searchQuery}
+              onVideoClick={handleVideoClick}
+              isLoggedIn={isLoggedIn}
             />
           )}
 
