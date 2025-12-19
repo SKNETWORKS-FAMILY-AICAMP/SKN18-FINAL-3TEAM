@@ -331,19 +331,70 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
           >
             <div
               style={{
-                padding: "0 0 20px 0",
-                fontSize: "16px",
-                fontWeight: "600",
-                color: COLORS.dark,
+                padding: "0 0 16px 0",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+                alignItems: "flex-start",
               }}
             >
-              대화 기록
+              <button
+                onClick={async () => {
+                  try {
+                    const token = localStorage.getItem("access_token");
+                    if (!token) {
+                      setSelectedSessionId(null);
+                      setMessages([]);
+                      return;
+                    }
+                    const newSession = await createChatSession();
+                    setSelectedSessionId(newSession.id);
+                    setMessages([]);
+                    const raw = await getChatHistory();
+                    const history = Array.isArray(raw) ? raw : raw?.sessions || [];
+                    setChatHistory(history || []);
+                  } catch (error) {
+                    console.error("새 세션 생성 실패:", error);
+                  }
+                }}
+                style={{
+                  alignSelf: "flex-start",
+                  border: "none",
+                  background: "transparent",
+                  color: COLORS.dark,
+                  cursor: "pointer",
+                  fontSize: "16px",
+                  padding: "4px 0px",
+                  borderRadius: "8px",
+                  transition: "background 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = COLORS.lightGray;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                새 채팅
+              </button>
+              <span
+                style={{
+                  fontSize: "16px",
+                  fontWeight: "600",
+                  color: COLORS.dark,
+                  marginTop: "4px",
+                  paddingLeft: "2px",
+                }}
+              >
+                대화 기록
+              </span>
             </div>
             <div
               style={{
                 flex: 1,
                 overflowY: "auto",
                 padding: "0",
+                paddingLeft: "2px",
               }}
             >
           {chatHistory.map((session) => (

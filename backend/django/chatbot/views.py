@@ -1,12 +1,14 @@
 import asyncio
 import logging
 import json
+import uuid
 
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.http import StreamingHttpResponse
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from django.db.models import Count
 
 from .models import ChatMessage, ChatSession
 from backend.langgraph_structure1.graph import create_graph_flow
@@ -114,6 +116,7 @@ def _handle_question(request, chat_session=None):
     """LangGraph 호출."""
     error = None
     ai_response = ""
+    fallback_answer = "어,어랏? 그게 뭐야아? 그거 조선말 맞아?"
 
     _hydrate_summary_from_db(request)
     query = (request.data.get("query") or request.data.get("question") or "").strip()
@@ -143,7 +146,7 @@ def _handle_question(request, chat_session=None):
                 }
             )
         )
-        ai_response = response_state.get("final_answer", "")
+        ai_response = response_state.get("final_answer") or fallback_answer
         logger.info("[chat] AI response len=%s", len(ai_response))
 
         _store_message(
@@ -223,7 +226,7 @@ class ChatQuestionView(APIView):
                         }
                     )
                 )
-                ai_response = response_state.get("final_answer", "")
+                ai_response = response_state.get("final_answer") or fallback_answer
                 logger.info("[chat][stream] AI response len=%s", len(ai_response))
 
                 _store_message(
@@ -263,7 +266,12 @@ class ChatHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        sessions = ChatSession.objects.filter(user=request.user).order_by("-updated_at")
+        sessions = (
+            ChatSession.objects.filter(user=request.user)
+            .annotate(msg_count=Count("messages"))
+            .filter(msg_count__gt=0)
+            .order_by("-updated_at")
+        )
         return Response({"sessions": [_build_session_payload(session) for session in sessions]})
 
 
@@ -309,11 +317,10 @@ class NewSessionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # 현재 브라우저 세션 키를 기준으로 하되, 사용자에 매핑
-        if not request.session.session_key:
-            request.session.save()
+        # 새로운 UUID 기반 세션 키로 생성 (브라우저 session_key 중복 방지)
+        session_key = uuid.uuid4().hex
         chat_session = ChatSession.objects.create(
-            session_key=request.session.session_key,
+            session_key=session_key,
             user=request.user,
         )
         return Response(_build_session_payload(chat_session), status=201)
