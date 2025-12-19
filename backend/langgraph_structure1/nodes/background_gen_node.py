@@ -17,7 +17,11 @@ def get_video_style_prompt(scene_text: str) -> str:
     text = scene_text.lower()
     
     # 1. 🔥 WAR (전쟁/전투) - 확실한 전투 키워드가 있을 때만
-    war_keywords = ['battle', 'fight', 'war', 'attack', 'explosion', 'cannon', 'arrow', 'kill', 'combat', '전투', '공격', '폭발']
+    war_keywords = [
+        'battlefield', 'fighting', 'war zone', 'combat', 
+        'soldiers charging', 'invasion', 'killing', 'bloody', 
+        'army clash', '전쟁', '전투', '침략'
+    ]
     if any(k in text for k in war_keywords):
         print("      👉 분위기 감지: [WAR/BATTLE]")
         return (
