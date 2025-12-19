@@ -22,10 +22,14 @@ async def hybrid_node(state: GraphState) -> GraphState:
     # retrieval 직전에만 키워드 추출하여 state에 주입
     kw_state = extract_keywords_node(state)
 
+    # vector만 실행 (Neo4j 비활성화)
     v_task = asyncio.create_task(_run_vector(kw_state))
-    g_task = asyncio.create_task(_run_graph(state))
+    g_task = asyncio.create_task(_run_graph(state))  # 필요 시 활성화
 
-    v_state, g_state = await asyncio.gather(v_task, g_task)
+    v_state = await asyncio.gather(v_task)
+    v_state = v_state[0]
+    g_state = await asyncio.gather(g_task)
+    g_state = g_state[0]
 
     # 기존 state + 벡터/그래프 결과를 모두 합쳐서 반환
     return {

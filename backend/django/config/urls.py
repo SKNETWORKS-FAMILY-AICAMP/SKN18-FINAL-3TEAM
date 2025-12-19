@@ -30,6 +30,9 @@ urlpatterns = [
 
     # 댓글 + 답글 + 좋아요 API
     path('api/community/', include('community.urls')),
+    # 챗봇 API
+    path('api/chatbot/', include('chatbot.urls')),
+    path('api/chat/', include('chatbot.urls')),
 
     # API 문서화
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

@@ -53,7 +53,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pgvector_load = "backend.db_pipeline.vectordb.cli:cli"
+pgvector_load = "backend.db_pipeline.postgres.cli:cli"
 ontology = "backend.langgraph_fuseki.cli:cli"
 
 [tool.setuptools.packages.find]
