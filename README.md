@@ -161,7 +161,7 @@ hop를 너무 늘리면 데이터가 많아서 할루시네이션도 생김
 
 LLM 서버로부터 받은 비정형 텍스트 데이터를 구조화된 JSON으로 변환하여 유니티 클라이언트가 해석하는 구조입니다.
 
-```mermaid
+```
 graph TD
     User[사용자 입력] -->|주제 전송| Client[LLMClient (Unity)]
     Client -->|API Request| Server[LangGraph Server]
