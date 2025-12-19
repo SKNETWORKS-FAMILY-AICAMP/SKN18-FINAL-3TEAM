@@ -59,10 +59,18 @@ class VideoListView(ListAPIView):
         else:
             queryset = queryset.order_by('-upload_date')
         
-        # 태그 필터
+        # 태그 필터 (부분 일치 지원)
         tag = self.request.query_params.get('tag', '')
         if tag:
-            queryset = queryset.filter(tags__contains=[tag])
+            queryset = queryset.extra(
+                where=["""
+                    EXISTS (
+                        SELECT 1 FROM unnest(tags) AS t
+                        WHERE t ILIKE %s
+                    )
+                """],
+                params=[f'%{tag}%']
+            )
         
         return queryset
     
@@ -149,6 +157,62 @@ class VideoUploadView(CreateAPIView):
             'data': VideoSerializer(serializer.instance).data,
             'message': '영상이 업로드되었습니다.'
         }, status=status.HTTP_201_CREATED)
+
+
+class PopularVideosView(ListAPIView):
+    """
+    인기 영상 API (임시)
+
+    GET /api/video/popular/
+    - 좋아요와 댓글 수 기준 인기 영상 반환
+    """
+    serializer_class = VideoSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        return Video.objects.all().order_by('-likes_count', '-comments_count')[:20]
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return Response({
+            'data': response.data,
+            'message': 'ok'
+        })
+
+
+class PopularTagsView(APIView):
+    """
+    인기 태그 API
+
+    GET /api/video/tags/popular/
+    - 가장 많이 사용된 태그 목록 반환 (최대 10개)
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        from collections import Counter
+
+        # 모든 비디오의 태그 수집
+        all_tags = []
+        videos = Video.objects.exclude(tags__isnull=True).exclude(tags=[])
+
+        for video in videos:
+            if video.tags:
+                all_tags.extend(video.tags)
+
+        # 태그 빈도 계산
+        tag_counter = Counter(all_tags)
+
+        # 상위 10개 태그
+        popular_tags = [
+            {'tag': tag, 'count': count}
+            for tag, count in tag_counter.most_common(10)
+        ]
+
+        return Response({
+            'data': popular_tags,
+            'message': 'ok'
+        })
 
 
 # 시스템 프롬프트 (Talchum Comedy / English Mode - Final Structured Version)
