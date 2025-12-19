@@ -5,6 +5,7 @@ from django.contrib.auth import logout
 from django.core.cache import cache
 from django.db import models
 from django.http import JsonResponse
+from django.shortcuts import redirect
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, parser_classes
@@ -496,3 +497,15 @@ class AdminUserDeleteView(DestroyAPIView):
             'data': None,
             'message': '사용자가 삭제되었습니다.'
         }, status=status.HTTP_200_OK)
+
+
+# ============================================
+# OAuth 취소 처리
+# ============================================
+
+def oauth_login_cancelled(request):
+    """
+    Google OAuth 로그인 취소 시 처리
+    /accounts/3rdparty/login/cancelled/ 요청을 프론트엔드로 리다이렉트
+    """
+    return redirect('http://localhost:3000/')

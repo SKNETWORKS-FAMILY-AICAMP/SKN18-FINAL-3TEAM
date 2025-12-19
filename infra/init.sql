@@ -93,3 +93,9 @@ CREATE TABLE IF NOT EXISTS search_history (
 CREATE INDEX IF NOT EXISTS korean_history_embedding_idx
 ON korean_history
 USING hnsw (embedding vector_cosine_ops);
+
+-- 초기 영상 데이터 삽입
+INSERT INTO video (title, video_url, tags, likes_count, comments_count)
+VALUES 
+    ('조선시대 한글 창제의 비밀', '/videos/selected_scene_1_video.mp4', ARRAY['세종', '한글', '발명품'], 0, 0)
+ON CONFLICT DO NOTHING;
