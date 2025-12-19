@@ -4,8 +4,8 @@ import time
 from typing import Any, Dict, List
 
 from backend.langgraph_structure1.state import GraphState
-from backend.db_pipeline.vectordb.ETL.load_to_pgvector import get_embedding
-from backend.db_pipeline.vectordb.services.custom_pgvector import CustomPGVector
+from backend.db_pipeline.postgres.ETL.load_to_pgvector import get_embedding
+from backend.db_pipeline.postgres.services.custom_pgvector import CustomPGVector
 from backend.db_pipeline.common.config import POSTGRES_CONN_STR, HISTORY_TABLE_NAME
 from backend.langgraph_structure1.rag.rag_config import (
     RETRIEVAL_TOP_K,
@@ -28,7 +28,7 @@ def retrieval_node(state: GraphState) -> GraphState:
 
     t0 = time.perf_counter()
 
-    # keywords가 있으면 질문과 함께 조합해 쿼리 문자열을 만든다
+    # keywords가 있으면 질문과 함께 조합해 쿼리 문자열을 만든다 (복수 키워드 지원)
     keywords: List[str] = state.get("keywords", []) or []
     if keywords:
         kw_str = " ".join(keywords)

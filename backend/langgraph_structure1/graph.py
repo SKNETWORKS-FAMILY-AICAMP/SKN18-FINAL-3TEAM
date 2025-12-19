@@ -2,7 +2,7 @@ from langgraph.graph import StateGraph, END
 from backend.langgraph_structure1.state import GraphState
 from backend.langgraph_structure1.nodes.classify_node import classify_node, route_classify
 from backend.langgraph_structure1.nodes.generate_node import generate_node
-from backend.langgraph_structure1.nodes.tone_adjust_node import tone_adjust_node
+from backend.langgraph_structure1.nodes.tone_adjust_node import tone_adjust_node, route_tone_adjust_node
 from backend.langgraph_structure1.nodes.scene_split_node import scene_split_node
 from backend.langgraph_structure1.rag.hybrid_node import hybrid_node
 
@@ -37,8 +37,20 @@ def create_graph_flow():
 
     # 말투 및 scene 분리 노드 연결
     workflow.add_edge("generate_node", "tone_adjust_node")
-    workflow.add_edge("tone_adjust_node", "scene_split_node")
+
+    workflow.add_conditional_edges(
+        "tone_adjust_node",
+        route_tone_adjust_node,
+        { 
+            "scene_split_node": "scene_split_node",
+            END: END,
+        },
+    )
+
     workflow.add_edge("scene_split_node", END)
+
+    # # ragas 평가용 노드 연결
+    # workflow.add_edge("generate_node", END)
 
     # 4) 그래프 compile
     graph = workflow.compile()

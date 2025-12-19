@@ -5,10 +5,14 @@ import api from "./axios";
  */
 
 // 질문 전송 및 답변 받기
-export const sendQuestion = async (question) => {
-  const response = await api.post("/api/chat/question/", {
+export const sendQuestion = async (question, sessionId = null) => {
+  const payload = {
     question: question,
-  });
+  };
+  if (sessionId) {
+    payload.session_id = sessionId;
+  }
+  const response = await api.post("/api/chat/question/", payload);
   return response.data;
 };
 
@@ -24,3 +28,14 @@ export const getChatSession = async (sessionId) => {
   return response.data;
 };
 
+// 새 세션 생성
+export const createChatSession = async () => {
+  const response = await api.post("/api/chat/new-session/");
+  return response.data;
+};
+
+// 세션 삭제
+export const deleteChatSession = async (sessionId) => {
+  const response = await api.delete(`/api/chat/session/${sessionId}/delete/`);
+  return response.data;
+};

@@ -1,0 +1,40 @@
+{"persona_id": "foreigner_culture_history", "qtype": "SIMPLE", "question_en": "Who was King Sejo ?", "question_ko": "세조는 누구였나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "SIMPLE", "question_en": "What was the role of a 삼도수군통제사 (naval commander) in Joseon?", "question_ko": "삼도수군통제사의 역할은 무엇이었나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "SIMPLE", "question_en": "Where is the 영릉 (Royal tomb) of Joseon's prince located?", "question_ko": "왕자의 영릉은 어디에 위치해 있나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "SIMPLE", "question_en": "What kind of job did a 문신 (civil official) have in Joseon?", "question_ko": "시대 문신은 어떤 일을 했나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "SIMPLE", "question_en": "What was the function of the 활인원 during Joseon times?", "question_ko": "시대에 활인원의 기능은 무엇이었나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "SIMPLE", "question_en": "Who was 김성일, the scholar related to 학봉집?", "question_ko": "학봉집과 관련된 학자 김성일은 누구인가요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "SIMPLE", "question_en": "What was the 정초군 military?", "question_ko": "정초군 군대는 무엇이었나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "SIMPLE", "question_en": "What does the punishment device called 추 mean in Joseon?", "question_ko": "추라는 처벌 장치는 무엇을 의미합니까?"}
+{"persona_id": "foreigner_culture_history", "qtype": "SIMPLE", "question_en": "Who were the 의병 during the Japanese invasions in Joseon?", "question_ko": "일본 침략 당시 의병은 누구였나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "SIMPLE", "question_en": "What was the purpose of the 교제창 warehouses in late Joseon?", "question_ko": "후기 교제창 창고의 목적은 무엇이었나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "CONNECTIVE", "question_en": "How did the role of military commanders like Seonsegang affect the outcome of conflicts involving local militias such as those led by Choi An during invasions?", "question_ko": "선세강과 같은 군 지휘관들의 역할이 최안이 이끄는 향토 의병과 같은 지역 민병대가 참여한 전쟁의 결과에 어떤 영향을 미쳤나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "CONNECTIVE", "question_en": "What was the relationship between government officials like Lee Chunran and the enforcement of local justice tools such as the punishment device called Chu?", "question_ko": "이춘란과 같은 관료들과 추라는 처벌 도구를 통한 지방 사법 집행과의 관계는 어땠나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "CONNECTIVE", "question_en": "How did the central army units like Jeongchogun influence the effectiveness of volunteer militias in battles such as the Second Siege of Jinju led by Choi Kipil?", "question_ko": "정초군과 같은 중앙군 부대가 최기필이 이끈 제2차 진주성 전투와 같은 전투에서 의병의 전투력에 어떤 영향을 미쳤나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "CONNECTIVE", "question_en": "In what ways did the political positions held by civil officials like Jeong Heumji impact military decisions during times of rebellion or invasion?", "question_ko": "정흠지와 같은 문관들이 맡은 정치적 직위가 반란이나 침략 시 군사 결정에 어떤 영향을 미쳤습니까?"}
+{"persona_id": "foreigner_culture_history", "qtype": "CONNECTIVE", "question_en": "How did the use of official documents called Gwanmun shape communication and power dynamics between different government offices court?", "question_ko": "관문이라는 공식 문서의 사용이 정부 내 여러 부서 간의 소통과 권력 관계에 어떤 영향을 미쳤나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "CONNECTIVE", "question_en": "Why did military officers such as Heo Jin hold both civil and military roles, and how did this dual role affect military logistics and civil administration?", "question_ko": "허진과 같은 군 장교들이 왜 문무를 겸했으며, 이러한 이중 역할이 군수 물자 관리와 민정 행정에 어떤 영향을 미쳤나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "CONNECTIVE", "question_en": "How did the practice of cultivating military fields by soldiers like Dunabyeong connect agricultural production to military readiness?", "question_ko": "둔야병과 같은 군인들이 군사 농지를 경작하는 관행이 농업 생산과 군사 대비태세를 어떻게 연결시켰나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "CONNECTIVE", "question_en": "What connections existed between the operation of relief granaries like Gyojechang and the government’s ability to manage famine in remote regions?", "question_ko": "교제창과 같은 구호 곡물 창고의 운영과 정부가 외딴 지역의 기근을 관리하는 능력 사이에는 어떤 연관성이 있었나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "CONNECTIVE", "question_en": "How did the involvement of royal family members such as Lee Taegyeong in political scandals influence the stability of the royal court?", "question_ko": "이태경과 같은 왕실 가족의 정치 스캔들 연루가 왕실의 안정성에 어떤 영향을 미쳤나요?"}
+{"persona_id": "foreigner_culture_history", "qtype": "CONNECTIVE", "question_en": "What was the impact of the publication of works like Hakbongjip on the education and political ideology of scholar-officials?", "question_ko": "학봉집과 같은 저작물의 출판이 유학자 관료들의 교육과 정치 이념에 어떤 영향을 미쳤나요?"}
+{"persona_id": "kids_child", "qtype": "SIMPLE", "question_ko": "조선은 언제 시작했어?"}
+{"persona_id": "kids_child", "qtype": "SIMPLE", "question_ko": "세조는 누구야?"}
+{"persona_id": "kids_child", "qtype": "SIMPLE", "question_ko": "임진왜란은 뭐야?"}
+{"persona_id": "kids_child", "qtype": "SIMPLE", "question_ko": "시대 왕은 몇 명 있었어?"}
+{"persona_id": "kids_child", "qtype": "SIMPLE", "question_ko": "시대에 군인은 뭐 했어?"}
+{"persona_id": "kids_child", "qtype": "SIMPLE", "question_ko": "이명섭은 누구야?"}
+{"persona_id": "kids_child", "qtype": "SIMPLE", "question_ko": "시대 의병은 뭐야?"}
+{"persona_id": "kids_child", "qtype": "SIMPLE", "question_ko": "삼도수군통제사는 뭐야?"}
+{"persona_id": "kids_child", "qtype": "SIMPLE", "question_ko": "시대 문신은 누군데?"}
+{"persona_id": "kids_child", "qtype": "SIMPLE", "question_ko": "시대 죄인은 어떻게 벌 받았어?"}
+{"persona_id": "kids_child", "qtype": "CONNECTIVE", "question_ko": "선세강이 병조참판일 때 무신 역할이 어떻게 변했어?"}
+{"persona_id": "kids_child", "qtype": "CONNECTIVE", "question_ko": "최안이 의병을 하면서 정유재란에 어떤 영향을 줬어?"}
+{"persona_id": "kids_child", "qtype": "CONNECTIVE", "question_ko": "이춘란이 삼화현령을 하면서 지방 사람들과 관계가 어떻게 달라졌어?"}
+{"persona_id": "kids_child", "qtype": "CONNECTIVE", "question_ko": "최기필이 임진왜란 때 진주성 전투에 참여한 이유와 결과는 뭐야?"}
+{"persona_id": "kids_child", "qtype": "CONNECTIVE", "question_ko": "정흠지가 형조판서와 중추원사를 하면서 정치에 어떤 변화가 있었어?"}
+{"persona_id": "kids_child", "qtype": "CONNECTIVE", "question_ko": "허진이 여러 무신 직책을 맡으면서 군사와 정치에 어떤 관계가 생겼어?"}
+{"persona_id": "kids_child", "qtype": "CONNECTIVE", "question_ko": "단암만록이 궁중 주유 사건과 관리 사회를 어떻게 연결해?"}
+{"persona_id": "kids_child", "qtype": "CONNECTIVE", "question_ko": "문서구가 승정원주서와 형조정랑을 하면서 문서와 법률 관계는 어떻게 변했어?"}
+{"persona_id": "kids_child", "qtype": "CONNECTIVE", "question_ko": "박재원이 홍문관수찬과 사헌부지평을 맡으면서 학문과 감찰이 어떻게 연결됐어?"}
+{"persona_id": "kids_child", "qtype": "CONNECTIVE", "question_ko": "권극지가 형조참판과 예조판서를 하면서 법과 예절이 어떻게 영향을 받았어?"}

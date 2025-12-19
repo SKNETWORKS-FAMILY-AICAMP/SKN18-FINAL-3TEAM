@@ -1,0 +1,32 @@
+jupyter==1.1.1 # 주피터 노트북
+python-dotenv==1.2.1 # 환경 변수 관리
+
+# LangChain 패키지
+langchain==1.0.7 # LangChain 메인 패키지
+langchain-core==1.0.5 # LangChain 코어 기능
+langchain-community==0.4.1 # LangChain 커뮤니티 확장
+langchain_openai==1.0.3
+
+# 모델별 패키지
+langchain-ollama==1.0.0                    # Ollama 모델 통합
+
+# 벡터DB 패키지
+# PostgreSQL + pgvector
+# pgvector 
+psycopg2-binary==2.9.11
+langchain-postgres==0.0.16
+
+# Qdrant
+# qdrant-client  # Qdrant Python 클라이언트
+langchain-qdrant==1.1.0  # LangChain Qdrant 통합
+
+# Milvus
+pymilvus==2.6.4
+langchain-milvus==0.3.0
+
+# Elasticsearch
+# langchain-elasticsearch -> langchain v1과 호환 이슈 
+elasticsearch==8.13.0
+
+# OpenAI
+openai==2.8.1

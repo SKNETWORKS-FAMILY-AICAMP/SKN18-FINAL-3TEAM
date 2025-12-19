@@ -2,6 +2,7 @@ from backend.langgraph_structure1.state import GraphState
 from backend.langgraph_structure1.state_type import Evidence, EvidencePayload
 from backend.langgraph_structure1.utils import create_model
 from typing import List, Dict, Any
+import time
 
 
 def build_llm_prompt(question: str, evidences: List[Evidence]) -> str:
@@ -67,7 +68,9 @@ def generate_node(state: GraphState) -> GraphState:
     - neo4j_results    : neo4j_query_node 에서 넘어온 검색 결과(JSON, similarity 포함)
     를 기반으로 최종 답변(final_answer)을 생성하는 노드.
     """
-    question = state["query"]
+    question = state.get("query")
+    t0 = state.get("t0")
+    
     vector_evidences: List[Evidence] = state.get("vector_evidences", [])
     neo4j_results: List[Dict[str, Any]] = state.get("neo4j_results", [])
 
@@ -116,13 +119,22 @@ def generate_node(state: GraphState) -> GraphState:
 
         final_answer = response.choices[0].message.content.strip()
 
+        total_elapsed = time.perf_counter() - t0
+
+
+        print(f"질문을 입력하세요 (종료하려면 'exit' 입력): {question}")
         print("[최종 답변]")
         print(final_answer)
+        print(f"[DEBUG] 최종 답변 생성 시간: {total_elapsed:.2f}초")
         print("-" * 60)
 
         return {
             **state,
             "final_answer": final_answer,
+            "answer_input_tokens": response.usage.prompt_tokens,
+            "answer_output_tokens": response.usage.completion_tokens,
+            "answer_total_tokens": response.usage.total_tokens,
+            "final_answer_elapsed": total_elapsed,
         }
 
 

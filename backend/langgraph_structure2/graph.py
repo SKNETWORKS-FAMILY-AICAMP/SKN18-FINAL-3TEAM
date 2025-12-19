@@ -7,7 +7,7 @@ from backend.langgraph_structure2.rag.evaluate_node import evaluate_node, route_
 from backend.langgraph_structure2.graphdb.generate_cypher_node import create_cypher
 from backend.langgraph_structure2.graphdb.neo4j_search_node import neo4j_search_node
 from backend.langgraph_structure2.nodes.generate_node import generate_node
-from backend.langgraph_structure2.nodes.tone_adjust_node import tone_adjust_node
+from backend.langgraph_structure2.nodes.tone_adjust_node import tone_adjust_node, route_tone_adjust_node
 from backend.langgraph_structure2.nodes.scene_split_node import scene_split_node
 
 
@@ -66,7 +66,16 @@ def create_graph_flow():
 
     # 말투 및 scene 분리 노드 연결
     workflow.add_edge("generate_node", "tone_adjust_node")
-    workflow.add_edge("tone_adjust_node", "scene_split_node")
+
+    workflow.add_conditional_edges(
+        "tone_adjust_node",
+        route_tone_adjust_node,
+        { 
+            "scene_split_node": "scene_split_node",
+            END: END,
+        },
+    )
+
     workflow.add_edge("scene_split_node", END)
 
     # 4) 그래프 compile

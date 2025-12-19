@@ -29,7 +29,7 @@ const ChatbotButton = ({ onNavigate }) => {
   const handleQuestionClick = () => {
     setShowMenu(false);
     if (onNavigate) {
-      onNavigate("question");
+      onNavigate("question", null, { newChat: true });
     }
   };
 
@@ -149,4 +149,3 @@ const ChatbotButton = ({ onNavigate }) => {
 };
 
 export default ChatbotButton;
-
