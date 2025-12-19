@@ -10,14 +10,46 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
     Generates JWT tokens and redirects to React frontend with tokens as URL parameters.
     """
 
+    def authentication_error(
+        self, request, provider_id, error=None, exception=None, extra_context=None
+    ):
+        """
+        OAuth 인증 실패 시 처리 (취소 버튼 클릭, 에러 발생 등)
+        기본 에러 페이지 대신 프론트엔드로 리다이렉트
+        """
+        # 프론트엔드 메인 페이지로 리다이렉트 (에러 파라미터 없이)
+        from django.shortcuts import redirect
+        return redirect("http://localhost:3000/")
+
     def populate_user(self, request, sociallogin, data):
         """
         소셜 로그인 시 사용자 정보 채우기
-        - username 필드를 사용하지 않으므로 email만 설정
+        - Google에서 이름을 가져와서 nickname에 저장
         """
         user = super().populate_user(request, sociallogin, data)
         # email은 Google에서 자동으로 가져옴
-        # username은 우리 모델에 없으므로 설정하지 않음
+        
+        # Google에서 이름 가져오기
+        # Google OAuth는 보통 'given_name' 또는 'name' 필드를 제공
+        name = (
+            data.get('given_name') or 
+            data.get('name') or 
+            data.get('first_name')
+        )
+        
+        # 디버깅을 위한 로깅
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Google 소셜 로그인 데이터: {data}")
+        logger.info(f"가져온 이름: {name}, 현재 닉네임: {user.nickname}")
+        
+        # 새 사용자인 경우 또는 닉네임이 이메일 앞부분인 경우 Google 이름으로 설정
+        if name:
+            # 닉네임이 없거나, 닉네임이 이메일 앞부분과 같은 경우 (기본값인 경우)
+            if not user.nickname or user.nickname == user.email.split('@')[0]:
+                user.nickname = name
+                logger.info(f"닉네임을 Google 이름으로 설정: {name}")
+        
         return user
 
     def _generate_token_redirect_url(self, user):
