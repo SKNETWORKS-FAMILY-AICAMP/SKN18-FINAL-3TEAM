@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS korean_history (
 CREATE TABLE IF NOT EXISTS "user" (
     id SERIAL PRIMARY KEY,
     nickname VARCHAR(30) UNIQUE,
-    profile_image VARCHAR(100) NULL,
+    profile_image TEXT NULL,
     sign_up_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     email TEXT UNIQUE NOT NULL,
     permission VARCHAR(50) NOT NULL DEFAULT 'user',
@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS video (
     tags TEXT[] NULL,
     likes_count INT NOT NULL DEFAULT 0,
     comments_count INT NOT NULL DEFAULT 0
+    thumbnail_url TEXT NULL
 );
 
 -- 시청 기록 관리 테이블 생성
@@ -79,6 +80,12 @@ CREATE TABLE IF NOT EXISTS likes (
     comment_id INT NULL REFERENCES comment(id) ON DELETE CASCADE,
     reply_id INT NULL REFERENCES reply(id) ON DELETE CASCADE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    CONSTRAINT chk_at_least_one_not_null
+        CHECK (
+            col1 IS NOT NULL
+            OR col2 IS NOT NULL
+            OR col3 IS NOT NULL
+        )
 );
 
 -- 검색 기록 테이블 생성
