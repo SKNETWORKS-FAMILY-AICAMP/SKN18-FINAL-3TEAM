@@ -1,5 +1,4 @@
 # services/video_conversion.py
-# 4분할 노드의 프롬프트를 그대로 살리면서, 기술적인 움직임만 제어하는 버전
 
 import os
 import time

@@ -108,9 +108,10 @@ def enhance_with_historical_context(prompt: str, is_image_prompt: bool = True) -
     
     # 2단계: 전쟁 키워드 감지
     war_keywords = [
-        'war', 'battle', 'invasion', 'fight', 'attack', 'army', 'weapon', 'soldier', 
-        'kill', 'destroy', 'fire', 'explosion', 'arrow', 'cannon', 
-        '전쟁', '전투', '공격', '침략'
+        'battlefield', 'fierce battle', 'invasion', 'combat', 
+        'soldiers fighting', 'killing', 'war zone', 'army clashing',
+        'bloody', 'destruction', 'troops charging',
+        '격전', '침략', '전쟁터', '살육'
     ]
     
     is_war_scene = any(keyword in prompt_lower for keyword in war_keywords)
