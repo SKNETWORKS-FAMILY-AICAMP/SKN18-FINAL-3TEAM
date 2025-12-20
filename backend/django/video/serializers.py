@@ -16,6 +16,7 @@ class VideoSerializer(serializers.ModelSerializer):
             'tags',
             'likes_count',
             'comments_count',
+            'thumbnail_url',
         ]
 
     def get_comments_count(self, obj):
@@ -40,6 +41,7 @@ class VideoDetailSerializer(serializers.ModelSerializer):
             'likes_count',
             'comments_count',
             'is_liked',
+            'thumbnail_url',
         ]
 
     def get_comments_count(self, obj):
@@ -58,12 +60,13 @@ class VideoDetailSerializer(serializers.ModelSerializer):
 
 class VideoCreateSerializer(serializers.ModelSerializer):
     """영상 생성용 Serializer (관리자용)"""
-    
+
     class Meta:
         model = Video
         fields = [
             'title',
             'video_url',
             'tags',
+            'thumbnail_url',
         ]
 
