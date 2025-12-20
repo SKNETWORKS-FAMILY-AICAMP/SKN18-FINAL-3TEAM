@@ -3,9 +3,14 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+from users.views import oauth_login_cancelled
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    # OAuth 취소 처리 (allauth.urls보다 먼저 선언하여 오버라이드)
+    path('accounts/3rdparty/login/cancelled/', oauth_login_cancelled, name='socialaccount_login_cancelled'),
+
     path('accounts/', include('allauth.urls')),
 
     # 인증/계정 API
@@ -25,6 +30,9 @@ urlpatterns = [
 
     # 댓글 + 답글 + 좋아요 API
     path('api/community/', include('community.urls')),
+    # 챗봇 API
+    path('api/chatbot/', include('chatbot.urls')),
+    path('api/chat/', include('chatbot.urls')),
 
     # API 문서화
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

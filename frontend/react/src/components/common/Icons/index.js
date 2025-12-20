@@ -10,3 +10,6 @@ export { default as ArrowLeftIcon } from './ArrowLeftIcon';
 export { default as PlusIcon } from './PlusIcon';
 export { default as CameraIcon } from './CameraIcon';
 export { default as EditIcon } from './EditIcon';
+export { default as ChatIcon } from './ChatIcon';
+export { default as ThinkingIcon } from './ThinkingIcon';
+export { default as MenuIcon } from './MenuIcon';

@@ -1,12 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { COLORS } from "./constants/theme";
 import Header from "./components/layout/Header";
 import ExpandableSearch from "./features/search/components/ExpandableSearch";
 import MainPage from "./pages/MainPage";
 import VideoDetailPage from "./pages/VideoDetailPage";
+import SearchResultPage from "./pages/SearchResultPage";
 import MyPage from "./pages/MyPage";
 import AllCommentsPage from "./pages/AllCommentsPage";
 import ProfileEditPage from "./pages/ProfileEditPage";
+import AdminPage from "./pages/AdminPage";
+import Chatbot from "./pages/Chatbot";
+import VideoCreatePage from "./pages/VideoCreatePage";
+import ChatbotButton from "./components/common/ChatbotButton";
 import {
   checkAuth,
   getGoogleLoginUrl,
@@ -18,23 +23,45 @@ const App = () => {
   const getInitialPage = () => {
     const hash = window.location.hash.replace("#", "");
     if (hash) {
-      const [page, videoId] = hash.split("/");
+      const [page, param] = hash.split("/");
+
+      // 영상 상세 페이지
+      if (page === "video" && param) {
+        return {
+          page: "video",
+          videoId: parseInt(param),
+          searchQuery: "",
+        };
+      }
+
+      // 검색 결과 페이지
+      if (page === "search" && param) {
+        return {
+          page: "search",
+          videoId: null,
+          searchQuery: decodeURIComponent(param),
+        };
+      }
+
       return {
         page: page || "main",
-        videoId: videoId ? parseInt(videoId) : null,
+        videoId: null,
+        searchQuery: "",
       };
     }
-    return { page: "main", videoId: null };
+    return { page: "main", videoId: null, searchQuery: "" };
   };
 
   const initial = getInitialPage();
   const [currentPage, setCurrentPage] = useState(initial.page);
   const [selectedVideoId, setSelectedVideoId] = useState(initial.videoId);
+  const [searchQuery, setSearchQuery] = useState(initial.searchQuery || "");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [newChatTrigger, setNewChatTrigger] = useState(0);
 
   // URL 변경 감지 (뒤로가기/앞으로가기 지원)
   useEffect(() => {
@@ -42,6 +69,7 @@ const App = () => {
       const initial = getInitialPage();
       setCurrentPage(initial.page);
       setSelectedVideoId(initial.videoId);
+      setSearchQuery(initial.searchQuery || "");
     };
 
     window.addEventListener("hashchange", handleHashChange);
@@ -110,6 +138,9 @@ const App = () => {
   };
 
   const handleVideoClick = (video) => {
+    if (!video || !video.id) {
+      return;
+    }
     setSelectedVideoId(video.id);
     setCurrentPage("video");
     updateURL("video", video.id);
@@ -128,6 +159,12 @@ const App = () => {
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   };
 
+  const handleAdminClick = () => {
+    setCurrentPage("admin");
+    updateURL("admin");
+    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  };
+
   const handleLogin = () => {
     // Google 로그인 페이지로 리다이렉트
     window.location.href = getGoogleLoginUrl();
@@ -139,19 +176,67 @@ const App = () => {
       setIsLoggedIn(false);
       setUser(null);
       setShowUserDropdown(false);
+
+      // 인증이 필요한 페이지에서 로그아웃 시 메인으로 이동
+      const authRequiredPages = [
+        "mypage",
+        "profile-edit",
+        "all-comments",
+        "admin",
+        "question",
+        "video-create",
+      ];
+      if (authRequiredPages.includes(currentPage)) {
+        setCurrentPage("main");
+        updateURL("main");
+        window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+      }
     } catch (error) {
       console.error("로그아웃 실패:", error);
       // 에러가 발생해도 로컬 상태는 초기화
       setIsLoggedIn(false);
       setUser(null);
       setShowUserDropdown(false);
+
+      // 에러가 발생해도 인증 필요 페이지면 메인으로 이동
+      const authRequiredPages = [
+        "mypage",
+        "profile-edit",
+        "all-comments",
+        "admin",
+        "question",
+        "video-create",
+      ];
+      if (authRequiredPages.includes(currentPage)) {
+        setCurrentPage("main");
+        updateURL("main");
+        window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+      }
     }
   };
 
-  const handleNavigate = (page, videoId = null) => {
+  // 프로필 업데이트 콜백 함수
+  const handleUserUpdate = useCallback((updatedUser) => {
+    setUser(updatedUser);
+  }, []);
+
+  const handleNavigate = (page, videoId = null, options = {}) => {
+    if (!isLoggedIn && (page === "question" || page === "video-create")) {
+      return;
+    }
+    if (options.newChat) {
+      setNewChatTrigger((prev) => prev + 1);
+    }
     setCurrentPage(page);
     updateURL(page, videoId);
     // 페이지 전환 시 스크롤을 맨 위로 이동
+    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  };
+
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    setCurrentPage("search");
+    window.location.hash = `search/${encodeURIComponent(query)}`;
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   };
 
@@ -191,12 +276,16 @@ const App = () => {
           onMyPageClick={handleMyPageClick}
           onLogin={handleLogin}
           onLogout={handleLogout}
+          onAdminClick={handleAdminClick}
+          currentPage={currentPage}
         />
 
         <ExpandableSearch
           isOpen={isSearchOpen}
           isLoggedIn={isLoggedIn}
           onClose={() => setIsSearchOpen(false)}
+          onSearch={handleSearch}
+          onVideoClick={handleVideoClick}
         />
 
         <div style={{ paddingTop: "76px" }}>
@@ -212,6 +301,14 @@ const App = () => {
             />
           )}
 
+          {currentPage === "search" && (
+            <SearchResultPage
+              query={searchQuery}
+              onVideoClick={handleVideoClick}
+              isLoggedIn={isLoggedIn}
+            />
+          )}
+
           {currentPage === "mypage" && (
             <MyPage onNavigate={handleNavigate} user={user} />
           )}
@@ -221,9 +318,34 @@ const App = () => {
           )}
 
           {currentPage === "profile-edit" && (
-            <ProfileEditPage onNavigate={handleNavigate} user={user} />
+            <ProfileEditPage
+              onNavigate={handleNavigate}
+              user={user}
+              onUserUpdate={handleUserUpdate}
+            />
+          )}
+
+          {currentPage === "admin" && (
+            <AdminPage onNavigate={handleNavigate} user={user} />
+          )}
+
+          {currentPage === "question" && (
+            <div style={{ overflow: "hidden", height: "calc(100vh - 76px)" }}>
+              <Chatbot
+                onNavigate={handleNavigate}
+                user={user}
+                newChatTrigger={newChatTrigger}
+              />
+            </div>
+          )}
+
+          {currentPage === "video-create" && (
+            <VideoCreatePage onNavigate={handleNavigate} user={user} />
           )}
         </div>
+
+        {/* 챗봇 버튼 (로그인 시에만 표시) */}
+        {isLoggedIn && <ChatbotButton onNavigate={handleNavigate} />}
       </div>
     </>
   );

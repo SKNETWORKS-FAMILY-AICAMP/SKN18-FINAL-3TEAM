@@ -14,6 +14,9 @@ import {
   likeComment,
   unlikeComment,
   deleteReply,
+  updateReply,
+  likeReply,
+  unlikeReply,
 } from "../../../api/communityApi";
 import { getProfileImageUrl } from "../../../utils/imageUtils";
 
@@ -59,15 +62,28 @@ const ReplyItem = ({
   onReplyAdd,
   onReplyDelete,
   hasMoreSiblings = false,
+  activeReplyId,
+  activeEditId,
+  onSetActiveReply,
+  onSetActiveEdit,
+  onClearActive,
 }) => {
-  const [showReplyInput, setShowReplyInput] = useState(false);
+  const replyId = `reply-${reply.id}`;
+  const showReplyInput = activeReplyId === replyId;
   const [replyText, setReplyText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [childReplies, setChildReplies] = useState(reply.child_replies || []);
   const [liked, setLiked] = useState(reply.is_liked || false);
   const [likesCount, setLikesCount] = useState(reply.likes_count || 0);
 
+  // 수정 기능 상태
+  const isEditing = activeEditId === replyId;
+  const [editText, setEditText] = useState(reply.reply_content || "");
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+
   const isOwnReply = currentUser && reply.user?.id === currentUser.id;
+  const isAdmin = currentUser && currentUser.permission === 'admin';
+  const canDelete = isOwnReply || isAdmin; // 작성자 또는 admin은 삭제 가능
   const maxDepth = 5;
 
   const handleReplySubmit = async () => {
@@ -97,7 +113,9 @@ const ReplyItem = ({
         }
       }
       setReplyText("");
-      setShowReplyInput(false);
+      if (onClearActive) {
+        onClearActive();
+      }
     } catch (error) {
       console.error("답글 작성 실패:", error);
       alert("답글 작성에 실패했습니다.");
@@ -120,9 +138,55 @@ const ReplyItem = ({
     }
   };
 
+  const handleEdit = () => {
+    if (onSetActiveEdit) {
+      onSetActiveEdit(replyId);
+    }
+    setEditText(reply.reply_content || "");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editText.trim() || isSubmittingEdit) return;
+
+    setIsSubmittingEdit(true);
+    try {
+      const response = await updateReply(reply.id, editText.trim());
+      if (response?.data) {
+        // 답글 내용 업데이트
+        reply.reply_content = response.data.reply_content;
+        if (onClearActive) {
+          onClearActive();
+        }
+      }
+    } catch (error) {
+      console.error("답글 수정 실패:", error);
+      alert("답글 수정에 실패했습니다.");
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    if (onClearActive) {
+      onClearActive();
+    }
+    setEditText(reply.reply_content || "");
+  };
+
   const handleLike = async () => {
-    setLiked(!liked);
-    setLikesCount(liked ? likesCount - 1 : likesCount + 1);
+    try {
+      if (liked) {
+        await unlikeReply(reply.id);
+        setLiked(false);
+        setLikesCount(likesCount - 1);
+      } else {
+        await likeReply(reply.id);
+        setLiked(true);
+        setLikesCount(likesCount + 1);
+      }
+    } catch (error) {
+      console.error("좋아요 처리 실패:", error);
+    }
   };
 
   const profileSize = 24;
@@ -233,7 +297,7 @@ const ReplyItem = ({
       <div style={{ flex: 1, marginLeft: "10px", minWidth: 0 }}>
         {/* 콘텐츠 영역 (세로선 높이 측정용) */}
         <div ref={contentRef}>
-          {/* 헤더: 닉네임, 시간, 삭제 */}
+          {/* 헤더: 닉네임, 시간, 수정/삭제 */}
           <div
             style={{
               display: "flex",
@@ -257,36 +321,121 @@ const ReplyItem = ({
             <span style={{ fontSize: "11px", color: "#999" }}>
               {formatTimeAgo(reply.created_at)}
             </span>
-            {isOwnReply && (
-              <button
-                onClick={handleDelete}
-                style={{
-                  marginLeft: "auto",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: "2px",
-                  opacity: 0.5,
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
-                onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
-              >
-                <CloseIcon size={10} color="#999" />
-              </button>
+            {!isEditing && (
+              <div style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
+                {isOwnReply && (
+                  <button
+                    onClick={handleEdit}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "2px",
+                      opacity: 0.5,
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
+                  >
+                    <EditIcon size={10} color="#999" />
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    onClick={handleDelete}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "2px",
+                      opacity: 0.5,
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
+                  >
+                    <CloseIcon size={10} color="#999" />
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
           {/* 답글 내용 */}
-          <div
-            style={{
-              fontSize: "13px",
-              color: COLORS.dark,
-              lineHeight: "1.5",
-              marginBottom: "6px",
-            }}
-          >
-            {reply.text || reply.reply_content}
-          </div>
+          {isEditing ? (
+            <div style={{ marginBottom: "8px" }}>
+              <input
+                type="text"
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSaveEdit();
+                  } else if (e.key === "Escape") {
+                    handleCancelEdit();
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  border: "2px solid",
+                  borderColor: COLORS.primary,
+                  borderRadius: "8px",
+                  fontSize: "11px",
+                  color: COLORS.dark,
+                  backgroundColor: COLORS.white,
+                  outline: "none",
+                  boxSizing: "border-box",
+                  boxShadow: `0 0 0 2px ${COLORS.primary}20`,
+                }}
+                autoFocus
+              />
+              <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={!editText.trim() || isSubmittingEdit}
+                  style={{
+                    padding: "6px 12px",
+                    border: "none",
+                    borderRadius: "4px",
+                    backgroundColor: editText.trim() ? COLORS.primary : COLORS.lightGray,
+                    color: COLORS.dark,
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    cursor: editText.trim() ? "pointer" : "not-allowed",
+                  }}
+                >
+                  저장
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  disabled={isSubmittingEdit}
+                  style={{
+                    padding: "6px 12px",
+                    border: `1px solid ${COLORS.textSecondary}`,
+                    borderRadius: "4px",
+                    backgroundColor: COLORS.white,
+                    color: COLORS.textSecondary,
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                  }}
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                fontSize: "13px",
+                color: COLORS.dark,
+                lineHeight: "1.5",
+                marginBottom: "6px",
+              }}
+            >
+              {reply.text || reply.reply_content}
+            </div>
+          )}
 
           {/* 좋아요 & 답글 버튼 */}
           <div
@@ -316,7 +465,18 @@ const ReplyItem = ({
 
             {currentUser && depth < maxDepth && (
               <button
-                onClick={() => setShowReplyInput(!showReplyInput)}
+                onClick={() => {
+                  if (showReplyInput) {
+                    if (onClearActive) {
+                      onClearActive();
+                    }
+                    setReplyText("");
+                  } else {
+                    if (onSetActiveReply) {
+                      onSetActiveReply(replyId);
+                    }
+                  }
+                }}
                 style={{
                   background: "none",
                   border: "none",
@@ -353,31 +513,46 @@ const ReplyItem = ({
                 }}
                 style={{
                   flex: 1,
-                  padding: "6px 10px",
-                  border: "1px solid #ddd",
-                  borderRadius: "12px",
-                  fontSize: "11px",
+                  padding: "8px 12px",
+                  border: "1.5px solid #ddd",
+                  borderRadius: "20px",
+                  fontSize: "12px",
+                  backgroundColor: COLORS.white,
+                  color: COLORS.dark,
                   outline: "none",
+                  transition: "border-color 0.2s ease",
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = COLORS.primary;
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = "#ddd";
                 }}
               />
               <button
                 onClick={handleReplySubmit}
                 disabled={!replyText.trim() || isSubmitting}
                 style={{
-                  width: "24px",
-                  height: "24px",
+                  width: "32px",
+                  height: "32px",
+                  minWidth: "32px",
+                  minHeight: "32px",
                   borderRadius: "50%",
-                  backgroundColor: replyText.trim() ? COLORS.primary : "#ddd",
+                  backgroundColor: replyText.trim() && !isSubmitting ? COLORS.primary : COLORS.lightGray,
                   border: "none",
-                  cursor: replyText.trim() ? "pointer" : "not-allowed",
+                  cursor: replyText.trim() && !isSubmitting ? "pointer" : "not-allowed",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  flexShrink: 0,
+                  overflow: "hidden",
+                  transition: "all 0.2s ease",
+                  padding: 0,
                 }}
               >
                 <SendIcon
-                  size={10}
-                  color={replyText.trim() ? COLORS.dark : "#999"}
+                  size={16}
+                  color={replyText.trim() && !isSubmitting ? COLORS.dark : COLORS.textMuted}
                 />
               </button>
             </div>
@@ -407,6 +582,11 @@ const ReplyItem = ({
                   );
                 }}
                 hasMoreSiblings={index < childReplies.length - 1}
+                activeReplyId={activeReplyId}
+                activeEditId={activeEditId}
+                onSetActiveReply={onSetActiveReply}
+                onSetActiveEdit={onSetActiveEdit}
+                onClearActive={onClearActive}
               />
             ))}
           </div>
@@ -423,8 +603,14 @@ const Comment = ({
   onDelete,
   onReplyAdd,
   isLast = false,
+  activeReplyId,
+  activeEditId,
+  onSetActiveReply,
+  onSetActiveEdit,
+  onClearActive,
 }) => {
-  const [showReplyInput, setShowReplyInput] = useState(false);
+  const commentId = `comment-${comment.id}`;
+  const showReplyInput = activeReplyId === commentId;
   const [replyText, setReplyText] = useState("");
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
   const [replies, setReplies] = useState(comment.replies || []);
@@ -432,11 +618,13 @@ const Comment = ({
   const [likesCount, setLikesCount] = useState(
     comment.comment_likes_count || comment.likes_count || 0
   );
-  const [isEditing, setIsEditing] = useState(false);
+  const isEditing = activeEditId === commentId;
   const [editText, setEditText] = useState(comment.comment_content || comment.text || "");
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   const isOwnComment = currentUser && comment.user?.id === currentUser.id;
+  const isAdmin = currentUser && currentUser.permission === 'admin';
+  const canDelete = isOwnComment || isAdmin; // 작성자 또는 admin은 삭제 가능
   const profileSize = 32;
   const hasReplies = replies && replies.length > 0;
 
@@ -457,7 +645,9 @@ const Comment = ({
   }, [hasReplies, replies.length, showReplyInput, replyText]);
 
   const handleEdit = () => {
-    setIsEditing(true);
+    if (onSetActiveEdit) {
+      onSetActiveEdit(commentId);
+    }
     setEditText(comment.comment_content || comment.text || "");
   };
 
@@ -471,7 +661,9 @@ const Comment = ({
         // 댓글 내용 업데이트
         comment.comment_content = response.data.comment_content;
         comment.text = response.data.comment_content;
-        setIsEditing(false);
+        if (onClearActive) {
+          onClearActive();
+        }
       }
     } catch (error) {
       console.error("댓글 수정 실패:", error);
@@ -482,7 +674,9 @@ const Comment = ({
   };
 
   const handleCancelEdit = () => {
-    setIsEditing(false);
+    if (onClearActive) {
+      onClearActive();
+    }
     setEditText(comment.comment_content || comment.text || "");
   };
 
@@ -543,7 +737,9 @@ const Comment = ({
         }
       }
       setReplyText("");
-      setShowReplyInput(false);
+      if (onClearActive) {
+        onClearActive();
+      }
     } catch (error) {
       console.error("답글 작성 실패:", error);
       alert("답글 작성에 실패했습니다.");
@@ -635,38 +831,42 @@ const Comment = ({
               <span style={{ fontSize: "11px", color: "#999" }}>
                 {formatTimeAgo(comment.created_at || comment.timeAgo)}
               </span>
-              {isOwnComment && !isEditing && (
+              {!isEditing && (
                 <div style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
-                  <button
-                    onClick={handleEdit}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      padding: "4px",
-                      opacity: 0.5,
-                      transition: "opacity 0.2s",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
-                    onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
-                  >
-                    <EditIcon size={14} color="#999" />
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      padding: "4px",
-                      opacity: 0.5,
-                      transition: "opacity 0.2s",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
-                    onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
-                  >
-                    <CloseIcon size={14} color="#999" />
-                  </button>
+                  {isOwnComment && (
+                    <button
+                      onClick={handleEdit}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "4px",
+                        opacity: 0.5,
+                        transition: "opacity 0.2s",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                      onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
+                    >
+                      <EditIcon size={14} color="#999" />
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      onClick={handleDelete}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "4px",
+                        opacity: 0.5,
+                        transition: "opacity 0.2s",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                      onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
+                    >
+                      <CloseIcon size={14} color="#999" />
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -803,7 +1003,18 @@ const Comment = ({
 
               {currentUser && (
                 <button
-                  onClick={() => setShowReplyInput(!showReplyInput)}
+                  onClick={() => {
+                    if (showReplyInput) {
+                      if (onClearActive) {
+                        onClearActive();
+                      }
+                      setReplyText("");
+                    } else {
+                      if (onSetActiveReply) {
+                        onSetActiveReply(commentId);
+                      }
+                    }
+                  }}
                   style={{
                     background: "none",
                     border: "none",
@@ -840,31 +1051,47 @@ const Comment = ({
                   }}
                   style={{
                     flex: 1,
-                    padding: "8px 12px",
-                    border: "1px solid #ddd",
-                    borderRadius: "16px",
-                    fontSize: "12px",
+                    padding: "10px 40px 10px 14px",
+                    border: "1.5px solid #ddd",
+                    borderRadius: "20px",
+                    fontSize: "13px",
+                    backgroundColor: COLORS.white,
+                    color: COLORS.dark,
                     outline: "none",
+                    transition: "border-color 0.2s ease",
+                    boxSizing: "border-box",
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = COLORS.primary;
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = "#ddd";
                   }}
                 />
                 <button
                   onClick={handleReplySubmit}
                   disabled={!replyText.trim() || isSubmittingReply}
                   style={{
-                    width: "28px",
-                    height: "28px",
+                    width: "32px",
+                    height: "32px",
+                    minWidth: "32px",
+                    minHeight: "32px",
                     borderRadius: "50%",
-                    backgroundColor: replyText.trim() ? COLORS.primary : "#ddd",
+                    backgroundColor: replyText.trim() && !isSubmittingReply ? COLORS.primary : COLORS.lightGray,
                     border: "none",
-                    cursor: replyText.trim() ? "pointer" : "not-allowed",
+                    cursor: replyText.trim() && !isSubmittingReply ? "pointer" : "not-allowed",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    flexShrink: 0,
+                    overflow: "hidden",
+                    transition: "all 0.2s ease",
+                    padding: 0,
                   }}
                 >
                   <SendIcon
-                    size={12}
-                    color={replyText.trim() ? COLORS.dark : "#999"}
+                    size={16}
+                    color={replyText.trim() && !isSubmittingReply ? COLORS.dark : COLORS.textMuted}
                   />
                 </button>
               </div>
@@ -894,6 +1121,11 @@ const Comment = ({
                     );
                   }}
                   hasMoreSiblings={index < replies.length - 1}
+                  activeReplyId={activeReplyId}
+                  activeEditId={activeEditId}
+                  onSetActiveReply={onSetActiveReply}
+                  onSetActiveEdit={onSetActiveEdit}
+                  onClearActive={onClearActive}
                 />
               ))}
             </div>

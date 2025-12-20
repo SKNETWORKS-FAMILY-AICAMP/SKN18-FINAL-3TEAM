@@ -68,6 +68,11 @@ class ReplySerializer(serializers.ModelSerializer):
     """답글 조회용 serializer (재귀적 중첩 지원)"""
     user = CommentUserSerializer(read_only=True)
     comment_id = serializers.IntegerField(source='comment.id', read_only=True)
+    comment_content = serializers.CharField(source='comment.comment_content', read_only=True)
+    comment_user = CommentUserSerializer(source='comment.user', read_only=True)
+    comment_created_at = serializers.DateTimeField(source='comment.created_at', read_only=True)
+    video_id = serializers.IntegerField(source='comment.video.id', read_only=True)
+    video_title = serializers.CharField(source='comment.video.title', read_only=True)
     child_replies = serializers.SerializerMethodField()
     likes_count = serializers.SerializerMethodField()
     is_liked = serializers.SerializerMethodField()
@@ -78,6 +83,11 @@ class ReplySerializer(serializers.ModelSerializer):
             'id',
             'comment',
             'comment_id',
+            'comment_content',
+            'comment_user',
+            'comment_created_at',
+            'video_id',
+            'video_title',
             'user',
             'reply_content',
             'parent_reply',

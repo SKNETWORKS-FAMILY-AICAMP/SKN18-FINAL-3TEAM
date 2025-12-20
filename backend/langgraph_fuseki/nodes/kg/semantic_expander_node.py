@@ -86,7 +86,7 @@ def get_pgvector_service():
     if _pgvector_service is None and USE_PGVECTOR:
         try:
             # load_title_embeddings.py와 동일한 import 방식 사용
-            from backend.db_pipeline.vectordb.services.title_vector_service import TitleVectorService
+            from backend.db_pipeline.postgres.services.title_vector_service import TitleVectorService
             
             _pgvector_service = TitleVectorService()
             print("  │  └─ pgvector 서비스 초기화 완료")
