@@ -14,6 +14,7 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
   const [video, setVideo] = useState(null);
   const [comments, setComments] = useState([]);
   const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const watchHistorySaved = useRef(false);
 
@@ -77,12 +78,27 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
         }
 
         // 비디오 정보 로드
-        const videoResponse = await getVideo(actualVideoId);
-        if (videoResponse?.data) {
-          const processedUrl = videoResponse.data.video_url
-            ? getVideoUrl(videoResponse.data.video_url)
-            : "/videos/selected_scene_1_video.mp4";
-          setVideo(videoResponse.data);
+        try {
+          const videoResponse = await getVideo(actualVideoId);
+          if (videoResponse?.data) {
+            const processedUrl = videoResponse.data.video_url
+              ? getVideoUrl(videoResponse.data.video_url)
+              : "/videos/selected_scene_1_video.mp4";
+            setVideo(videoResponse.data);
+            setLikesCount(videoResponse.data.likes_count || 0);
+
+            // 백엔드에서 받은 좋아요 상태 설정
+            if (isLoggedIn) {
+              setIsLiked(videoResponse.data.is_liked || false);
+            }
+          } else {
+            console.warn("비디오 데이터가 없습니다.");
+            setVideo(null);
+          }
+        } catch (error) {
+          console.error("비디오 정보 로드 실패:", error);
+          // 비디오 로드 실패해도 페이지는 표시 (에러 메시지와 함께)
+          setVideo(null);
         }
 
         // 댓글 로드 (로그인한 경우만)
@@ -90,7 +106,6 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
           try {
             const commentsResponse = await getVideoComments(actualVideoId);
             if (commentsResponse?.data) {
-              console.log("댓글 데이터:", commentsResponse.data);
               const formattedComments = commentsResponse.data.map((c) => ({
                 id: c.id,
                 username: c.user?.nickname || c.user?.display_name || "사용자",
@@ -105,7 +120,6 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
                 user: c.user,
                 is_liked: c.is_liked || false,
               }));
-              console.log("포맷된 댓글:", formattedComments);
               setComments(formattedComments);
             }
           } catch (error) {
@@ -116,7 +130,6 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
         // 에러 발생 시에도 로딩 상태 해제
-        setLoading(false);
       } finally {
         setLoading(false);
       }
@@ -132,9 +145,12 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
         try {
           await createWatchHistory(actualVideoId, 0, video.tags || []);
           watchHistorySaved.current = true;
-          console.log("시청 기록 저장 완료:", actualVideoId);
         } catch (error) {
-          console.error("시청 기록 저장 실패:", error);
+          // 403 에러는 권한 문제이므로 조용히 처리
+          // 백엔드에서 시청 기록 저장 API가 특정 권한을 요구하거나
+          // 인증 토큰이 만료되었을 수 있음
+          // 에러가 발생해도 watchHistorySaved를 true로 설정하여 재시도 방지
+          watchHistorySaved.current = true;
         }
       }
     };
@@ -150,14 +166,29 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
 
     try {
       if (isLiked) {
+        // 좋아요 취소
         await unlikeVideo(actualVideoId);
         setIsLiked(false);
+        setLikesCount((prev) => Math.max(0, prev - 1));
       } else {
+        // 좋아요 추가
         await likeVideo(actualVideoId);
         setIsLiked(true);
+        setLikesCount((prev) => prev + 1);
       }
     } catch (error) {
       console.error("좋아요 처리 실패:", error);
+      // 에러 발생 시 상태 롤백
+      if (
+        error.response?.status === 400 &&
+        error.response?.data?.error?.code === "ALREADY_LIKED"
+      ) {
+        // 이미 좋아요가 있는 경우
+        setIsLiked(true);
+      } else if (error.response?.status === 404) {
+        // 좋아요가 없는 경우
+        setIsLiked(false);
+      }
     }
   };
 
@@ -195,7 +226,7 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
           date={formatKoreanDate(video?.upload_date)}
           isLiked={isLiked}
           onLikeClick={handleLikeClick}
-          likesCount={video?.likes_count || 0}
+          likesCount={likesCount}
         />
       </div>
 

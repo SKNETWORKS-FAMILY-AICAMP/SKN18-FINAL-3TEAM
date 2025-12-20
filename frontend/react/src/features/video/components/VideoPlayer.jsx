@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import ReactPlayer from "react-player";
 
 // 5초 뒤로 가기 아이콘 (이중 왼쪽 화살표)
 const SkipBackwardIcon = ({ size = 48, color = "#fff" }) => (
@@ -82,41 +81,43 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
 
   // videoUrl이 변경되면 에러 상태 초기화
   useEffect(() => {
-    console.log("VideoPlayer - videoUrl 변경:", videoUrl);
     setError(null);
-    setPlaying(false);
+    setPlaying(false); // 재생 중단
     setPlayed(0);
     setDuration(0);
   }, [videoUrl]);
 
+  // playing 상태에 따라 video 재생/일시정지
+  useEffect(() => {
+    const video = playerRef.current;
+    if (!video) return;
+
+    if (playing) {
+      video.play().catch((err) => {
+        console.error("재생 실패:", err);
+        setPlaying(false);
+      });
+    } else {
+      video.pause();
+    }
+  }, [playing]);
+
   const handlePlayPause = () => {
+    // 에러가 있으면 재생하지 않음
+    if (error) return;
     setPlaying(!playing);
   };
 
-  const handleProgress = (state) => {
-    if (!seeking) {
-      setPlayed(state.played);
-    }
-  };
-
-  const handleDuration = (dur) => {
-    setDuration(dur);
-  };
-
   const handleSkipBackward = () => {
-    if (!playerRef.current || typeof playerRef.current.seekTo !== "function")
-      return;
-    const currentTime = playerRef.current.getCurrentTime() || 0;
-    const newTime = Math.max(0, currentTime - 5);
-    playerRef.current.seekTo(newTime);
+    const video = playerRef.current;
+    if (!video) return;
+    video.currentTime = Math.max(0, video.currentTime - 5);
   };
 
   const handleSkipForward = () => {
-    if (!playerRef.current || typeof playerRef.current.seekTo !== "function")
-      return;
-    const currentTime = playerRef.current.getCurrentTime() || 0;
-    const newTime = Math.min(duration, currentTime + 5);
-    playerRef.current.seekTo(newTime);
+    const video = playerRef.current;
+    if (!video) return;
+    video.currentTime = Math.min(duration, video.currentTime + 5);
   };
 
   const formatTime = (seconds) => {
@@ -219,55 +220,36 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
       onMouseLeave={handleMouseLeave}
       onClick={handlePlayPause}
     >
-      <ReactPlayer
+      <video
         ref={playerRef}
-        url={videoUrl}
-        playing={playing}
-        width="100%"
-        height="100%"
-        onProgress={handleProgress}
-        onDuration={handleDuration}
-        onError={(err) => {
-          console.error("영상 로드 오류:", err, "URL:", videoUrl);
-          console.error("에러 타입:", err?.type, "에러 메시지:", err?.message);
-          setError(`영상을 로드할 수 없습니다: ${videoUrl}`);
-        }}
-        onReady={() => {
-          setError(null);
-          console.log("영상 준비 완료:", videoUrl);
-          if (playerRef.current) {
-            try {
-              const dur = playerRef.current.getDuration();
-              if (dur && dur > 0) {
-                console.log("영상 길이 (getDuration):", dur);
-                setDuration(dur);
-              }
-            } catch (e) {
-              console.warn("영상 길이 가져오기 실패:", e);
-            }
-          }
-        }}
-        onStart={() => {
-          console.log("영상 시작:", videoUrl);
-          setError(null);
-        }}
-        controls={false}
-        config={{
-          file: {
-            attributes: {
-              controlsList: "nodownload",
-              preload: "metadata",
-              crossOrigin: "anonymous",
-            },
-            forceVideo: true,
-            forceHLS: false,
-            forceDASH: false,
-          },
-        }}
+        src={videoUrl}
         style={{
           position: "absolute",
           top: 0,
           left: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+        }}
+        playsInline
+        preload="metadata"
+        onLoadedMetadata={(e) => {
+          setError(null);
+          const dur = e.target.duration;
+          setDuration(dur);
+        }}
+        onTimeUpdate={(e) => {
+          if (!seeking && duration > 0) {
+            setPlayed(e.target.currentTime / duration);
+          }
+        }}
+        onError={(e) => {
+          console.error("영상 로드 오류:", e.target.error, "URL:", videoUrl);
+          setError(`영상을 로드할 수 없습니다: ${videoUrl}`);
+          setPlaying(false);
+        }}
+        onCanPlay={() => {
+          // 영상 재생 가능 상태
         }}
       />
 
@@ -457,13 +439,11 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             const percent = (e.clientX - rect.left) / rect.width;
-            if (
-              playerRef.current &&
-              typeof playerRef.current.seekTo === "function"
-            ) {
-              playerRef.current.seekTo(percent);
+            const video = playerRef.current;
+            if (video && duration > 0) {
+              video.currentTime = percent * duration;
+              setPlayed(percent);
             }
-            setPlayed(percent);
           }}
         >
           {/* 재생된 부분 (빨간색) */}
@@ -503,11 +483,9 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
                   setPlayed(percent);
                 };
                 const handleMouseUp = () => {
-                  if (
-                    playerRef.current &&
-                    typeof playerRef.current.seekTo === "function"
-                  ) {
-                    playerRef.current.seekTo(played);
+                  const video = playerRef.current;
+                  if (video && duration > 0) {
+                    video.currentTime = played * duration;
                   }
                   setSeeking(false);
                   document.removeEventListener("mousemove", handleMouseMove);

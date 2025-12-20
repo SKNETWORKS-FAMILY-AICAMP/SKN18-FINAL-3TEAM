@@ -48,6 +48,9 @@ const MyPage = ({ onNavigate, user }) => {
               text: c.comment_content,
               videoTitle: c.video_title || c.video?.title || "영상",
               createdAt: c.created_at,
+              replies: c.replies || [], // 답글 배열
+              repliesCount: c.replies?.length || 0, // 답글 개수
+              user: c.user || null, // 사용자 정보 (프로필 사진 포함)
             }))
           );
         }

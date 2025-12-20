@@ -1,8 +1,32 @@
 import { COLORS } from '../../../constants/theme';
+import { getThumbnailUrl } from '../../../utils/imageUtils';
 
 const VideoCard = ({ video, onClick }) => {
+  if (!video) {
+    return null;
+  }
+
+  const handleClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onClick && video && video.id) {
+      onClick(video);
+    }
+  };
+
   return (
-    <div style={{ cursor: 'pointer' }} onClick={() => onClick(video)}>
+    <div 
+      style={{ cursor: 'pointer', position: 'relative' }} 
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleClick(e);
+        }
+      }}
+    >
       <div
         style={{
           width: '100%',
@@ -11,6 +35,10 @@ const VideoCard = ({ video, onClick }) => {
           borderRadius: '12px',
           marginBottom: '12px',
           transition: 'transform 0.3s ease',
+          overflow: 'hidden',
+          backgroundImage: video.thumbnail_url ? `url(${getThumbnailUrl(video.thumbnail_url)})` : 'none',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
         }}
         onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.02)')}
         onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
@@ -22,7 +50,7 @@ const VideoCard = ({ video, onClick }) => {
           marginBottom: '6px',
         }}
       >
-        {video.tags}
+        {video.tags || ''}
       </div>
       <div
         style={{
@@ -31,7 +59,7 @@ const VideoCard = ({ video, onClick }) => {
           color: COLORS.dark,
         }}
       >
-        {video.title}
+        {video.title || ''}
       </div>
     </div>
   );

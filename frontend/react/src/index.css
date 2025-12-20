@@ -1,4 +1,22 @@
 @font-face {
+  font-family: "SB 어그로";
+  src: url("/fonts/sb-aggro-bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+AC00-D7A3, U+3131-318E;
+}
+
+@font-face {
+  font-family: "SB 어그로";
+  src: url("/fonts/sb-aggro-medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+AC00-D7A3, U+3131-318E;
+}
+
+@font-face {
   font-family: "Space Mono";
   src: url("/fonts/space-mono.bold.ttf") format("truetype");
   font-weight: 700;

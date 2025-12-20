@@ -11,12 +11,14 @@ import {
 } from "../../../api/activityApi";
 import { getPopularTags, getPopularVideos } from "../../../api/videoApi";
 
-const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
+const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVideoClick }) => {
   const [searchValue, setSearchValue] = useState("");
   const [phase, setPhase] = useState(0); // 0: closed, 1: expanding width, 2: expanding height, 3: content visible
   const [hasBeenOpened, setHasBeenOpened] = useState(false); // 한 번이라도 열렸는지 추적
   const [shouldRender, setShouldRender] = useState(false); // 실제로 렌더링할지 여부
   const inputRef = useRef(null);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const scrollTimerRef = useRef(null);
 
   // API에서 가져온 데이터
   const [searchHistory, setSearchHistory] = useState([]);
@@ -62,22 +64,30 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
     }
   }, [isOpen, isLoggedIn]);
 
-  // 검색 실행 시 검색 기록 저장
+  // 검색 실행 시 검색 기록 저장 및 검색 페이지로 이동
   const handleSearch = async () => {
     if (!searchValue.trim()) return;
 
+    const searchQuery = searchValue.trim();
+
     try {
       if (isLoggedIn) {
-        await createSearchHistory(searchValue.trim());
-        // 검색 기록 업데이트
+        await createSearchHistory(searchQuery);
+        // 검색 기록 업데이트 (최대 10개)
         setSearchHistory((prev) =>
           [
-            searchValue.trim(),
-            ...prev.filter((h) => h !== searchValue.trim()),
-          ].slice(0, 5)
+            searchQuery,
+            ...prev.filter((h) => h !== searchQuery),
+          ].slice(0, 10)
         );
       }
-      // 여기서 실제 검색 로직 실행
+      // 검색 페이지로 이동
+      if (onSearch) {
+        onSearch(searchQuery);
+      }
+      // 입력창 초기화
+      setSearchValue("");
+      onClose();
     } catch (error) {
       console.error("검색 기록 저장 실패:", error);
     }
@@ -119,21 +129,61 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
     onClose();
   };
 
+  // 스크롤 이벤트 핸들러
+  const handleScroll = () => {
+    setIsScrolling(true);
+
+    // 기존 타이머 제거
+    if (scrollTimerRef.current) {
+      clearTimeout(scrollTimerRef.current);
+    }
+
+    // 1초 후 스크롤바 숨김
+    scrollTimerRef.current = setTimeout(() => {
+      setIsScrolling(false);
+    }, 1000);
+  };
+
   // 초기 로드 시에는 렌더링하지 않음
   if (!shouldRender) return null;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 9999,
-        pointerEvents: phase >= 1 ? "auto" : "none",
-      }}
-    >
+    <>
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background-color: ${isScrolling ? 'rgba(0, 0, 0, 0.2)' : 'transparent'};
+          border-radius: 3px;
+          transition: background-color 0.3s ease;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background-color: rgba(0, 0, 0, 0.3);
+        }
+
+        .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: ${isScrolling ? 'rgba(0, 0, 0, 0.2)' : 'transparent'} transparent;
+        }
+      `}</style>
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9999,
+          pointerEvents: phase >= 1 ? "auto" : "none",
+        }}
+      >
       {/* 어두운 배경 오버레이 */}
       <div
         onClick={handleClose}
@@ -277,7 +327,17 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
                     검색 기록
                   </h3>
 
-                  <div style={{ display: "flex", flexDirection: "column" }}>
+                  <div
+                    onScroll={handleScroll}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      maxHeight: "135px",
+                      overflowY: "auto",
+                      paddingRight: "8px",
+                    }}
+                    className="custom-scrollbar"
+                  >
                     {searchHistory.length === 0 ? (
                       <p style={{ fontSize: "13px", color: COLORS.gray }}>
                         검색 기록이 없습니다.
@@ -292,7 +352,6 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
                             justifyContent: "space-between",
                             padding: "10px 0",
                             borderBottom: "1px solid #f0f0f0",
-                            cursor: "pointer",
                             opacity: phase >= 3 ? 1 : 0,
                             transform:
                               phase >= 3
@@ -300,10 +359,22 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
                                 : "translateX(-15px)",
                             transition: `all 0.3s ease ${0.15 + idx * 0.05}s`,
                           }}
-                          onClick={() => setSearchValue(item)}
                         >
                           <span
-                            style={{ fontSize: "13px", color: COLORS.gray }}
+                            style={{
+                              fontSize: "13px",
+                              color: COLORS.gray,
+                              cursor: "pointer",
+                              flex: 1,
+                            }}
+                            onClick={() => {
+                              setSearchValue(item);
+                              if (onSearch) {
+                                onSearch(item);
+                              }
+                              setSearchValue("");
+                              onClose();
+                            }}
                           >
                             {item}
                           </span>
@@ -315,6 +386,12 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
                               padding: "2px",
                               opacity: 0.4,
                               transition: "opacity 0.2s",
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSearchHistory((prev) =>
+                                prev.filter((h) => h !== item)
+                              );
                             }}
                             onMouseEnter={(e) =>
                               (e.currentTarget.style.opacity = 1)
@@ -355,7 +432,14 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
                       tags.map((tag, idx) => (
                         <button
                           key={idx}
-                          onClick={() => setSearchValue(tag.replace("# ", ""))}
+                          onClick={() => {
+                            const tagValue = tag.replace("# ", "");
+                            setSearchValue(tagValue);
+                            if (onSearch) {
+                              onSearch(tagValue);
+                            }
+                            onClose();
+                          }}
                           style={{
                             padding: "8px 16px",
                             backgroundColor: "transparent",
@@ -389,109 +473,117 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
               </div>
             )}
 
-            {/* 우측: 추천 영상 */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h3
-                style={{
-                  fontSize: "14px",
-                  fontWeight: "700",
-                  color: COLORS.dark,
-                  marginBottom: "16px",
-                }}
-              >
-                {searchValue ? `"${searchValue}" 관련 영상` : "추천 영상"}
-              </h3>
+            {/* 우측: 추천 영상 (로그인한 경우만 표시) */}
+            {isLoggedIn && (
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h3
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: "700",
+                    color: COLORS.dark,
+                    marginBottom: "16px",
+                  }}
+                >
+                  {searchValue ? `"${searchValue}" 관련 영상` : "추천 영상"}
+                </h3>
 
-              <div
-                style={{
-                  display: "flex",
-                  gap: "16px",
-                  overflowX: "auto",
-                  paddingBottom: "8px",
-                }}
-              >
-                {suggestedVideos.length === 0 ? (
-                  <p style={{ fontSize: "13px", color: COLORS.gray }}>
-                    추천 영상이 없습니다.
-                  </p>
-                ) : (
-                  suggestedVideos.map((video, idx) => (
-                    <div
-                      key={video.id}
-                      style={{
-                        minWidth: "140px",
-                        cursor: "pointer",
-                        opacity: phase >= 3 ? 1 : 0,
-                        transform:
-                          phase >= 3 ? "translateY(0)" : "translateY(15px)",
-                        transition: `all 0.3s ease ${0.2 + idx * 0.04}s`,
-                      }}
-                    >
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "16px",
+                    overflowX: "auto",
+                    paddingBottom: "8px",
+                  }}
+                >
+                  {suggestedVideos.length === 0 ? (
+                    <p style={{ fontSize: "13px", color: COLORS.gray }}>
+                      추천 영상이 없습니다.
+                    </p>
+                  ) : (
+                    suggestedVideos.map((video, idx) => (
                       <div
+                        key={video.id}
+                        onClick={() => {
+                          if (onVideoClick) {
+                            onVideoClick(video);
+                          }
+                          onClose();
+                        }}
                         style={{
-                          width: "140px",
-                          height: "180px",
-                          backgroundColor: COLORS.lightGray,
-                          borderRadius: "8px",
-                          marginBottom: "10px",
-                          overflow: "hidden",
-                          transition:
-                            "transform 0.25s ease, box-shadow 0.25s ease",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          background: `linear-gradient(135deg, hsl(${
-                            idx * 25 + 200
-                          }, 15%, 92%) 0%, hsl(${
-                            idx * 25 + 220
-                          }, 20%, 88%) 100%)`,
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = "scale(1.04)";
-                          e.currentTarget.style.boxShadow =
-                            "0 8px 20px rgba(0,0,0,0.12)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = "scale(1)";
-                          e.currentTarget.style.boxShadow = "none";
+                          minWidth: "140px",
+                          cursor: "pointer",
+                          opacity: phase >= 3 ? 1 : 0,
+                          transform:
+                            phase >= 3 ? "translateY(0)" : "translateY(15px)",
+                          transition: `all 0.3s ease ${0.2 + idx * 0.04}s`,
                         }}
                       >
-                        <svg
-                          width="32"
-                          height="32"
-                          viewBox="0 0 24 24"
-                          fill="none"
+                        <div
+                          style={{
+                            width: "140px",
+                            height: "180px",
+                            backgroundColor: COLORS.lightGray,
+                            borderRadius: "8px",
+                            marginBottom: "10px",
+                            overflow: "hidden",
+                            transition:
+                              "transform 0.25s ease, box-shadow 0.25s ease",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: `linear-gradient(135deg, hsl(${
+                              idx * 25 + 200
+                            }, 15%, 92%) 0%, hsl(${
+                              idx * 25 + 220
+                            }, 20%, 88%) 100%)`,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = "scale(1.04)";
+                            e.currentTarget.style.boxShadow =
+                              "0 8px 20px rgba(0,0,0,0.12)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = "scale(1)";
+                            e.currentTarget.style.boxShadow = "none";
+                          }}
                         >
-                          <polygon points="5,3 19,12 5,21" fill="#ccc" />
-                        </svg>
+                          <svg
+                            width="32"
+                            height="32"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                          >
+                            <polygon points="5,3 19,12 5,21" fill="#ccc" />
+                          </svg>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: "600",
+                            color: COLORS.dark,
+                            marginBottom: "3px",
+                            lineHeight: "1.3",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {video.title}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            color: COLORS.gray,
+                          }}
+                        >
+                          {video.tags}
+                        </div>
                       </div>
-                      <div
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: "600",
-                          color: COLORS.dark,
-                          marginBottom: "3px",
-                          lineHeight: "1.3",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {video.title}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "11px",
-                          color: COLORS.gray,
-                        }}
-                      >
-                        {video.tags}
-                      </div>
-                    </div>
-                  ))
-                )}
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* 하단 로고 */}
@@ -506,7 +598,8 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false }) => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

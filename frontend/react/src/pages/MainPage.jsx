@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { COLORS } from "../constants/theme";
 import VideoGrid from "../features/video/components/VideoGrid";
-import { getVideos } from "../api/videoApi";
+import { getVideos, getPopularVideos } from "../api/videoApi";
 
 const MainPage = ({ isLoggedIn, onVideoClick }) => {
   const [videos, setVideos] = useState([]);
@@ -11,8 +11,11 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
     const fetchVideos = async () => {
       try {
         setLoading(true);
-        // 로그인 여부와 관계없이 최신 영상 목록 조회
-        const response = await getVideos("latest");
+        // 로그인 사용자는 추천 영상, 비로그인은 인기 영상
+        const response = isLoggedIn
+          ? await getVideos("latest")
+          : await getVideos(); //비로그인은 인기 영상이 되어야 하므로 나중에 getPopularVideos()로 변경
+
 
         if (response?.data) {
           // 백엔드 데이터를 프론트엔드 형식으로 변환
@@ -22,6 +25,7 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
             tags: video.tags ? video.tags.map((t) => `#${t}`).join(" ") : "",
             likes_count: video.likes_count,
             comments_count: video.comments_count,
+            thumbnail_url: video.thumbnail_url,
           }));
           setVideos(formattedVideos);
         }
@@ -35,7 +39,7 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
     };
 
     fetchVideos();
-  }, []);
+  }, [isLoggedIn]);
 
   return (
     <main
@@ -67,7 +71,7 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
             transformOrigin: "left",
           }}
         >
-          RECOMMEND
+          {isLoggedIn ? "RECOMMEND" : "POPULAR"}
         </h1>
       </div>
 

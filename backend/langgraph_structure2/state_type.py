@@ -1,5 +1,5 @@
 """
-vectordb에서 검색된 청크의 타입 정의
+postgres에서 검색된 청크의 타입 정의
 """
 
 from typing import TypedDict, Any, Dict

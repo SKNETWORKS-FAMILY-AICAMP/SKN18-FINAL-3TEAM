@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.generics import DestroyAPIView, UpdateAPIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
+from community.background_task import generate_reply_for_comment
 from video.models import Video
 from .models import Comment, Reply, Likes
 from .serializers import (
@@ -44,6 +45,15 @@ class IsOwnerOrAdmin(BasePermission):
         if request.user.permission == 'admin':
             return True
         # 작성자 본인만 자신의 댓글/답글 삭제 가능
+        return obj.user == request.user
+
+
+class IsOwner(BasePermission):
+    """
+    작성자 본인만 수정 가능 (관리자도 불가)
+    """
+    def has_object_permission(self, request, view, obj):
+        # 작성자 본인만 수정 가능
         return obj.user == request.user
 
 
@@ -96,6 +106,10 @@ class VideoCommentView(APIView):
 
         if serializer.is_valid():
             serializer.save(user=request.user, video=video)
+
+            # 댓글 저장 후 인플루언서 답글 자동 생성(백그라운드 동작)
+            generate_reply_for_comment.delay(serializer.instance.id)
+
             return Response({
                 'data': CommentSerializer(serializer.instance, context={'request': request}).data,
                 'message': '댓글이 작성되었습니다.'
@@ -182,12 +196,12 @@ class CommentReplyView(APIView):
 class CommentUpdateView(UpdateAPIView):
     """
     댓글 수정 API
-    - 작성자 본인 또는 관리자만 수정 가능
+    - 작성자 본인만 수정 가능
 
     PATCH /api/community/comments/{comment_id}/
     """
     queryset = Comment.objects.all()
-    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
+    permission_classes = [IsAuthenticated, IsOwner]
     serializer_class = CommentCreateSerializer
     lookup_url_kwarg = 'comment_id'
 
@@ -222,6 +236,32 @@ class CommentDeleteView(DestroyAPIView):
         return Response({
             'data': None,
             'message': '댓글이 삭제되었습니다.'
+        }, status=status.HTTP_200_OK)
+
+
+class ReplyUpdateView(UpdateAPIView):
+    """
+    답글 수정 API
+    - 작성자 본인만 수정 가능
+
+    PATCH /api/community/replies/{reply_id}/
+    """
+    queryset = Reply.objects.all()
+    permission_classes = [IsAuthenticated, IsOwner]
+    serializer_class = ReplyCreateSerializer
+    lookup_url_kwarg = 'reply_id'
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        # 수정된 답글을 ReplySerializer로 반환
+        updated_reply = ReplySerializer(instance, context={'request': request})
+        return Response({
+            'data': updated_reply.data,
+            'message': '답글이 수정되었습니다.'
         }, status=status.HTTP_200_OK)
 
 
@@ -440,8 +480,8 @@ class UserActivityView(APIView):
         # 내가 작성한 댓글
         comments = Comment.objects.filter(user=user).select_related('video').order_by('-created_at')
 
-        # 내가 작성한 답글
-        replies = Reply.objects.filter(user=user).select_related('comment').order_by('-created_at')
+        # 내가 작성한 답글 (comment와 video 정보 포함)
+        replies = Reply.objects.filter(user=user).select_related('comment', 'comment__video').order_by('-created_at')
 
         # 내가 누른 좋아요
         likes = Likes.objects.filter(user=user).select_related('video', 'comment', 'reply').order_by('-created_at')
