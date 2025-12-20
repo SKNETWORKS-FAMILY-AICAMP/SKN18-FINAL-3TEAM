@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS video (
     upload_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     tags TEXT[] NULL,
     likes_count INT NOT NULL DEFAULT 0,
-    comments_count INT NOT NULL DEFAULT 0
+    comments_count INT NOT NULL DEFAULT 0,
     thumbnail_url TEXT NULL
 );
 
@@ -79,12 +79,12 @@ CREATE TABLE IF NOT EXISTS likes (
     video_id INT NULL REFERENCES video(id) ON DELETE CASCADE,
     comment_id INT NULL REFERENCES comment(id) ON DELETE CASCADE,
     reply_id INT NULL REFERENCES reply(id) ON DELETE CASCADE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_at_least_one_not_null
         CHECK (
-            col1 IS NOT NULL
-            OR col2 IS NOT NULL
-            OR col3 IS NOT NULL
+            video_id IS NOT NULL
+            OR comment_id IS NOT NULL
+            OR reply_id IS NOT NULL
         )
 );
 
