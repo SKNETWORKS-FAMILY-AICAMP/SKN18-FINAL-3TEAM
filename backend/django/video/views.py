@@ -119,6 +119,28 @@ class VideoUploadView(CreateAPIView):
         from django.core.files.storage import default_storage
         from django.conf import settings
 
+        thumbnail_url = None
+
+        # 썸네일 파일 처리
+        if 'thumbnail_file' in request.FILES:
+            thumbnail_file = request.FILES['thumbnail_file']
+
+            # 썸네일 저장 경로 생성
+            thumbnail_dir = 'thumbnails'
+            os.makedirs(os.path.join(settings.MEDIA_ROOT, thumbnail_dir), exist_ok=True)
+
+            # 파일명 생성 (중복 방지)
+            import time
+            file_extension = os.path.splitext(thumbnail_file.name)[1]
+            file_name = f"{int(time.time())}_thumbnail{file_extension}"
+            file_path = os.path.join(thumbnail_dir, file_name)
+
+            # 파일 저장
+            saved_thumbnail_path = default_storage.save(file_path, thumbnail_file)
+
+            # URL 생성
+            thumbnail_url = request.build_absolute_uri(f"{settings.MEDIA_URL}{saved_thumbnail_path}")
+
         # 파일 업로드인 경우
         if 'video_file' in request.FILES:
             video_file = request.FILES['video_file']
@@ -143,11 +165,14 @@ class VideoUploadView(CreateAPIView):
             data = {
                 'title': request.data.get('title'),
                 'video_url': video_url,
-                'tags': request.data.getlist('tags[]') if 'tags[]' in request.data else []
+                'tags': request.data.getlist('tags[]') if 'tags[]' in request.data else [],
+                'thumbnail_url': thumbnail_url
             }
         else:
             # URL 입력인 경우
-            data = request.data
+            data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+            if thumbnail_url:
+                data['thumbnail_url'] = thumbnail_url
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
