@@ -27,6 +27,7 @@ class VideoSerializer(serializers.ModelSerializer):
 class VideoDetailSerializer(serializers.ModelSerializer):
     """영상 상세용 Serializer"""
     comments_count = serializers.SerializerMethodField()
+    is_liked = serializers.SerializerMethodField()
 
     class Meta:
         model = Video
@@ -38,12 +39,21 @@ class VideoDetailSerializer(serializers.ModelSerializer):
             'tags',
             'likes_count',
             'comments_count',
+            'is_liked',
         ]
 
     def get_comments_count(self, obj):
         """실제 댓글 개수를 DB에서 카운트"""
         from community.models import Comment
         return Comment.objects.filter(video=obj).count()
+
+    def get_is_liked(self, obj):
+        """현재 사용자가 좋아요 했는지 여부"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            from community.models import Likes
+            return Likes.objects.filter(user=request.user, video=obj).exists()
+        return False
 
 
 class VideoCreateSerializer(serializers.ModelSerializer):
