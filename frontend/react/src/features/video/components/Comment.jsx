@@ -15,6 +15,8 @@ import {
   unlikeComment,
   deleteReply,
   updateReply,
+  likeReply,
+  unlikeReply,
 } from "../../../api/communityApi";
 import { getProfileImageUrl } from "../../../utils/imageUtils";
 
@@ -172,8 +174,19 @@ const ReplyItem = ({
   };
 
   const handleLike = async () => {
-    setLiked(!liked);
-    setLikesCount(liked ? likesCount - 1 : likesCount + 1);
+    try {
+      if (liked) {
+        await unlikeReply(reply.id);
+        setLiked(false);
+        setLikesCount(likesCount - 1);
+      } else {
+        await likeReply(reply.id);
+        setLiked(true);
+        setLikesCount(likesCount + 1);
+      }
+    } catch (error) {
+      console.error("좋아요 처리 실패:", error);
+    }
   };
 
   const profileSize = 24;
