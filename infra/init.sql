@@ -102,7 +102,10 @@ ON korean_history
 USING hnsw (embedding vector_cosine_ops);
 
 -- 초기 영상 데이터 삽입
-INSERT INTO video (title, video_url, tags, likes_count, comments_count)
+INSERT INTO video (title, video_url, tags, likes_count, comments_count, thumbnail_url)
 VALUES 
-    ('조선시대 한글 창제의 비밀', '/videos/selected_scene_1_video.mp4', ARRAY['세종', '한글', '발명품'], 0, 0)
+    ('임진왜란_짧동', 'http://localhost:3000//videos/selected_scene_2_video.mp4', ARRAY['임진왜란', '역사', '전쟁'], 0, 0,'/thumbnail_images/imjin.png'),
+    ('백성들이 뭉쳤다! 의병과 함께한 임진왜란 이야기', 'http://localhost:3000//videos/Prompt_Edited_Movie_Imjin_War.mp4', ARRAY['임진왜란', '역사', '전쟁'], 0, 0,'/thumbnail_images/imjin2.png'),
+    ('한글, 누가 만들었을까?', 'http://localhost:3000//videos/Prompt_Edited_Movie_Sejong.mp4', ARRAY['세종', '한글', '발명품'], 0, 0,'/thumbnail_images/sejong.png'),
+    ('백성을 사랑한 임금, 정조', 'http://localhost:3000//videos/Prompt_Edited_Movie_Jeongjo.mp4', ARRAY['정조', '백성', '정책'], 0, 0,'/thumbnail_images/jeongjo.png')
 ON CONFLICT DO NOTHING;
