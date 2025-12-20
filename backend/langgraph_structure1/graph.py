@@ -39,7 +39,7 @@ def create_graph_flow():
     workflow.add_edge("generate_node", "tone_adjust_node")
 
     workflow.add_conditional_edges(
-        "tone_adjust_node",
+        "route_tone_adjust_node",
         route_tone_adjust_node,
         { 
             "scene_split_node": "scene_split_node",

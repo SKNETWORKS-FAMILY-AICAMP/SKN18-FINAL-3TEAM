@@ -9,12 +9,17 @@ def tone_adjust_node(state: GraphState) -> GraphState:
     (현재는 단순히 final_answer 를 그대로 tone_corrected_answer 에 복사하는 더미 구현)
     """
     final_answer = state.get("final_answer", "")
+    lang = state.get("detect_lang", "ko")   
 
     if not final_answer:
         raise ValueError("tone_adjust_node: 'final_answer' 값이 state에 없습니다.")
+    
+    if lang == "ko":
+        TONE_PROMPT = f""""""
+
 
     # LLM 호출(모델 GPT-5-mini) -> 추후 파인튜닝 모델로 교체 예정
-    TRANSLATE_TONE_PROMPT = f"""
+    TONE_PROMPT = f"""
     SYSTEM:
     You transform a Korean answer or explanation text into simple English for foreign audiences. The topic is Korean history, so explanations must be easy, culturally clear, and friendly for readers with no background knowledge of Korea.
 
@@ -49,7 +54,7 @@ def tone_adjust_node(state: GraphState) -> GraphState:
         model=MODEL_NAME,
         response_format={"type": "text"},
         messages=[
-            {"role": "system", "content": TRANSLATE_TONE_PROMPT},
+            {"role": "system", "content": TONE_PROMPT},
             {"role": "user", "content": user_content},
         ],
     )
@@ -71,7 +76,7 @@ def route_tone_adjust_node(state: GraphState) -> str:
     """
 
     tag = state.get("tag", "")
-    if tag == "chat":
+    if tag == "chat" or tag == "reply":
         return END
     elif tag == "video":
         return "scene_split_node"
