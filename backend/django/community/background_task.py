@@ -11,13 +11,15 @@ User = get_user_model()
 
 @shared_task
 def generate_reply_for_comment(comment_id):
+
     # 댓글 ID로 댓글 객체 가져오기
     comment = Comment.objects.get(id=comment_id)
+
     app = create_graph_flow()
-    state = {"query": comment.comment_content, "tag": "chat"}
+    state = {"query": comment.comment_content, "tag": "reply"}
     # hybrid_node가 async 기반이면 ainvoke로 실행
     result = asyncio.run(app.ainvoke(state))
-    answer = result.get("final_answer") or ""
+    answer = result.get("final_answer") or "역사 답변이 맞나요? 다시 한 번 입력해주세요!"
     # 시스템/봇 계정이 있으면 지정, 없으면 None
     bot_user = User.objects.filter(email=BOT_EMAIL).first() if BOT_EMAIL else None
     Reply.objects.create(

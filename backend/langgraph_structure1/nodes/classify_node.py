@@ -2,6 +2,8 @@ from backend.langgraph_structure1.state import GraphState
 from langgraph.graph import END
 from backend.langgraph_structure1.utils import create_model
 from deep_translator import GoogleTranslator
+from celery.utils.log import get_task_logger
+logger = get_task_logger(__name__)
 
 import time
 
@@ -92,7 +94,7 @@ def classify_node(state: GraphState) -> GraphState:
     )
 
     query_type = response.choices[0].message.content.strip()
-    print(f"[DEBUG] src_lang={src_lang}, query_type={query_type!r}")
+    logger.warning("[DEBUG] src_lang=%s, query_type=%r, tag=%s", src_lang, query_type, state.get("tag"))
 
     return {
         **state,
