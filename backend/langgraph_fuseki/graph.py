@@ -23,7 +23,7 @@ from backend.langgraph_fuseki.state import GraphState
 from backend.langgraph_fuseki.nodes.history_check_node import history_check_node
 from backend.langgraph_fuseki.nodes.classify_node import query_classifier_node
 from backend.langgraph_fuseki.nodes.entity_expander_node import entity_expander_node
-from backend.langgraph_fuseki.nodes.semantic_expander_node import semantic_expander_node
+from backend.langgraph_fuseki.nodes.kg.semantic_expander_node import semantic_expander_node
 from backend.langgraph_fuseki.nodes.kg.parallel_knowledge_retrieval_node import parallel_knowledge_retrieval_node
 from backend.langgraph_fuseki.nodes.kg.path_evidence_aggregator_node import path_evidence_aggregator_node
 from backend.langgraph_fuseki.nodes.generate_node import story_generator_node
