@@ -74,10 +74,12 @@ def route_tone_adjust_node(state: GraphState) -> str:
     """
 
     tag = state.get("tag", "")
-    if tag == "chat":
+    if tag == "chat" or tag == "reply":
         return END
     elif tag == "video":
         return "scene_split_node"
+    # 방어: 알 수 없는 태그는 종료
+    return END
 
 
 if __name__ == "__main__":

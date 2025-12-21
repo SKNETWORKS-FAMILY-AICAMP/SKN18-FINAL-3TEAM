@@ -2,14 +2,17 @@
 from langgraph.graph import END
 from backend.langgraph_structure1.state import GraphState
 from backend.langgraph_structure1.utils import create_model
+from celery.utils.log import get_task_logger
+logger = get_task_logger(__name__)
 
 def tone_adjust_node(state: GraphState) -> GraphState:
     """
     말투 교정 노드
     """
     final_answer = state.get("final_answer", "")
-    tag = state.get("tag", "video")
-    lang = state.get("detect_lang", "ko")   
+    tag = state.get("tag", "reply")
+    lang = state.get("detect_lang", "ko")
+
 
     if not final_answer:
         raise ValueError("tone_adjust_node: 'final_answer' 값이 state에 없습니다.")
@@ -146,13 +149,18 @@ def tone_adjust_node(state: GraphState) -> GraphState:
     transformed_text = response.choices[0].message.content.strip()
 
     # 결과 터미널 출력
-    print(f"[DEBUG] tone_adjust_node - Transformed Text:\n{transformed_text}")
-    print("-" * 60)
+    logger.info("[tone_adjust_node] Transformed Text:\n%s", transformed_text)
+    logger.info("-" * 60)
 
-    return {
+    new_state = {
         **state,
         "tone_corrected_answer": transformed_text,
     }
+    # 채팅/답글인 경우 교정된 답변을 최종 답변으로도 반영
+    if tag in ("chat", "reply"):
+        new_state["final_answer"] = transformed_text
+
+    return new_state
 
 def route_tone_adjust_node(state: GraphState) -> str:
     """
@@ -164,6 +172,8 @@ def route_tone_adjust_node(state: GraphState) -> str:
         return END
     elif tag == "video":
         return "scene_split_node"
+    # 방어 로직: 알 수 없는 태그면 그래프 종료로 안전하게 처리
+    return END
 
 
 if __name__ == "__main__":
