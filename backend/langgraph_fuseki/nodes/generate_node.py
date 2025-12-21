@@ -470,13 +470,7 @@ def story_generator_node(state: GraphState) -> GraphState:
             entity_info_text = f"\n## 추출된 핵심 엔티티\n{', '.join(entity_names)}\n→ 이 엔티티들을 반드시 답변에 포함하고 설명하세요.\n"
     
     # 질문 유형별 프롬프트 조정
-    if query_type == "what_if":
-        instruction = """가상 시나리오에 기반한 대체 역사 스토리를 작성해 주세요.
-- "만약 ~했다면" 형식으로 시작합니다
-- 추론된 인과관계를 자연스럽게 설명합니다
-- 실제 역사와의 차이점을 명확히 합니다"""
-
-    elif query_type == "deep_analysis":
+    if query_type == "deep_analysis":
         instruction = """역사의 이면과 숨은 동기를 분석해 주세요.
 - 여러 근거를 종합하여 깊이 있는 해석을 제시합니다
 - 당시 정치적/사회적 맥락을 설명합니다
@@ -493,14 +487,8 @@ def story_generator_node(state: GraphState) -> GraphState:
     deduplicated_evidences = deduplicate_and_select_top_evidences(evidences, top_k=len(evidences))
     print(f"  ├─ 중복 제거 후: {len(deduplicated_evidences)}개")
     
-    # 본문 생성용: 전체 근거 포맷팅 (15개 모두, 중복 제거된 것)
+    # 전체 근거 포맷팅 (중복 제거된 것)
     evidence_list_all, _ = format_evidence_for_prompt(deduplicated_evidences, query)
-    
-    # 참고 근거 섹션용: 주요 5개만 선택 및 포맷팅
-    top_evidences = deduplicated_evidences[:5] if len(deduplicated_evidences) > 5 else deduplicated_evidences
-    print(f"  ├─ 참고 근거 섹션용: {len(top_evidences)}개 선택")
-    _, evidence_footnotes_top = format_evidence_for_prompt(top_evidences, query)
-    evidence_details = "\n".join(evidence_footnotes_top)
 
     # 의도 정보 추가
     intent_info = ""
@@ -519,6 +507,15 @@ def story_generator_node(state: GraphState) -> GraphState:
 {intent_info}
 
 **중요: 위 질문에 대한 명확하고 직접적인 답변을 반드시 제공하세요.**
+
+### 다중 질문 처리 (매우 중요!)
+- 질문에 여러 개의 하위 질문이 포함된 경우 (예: "원인과 결과를 알려줘", "A와 B를 설명해줘"), **모든 하위 질문에 대해 각각 답변**하세요.
+- 예시: "명성황후 시해사건의 원인과 이로 인해 발발된 사건을 알려줘"
+  → 1) 원인을 먼저 설명하고, 2) 그 다음 발발된 사건을 설명하세요.
+- 각 하위 질문에 대한 답변을 명확히 구분하여 제공하세요.
+- 하나의 질문만 답변하고 나머지를 누락하지 마세요.
+
+### 단일 질문 처리
 - 질문이 비교를 요구하는 경우 (예: "어느나라가 더 많이", "누가 더", "어느 것이 더"), 명확한 비교 결과를 제시하세요.
 - 질문이 횟수를 묻는 경우 (예: "몇 번", "몇 차례"), 구체적인 숫자와 함께 답변하세요.
 - 질문에 대한 답변을 회피하거나 모호하게 표현하지 마세요.
@@ -562,77 +559,83 @@ def story_generator_node(state: GraphState) -> GraphState:
    - 질문에서 추출된 핵심 엔티티(예: 갑술환국, 기사환국, 경신환국)를 반드시 언급하세요.
    - 추출된 엔티티가 근거에 없으면, 해당 엔티티에 대한 정보를 명시적으로 설명하세요.
 
-### 5. 각주 형식: [1][2][3]
-   - 문장 끝에 **[1][2][3]** 형태로 근거 번호를 표시하세요.
-   - 나쁜 예: "(참고: 1, 2)"
-   - 좋은 예: "경복궁은 1395년에 창건되었습니다.[1][3]"
-
-### 6. 정규화된 ID 사용 금지
+### 5. 정규화된 ID 사용 금지
    - "Institution_d4c9663e" 같은 코드 절대 사용 금지
    - 실제 이름을 모르면 "관련 기관" 등으로 대체
+
+### 6. 각주 번호 사용 금지
+   - 문장 끝에 [1][2][3] 같은 각주 번호를 절대 사용하지 마세요.
+   - 근거는 자연스럽게 문장 안에 포함하여 설명하세요.
+   - 나쁜 예: "경복궁은 1395년에 창건되었습니다.[1][3]"
+   - 좋은 예: "1395년 태조 이성계가 경복궁을 창건하였습니다."
 
 ### 7. 추측 표시
    - 확실하지 않은 내용은 "~로 추정됩니다", "~했을 것으로 보입니다"로 표현
 
 ## 출력 형식 (반드시 준수)
 
-[본문]
-2-3문단으로 자연스럽게 서술 (200-400자, "-입니다" 체, 한국어만 사용)
-- 연도, 사건명, 인물명을 명확히 언급
-- 문장 끝에 [1][2] 형태로 근거 번호 표시
+**1단계: 핵심 답변 (제일 먼저 제시)**
+- 사용자 질문에 대한 직접적이고 명확한 답변을 먼저 제시하세요.
+- **다중 질문인 경우**: 각 하위 질문에 대한 핵심 답변을 모두 포함하세요.
+  예: "명성황후 시해사건의 원인은...이며, 이로 인해 발발된 사건은...입니다."
+- 비교 질문인 경우: "A가 더 많습니다" 또는 "B가 더 많습니다" 등 명확한 결론을 제시하세요.
+- 횟수 질문인 경우: "총 N번" 또는 "A는 N번, B는 M번" 등 구체적인 숫자를 제시하세요.
+- "-입니다" 체로 작성하세요.
+
+**2단계: 상세 설명 (핵심 답변 아래에 확장)**
+- 핵심 답변을 바탕으로 2-3문단으로 자연스럽게 상세 설명을 제공하세요 (200-400자).
+- **다중 질문인 경우**: 각 하위 질문에 대한 상세 설명을 모두 포함하세요.
+  예: 첫 번째 문단에서 원인을 상세히 설명하고, 두 번째 문단에서 발발된 사건을 상세히 설명하세요.
+- 연도, 사건명, 인물명을 명확히 언급하세요.
+- "-입니다" 체로 작성하세요.
 - 영어 단어나 영어 문장 절대 사용 금지
+- 전체 근거 목록을 참고하여 답변을 작성하세요.
 
-[요약]
-한 문장으로 핵심 정리 ("-입니다" 체, 한국어만 사용)
+**작성 순서:**
+1. 먼저 핵심 답변을 한 문장으로 제시
+2. 그 다음 줄바꿈 후 상세 설명을 2-3문단으로 작성
 
-[주석]
-위의 참고 근거 목록(전체 {len(deduplicated_evidences)}개) 중에서 질문과 가장 관련성이 높은 **주요 5개만** 선택하여 학술적 서적 스타일로 서술형으로 작성하세요.
+**중요: 제목이나 섹션명 출력 금지**
+- "상세 설명", "핵심 답변", "본문" 같은 제목이나 섹션명을 절대 출력하지 마세요.
+- 바로 내용만 작성하세요.
+- 나쁜 예: 
+  핵심 답변
+  [답변 내용]
+  
+  상세 설명
+  [상세 내용]
+- 좋은 예:
+  [핵심 답변 내용]
+  
+  [상세 설명 내용]
 
-**중요: 주요 근거만 나열하세요.**
-- 질문과 가장 관련성이 높은 주요 사건/인물/제도만 선택하여 나열하세요.
-- 중복되거나 덜 중요한 근거는 제외하세요.
-- 반드시 **최대 5개의 주요 근거만** 나열하세요.
-- 위의 전체 근거 목록을 참고하여 가장 중요한 5개를 선별하세요.
+**예시 구조:**
+[핵심 답변 한 문장]
 
-**작성 형식:**
-- 각 근거를 [번호] 형식으로 시작하세요.
-- 근거 타입별로 다음 형식을 정확히 따르세요:
-  * 【사건】: "[번호] 【사건】 연도에 발생한 사건명은..."
-  * 【인물】: "[번호] 【인물】 인물명(연도)은 역할..."
-  * 【제도】: "[번호] 【제도】 제도명(연도)은 설립/운영..."
-  * 【장소】: "[번호] 【장소】 장소명(연도)은 건립..."
-  * 【개념】: "[번호] 【개념】 개념명은..."
-
-**작성 예시:**
-[1] 【사건】 1592년에 발생한 임진왜란은 조선과 일본 간의 전쟁입니다.
-[2] 【인물】 이순신(1545년)은 임진왜란에 참여한 인물입니다. 조선 수군을 이끌어 승리를 이끌었습니다.
-[3] 【제도】 훈민정음(1446년)은 세종대왕이 창제한 한글입니다.
-
-**중요 규칙:**
-- 각 근거를 완전한 문장으로 서술하세요. 한 글자씩 줄바꿈하지 마세요.
-- 각 근거는 반드시 한 줄로 작성하세요.
-- 영어 단어나 영어 문장 절대 사용 금지
-- 주요 근거만 선택하여 최대 5개만 나열하세요.
-
-**중요: [본문], [요약], [주석] 세 섹션을 모두 출력하세요. 각 섹션은 명확하게 구분하여 작성하세요.**"""
+[상세 설명 2-3문단]"""
 
     try:
         response = llm.invoke(story_prompt)
+        
+        # 토큰 사용량 추출 및 state에 누적
+        from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
+        token_update = extract_and_accumulate_tokens(state, response)
+        state.update(token_update)
+        
         llm_answer = response.content.strip()
 
-        # LLM이 [본문], [요약], [참고 근거]를 모두 생성하므로 그대로 사용
+        # LLM이 핵심 답변과 상세 설명을 생성하므로 그대로 사용
         final_answer = llm_answer
 
         print(f"  └─ 완료: {len(llm_answer)}자 생성 (근거 {len(evidences)}개 사용)")
         print()
 
-        # 근거 포함 답변 구성 (주요 5개만 포함)
+        # 근거 포함 답변 구성 (전체 근거 포함)
         answer_with_sources = {
             "story": final_answer,
-            "sources": top_evidences,  # 주요 5개만 포함
+            "sources": deduplicated_evidences,  # 전체 근거 포함
             "query_type": query_type,
-            "evidence_count": len(top_evidences),  # 주요 근거 개수
-            "total_evidence_count": len(evidences)  # 전체 근거 개수 (참고용)
+            "evidence_count": len(deduplicated_evidences)  # 근거 개수
         }
 
     except Exception as e:
@@ -661,8 +664,8 @@ def story_generator_node(state: GraphState) -> GraphState:
         # 메타 정보
         "executed_nodes": state.get("executed_nodes", []) + ["story_generator"],
         "node_execution_times": node_times,
-        
+
         # 필요한 경우에만 포함 (선택적)
         "extracted_entities": extracted_entities[:10] if extracted_entities else [],  # 최대 10개만
-        "evidences": evidences[:5] if evidences else [],  # 최대 5개만 (실제 사용)
+        "evidences": evidences if evidences else [],  # 전체 evidences 사용
     }
