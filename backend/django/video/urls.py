@@ -1,6 +1,14 @@
 from django.urls import path
 from . import views
-from .views import VideoListView, VideoDetailView, VideoUploadView, PopularVideosView, PopularTagsView
+from .views import (
+    VideoListView,
+    VideoDetailView,
+    VideoUploadView,
+    VideoUpdateView,
+    VideoDeleteView,
+    PopularVideosView,
+    PopularTagsView
+)
 
 # Video app URLs
 
@@ -19,6 +27,12 @@ urlpatterns = [
 
     # POST /api/video/upload/ - 영상 업로드 (관리자 전용)
     path('upload/', VideoUploadView.as_view(), name='video-upload'),
+
+    # PATCH /api/video/<id>/update/ - 영상 수정 (관리자 전용)
+    path('<int:pk>/update/', VideoUpdateView.as_view(), name='video-update'),
+
+    # DELETE /api/video/<id>/delete/ - 영상 삭제 (관리자 전용)
+    path('<int:pk>/delete/', VideoDeleteView.as_view(), name='video-delete'),
 
     # GET /api/video/popular/ - 인기 영상 조회
     path('popular/', PopularVideosView.as_view(), name='popular-videos'),
