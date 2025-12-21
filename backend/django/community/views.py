@@ -27,15 +27,6 @@ from .serializers import (
 from rest_framework.permissions import BasePermission
 
 
-class IsAdminUser(BasePermission):
-    """관리자(permission='admin')만 접근 가능"""
-    def has_permission(self, request, view):
-        return (
-            request.user.is_authenticated and
-            request.user.permission == 'admin'
-        )
-
-
 class IsOwnerOrAdmin(BasePermission):
     """
     작성자 본인 또는 관리자만 삭제 가능
