@@ -139,21 +139,51 @@ def translate_historical_terms(text: str) -> str:
     return translated_text
 
 
+def is_battle_scene(prompt: str) -> bool:
+    """
+    프롬프트가 전투/전쟁 장면인지 판단
+
+    Args:
+        prompt: 원본 프롬프트
+
+    Returns:
+        전투 장면 여부
+    """
+    # 전투 관련 키워드
+    battle_keywords = [
+        # 영어
+        'battle', 'fight', 'attack', 'war', 'combat', 'charge', 'strike', 'clash',
+        'siege', 'invasion', 'assault', 'defense', 'arrow', 'fire', 'explosion',
+        'cannon', 'shoot', 'blast', 'shell', 'victory', 'defeat',
+        # 한국어
+        '전투', '전쟁', '공격', '방어', '침략', '함락', '승전', '대첩', '격전',
+        '화살', '포탄', '폭발', '발사', '사격', '포격', '돌격', '수성',
+        # 임진왜란 특정 전투
+        '부산진', '동래성', '상주', '행주', '진주성', '한산도', '명량'
+    ]
+
+    prompt_lower = prompt.lower()
+    return any(keyword in prompt_lower for keyword in battle_keywords)
+
+
 def enhance_with_historical_context(prompt: str, is_image_prompt: bool = True) -> str:
     """
     프롬프트에 임진왜란 역사적 배경 추가
-    
+
     Args:
         prompt: 원본 프롬프트
         is_image_prompt: 이미지 생성용인지 (True) 영상 생성용인지 (False)
-    
+
     Returns:
         강화된 프롬프트
     """
     # 1단계: 한국어 용어 변환
     enhanced = translate_historical_terms(prompt)
-    
-    # 2단계: 역사적 배경 추가
+
+    # 2단계: 원본 프롬프트 분석 (전투/평화 판단)
+    is_battle = is_battle_scene(prompt)
+
+    # 3단계: 역사적 배경 추가
     if is_image_prompt:
         historical_suffix = """
 HISTORICAL SETTING REQUIREMENTS:
@@ -165,12 +195,20 @@ HISTORICAL SETTING REQUIREMENTS:
 - NO modern elements: NO modern soldiers, NO modern weapons, NO contemporary clothing
 - Historical accuracy in costumes, architecture, and military equipment"""
     else:
-        # 영상 생성용 (더 간결하게)
-        historical_suffix = """
-STRICT HISTORICAL PERIOD: Joseon Dynasty 16th century Korea, Imjin War 1592-1598, traditional Korean and Japanese armor and weapons of the period, NO modern military elements whatsoever"""
-    
+        # 영상 생성용: 전투/평화에 따라 다른 배경 추가
+        if is_battle:
+            # 전투 장면: 전투 키워드 포함
+            historical_suffix = """
+STRICT HISTORICAL PERIOD: Joseon Dynasty 16th century Korea, Imjin War 1592-1598 battle scene, traditional Korean and Japanese armor and weapons of the period, warfare atmosphere, NO modern military elements whatsoever"""
+            print(f"    ⚔️ 전투 장면 감지: 전투 효과 적용")
+        else:
+            # 평화로운 장면: 전투 키워드 제외
+            historical_suffix = """
+STRICT HISTORICAL PERIOD: Joseon Dynasty 16th century Korea peaceful scene, traditional Korean architecture and clothing of the period, serene atmosphere, NO modern elements whatsoever"""
+            print(f"    🏯 평화 장면 감지: 평화로운 효과 적용")
+
     enhanced_prompt = f"{enhanced}. {historical_suffix}"
-    
+
     return enhanced_prompt
 
 
