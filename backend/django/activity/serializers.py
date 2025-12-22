@@ -7,6 +7,7 @@ class WatchingHistorySerializer(serializers.ModelSerializer):
     user_email = serializers.EmailField(source='user.email', read_only=True)
     user_nickname = serializers.CharField(source='user.nickname', read_only=True)
     video_title = serializers.CharField(source='video.title', read_only=True)
+    video_thumbnail = serializers.CharField(source='video.thumbnail_url', read_only=True)
 
     class Meta:
         model = WatchingHistory
@@ -14,6 +15,7 @@ class WatchingHistorySerializer(serializers.ModelSerializer):
             'id',
             'video',
             'video_title',
+            'video_thumbnail',
             'user',
             'user_email',
             'user_nickname',
