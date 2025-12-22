@@ -336,3 +336,5 @@ infra/database/
 .bak
 
 backend/ragas/data/
+
+celery.pid
