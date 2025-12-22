@@ -1,4 +1,5 @@
 import { COLORS } from "../../../constants/theme";
+import { getThumbnailUrl } from "../../../utils/imageUtils";
 
 const WatchHistory = ({ items, loading = false, onVideoClick }) => {
   return (
@@ -68,6 +69,11 @@ const WatchHistory = ({ items, loading = false, onVideoClick }) => {
                   borderRadius: "8px",
                   marginBottom: "8px",
                   transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                  backgroundImage: item.thumbnail_url
+                    ? `url(${getThumbnailUrl(item.thumbnail_url)})`
+                    : "none",
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
                 }}
               ></div>
               <div style={{ fontSize: "13px", color: COLORS.dark }}>
