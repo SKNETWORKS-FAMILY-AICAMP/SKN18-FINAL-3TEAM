@@ -1,5 +1,320 @@
 # 창작 모드 - 조선시대 역사 스토리텔링 LangGraph
 
+> Apache Fuseki + LangGraph 기반 조선시대 역사 질의응답 시스템
+> RDF 온톨로지, SPARQL, pgvector를 활용한 하이브리드 검색 및 스토리 생성
+
+## 📑 목차
+
+- [🏗️ Fuseki 아키텍처 개요](#️-fuseki-아키텍처-개요)
+  - [시스템 아키텍처](#시스템-아키텍처)
+  - [데이터 모델 (RDF Ontology)](#데이터-모델-rdf-ontology)
+  - [컴포넌트 간 상호작용 시퀀스](#컴포넌트-간-상호작용-시퀀스)
+  - [데이터 흐름 및 최적화 포인트](#데이터-흐름-및-최적화-포인트)
+- [📊 전체 플로우차트](#-전체-플로우차트)
+- [🔧 핵심 컴포넌트](#-핵심-컴포넌트)
+- [📊 데이터 플로우 예시](#-데이터-플로우-예시)
+- [📚 기술 스택](#-기술-스택)
+- [🚀 실행 방법](#-실행-방법)
+- [📊 성능 비교](#-성능-비교)
+- [🆕 주요 변경사항 (v2.0)](#-주요-변경사항-v20)
+- [🔥 아키텍처 상세](#-아키텍처-상세)
+- [⚡ 성능 최적화](#-성능-최적화)
+- [🗂️ 파일 구조](#️-파일-구조)
+
+---
+
+## 🏗️ Fuseki 아키텍처 개요
+
+### 시스템 아키텍처
+
+```mermaid
+graph TB
+    subgraph "Frontend Layer"
+        User[사용자 질문]
+    end
+
+    subgraph "LangGraph Pipeline"
+        Main[main.py<br/>Entry Point]
+        Graph[graph.py<br/>Workflow Definition]
+        State[state.py<br/>GraphState Management]
+    end
+
+    subgraph "Processing Nodes"
+        N0[history_check_node<br/>역사 필터링]
+        N1[classify_node<br/>질문 분류 + 키워드 확장]
+        N2[entity_expander_node<br/>하이브리드 엔티티 추출]
+        N2_5[semantic_expander_node<br/>의미론적 확장]
+        N3[parallel_knowledge_retrieval<br/>5-Thread SPARQL]
+        N4[path_evidence_aggregator<br/>근거 통합]
+        N5[story_generator_node<br/>스토리 생성]
+    end
+
+    subgraph "Data Layer"
+        TTL[(korean_history_normalized.ttl<br/>15MB RDF Data)]
+        Groups[property_groups.json<br/>32 Property Groups]
+        Fuseki[(Apache Fuseki<br/>SPARQL Endpoint)]
+        PGVector[(pgvector<br/>임베딩 검색)]
+    end
+
+    subgraph "External Services"
+        OpenAI[OpenAI API<br/>gpt-4o / gpt-4o-mini]
+    end
+
+    User --> Main
+    Main --> Graph
+    Graph --> State
+    State --> N0
+    N0 --> N1
+    N1 --> N2
+    N2 --> N2_5
+    N2_5 --> N3
+    N3 --> N4
+    N4 --> N5
+
+    N1 -.LLM 2회 병렬.-> OpenAI
+    N0 -.LLM 1회.-> OpenAI
+    N5 -.LLM 1회.-> OpenAI
+
+    N2 -.캐시 로드.-> TTL
+    N2 -.fallback.-> PGVector
+    N1 -.선택.-> Groups
+    N2_5 -.SPARQL.-> Fuseki
+    N3 -.SPARQL 5개.-> Fuseki
+
+    TTL -.업로드.-> Fuseki
+
+    style User fill:#e1f5ff,stroke:#01579b,stroke-width:3px
+    style Fuseki fill:#fff3e0,stroke:#e65100,stroke-width:3px
+    style OpenAI fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    style N3 fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style N5 fill:#b2dfdb,stroke:#00695c,stroke-width:2px
+```
+
+### 데이터 모델 (RDF Ontology)
+
+```mermaid
+classDiagram
+    class Person {
+        +rdfs:label string
+        +hasBirthYear xsd:gYear
+        +hasDeathYear xsd:gYear
+        +hasRank string
+        +participatesIn Event
+        +servedUnder Person
+        +commands Person
+        +affiliatedWith Institution
+    }
+
+    class Event {
+        +rdfs:label string
+        +hasYear xsd:gYear
+        +hasStartYear xsd:gYear
+        +hasEndYear xsd:gYear
+        +involvesPerson Person
+        +occursAt Place
+        +leadsTo Event
+        +causedBy Event
+    }
+
+    class Institution {
+        +rdfs:label string
+        +foundedOn xsd:date
+        +establishedBy Person
+        +hasHeadquarters Place
+        +hasCharter string
+    }
+
+    class Place {
+        +rdfs:label string
+        +locatedIn Place
+        +partOf Place
+        +builtIn xsd:gYear
+        +hasCoordinates string
+    }
+
+    class Document {
+        +rdfs:label string
+        +hasAuthor Person
+        +writtenInYear xsd:gYear
+        +documents Event
+        +describes Person
+    }
+
+    class Battle {
+        +rdfs:label string
+        +hasParticipant Person
+        +hasWinner Person
+        +hasLoser Person
+        +occurredAt Place
+    }
+
+    Person "N" --> "N" Event : participatesIn
+    Person "N" --> "1" Person : servedUnder
+    Event "N" --> "N" Event : leadsTo/causedBy
+    Event "N" --> "1" Place : occursAt
+    Institution "1" --> "N" Person : establishedBy
+    Document "1" --> "N" Person : hasAuthor
+    Battle "N" --> "N" Person : hasParticipant
+    Battle "N" --> "1" Place : occurredAt
+```
+
+### 컴포넌트 간 상호작용 시퀀스
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Main as main.py
+    participant Graph as LangGraph
+    participant N0 as history_check
+    participant N1 as classify
+    participant N2 as entity_expander
+    participant N2_5 as semantic_expander
+    participant N3 as parallel_retrieval
+    participant N4 as evidence_aggregator
+    participant N5 as story_generator
+    participant Fuseki as Apache Fuseki
+    participant PGVector as pgvector
+    participant OpenAI as OpenAI API
+
+    User->>Main: 질문 입력
+    Main->>Graph: invoke({"query": "..."})
+    Graph->>N0: Stage 0: 역사 관련?
+
+    N0->>OpenAI: LLM 호출 (1회)
+    OpenAI-->>N0: is_historical: true/false
+
+    alt 비역사 질문
+        N0->>N5: 조기 종료
+        N5-->>Graph: "답변 불가" 메시지
+        Graph-->>User: 최종 답변
+    else 역사 질문
+        N0->>N1: Stage 1: 분류 & 확장
+
+        par Thread 1: 의도분석
+            N1->>OpenAI: 의도 + 프로퍼티 그룹
+            OpenAI-->>N1: query_type, property_groups
+        and Thread 2: 키워드확장
+            N1->>OpenAI: 키워드 확장
+            OpenAI-->>N1: expanded_keywords
+        end
+
+        N1->>N2: Stage 2: 엔티티 추출
+        N2->>N2: TTL 캐시 로드
+        N2->>N2: 정확 매칭
+        N2->>PGVector: pgvector 검색 (fallback)
+        PGVector-->>N2: 유사 엔티티
+        loop 각 엔티티
+            N2->>Fuseki: SPARQL 스코어링
+            Fuseki-->>N2: 연결 노드 수
+        end
+        N2->>N2_5: 상위 30개
+
+        N2_5->>Fuseki: 시간적 확장 (±10년)
+        Fuseki-->>N2_5: 시대적 엔티티
+        N2_5->>Fuseki: 카테고리 확장
+        Fuseki-->>N2_5: 동일 유형
+        N2_5->>Fuseki: 인과 체인
+        Fuseki-->>N2_5: leadsTo/causedBy
+        N2_5->>PGVector: 벡터 유사도
+        PGVector-->>N2_5: 유사 엔티티
+
+        N2_5->>N3: 확장된 엔티티 (40개)
+
+        par Thread 1
+            N3->>Fuseki: outgoing_relations
+            Fuseki-->>N3: A → B
+        and Thread 2
+            N3->>Fuseki: incoming_relations
+            Fuseki-->>N3: B → A
+        and Thread 3
+            N3->>Fuseki: entity_properties
+            Fuseki-->>N3: 속성값
+        and Thread 4
+            N3->>Fuseki: connected_entities (BFS)
+            Fuseki-->>N3: 연결된 엔티티
+        and Thread 5
+            N3->>Fuseki: type_and_summary
+            Fuseki-->>N3: 타입/요약
+        end
+
+        N3->>N4: 5개 Thread 결과
+        N4->>N4: 경로 추출
+        N4->>N4: 수렴 노드 감지
+        N4->>N4: 관련성 점수 계산
+        N4->>N5: 상위 15개 근거
+
+        N5->>OpenAI: LLM 스토리 생성 (1회)
+        OpenAI-->>N5: 최종 답변
+        N5-->>Graph: answer_with_sources
+        Graph-->>User: 최종 답변 + 출처
+    end
+```
+
+### 데이터 흐름 및 최적화 포인트
+
+```mermaid
+graph TB
+    subgraph "입력 처리"
+        Q[사용자 질문] --> L0{LLM 1<br/>역사?}
+        L0 -->|No| Exit[조기 종료<br/>⚡ 비용 절감]
+        L0 -->|Yes| L1[LLM 2-3 병렬<br/>⚡ 시간 단축]
+    end
+
+    subgraph "엔티티 발견"
+        L1 --> C1[TTL 캐시<br/>⚡ mtime 캐싱]
+        C1 --> |Hit| E1[정확 매칭]
+        C1 --> |Miss| E2[pgvector<br/>fallback]
+        E1 --> S1[SPARQL 스코어링]
+        E2 --> S1
+    end
+
+    subgraph "엔티티 확장"
+        S1 --> Top30[상위 30개]
+        Top30 --> EX1[시간적 ±10년]
+        Top30 --> EX2[카테고리]
+        Top30 --> EX3[인과 체인]
+        Top30 --> EX4[벡터]
+        EX1 --> Expanded[40개<br/>중복 제거]
+        EX2 --> Expanded
+        EX3 --> Expanded
+        EX4 --> Expanded
+    end
+
+    subgraph "병렬 검색 ⚡"
+        Expanded --> T1[Thread 1<br/>outgoing]
+        Expanded --> T2[Thread 2<br/>incoming]
+        Expanded --> T3[Thread 3<br/>properties]
+        Expanded --> T4[Thread 4<br/>connected+BFS]
+        Expanded --> T5[Thread 5<br/>type/summary]
+    end
+
+    subgraph "근거 통합"
+        T1 --> AGG[Path Extractor]
+        T2 --> AGG
+        T3 --> AGG
+        T4 --> AGG
+        T5 --> AGG
+        AGG --> CONV[수렴 노드<br/>2배 부스트]
+        CONV --> TOP15[상위 15개]
+    end
+
+    subgraph "최종 생성"
+        TOP15 --> L4[LLM 4<br/>스토리 생성]
+        L4 --> ANS[최종 답변]
+    end
+
+    style Exit fill:#ffcdd2,stroke:#b71c1c,stroke-width:2px
+    style C1 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style L1 fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style T1 fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style T2 fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style T3 fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style T4 fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style T5 fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style CONV fill:#ffccbc,stroke:#bf360c,stroke-width:2px
+    style ANS fill:#c5e1a5,stroke:#33691e,stroke-width:3px
+```
+
 ## 📊 전체 플로우차트
 
 ```mermaid
@@ -1969,28 +2284,147 @@ def extract_historical_keywords_with_llm(query, include_query_type=True):
 
 ## 🗂️ 파일 구조
 
+### 디렉토리 구조 다이어그램
+
+```mermaid
+graph LR
+    subgraph "backend/langgraph_fuseki/"
+        direction TB
+
+        subgraph "Entry Points"
+            main[main.py<br/>대화형 실행]
+            cli[cli.py<br/>CLI 명령어]
+            graph[graph.py<br/>워크플로우 정의]
+            state[state.py<br/>상태 관리]
+        end
+
+        subgraph "Processing Nodes"
+            direction TB
+            n0[history_check_node.py]
+            n1[classify_node.py]
+            n2[entity_expander_node.py]
+            n2_5[semantic_expander_node.py]
+
+            subgraph "KG Operations"
+                n3[parallel_knowledge_retrieval.py]
+                n4[path_evidence_aggregator.py]
+            end
+
+            n5[generate_node.py]
+        end
+
+        subgraph "Data & Ontology"
+            direction TB
+            ttl[(korean_history_normalized.ttl<br/>15MB)]
+            groups[property_groups.json<br/>32 groups]
+
+            subgraph "Scripts"
+                upload[load_ttl_to_fuseki.py]
+                extract[extract_property_groups.py]
+                normalize[normalize_ttl.py]
+                llm_gen[llm_ttl_generator.py]
+            end
+        end
+
+        subgraph "Configuration"
+            config[config.py<br/>경로 & 환경설정]
+            schema[ontology_schema.py<br/>OWL 스키마]
+            utils[utils.py<br/>공통 유틸]
+        end
+
+        subgraph "Documentation"
+            readme[README.md]
+            setup[SETUP.md]
+            ont_doc[ONTOLOGY_SCHEMA.md]
+            query_guide[QUERY_CLASSIFICATION_GUIDE.md]
+        end
+    end
+
+    style main fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style graph fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style ttl fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style n3 fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style n5 fill:#b2dfdb,stroke:#00695c,stroke-width:2px
 ```
-backend/ontology_langgraph_structure/
-├── main.py                    # 메인 실행
-├── graph.py                   # LangGraph 정의
-├── state.py                   # GraphState 정의
-├── nodes/
-│   ├── classify_node.py       # 질문 분류 + 프로퍼티 그룹 선택
-│   ├── entity_expander_node.py  # 하이브리드 엔티티 추출 (⚡캐싱+LLM통합)
-│   ├── generate_node.py       # 스토리 생성
-│   └── kg/
-│       ├── parallel_knowledge_retrieval_node.py  # Parallel Knowledge Retrieval: 5개 Thread 범용 관계 검색
-│       └── path_evidence_aggregator_node.py  # 경로 추출 및 근거 통합 (통합 노드)
-├── ontology/
-│   ├── korean_history.owl     # 온톨로지 스키마
+
+### 상세 파일 트리
+
+```
+backend/langgraph_fuseki/
+├── __init__.py
+├── main.py                          # 대화형 CLI 실행
+├── cli.py                           # Click CLI 명령어
+├── graph.py                         # LangGraph 워크플로우 정의
+├── state.py                         # GraphState TypedDict
+├── config.py                        # 설정 & 경로 관리
+├── ontology_schema.py               # OWL 스키마 정의
+├── utils.py                         # 공통 유틸리티
+│
+├── nodes/                           # 처리 노드
+│   ├── __init__.py
+│   ├── history_check_node.py        # Stage 0: 역사 질문 필터링
+│   ├── classify_node.py             # Stage 1: 질문 분류 & 키워드 확장
+│   ├── entity_expander_node.py      # Stage 2: 하이브리드 엔티티 추출 (43KB)
+│   ├── semantic_expander_node.py    # Stage 2.5: 의미론적 확장 (31KB)
+│   ├── generate_node.py             # Stage 5: 스토리 생성 (30KB)
+│   │
+│   ├── kg/                          # Knowledge Graph 연산
+│   │   ├── parallel_knowledge_retrieval_node.py  # Stage 3: 5-Thread SPARQL
+│   │   └── path_evidence_aggregator_node.py      # Stage 4: 근거 통합
+│   │
+│   └── backup/                      # Legacy 노드 (미사용)
+│       ├── evidence_aggregator_node.py
+│       ├── hypothetical_triple_node.py
+│       ├── inference_path_extractor_node.py
+│       ├── multi_path_extractor_node.py
+│       ├── multi_query_generator_node.py
+│       ├── realtime_inference_node.py
+│       └── sparql_generator_node.py
+│
+├── ontology/                        # 온톨로지 데이터
+│   ├── __init__.py
 │   ├── instances/
-│   │   ├── korean_history_normalized.ttl  # 정규화된 데이터
-│   │   └── property_groups.json  # 프로퍼티 그룹 (70개 그룹)
-│   └── scripts/
-│       ├── upload_ttl_to_fuseki.sh  # Fuseki 업로드
-│       └── extract_property_groups.py  # 프로퍼티 그룹 추출 스크립트
-└── docs/
-    └── README.md              # 이 문서
+│   │   ├── korean_history_instances.ttl      # 원본 (17MB)
+│   │   ├── korean_history_normalized.ttl     # 정규화 (15MB, 운영)
+│   │   └── property_groups.json              # 32개 프로퍼티 그룹
+│   │
+│   └── scripts/                     # 온톨로지 관리 스크립트
+│       ├── generate_all_ttl.py      # TTL 전체 생성
+│       ├── check_duplicate_triples.py
+│       ├── load_ttl_to_fuseki.py    # Fuseki 업로드
+│       ├── extract_property_groups.py
+│       ├── llm_ttl_generator.py     # LLM 기반 TTL 생성
+│       ├── normalize_ttl.py         # TTL 정규화
+│       └── count_ttl_stats.py       # 통계 수집
+│
+├── utils/
+│   ├── __init__.py
+│   └── inference_triple_generator.py  # 추론 결과 → TTL 변환
+│
+├── outputs/                         # 생성 결과물
+│   └── inference/                   # 추론 결과 TTL
+│       ├── inference_20251219_184752.ttl
+│       ├── inference_20251219_184344.ttl
+│       └── inference_20251219_190030.ttl
+│
+└── docs/                            # 문서
+    ├── README.md                    # 전체 워크플로우 (이 문서)
+    ├── SETUP.md                     # 설치 & 설정
+    ├── ONTOLOGY_SCHEMA.md           # 스키마 상세
+    ├── QUERY_CLASSIFICATION_GUIDE.md  # 분류 가이드
+    └── scoring_methodology.md       # 점수 계산 방법론
 ```
+
+### 핵심 파일 설명
+
+| 파일 | 크기 | 역할 |
+|------|------|------|
+| [entity_expander_node.py](../nodes/entity_expander_node.py) | 43KB | 가장 복잡한 노드: TTL 캐싱 + pgvector fallback + SPARQL 스코어링 |
+| [semantic_expander_node.py](../nodes/semantic_expander_node.py) | 31KB | 4가지 확장: 시간적/카테고리/인과/벡터 |
+| [generate_node.py](../nodes/generate_node.py) | 30KB | 스토리 생성 + 프롬프트 엔지니어링 |
+| [korean_history_normalized.ttl](../ontology/instances/korean_history_normalized.ttl) | 15MB | 운영 데이터 (정규화됨) |
+| [property_groups.json](../ontology/instances/property_groups.json) | ~10KB | 32개 프로퍼티 그룹 정의 |
+| [graph.py](../graph.py) | ~120줄 | LangGraph 워크플로우 정의 |
+| [config.py](../config.py) | ~50줄 | 경로 & 환경변수 관리 |
 
 ---

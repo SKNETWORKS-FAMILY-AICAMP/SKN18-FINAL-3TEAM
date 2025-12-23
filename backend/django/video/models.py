@@ -40,6 +40,11 @@ class Video(models.Model):
         validators=[MinValueValidator(0)],
         verbose_name='댓글 수'
     )
+    thumbnail_url = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name='썸네일 URL'
+    )
 
     class Meta:
         db_table = 'video'

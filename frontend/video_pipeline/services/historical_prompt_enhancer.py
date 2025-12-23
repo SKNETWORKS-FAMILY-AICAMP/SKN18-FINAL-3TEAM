@@ -86,7 +86,6 @@ def translate_historical_terms(text: str) -> str:
         return text
     
     translated_text = text
-    replacements = []
     
     # 길이가 긴 순서대로 변환
     sorted_terms = sorted(KOREAN_HISTORICAL_TERMS.items(), key=lambda x: len(x[0]), reverse=True)
@@ -94,39 +93,58 @@ def translate_historical_terms(text: str) -> str:
     for korean_term, english_term in sorted_terms:
         if korean_term in translated_text:
             translated_text = translated_text.replace(korean_term, english_term)
-            replacements.append(f"'{korean_term}' → English Term")
     
     return translated_text
 
+# [Dev 브랜치 기능 흡수] 강력한 전투 감지 로직
+def is_battle_scene(prompt: str) -> bool:
+    """
+    프롬프트가 전투/전쟁 장면인지 판단
+    Args:
+        prompt: 원본 프롬프트
+    Returns:
+        전투 장면 여부
+    """
+    # 전투 관련 키워드 (Dev 브랜치에서 가져옴)
+    battle_keywords = [
+        # 영어
+        'battle', 'fight', 'attack', 'war', 'combat', 'charge', 'strike', 'clash',
+        'siege', 'invasion', 'assault', 'defense', 'arrow', 'fire', 'explosion',
+        'cannon', 'shoot', 'blast', 'shell', 'victory', 'defeat', 'killing', 'blood',
+        # 한국어
+        '전투', '전쟁', '공격', '방어', '침략', '함락', '승전', '대첩', '격전',
+        '화살', '포탄', '폭발', '발사', '사격', '포격', '돌격', '수성', '살육',
+        # 임진왜란 특정 전투
+        '부산진', '동래성', '상주', '행주', '진주성', '한산도', '명량'
+    ]
+
+    prompt_lower = prompt.lower()
+    return any(keyword in prompt_lower for keyword in battle_keywords)
+
+
 def enhance_with_historical_context(prompt: str, is_image_prompt: bool = True) -> str:
     """
-    프롬프트에 조선시대 역사적 배경 추가 (전쟁 vs 평화 자동 감지)
+    프롬프트에 조선시대/임진왜란 역사적 배경 추가
     """
     # 1단계: 한국어 용어 변환
     enhanced = translate_historical_terms(prompt)
-    prompt_lower = enhanced.lower()
     
-    # 2단계: 전쟁 키워드 감지
-    war_keywords = [
-        'battlefield', 'fierce battle', 'invasion', 'combat', 
-        'soldiers fighting', 'killing', 'war zone', 'army clashing',
-        'bloody', 'destruction', 'troops charging',
-        '격전', '침략', '전쟁터', '살육'
-    ]
+    # 2단계: 전쟁 키워드 감지 (Dev 브랜치의 강력한 함수 사용)
+    is_war_scene = is_battle_scene(prompt)
     
-    is_war_scene = any(keyword in prompt_lower for keyword in war_keywords)
-    
-    # 3단계: 상황에 맞는 컨텍스트 주입
+    # 3단계: 상황에 맞는 컨텍스트 주입 (작성자님의 깔끔한 상수 사용)
     if is_war_scene:
         # 전쟁 상황
         context_suffix = IMJIN_WAR_CONTEXT
         if not is_image_prompt: # 영상용이면 더 짧게
-            context_suffix = "Setting: Fierce battlefield of Imjin War. Smoke, fire, combat atmosphere."
+            context_suffix = "Setting: Fierce battlefield of Imjin War (1592). Smoke, fire, combat atmosphere."
+        print(f"    ⚔️ [History] 전투 장면 감지 -> 임진왜란 컨텍스트 적용")
     else:
-        # 평화/일반 상황 (세종대왕 등)
+        # 평화/일반 상황
         context_suffix = JOSEON_GENERAL_CONTEXT
         if not is_image_prompt: # 영상용이면 더 짧게
             context_suffix = "Setting: Peaceful Joseon Dynasty scenery. Nature, palace, quiet atmosphere."
+        print(f"    🏯 [History] 평화 장면 감지 -> 조선시대 컨텍스트 적용")
     
     enhanced_prompt = f"{enhanced}. {context_suffix}"
     
@@ -138,6 +156,10 @@ def add_anti_modern_negative_prompt() -> str:
 
 def process_scene_prompt(scene_prompt: str, is_image: bool = True) -> tuple:
     """장면 프롬프트를 처리하여 강화된 프롬프트와 네거티브 프롬프트 반환"""
+    enhanced_prompt, _ = enhance_with_historical_context(scene_prompt, is_image_prompt=is_image), None
+    # 위 함수 리턴값이 str이므로 튜플 언패킹 수정 (enhanced_prompt만 받음)
+    
+    # enhance_with_historical_context가 str만 반환하므로 다시 호출
     enhanced_prompt = enhance_with_historical_context(scene_prompt, is_image_prompt=is_image)
     negative_prompt = add_anti_modern_negative_prompt()
     

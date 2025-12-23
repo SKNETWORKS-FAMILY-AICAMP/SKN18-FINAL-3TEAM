@@ -12,12 +12,14 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated, BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.generics import ListAPIView, RetrieveAPIView, CreateAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView, CreateAPIView, UpdateAPIView, DestroyAPIView
+from openai import OpenAI
 from dotenv import load_dotenv
 
 # 모델 및 시리얼라이저 (Dev 브랜치 기준)
 from .models import Video
 from .serializers import VideoSerializer, VideoDetailSerializer, VideoCreateSerializer
+from config.permissions import IsAdminUser
 
 # LangGraph 임포트 (작성자님 기능 유지)
 from backend.langgraph_structure1.graph import create_graph_flow
@@ -165,6 +167,33 @@ class VideoUploadView(CreateAPIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def create(self, request, *args, **kwargs):
+        import os
+        from django.core.files.storage import default_storage
+        from django.conf import settings
+
+        thumbnail_url = None
+
+        # 썸네일 파일 처리
+        if 'thumbnail_file' in request.FILES:
+            thumbnail_file = request.FILES['thumbnail_file']
+
+            # 썸네일 저장 경로 생성
+            thumbnail_dir = 'thumbnails'
+            os.makedirs(os.path.join(settings.MEDIA_ROOT, thumbnail_dir), exist_ok=True)
+
+            # 파일명 생성 (중복 방지)
+            import time
+            file_extension = os.path.splitext(thumbnail_file.name)[1]
+            file_name = f"{int(time.time())}_thumbnail{file_extension}"
+            file_path = os.path.join(thumbnail_dir, file_name)
+
+            # 파일 저장
+            saved_thumbnail_path = default_storage.save(file_path, thumbnail_file)
+
+            # URL 생성
+            thumbnail_url = request.build_absolute_uri(f"{settings.MEDIA_URL}{saved_thumbnail_path}")
+
+        # 파일 업로드인 경우
         if 'video_file' in request.FILES:
             video_file = request.FILES['video_file']
             upload_dir = 'videos'
@@ -179,10 +208,14 @@ class VideoUploadView(CreateAPIView):
             data = {
                 'title': request.data.get('title'),
                 'video_url': video_url,
-                'tags': request.data.getlist('tags[]') if 'tags[]' in request.data else []
+                'tags': request.data.getlist('tags[]') if 'tags[]' in request.data else [],
+                'thumbnail_url': thumbnail_url
             }
         else:
-            data = request.data
+            # URL 입력인 경우
+            data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+            if thumbnail_url:
+                data['thumbnail_url'] = thumbnail_url
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
@@ -192,6 +225,117 @@ class VideoUploadView(CreateAPIView):
             'data': VideoSerializer(serializer.instance).data,
             'message': '영상이 업로드되었습니다.'
         }, status=status.HTTP_201_CREATED)
+
+
+class VideoUpdateView(UpdateAPIView):
+    """
+    영상 수정 API
+    - 관리자만 수정 가능
+
+    PATCH /api/video/<int:pk>/
+    """
+    queryset = Video.objects.all()
+    serializer_class = VideoCreateSerializer
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def update(self, request, *args, **kwargs):
+        import os
+        from django.core.files.storage import default_storage
+        from django.conf import settings
+
+        instance = self.get_object()
+        thumbnail_url = instance.thumbnail_url  # 기존 썸네일 유지
+
+        # 썸네일 파일 처리 (새로 업로드한 경우)
+        if 'thumbnail_file' in request.FILES:
+            thumbnail_file = request.FILES['thumbnail_file']
+
+            # 썸네일 저장 경로 생성
+            thumbnail_dir = 'thumbnails'
+            os.makedirs(os.path.join(settings.MEDIA_ROOT, thumbnail_dir), exist_ok=True)
+
+            # 파일명 생성 (중복 방지)
+            import time
+            file_extension = os.path.splitext(thumbnail_file.name)[1]
+            file_name = f"{int(time.time())}_thumbnail{file_extension}"
+            file_path = os.path.join(thumbnail_dir, file_name)
+
+            # 파일 저장
+            saved_thumbnail_path = default_storage.save(file_path, thumbnail_file)
+
+            # URL 생성
+            thumbnail_url = request.build_absolute_uri(f"{settings.MEDIA_URL}{saved_thumbnail_path}")
+
+        # 영상 파일 처리 (새로 업로드한 경우)
+        if 'video_file' in request.FILES:
+            video_file = request.FILES['video_file']
+
+            # 파일 저장 경로 생성
+            upload_dir = 'videos'
+            os.makedirs(os.path.join(settings.MEDIA_ROOT, upload_dir), exist_ok=True)
+
+            # 파일명 생성 (중복 방지)
+            import time
+            file_extension = os.path.splitext(video_file.name)[1]
+            file_name = f"{int(time.time())}_{video_file.name}"
+            file_path = os.path.join(upload_dir, file_name)
+
+            # 파일 저장
+            saved_path = default_storage.save(file_path, video_file)
+
+            # URL 생성
+            video_url = request.build_absolute_uri(f"{settings.MEDIA_URL}{saved_path}")
+
+            # 데이터 준비
+            data = {
+                'title': request.data.get('title'),
+                'video_url': video_url,
+                'tags': request.data.getlist('tags[]') if 'tags[]' in request.data else [],
+                'thumbnail_url': thumbnail_url
+            }
+        else:
+            # URL 입력 또는 기존 데이터 수정
+            data = {}
+            if 'title' in request.data:
+                data['title'] = request.data.get('title')
+            if 'video_url' in request.data:
+                data['video_url'] = request.data.get('video_url')
+            if 'tags[]' in request.data:
+                data['tags'] = request.data.getlist('tags[]')
+            elif 'tags' in request.data:
+                data['tags'] = request.data.get('tags')
+            if thumbnail_url:
+                data['thumbnail_url'] = thumbnail_url
+
+        serializer = self.get_serializer(instance, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response({
+            'data': VideoSerializer(serializer.instance).data,
+            'message': '영상이 수정되었습니다.'
+        }, status=status.HTTP_200_OK)
+
+
+class VideoDeleteView(DestroyAPIView):
+    """
+    영상 삭제 API
+    - 관리자만 삭제 가능
+
+    DELETE /api/video/<int:pk>/
+    """
+    queryset = Video.objects.all()
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        video_title = instance.title
+        self.perform_destroy(instance)
+
+        return Response({
+            'message': f'영상 "{video_title}"이(가) 삭제되었습니다.'
+        }, status=status.HTTP_200_OK)
+
 
 class PopularVideosView(ListAPIView):
     """
