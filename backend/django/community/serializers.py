@@ -13,7 +13,7 @@ class CommentUserSerializer(serializers.Serializer):
 
 class CommentSerializer(serializers.ModelSerializer):
     """댓글 조회용 serializer"""
-    user = CommentUserSerializer(read_only=True)
+    user = serializers.SerializerMethodField()
     video_title = serializers.CharField(source='video.title', read_only=True)
     replies_count = serializers.SerializerMethodField()
     replies = serializers.SerializerMethodField()
@@ -34,6 +34,18 @@ class CommentSerializer(serializers.ModelSerializer):
             'created_at',
         ]
         read_only_fields = ['id', 'created_at', 'user', 'comment_likes_count']
+
+    def get_user(self, obj):
+        """작성자 정보 반환 (탈퇴한 사용자 처리)"""
+        if obj.user is None:
+            return {
+                'id': None,
+                'nickname': '탈퇴한 사용자',
+                'email': None,
+                'profile_image': None,
+                'display_name': '탈퇴한 사용자'
+            }
+        return CommentUserSerializer(obj.user).data
 
     def get_replies_count(self, obj):
         return obj.replies.count()
@@ -66,10 +78,10 @@ class CommentCreateSerializer(serializers.ModelSerializer):
 
 class ReplySerializer(serializers.ModelSerializer):
     """답글 조회용 serializer (재귀적 중첩 지원)"""
-    user = CommentUserSerializer(read_only=True)
+    user = serializers.SerializerMethodField()
     comment_id = serializers.IntegerField(source='comment.id', read_only=True)
     comment_content = serializers.CharField(source='comment.comment_content', read_only=True)
-    comment_user = CommentUserSerializer(source='comment.user', read_only=True)
+    comment_user = serializers.SerializerMethodField()
     comment_created_at = serializers.DateTimeField(source='comment.created_at', read_only=True)
     video_id = serializers.IntegerField(source='comment.video.id', read_only=True)
     video_title = serializers.CharField(source='comment.video.title', read_only=True)
@@ -97,6 +109,30 @@ class ReplySerializer(serializers.ModelSerializer):
             'created_at',
         ]
         read_only_fields = ['id', 'created_at', 'user', 'comment']
+
+    def get_user(self, obj):
+        """작성자 정보 반환 (탈퇴한 사용자 처리)"""
+        if obj.user is None:
+            return {
+                'id': None,
+                'nickname': '탈퇴한 사용자',
+                'email': None,
+                'profile_image': None,
+                'display_name': '탈퇴한 사용자'
+            }
+        return CommentUserSerializer(obj.user).data
+
+    def get_comment_user(self, obj):
+        """댓글 작성자 정보 반환 (탈퇴한 사용자 처리)"""
+        if obj.comment.user is None:
+            return {
+                'id': None,
+                'nickname': '탈퇴한 사용자',
+                'email': None,
+                'profile_image': None,
+                'display_name': '탈퇴한 사용자'
+            }
+        return CommentUserSerializer(obj.comment.user).data
 
     def get_child_replies(self, obj):
         """자식 답글들을 재귀적으로 가져옴"""
