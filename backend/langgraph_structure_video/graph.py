@@ -40,9 +40,6 @@ def create_graph_flow():
     workflow.add_edge("tone_adjust_node", "scene_split_node")
     workflow.add_edge("scene_split_node", END)
 
-    # # ragas 평가용 노드 연결
-    # workflow.add_edge("generate_node", END)
-
     # 4) 그래프 compile
     graph = workflow.compile()
     
