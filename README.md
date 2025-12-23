@@ -115,7 +115,7 @@ SKN18-FINAL-3TEAM/
 Vectordb와 Graph db를 따로 사용해봤더니 
 상호 보완적인 결과가 나와 하이브리드로 사용.
 
-<img src="./제목 없음1.png"/>
+<img src="./vector_graph.png"/>
 
 
 
@@ -163,17 +163,37 @@ LLM 서버로부터 받은 비정형 텍스트 데이터를 구조화된 JSON으
 
 ```
 graph TD
-    User[사용자 입력] -->|주제 전송| Client[LLMClient (Unity)]
-    Client -->|API Request| Server[LangGraph Server]
-    Server -->|Generate JSON| Client
-    Client -->|Scenario Data| Director[Director Controller]
+    User[사용자 입력] -->|send_topic| Client[LLMClient (Unity)]
+    Client -->|api_request| Server[LangGraph Server]
+    Server -->|generate_json| Client
+    Client -->|scenario_data| Director[Director Controller]
     
-    subgraph "Unity Presentation Layer"
-        Director -->|Action & Gaze| Actor[Actor Controller]
-        Director -->|Pitch Variation| Audio[Audio Manager]
-        Director -->|Camera Shot| Cam[Camera Manager]
+    subgraph UnityPresentationLayer["Unity Presentation Layer"]
+        Director -->|action_gaze| Actor[Actor Controller]
+        Director -->|pitch_variation| Audio[Audio Manager]
+        Director -->|camera_shot| Cam[Camera Manager]
     end
 ```
+## System Architecture
+
+본 시스템은 LLM 서버로부터 생성된 비정형 텍스트 응답을  
+구조화된 JSON 형태로 변환하고, 이를 Unity 클라이언트가 해석하여  
+캐릭터의 행동, 시선, 음성, 카메라 연출로 표현하는 구조입니다.
+
+### Flow Overview
+
+- 사용자는 Unity 클라이언트를 통해 자연어 입력을 전달합니다.
+- Unity 클라이언트는 입력된 주제를 LLM 서버(LangGraph Server)로 전송합니다.
+- LLM 서버는 응답을 시나리오용 JSON 데이터로 생성하여 반환합니다.
+- Unity의 Director Controller는 해당 JSON을 해석하여 연출 흐름을 제어합니다.
+- 각 Controller는 역할에 따라 캐릭터, 오디오, 카메라를 개별적으로 제어합니다.
+
+### Unity Presentation Layer
+
+- **Actor Controller**: 캐릭터의 행동 및 시선 제어
+- **Audio Manager**: 음성 톤 및 피치 변화 처리
+- **Camera Manager**: 카메라 샷 및 시점 연출
+
 
 ## 3. 핵심 기술 구현 (Core Technical Implementation)
 

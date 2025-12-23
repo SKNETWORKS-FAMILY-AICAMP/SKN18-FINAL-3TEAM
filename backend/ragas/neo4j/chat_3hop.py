@@ -1,16 +1,12 @@
-# chat_1hop.py
 """
-Neo4j 그래프DB + 1-hop contexts + LLM 답변 + Retry(질문/쿼리 재시도) - 1hop 고정
+Neo4j 그래프DB + 3-hop contexts + LLM 답변 + Retry(질문/쿼리 재시도)
 
 ✅ 핵심
-- hop(1-hop) 구조는 고정 (retry도 1-hop만)
+- hop(3-hop) 구조는 고정 (retry도 3-hop만)
 - retry는 "트리거되기만 해도" retry.used=True 로 기록
 - Neo4j 5.x 대응: exists(n.prop) -> n.prop IS NOT NULL
 - no-info 메타문장 금지, 정말 못 만들면 fallback 1줄만 허용
-- 답변/번역 토큰/시간 메타 기록 (Responses API)
-- contexts = main + neighbors(in/out) + (year events) 포함 (RAGAS 안정화)
-
-!!!삭제하지 마세요!!!
+- 답변/번역 토큰/시간 메타 기록
 """
 
 # ===== FORCE PROJECT ROOT INTO PYTHONPATH (MUST BE FIRST) =====
@@ -48,27 +44,18 @@ NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "skn183final")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5-nano")
 RETRY_REWRITE_MODEL = os.getenv("RETRY_REWRITE_MODEL", "gpt-4o-mini")
 
-# retry 설정 (1-hop)
+# retry 설정
 MIN_CONTEXTS_OK = int(os.getenv("RETRY_MIN_CONTEXTS_OK", "2"))
 RETRY_CANDIDATE_LIMIT = int(os.getenv("RETRY_CANDIDATE_LIMIT", "30"))
 RETRY_MIN_CANDIDATES = int(os.getenv("RETRY_MIN_CANDIDATES", "3"))
 RETRY_MAIN_LIMIT = int(os.getenv("RETRY_MAIN_LIMIT", "8"))
-RETRY_NEIGHBOR_LIMIT = int(os.getenv("RETRY_NEIGHBOR_LIMIT", "60"))
+RETRY_PATH_LIMIT = int(os.getenv("RETRY_PATH_LIMIT", "80"))
 RETRY_USE_LLM_REWRITE = os.getenv("RETRY_USE_LLM_REWRITE", "1").strip() not in {"0", "false", "False"}
 
 # ✅ fallback 1줄 (이거 외의 "없다/확인불가" 메타문장 금지)
 FALLBACK_NOINFO_SENTENCE = "해당 주제에 대한 구체적 기록은 확인되지 않습니다."
 
-# Allowed labels(검색 범위)
-ALLOWED_LABELS = [
-    "Person", "Event", "Place", "Organization", "Heritage",
-    "Concept", "Object", "System", "Document", "Work", "Ritual",
-    "Clothing", "Policy", "Year",
-]
 
-# =====================================================
-# OpenAI client
-# =====================================================
 def _get_openai_client():
     key = (
         os.getenv("OPENAI_API_KEY")
@@ -79,8 +66,47 @@ def _get_openai_client():
         raise RuntimeError("OPENAI_API_KEY not found. Put OPENAI_API_KEY=... in your .env and restart terminal.")
     return OpenAI(api_key=key)
 
+
 client = _get_openai_client()
 kiwi = Kiwi()
+
+# =====================================================
+# ✅ Allowed Labels / Allowed Rels
+# =====================================================
+REL_MAP = {
+    ("Place", "Event"): "PLACE_OF_EVENT",
+    ("Event", "Person"): "PARTICIPANT",
+    ("Event", "Object"): "USED_OBJECT",
+    ("Event", "Concept"): "RELATED_CONCEPT",
+    ("Heritage", "Place"): "LOCATED_IN",
+    ("Organization", "Event"): "INVOLVED_IN",
+    ("Organization", "System"): "OPERATES",
+    ("Organization", "Policy"): "ENFORCES",
+    ("Document", "Organization"): "ABOUT_ORG",
+    ("Person", "Person"): "ASSOCIATED_WITH",
+    ("Person", "Work"): "CREATED_WORK",
+}
+ALLOWED_REL_TYPES = sorted(set(REL_MAP.values()))
+ALLOWED_LABELS = [
+    "Person", "Event", "Place", "Organization", "Heritage",
+    "Concept", "Object", "System", "Document", "Work", "Ritual",
+    "Clothing", "Policy",
+]
+
+# =====================================================
+# ✅ Caps
+# =====================================================
+MAIN_LIMIT = 10
+OUT3_LIMIT = 50
+IN3_LIMIT = 50
+MAX_3HOP_NODES = 80
+
+MAX_CONTEXTS = 18
+MAIN_SUMMARY_MAX_CHARS = 320
+MID1_SUMMARY_MAX_CHARS = 200
+MID2_SUMMARY_MAX_CHARS = 200
+N3_SUMMARY_MAX_CHARS = 260
+
 
 # =====================================================
 # OpenAI helper (Responses API) + meta
@@ -120,16 +146,19 @@ def call_llm(system: str, user: str, return_meta: bool = False):
     }
     return (text, meta) if return_meta else text
 
+
 # =====================================================
 # Neo4j
 # =====================================================
 def get_driver():
     return GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
+
 def run_cypher(driver, query, params=None):
     params = params or {}
     with driver.session() as session:
         return list(session.run(query, **params))
+
 
 def serialize_value(v):
     if isinstance(v, Node):
@@ -142,8 +171,10 @@ def serialize_value(v):
         return {k: serialize_value(val) for k, val in v.items()}
     return v
 
+
 def serialize_records(records):
     return [{k: serialize_value(v) for k, v in r.items()} for r in records]
+
 
 # =====================================================
 # Kiwi keywords
@@ -156,6 +187,7 @@ STOPWORDS = {
     "알려줘", "설명", "대해", "대해서",
     "에", "의", "것", "거", "관계",
 }
+
 
 def extract_nouns(text: str):
     analyzed = kiwi.analyze(text)
@@ -171,17 +203,20 @@ def extract_nouns(text: str):
             if w in STOPWORDS:
                 continue
             nouns.append(w)
+
     uniq = []
     for w in nouns:
         if w not in uniq:
             uniq.append(w)
     return uniq
 
+
 # =====================================================
 # Embedding & similarity
 # =====================================================
 def get_query_embedding(text):
     return embed(text)
+
 
 def cosine_sim(a, b):
     if not a or not b:
@@ -193,15 +228,24 @@ def cosine_sim(a, b):
         return 0.0
     return dot / (na * nb)
 
-def add_similarity(records, query_emb):
+
+def add_similarity_records_and_lists(records, query_emb):
+    def _handle_node_dict(d):
+        props = d.get("props", {})
+        emb = props.get("embedding")
+        if isinstance(emb, list):
+            props["similarity_score"] = cosine_sim(query_emb, emb)
+            del props["embedding"]
+
     for rec in records:
         for _, v in rec.items():
             if isinstance(v, dict) and v.get("_type") == "node":
-                props = v.get("props", {})
-                emb = props.get("embedding")
-                if isinstance(emb, list):
-                    props["similarity_score"] = cosine_sim(query_emb, emb)
-                    del props["embedding"]
+                _handle_node_dict(v)
+            elif isinstance(v, list):
+                for item in v:
+                    if isinstance(item, dict) and item.get("_type") == "node":
+                        _handle_node_dict(item)
+
 
 # =====================================================
 # Translate (English -> Korean) + meta
@@ -225,15 +269,11 @@ def translate_to_korean_if_english(text: str):
 
     return text, False, None
 
-# =====================================================
-# Cypher generator (✅ 1-hop 고정)
-# - main 검색 + out/in neighbors
-# - year 질의면 year + events 포함
-# =====================================================
-MAIN_LIMIT = 10
-NEIGHBOR_LIMIT = 60
 
-def generate_cypher_1hop(question: str) -> str:
+# =====================================================
+# Cypher generator (3-hop fixed)
+# =====================================================
+def generate_cypher(question: str) -> str:
     q = question.strip()
 
     # 사용자가 직접 Cypher 입력
@@ -252,17 +292,14 @@ RETURN y AS main_year, collect(e) AS events
 
     kws = extract_nouns(q)
     if not kws:
-        return f"""
-MATCH (n)
-RETURN n AS main
-LIMIT {MAIN_LIMIT}
-""".strip()
+        return f"MATCH (n) RETURN n AS main LIMIT {MAIN_LIMIT}"
 
-    literal = "[" + ", ".join(f"'{k}'" for k in kws) + "]"
+    rels_literal = "[" + ", ".join(f"'{t}'" for t in ALLOWED_REL_TYPES) + "]"
+    keywords_literal = "[" + ", ".join(f"'{k}'" for k in kws) + "]"
 
-    # ✅ 1-hop: main 찾고 in/out neighbors 수집
     return f"""
-WITH {literal} AS keywords
+WITH {keywords_literal} AS keywords, {rels_literal} AS allowedRels
+
 MATCH (n)
 WHERE any(l IN labels(n) WHERE l IN [
  'Person','Event','Place','Organization','Heritage',
@@ -273,19 +310,68 @@ AND any(kw IN keywords WHERE
   replace(coalesce(n.title,''), ' ', '') CONTAINS replace(kw,' ','')
   OR replace(coalesce(n.summary,''), ' ', '') CONTAINS replace(kw,' ','')
 )
-WITH n
+WITH n, allowedRels
 LIMIT {MAIN_LIMIT}
 
-OPTIONAL MATCH (n)-[r1]->(o)
-WITH n, collect(DISTINCT o)[..{NEIGHBOR_LIMIT}] AS out_nodes
-OPTIONAL MATCH (i)-[r2]->(n)
-WITH n, out_nodes, collect(DISTINCT i)[..{NEIGHBOR_LIMIT}] AS in_nodes
+CALL {{
+  WITH n, allowedRels
+  MATCH (n)-[r1]->(m1)-[r2]->(m2)-[r3]->(n3)
+  WHERE type(r1) IN allowedRels AND type(r2) IN allowedRels AND type(r3) IN allowedRels
+  WITH DISTINCT r1, m1, r2, m2, r3, n3
+  LIMIT {OUT3_LIMIT}
+  RETURN
+    collect(DISTINCT {{
+      dir: 'OUT',
+      r1: type(r1),
+      mid1: coalesce(m1.title, toString(m1.value), ''),
+      mid1_summary: coalesce(m1.summary, ''),
+      r2: type(r2),
+      mid2: coalesce(m2.title, toString(m2.value), ''),
+      mid2_summary: coalesce(m2.summary, ''),
+      r3: type(r3),
+      n3: coalesce(n3.title, toString(n3.value), ''),
+      n3_summary: coalesce(n3.summary, '')
+    }}) AS out_paths,
+    collect(DISTINCT n3) AS out_3hop
+}}
 
-RETURN n AS main, n.summary AS main_summary, out_nodes, in_nodes
+CALL {{
+  WITH n, allowedRels
+  MATCH (n3)-[r3]->(m2)-[r2]->(m1)-[r1]->(n)
+  WHERE type(r1) IN allowedRels AND type(r2) IN allowedRels AND type(r3) IN allowedRels
+  WITH DISTINCT r1, m1, r2, m2, r3, n3
+  LIMIT {IN3_LIMIT}
+  RETURN
+    collect(DISTINCT {{
+      dir: 'IN',
+      r1: type(r1),
+      mid1: coalesce(m1.title, toString(m1.value), ''),
+      mid1_summary: coalesce(m1.summary, ''),
+      r2: type(r2),
+      mid2: coalesce(m2.title, toString(m2.value), ''),
+      mid2_summary: coalesce(m2.summary, ''),
+      r3: type(r3),
+      n3: coalesce(n3.title, toString(n3.value), ''),
+      n3_summary: coalesce(n3.summary, '')
+    }}) AS in_paths,
+    collect(DISTINCT n3) AS in_3hop
+}}
+
+WITH n,
+     (out_paths + in_paths) AS threehop_paths,
+     (out_3hop + in_3hop) AS threehop_nodes_raw
+WITH n, threehop_paths, threehop_nodes_raw[..{MAX_3HOP_NODES}] AS threehop_nodes
+
+RETURN
+  n AS main,
+  n.summary AS main_summary,
+  threehop_nodes AS threehop_nodes,
+  threehop_paths AS threehop_paths
 """.strip()
 
+
 # =====================================================
-# contexts builder (main + neighbors + year events)
+# contexts builder
 # =====================================================
 def _truncate(s: str, max_chars: int) -> str:
     s = (s or "").strip()
@@ -293,24 +379,13 @@ def _truncate(s: str, max_chars: int) -> str:
         return ""
     return s if len(s) <= max_chars else s[:max_chars].rstrip() + "…"
 
-MAIN_SUMMARY_MAX_CHARS = 320
-NEI_SUMMARY_MAX_CHARS = 220
-YEAR_SUMMARY_MAX_CHARS = 220
-MAX_CONTEXTS = 15
 
 def build_contexts_from_ser(ser, max_contexts=MAX_CONTEXTS):
     seen = set()
     contexts = []
 
-    def add_ctx(title, summary, prefix=""):
-        summary = (summary or "").strip()
-        if not summary:
-            return
-        title = (title or "").strip()
-        if title:
-            s = f"{prefix}{title} - {summary}".strip()
-        else:
-            s = f"{prefix}{summary}".strip()
+    def add_ctx(s: str):
+        s = (s or "").strip()
         if len(s) < 5:
             return
         if s in seen:
@@ -319,42 +394,59 @@ def build_contexts_from_ser(ser, max_contexts=MAX_CONTEXTS):
         contexts.append(s)
 
     for rec in ser:
-        # year query case
-        y = rec.get("main_year")
-        if isinstance(y, dict) and y.get("_type") == "node":
-            p = y.get("props", {})
-            add_ctx(str(p.get("value")), _truncate(p.get("summary"), YEAR_SUMMARY_MAX_CHARS), prefix="[YEAR] ")
+        # MAIN 1개는 무조건
+        main_sum = rec.get("main_summary") or ""
+        main_node = rec.get("main")
+        title = ""
+        if isinstance(main_node, dict) and main_node.get("_type") == "node":
+            p = main_node.get("props", {})
+            title = (p.get("title") or p.get("value") or "").strip()
 
-        evs = rec.get("events")
-        if isinstance(evs, list):
-            for e in evs:
-                if isinstance(e, dict) and e.get("_type") == "node":
-                    p = e.get("props", {})
-                    add_ctx(p.get("title"), _truncate(p.get("summary"), NEI_SUMMARY_MAX_CHARS), prefix="[EVENT] ")
-                    if len(contexts) >= max_contexts:
-                        break
+        if main_sum:
+            add_ctx(f"[MAIN] {title} - {_truncate(main_sum, MAIN_SUMMARY_MAX_CHARS)}")
+            if len(contexts) >= max_contexts:
+                break
 
-        # main
-        m = rec.get("main")
-        if isinstance(m, dict) and m.get("_type") == "node":
-            p = m.get("props", {})
-            add_ctx(p.get("title") or p.get("value"), _truncate(p.get("summary"), MAIN_SUMMARY_MAX_CHARS), prefix="[MAIN] ")
+        paths = rec.get("threehop_paths")
+        if not isinstance(paths, list):
+            continue
 
-        # neighbors
-        for key, pref in (("out_nodes", "[OUT] "), ("in_nodes", "[IN] ")):
-            ns = rec.get(key)
-            if isinstance(ns, list):
-                for n in ns:
-                    if isinstance(n, dict) and n.get("_type") == "node":
-                        p = n.get("props", {})
-                        add_ctx(p.get("title") or p.get("value"), _truncate(p.get("summary"), NEI_SUMMARY_MAX_CHARS), prefix=pref)
-                        if len(contexts) >= max_contexts:
-                            break
+        for p in paths:
+            if not isinstance(p, dict):
+                continue
+            direction = (p.get("dir") or "").strip()
+
+            r1 = p.get("r1") or ""
+            mid1 = (p.get("mid1") or "").strip()
+            mid1_sum = _truncate(p.get("mid1_summary") or "", MID1_SUMMARY_MAX_CHARS)
+
+            r2 = p.get("r2") or ""
+            mid2 = (p.get("mid2") or "").strip()
+            mid2_sum = _truncate(p.get("mid2_summary") or "", MID2_SUMMARY_MAX_CHARS)
+
+            r3 = p.get("r3") or ""
+            n3 = (p.get("n3") or "").strip()
+            n3_sum = _truncate(p.get("n3_summary") or "", N3_SUMMARY_MAX_CHARS)
+
+            s = f"{direction}: ({r1}) {mid1}"
+            if mid1_sum:
+                s += f" - {mid1_sum}"
+            s += f" -> ({r2}) {mid2}"
+            if mid2_sum:
+                s += f" - {mid2_sum}"
+            s += f" -> ({r3}) {n3}"
+            if n3_sum:
+                s += f" - {n3_sum}"
+
+            add_ctx(s)
+            if len(contexts) >= max_contexts:
+                break
 
         if len(contexts) >= max_contexts:
             break
 
     return contexts[:max_contexts]
+
 
 # =====================================================
 # retry trigger 판단
@@ -368,6 +460,7 @@ _NOINFO_PATTERNS = [
     r"자료.*(없|않)",
 ]
 
+
 def answer_looks_noinfo(answer: str) -> bool:
     a = (answer or "").strip()
     if not a:
@@ -379,6 +472,7 @@ def answer_looks_noinfo(answer: str) -> bool:
             return True
     return False
 
+
 def need_retry(contexts: List[str], answer: str = "", *, min_ok: int = MIN_CONTEXTS_OK) -> bool:
     if not contexts or len(contexts) < min_ok:
         return True
@@ -388,8 +482,9 @@ def need_retry(contexts: List[str], answer: str = "", *, min_ok: int = MIN_CONTE
         return True
     return False
 
+
 # =====================================================
-# retry util (Kiwi -> candidates -> regen cypher 1hop)
+# retry util (Kiwi -> candidates -> regen cypher)
 # =====================================================
 def extract_keywords_kiwi_for_retry(text: str, *, min_len: int = 2) -> List[str]:
     analyzed = kiwi.analyze(text, top_n=1)
@@ -405,6 +500,7 @@ def extract_keywords_kiwi_for_retry(text: str, *, min_len: int = 2) -> List[str]
         if k not in uniq:
             uniq.append(k)
     return uniq
+
 
 def fetch_candidate_nodes_for_retry(driver, keywords: List[str], *, limit: int = RETRY_CANDIDATE_LIMIT) -> List[Dict[str, Any]]:
     """
@@ -434,6 +530,7 @@ def fetch_candidate_nodes_for_retry(driver, keywords: List[str], *, limit: int =
     ORDER BY score DESC
     LIMIT $limit
     """
+
     with driver.session() as session:
         rows = session.run(
             cypher,
@@ -454,6 +551,7 @@ def fetch_candidate_nodes_for_retry(driver, keywords: List[str], *, limit: int =
             })
         return out
 
+
 def _cypher_list_literal(items: List[str]) -> str:
     escaped = []
     for s in items:
@@ -461,11 +559,10 @@ def _cypher_list_literal(items: List[str]) -> str:
         escaped.append(f"'{s}'")
     return "[" + ", ".join(escaped) + "]"
 
-def regen_cypher_from_titles_1hop(titles: List[str], *, main_limit: int = RETRY_MAIN_LIMIT, neighbor_limit: int = RETRY_NEIGHBOR_LIMIT) -> str:
+
+def regen_cypher_from_titles_3hop(titles: List[str], *, main_limit: int = RETRY_MAIN_LIMIT, path_limit: int = RETRY_PATH_LIMIT) -> str:
     """
-    ✅ 1-hop 고정:
-    - title 후보를 main으로 강제 지정
-    - in/out neighbors만 수집
+    ✅ Neo4j 5.x 대응: exists(n.title) -> n.title IS NOT NULL
     """
     uniq: List[str] = []
     for t in titles:
@@ -475,7 +572,7 @@ def regen_cypher_from_titles_1hop(titles: List[str], *, main_limit: int = RETRY_
         if len(uniq) >= main_limit:
             break
     if not uniq:
-        return f"MATCH (n) RETURN n AS main LIMIT {MAIN_LIMIT}"
+        return "MATCH (n) RETURN n AS main LIMIT 10"
 
     titles_literal = _cypher_list_literal(uniq)
     return f"""
@@ -484,19 +581,23 @@ MATCH (n)
 WHERE n.title IS NOT NULL AND n.title IN titles
 WITH n
 LIMIT {int(main_limit)}
-
-OPTIONAL MATCH (n)-[r1]->(o)
-WITH n, collect(DISTINCT o)[..{int(neighbor_limit)}] AS out_nodes
-OPTIONAL MATCH (i)-[r2]->(n)
-WITH n, out_nodes, collect(DISTINCT i)[..{int(neighbor_limit)}] AS in_nodes
-
-RETURN n AS main, n.summary AS main_summary, out_nodes, in_nodes
+CALL {{
+  WITH n
+  MATCH p = (n)-[*1..3]-(m)
+  RETURN p
+  LIMIT {int(path_limit)}
+}}
+WITH n, collect(DISTINCT p) AS paths
+UNWIND paths AS p1
+UNWIND nodes(p1) AS nd
+WITH n, paths, collect(DISTINCT nd) AS hop_nodes
+RETURN n AS main, n.summary AS main_summary, hop_nodes AS threehop_nodes, paths AS threehop_paths
 """.strip()
+
 
 def rewrite_question_llm_for_retry(question: str, candidates: List[Dict[str, Any]], *, model: str = RETRY_REWRITE_MODEL) -> Tuple[str, Dict[str, Any]]:
     """
     B안(프롬프트 기반 리라이팅) 유지.
-    (주의: 실제 검색은 title 기반 1-hop regen을 사용하므로 rewrite는 '기록/분석용' 성격이 큼)
     """
     if not (RETRY_USE_LLM_REWRITE and bool(os.getenv("OPENAI_API_KEY"))):
         return question, {"used": False}
@@ -533,6 +634,7 @@ def rewrite_question_llm_for_retry(question: str, candidates: List[Dict[str, Any
     }
     return text, meta
 
+
 # =====================================================
 # Answer prompt (메타 no-info 문장 금지)
 # =====================================================
@@ -567,18 +669,19 @@ def generate_llm_answer(question, contexts):
     answer, meta = call_llm(system, user, return_meta=True)
     return answer, meta
 
+
 # =====================================================
-# Main structured (✅ retry 포함, ✅ 항상 retry dict 반환)
+# Main structured
 # =====================================================
 def answer_question_structured(question: str, driver):
     ko_question, translated, trans_meta = translate_to_korean_if_english(question)
     q_emb = get_query_embedding(ko_question)
 
-    # 1차 (1-hop)
-    cypher = generate_cypher_1hop(ko_question)
+    # 1차
+    cypher = generate_cypher(ko_question)
     raw = run_cypher(driver, cypher)
     ser = serialize_records(raw)
-    add_similarity(ser, q_emb)
+    add_similarity_records_and_lists(ser, q_emb)
 
     contexts = build_contexts_from_ser(ser, max_contexts=MAX_CONTEXTS)
     if not contexts:
@@ -588,7 +691,7 @@ def answer_question_structured(question: str, driver):
 
     # ✅ retry report (항상 dict) + used는 "트리거만" 기준
     retry_report = {
-        "used": False,
+        "used": False,       # ✅ 트리거만 돼도 True
         "triggered": False,
         "executed": False,
         "applied": False,
@@ -606,42 +709,37 @@ def answer_question_structured(question: str, driver):
         retry_report["triggered"] = True
         retry_report["reason"] = "noinfo_or_low_context"
 
-        # 후보 노드 찾기
+        # 후보 찾기
         keywords = extract_keywords_kiwi_for_retry(ko_question)
         cands = fetch_candidate_nodes_for_retry(driver, keywords, limit=RETRY_CANDIDATE_LIMIT)
         retry_report["candidates_n"] = len(cands)
 
         if len(cands) >= RETRY_MIN_CANDIDATES:
-            # 질문 리라이팅(기록용/분석용)
+            # 질문 리라이팅(B안)
             _, llm_meta = rewrite_question_llm_for_retry(ko_question, cands)
             retry_report["llm_meta"] = llm_meta
             retry_report["strategy"] = "rewrite_question_llm" if llm_meta.get("used") else "regen_cypher_from_candidates"
 
             titles = [c.get("title") for c in cands if c.get("title")]
-            cypher2 = regen_cypher_from_titles_1hop(
-                titles,
-                main_limit=RETRY_MAIN_LIMIT,
-                neighbor_limit=RETRY_NEIGHBOR_LIMIT
-            )
+            cypher2 = regen_cypher_from_titles_3hop(titles, main_limit=RETRY_MAIN_LIMIT, path_limit=RETRY_PATH_LIMIT)
 
             retry_report["executed"] = True
 
             raw2 = run_cypher(driver, cypher2)
             ser2 = serialize_records(raw2)
-            add_similarity(ser2, q_emb)
+            add_similarity_records_and_lists(ser2, q_emb)
             contexts2 = build_contexts_from_ser(ser2, max_contexts=MAX_CONTEXTS)
 
-            # 적용 조건(간단/안전): contexts 수가 늘면 채택
             if len(contexts2) > len(contexts):
                 retry_report["applied"] = True
                 contexts = contexts2
                 cypher = cypher2
                 ser = ser2
 
-            # retry가 트리거됐으면 최종 contexts로 답변 다시 생성
+            # retry 트리거됐으면 답변은 최종 contexts로 다시 생성
             answer, ans_meta = generate_llm_answer(ko_question, contexts)
 
-    # 디버그용 summary_nodes (top 유사도)
+    # summary_nodes (디버그용)
     summary_nodes = []
     for rec in ser:
         m = rec.get("main") or rec.get("main_year")
@@ -695,6 +793,7 @@ def answer_question_structured(question: str, driver):
         "retry": retry_report,  # ✅ 항상 dict
     }
 
+
 def answer_question(question, driver):
     result = answer_question_structured(question, driver)
     print(f"\n[원본 질문] {result['question_original']}\n")
@@ -725,6 +824,7 @@ def answer_question(question, driver):
     }, ensure_ascii=False, indent=2))
     print("=" * 80)
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("question", nargs="*")
@@ -747,5 +847,7 @@ def main():
     finally:
         driver.close()
 
+
 if __name__ == "__main__":
     main()
+
