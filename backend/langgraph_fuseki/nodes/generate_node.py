@@ -411,7 +411,7 @@ def story_generator_node(state: GraphState) -> GraphState:
     )
 
     print(f"\n{'='*70}")
-    print(f"[5/6] 스토리 생성 (Story Generator)")
+    print(f"[Stage 6/6] 스토리 생성 (Story Generator)")
     print(f"{'='*70}")
 
     # 근거가 없는 경우 처리

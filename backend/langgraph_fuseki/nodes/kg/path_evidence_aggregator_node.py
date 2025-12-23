@@ -595,7 +595,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
         entity_boost_mode = test_config["entity_boost_mode"]
 
     print(f"\n{'='*70}")
-    print(f"[4/6] 경로 추출 및 근거 통합 (Path Extractor & Evidence Aggregator)")
+    print(f"[Stage 5/6] 경로 추출 및 근거 통합 (Path Evidence Aggregator)")
     print(f"{'='*70}")
     if entity_boost_mode:
         print(f"  ├─ [테스트 모드] Entity Boost Mode: {entity_boost_mode}")
@@ -610,15 +610,9 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
             inference_paths[thread_type] = []
             continue
 
-        # Thread별 경로 추출 - base_weight를 thread별로 차별화() / 1.00 ~ 1.05
-        default_weights = {
-            "outgoing_relations": 0.5,  # 나가는 관계는 높게
-            "incoming_relations": 0.4,   # 들어오는 관계는 중간
-            "entity_properties": 0.3,   # 속성은 낮게
-            "connected_entities": 0.3,  # 연결은 낮게
-            "type_and_summary": 0.2     # 요약은 가장 낮게
-        }
-        base_weight = thread_weights.get(thread_type, default_weights.get(thread_type, 0.3))
+        # Thread별 경로 추출 - base_weight는 config에서 가져온 값 사용
+        # thread_weights는 GraphState에서 전달됨 (config.py의 THREAD_WEIGHT_* 값들)
+        base_weight = thread_weights.get(thread_type, 1.0)  # config 값 사용, 기본값 1.0
 
         if thread_type == "outgoing_relations":
             paths = extract_outgoing_relations(bindings, base_weight, query_entities, entity_boost_mode)

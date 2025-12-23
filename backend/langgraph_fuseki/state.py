@@ -9,8 +9,27 @@ class GraphState(TypedDict):
 
     # ========== 1단계: 질문 분석 (Query Classifier) ==========
     is_historical: NotRequired[bool]  # 역사 관련 질문 여부 (False면 조기 종료)
-    query_type: NotRequired[Literal["causal", "what_if", "deep_analysis"]]  # 질문 유형
+    query_type: NotRequired[Literal["causal", "factual", "deep_analysis", "comparative"]]  # 질문 유형 (최종)
+    query_type_initial: NotRequired[Literal["causal", "factual", "deep_analysis", "comparative"]]  # 초기 예측
     query_intent: NotRequired[str]  # 핵심 의도 (예: "궁궐을 건설한 왕 찾기")
+
+    # ========== 1.5단계: 사용자 의도 확인 (User Intent Clarification) ==========
+    needs_clarification: NotRequired[bool]  # 의도 확인 필요 여부
+    classification_strategy: NotRequired[Literal["time-based", "class-based", "depth-based", "scope-based"]]  # 선택된 분류 전략
+    expansion_directions: NotRequired[List[Dict[str, Any]]]  # LLM이 제시하는 확장 방향 옵션
+    # [
+    #     {
+    #         "id": 1,
+    #         "direction_id": "cause",
+    #         "title": "시해 원인 (사건 이전)",
+    #         "description": "시해가 일어난 정치적 배경과 원인",
+    #         "keywords": ["청일전쟁", "일본 세력 확대", ...],
+    #         "property_groups": ["인과관계", "외교", "통치"]
+    #     },
+    #     ...
+    # ]
+    user_selected_direction: NotRequired[str]  # 사용자가 선택한 방향 (direction_id)
+    clarification_question: NotRequired[str]  # 사용자에게 보여줄 질문 텍스트
 
     # 프로퍼티 그룹 선택
     selected_property_groups: NotRequired[List[str]]  # 선택된 프로퍼티 그룹 (예: ["건설", "설립", "통치"])

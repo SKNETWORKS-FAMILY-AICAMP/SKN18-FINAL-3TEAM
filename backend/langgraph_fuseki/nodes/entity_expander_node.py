@@ -753,8 +753,24 @@ def entity_expander_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
 
     print(f"\n{'='*70}")
-    print(f"[2/6] 엔티티 추출 (Entity Extractor)")
+    print(f"[Stage 2/6] 엔티티 추출 (Entity Extractor)")
     print(f"{'='*70}")
+
+    # Phase 1: 사용자 선택 방향 확인
+    user_selected_direction = state.get("user_selected_direction")
+    expansion_directions = state.get("expansion_directions", [])
+    selected_direction_info = None
+
+    if user_selected_direction and expansion_directions:
+        # 선택된 방향 정보 찾기
+        for direction in expansion_directions:
+            if direction["direction_id"] == user_selected_direction:
+                selected_direction_info = direction
+                break
+
+        if selected_direction_info:
+            print(f"  ├─ 선택된 방향: {selected_direction_info['title']}")
+            print(f"  ├─ 우선 Property Groups: {', '.join(selected_direction_info.get('property_groups', [])[:3])}")
 
     # 1. TTL 데이터 로드 (캐싱됨)
     ttl_data = load_ttl_entities()
@@ -1147,11 +1163,25 @@ def entity_expander_node(state: GraphState) -> GraphState:
     node_times = state.get("node_execution_times", {})
     node_times["entity_expander"] = node_elapsed
 
+    # Phase 1: 최종 query_type 확정
+    # 사용자 선택에 따라 query_type이 변경될 수 있음
+    final_query_type = state.get("query_type_initial", "causal")
+
+    # 선택된 방향에 따라 query_type 조정 (Phase 1에서는 대부분 유지)
+    if selected_direction_info:
+        # 예: long_term_impact 선택 시 deep_analysis로 변경
+        direction_id = selected_direction_info.get("direction_id", "")
+        if "impact" in direction_id or "scope" in direction_id:
+            # 영향/범위 관련은 deep_analysis로 처리
+            if state.get("query_type_initial") == "causal":
+                final_query_type = "deep_analysis"
+
     return {
         **state,
         "extracted_entities": matched_entities,
         "ontology_schema": ontology_schema,
         "ttl_data": ttl_data,
+        "query_type": final_query_type,  # 최종 확정
         "executed_nodes": state.get("executed_nodes", []) + ["entity_expander"],
         "node_execution_times": node_times
     }

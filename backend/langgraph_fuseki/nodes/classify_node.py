@@ -22,6 +22,10 @@ from langchain_openai import ChatOpenAI
 from backend.langgraph_fuseki.state import GraphState
 from backend.langgraph_fuseki.config import PROPERTY_GROUPS_PATH
 from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
+from backend.langgraph_fuseki.nodes.intent_clarification_templates import (
+    generate_expansion_directions,
+    generate_clarification_question
+)
 
 # 한국어 형태소 분석기 (키워드 추출용)
 try:
@@ -436,9 +440,10 @@ def query_classifier_node(state: GraphState) -> GraphState:
         # Thread 2 결과 (키워드 확장)
         expanded_keywords_dict = result2.get("expanded_keywords", {})
         
-        # 검증
-        if query_type not in ["causal", "deep_analysis"]:
-            query_type = "causal"
+        # 검증 (Phase 1: 4가지 유형 지원)
+        valid_types = ["causal", "factual", "deep_analysis", "comparative"]
+        if query_type not in valid_types:
+            query_type = "causal"  # fallback
         
         # 선택된 그룹에서 실제 프로퍼티 목록 추출
         all_groups = load_property_groups()
@@ -478,12 +483,28 @@ def query_classifier_node(state: GraphState) -> GraphState:
         expanded_keywords = []
         expanded_keywords_dict = {}
 
+    # ========== Phase 1: 의도 확인 방향 생성 (고정 매핑) ==========
+    # 질문 유형에 따라 확장 방향 생성
+    classification_strategy, expansion_directions = generate_expansion_directions(
+        query_type=query_type,
+        query=query,
+        keywords=expanded_keywords[:5] if expanded_keywords else []  # 상위 5개 키워드만 전달
+    )
+
+    # 사용자 질문 텍스트 생성
+    clarification_question = generate_clarification_question(
+        strategy=classification_strategy,
+        directions=expansion_directions,
+        query=query
+    )
+
     node_elapsed = time.time() - node_start
 
     print(f"\n{'='*70}")
-    print(f"[1/6] 질문 분석 (Query Classifier)")
+    print(f"[Stage 1/6] 질문 분석 (Query Classifier)")
     print(f"{'='*70}")
-    print(f"  ├─ 질문 유형: {query_type}")
+    print(f"  ├─ 질문 유형: {query_type} (초기)")
+    print(f"  ├─ 분류 전략: {classification_strategy}")
     print(f"  ├─ 핵심 의도: {intent}")
     print(f"  ├─ 추출 키워드: {keywords_text}")
     if selected_groups:
@@ -492,9 +513,8 @@ def query_classifier_node(state: GraphState) -> GraphState:
         # 확장된 키워드를 간결하게 표시 (최대 3개 그룹)
         sample_expansions = list(expanded_keywords_dict.items())[:3]
         expansion_summary = ', '.join([f"{k}→{len(v)}개" for k, v in sample_expansions])
-        print(f"  └─ 확장 키워드: {expansion_summary}{'...' if len(expanded_keywords_dict) > 3 else ''} ({node_elapsed:.2f}초)")
-    else:
-        print(f"  └─ 완료 ({node_elapsed:.2f}초)")
+        print(f"  ├─ 확장 키워드: {expansion_summary}{'...' if len(expanded_keywords_dict) > 3 else ''}")
+    print(f"  └─ 사용자 선택 방향: {len(expansion_directions)}개 생성 ({node_elapsed:.2f}초)")
     print()
 
     # 노드 실행 시간 기록
@@ -505,12 +525,19 @@ def query_classifier_node(state: GraphState) -> GraphState:
     updated_state = {
         **state,
         "is_historical": True,  # 역사 관련 질문임을 명시
-        "query_type": query_type,
+        "query_type_initial": query_type,  # 초기 예측 (사용자 선택 후 변경될 수 있음)
         "query_intent": intent,
         "selected_property_groups": selected_groups,
         "selected_properties": selected_properties,
         "expanded_keywords": expanded_keywords,  # 확장된 키워드 리스트
         "expanded_keywords_dict": expanded_keywords_dict,  # 원본 매핑 (디버깅용)
+
+        # Phase 1: 의도 확인 관련 필드
+        "needs_clarification": True,  # 사용자 선택 필요
+        "classification_strategy": classification_strategy,
+        "expansion_directions": expansion_directions,
+        "clarification_question": clarification_question,
+
         "executed_nodes": state.get("executed_nodes", []) + ["query_classifier"],
         "node_execution_times": node_times
     }

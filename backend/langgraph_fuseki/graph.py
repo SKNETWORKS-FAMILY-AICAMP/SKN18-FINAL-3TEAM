@@ -22,6 +22,7 @@ from backend.langgraph_fuseki.state import GraphState
 # 노드 import
 from backend.langgraph_fuseki.nodes.history_check_node import history_check_node
 from backend.langgraph_fuseki.nodes.classify_node import query_classifier_node
+from backend.langgraph_fuseki.nodes.user_intent_clarification_node import user_intent_clarification_node  # NEW: Phase 1
 from backend.langgraph_fuseki.nodes.entity_expander_node import entity_expander_node
 from backend.langgraph_fuseki.nodes.kg.semantic_expander_node import semantic_expander_node
 from backend.langgraph_fuseki.nodes.kg.parallel_knowledge_retrieval_node import parallel_knowledge_retrieval_node
@@ -37,8 +38,12 @@ def create_graph_flow():
     0. History Check → 역사 관련 여부 체크 (LLM 1회) ⭐NEW
        ├─ false → 조기 종료 (비용 절감)
        └─ true → Query Classifier로 진행
-    1. Query Classifier → 질문 유형 분류 (causal/deep_analysis)
-    2. Entity Extractor → 하이브리드 엔티티 추출 (TTL + pgvector)
+    1. Query Classifier → 질문 유형 분류 (causal/factual/deep_analysis/comparative) + 확장 방향 생성 ⭐UPDATED
+    1.5. User Intent Clarification → 사용자 의도 확인 (Phase 1) ⭐NEW
+       ├─ 사용자에게 2-4개 확장 방향 제시
+       ├─ 사용자 선택 입력
+       └─ 선택 방향 저장
+    2. Entity Extractor → 하이브리드 엔티티 추출 (TTL + pgvector) + 방향 반영 ⭐UPDATED
     3. Semantic Expander → 의미론적 엔티티 확장 (NEW)
        ├─ 시간적 맥락 (±10년)
        ├─ 카테고리/주제
@@ -59,13 +64,14 @@ def create_graph_flow():
     workflow = StateGraph(GraphState)
 
     # ========== 노드 등록 ==========
-    workflow.add_node("history_check", history_check_node)  # NEW: 0단계
-    workflow.add_node("query_classifier", query_classifier_node)
-    workflow.add_node("entity_expander", entity_expander_node)
-    workflow.add_node("semantic_expander", semantic_expander_node)  # NEW
-    workflow.add_node("parallel_knowledge_retrieval", parallel_knowledge_retrieval_node)
-    workflow.add_node("path_evidence_aggregator", path_evidence_aggregator_node)  # 통합 노드
-    workflow.add_node("story_generator", story_generator_node)
+    workflow.add_node("history_check", history_check_node)  # 0단계
+    workflow.add_node("query_classifier", query_classifier_node)  # 1단계
+    workflow.add_node("user_intent_clarification", user_intent_clarification_node)  # 1.5단계 (Phase 1)
+    workflow.add_node("entity_expander", entity_expander_node)  # 2단계
+    workflow.add_node("semantic_expander", semantic_expander_node)  # 3단계
+    workflow.add_node("parallel_knowledge_retrieval", parallel_knowledge_retrieval_node)  # 4단계
+    workflow.add_node("path_evidence_aggregator", path_evidence_aggregator_node)  # 5단계
+    workflow.add_node("story_generator", story_generator_node)  # 6단계
 
     # ========== 플로우 정의 ==========
     # 0. 시작: 역사 관련 여부 체크 (최우선)
@@ -92,8 +98,11 @@ def create_graph_flow():
         }
     )
 
-    # 2. Query Classifier → Entity Expander
-    workflow.add_edge("query_classifier", "entity_expander")
+    # 2. Query Classifier → User Intent Clarification (Phase 1)
+    workflow.add_edge("query_classifier", "user_intent_clarification")
+
+    # 2.5. User Intent Clarification → Entity Expander
+    workflow.add_edge("user_intent_clarification", "entity_expander")
 
     # 3. 엔티티 추출 (하이브리드: TTL + pgvector)
     # 4. 의미론적 확장 (NEW)

@@ -659,7 +659,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
     test_config = state.get("test_config")  # 테스트 설정
 
     print(f"\n{'='*70}")
-    print(f"[2.5/6] 의미론적 확장 (Semantic Expander)")
+    print(f"[Stage 3/6] 의미론적 확장 (Semantic Expander)")
     print(f"{'='*70}")
     print(f"  ├─ 입력 엔티티: {len(extracted_entities)}개")
 

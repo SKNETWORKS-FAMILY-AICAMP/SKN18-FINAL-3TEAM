@@ -56,13 +56,6 @@ THREAD_WEIGHTS = {
         "connected_entities": THREAD_WEIGHT_CONNECTED_ENTITIES,
         "entity_properties": THREAD_WEIGHT_ENTITY_PROPERTIES,
         "type_and_summary": THREAD_WEIGHT_TYPE_AND_SUMMARY
-    },
-    "what_if": {
-        "outgoing_relations": THREAD_WEIGHT_OUTGOING_RELATIONS,
-        "incoming_relations": THREAD_WEIGHT_INCOMING_RELATIONS,
-        "connected_entities": THREAD_WEIGHT_CONNECTED_ENTITIES,
-        "entity_properties": THREAD_WEIGHT_ENTITY_PROPERTIES,
-        "type_and_summary": THREAD_WEIGHT_TYPE_AND_SUMMARY
     }
 }
 
@@ -235,7 +228,7 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
         thread_config = test_config["aggregator_threads"]
         active_threads = [t for t, enabled in thread_config.items() if enabled]
         print(f"\n{'='*70}")
-        print(f"[3/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
+        print(f"[Stage 4/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
         print(f"{'='*70}")
         print(f"  ├─ [테스트 모드] 활성화된 Thread:")
         for thread in active_threads:
@@ -244,7 +237,7 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
     else:
         active_threads = list(DATA_THREADS.keys())
         print(f"\n{'='*70}")
-        print(f"[3/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
+        print(f"[Stage 4/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
         print(f"{'='*70}")
         print(f"  ├─ [일반 모드] Thread 수: {len(DATA_THREADS)}개")
         print(f"  ├─ 엔티티: {len(entities)}개")
