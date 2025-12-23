@@ -15,10 +15,9 @@ import os
 from dotenv import load_dotenv
 from datetime import timedelta
 
-load_dotenv()
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(override=True, dotenv_path=BASE_DIR.parent.parent / ".env")
 
 
 def env_required(key: str) -> str:
@@ -75,6 +74,7 @@ INSTALLED_APPS = [
     'video',         # 영상 관리
     'activity',      # 검색 + 시청 기록
     'community',     # 댓글 + 답글 + 좋아요
+    'chatbot',       # 챗봇
 ]
 
 SITE_ID = 1
@@ -282,3 +282,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # 유니티가 접속할 내 서버(local) 주소
 MY_SERVER_URL = "http://127.0.0.1:8000"
+# Celery 앱 설정
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"

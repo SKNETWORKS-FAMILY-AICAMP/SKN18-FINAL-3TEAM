@@ -14,48 +14,55 @@ import concurrent.futures
 from datetime import datetime
 from pathlib import Path
 from backend.langgraph_fuseki.state import GraphState
-from backend.langgraph_fuseki.config import FUSEKI_URL, INFERENCE_OUTPUT_DIR
+from backend.langgraph_fuseki.config import (
+    FUSEKI_URL,
+    INFERENCE_OUTPUT_DIR,
+    THREAD_WEIGHT_OUTGOING_RELATIONS,
+    THREAD_WEIGHT_INCOMING_RELATIONS,
+    THREAD_WEIGHT_CONNECTED_ENTITIES,
+    THREAD_WEIGHT_ENTITY_PROPERTIES,
+    THREAD_WEIGHT_TYPE_AND_SUMMARY
+)
 
 
 SAVE_INFERENCE_TRIPLES = os.getenv("SAVE_INFERENCE_TRIPLES", "true").lower() == "true"
 
-
-# 질문 유형별 Thread 가중치 (데이터 기반)
+# 질문 유형별 Thread 가중치 (config에서 가져온 값 사용)
 THREAD_WEIGHTS = {
     "causal": {
-        "outgoing_relations": 0.30,    # 나가는 관계 중요
-        "incoming_relations": 0.25,    # 들어오는 관계
-        "connected_entities": 0.20,     # 연결된 엔티티
-        "entity_properties": 0.15,     # 엔티티 속성
-        "type_and_summary": 0.10       # 타입/요약
+        "outgoing_relations": THREAD_WEIGHT_OUTGOING_RELATIONS,
+        "incoming_relations": THREAD_WEIGHT_INCOMING_RELATIONS,
+        "connected_entities": THREAD_WEIGHT_CONNECTED_ENTITIES,
+        "entity_properties": THREAD_WEIGHT_ENTITY_PROPERTIES,
+        "type_and_summary": THREAD_WEIGHT_TYPE_AND_SUMMARY
     },
     "deep_analysis": {
-        "entity_properties": 0.30,     # 속성 정보 중요
-        "incoming_relations": 0.25,    # 들어오는 관계
-        "outgoing_relations": 0.20,    # 나가는 관계
-        "connected_entities": 0.15,    # 연결된 엔티티
-        "type_and_summary": 0.10      # 타입/요약
+        "outgoing_relations": THREAD_WEIGHT_OUTGOING_RELATIONS,
+        "incoming_relations": THREAD_WEIGHT_INCOMING_RELATIONS,
+        "connected_entities": THREAD_WEIGHT_CONNECTED_ENTITIES,
+        "entity_properties": THREAD_WEIGHT_ENTITY_PROPERTIES,
+        "type_and_summary": THREAD_WEIGHT_TYPE_AND_SUMMARY
     },
     "factual": {
-        "outgoing_relations": 0.35,    # 사실 기반 질문
-        "entity_properties": 0.25,     # 속성 정보
-        "connected_entities": 0.20,    # 연결된 엔티티
-        "incoming_relations": 0.10,    # 들어오는 관계
-        "type_and_summary": 0.10      # 타입/요약
+        "outgoing_relations": THREAD_WEIGHT_OUTGOING_RELATIONS,
+        "incoming_relations": THREAD_WEIGHT_INCOMING_RELATIONS,
+        "connected_entities": THREAD_WEIGHT_CONNECTED_ENTITIES,
+        "entity_properties": THREAD_WEIGHT_ENTITY_PROPERTIES,
+        "type_and_summary": THREAD_WEIGHT_TYPE_AND_SUMMARY
     },
     "comparative": {
-        "connected_entities": 0.35,   # 비교 분석 - 연결 엔티티 중요
-        "outgoing_relations": 0.25,    # 나가는 관계
-        "incoming_relations": 0.20,    # 들어오는 관계
-        "entity_properties": 0.10,    # 속성 정보
-        "type_and_summary": 0.10      # 타입/요약
+        "outgoing_relations": THREAD_WEIGHT_OUTGOING_RELATIONS,
+        "incoming_relations": THREAD_WEIGHT_INCOMING_RELATIONS,
+        "connected_entities": THREAD_WEIGHT_CONNECTED_ENTITIES,
+        "entity_properties": THREAD_WEIGHT_ENTITY_PROPERTIES,
+        "type_and_summary": THREAD_WEIGHT_TYPE_AND_SUMMARY
     },
     "what_if": {
-        "outgoing_relations": 0.30,    # 가상 시나리오
-        "connected_entities": 0.25,   # 연결된 엔티티
-        "incoming_relations": 0.20,    # 들어오는 관계
-        "entity_properties": 0.15,    # 속성 정보
-        "type_and_summary": 0.10      # 타입/요약
+        "outgoing_relations": THREAD_WEIGHT_OUTGOING_RELATIONS,
+        "incoming_relations": THREAD_WEIGHT_INCOMING_RELATIONS,
+        "connected_entities": THREAD_WEIGHT_CONNECTED_ENTITIES,
+        "entity_properties": THREAD_WEIGHT_ENTITY_PROPERTIES,
+        "type_and_summary": THREAD_WEIGHT_TYPE_AND_SUMMARY
     }
 }
 
@@ -68,11 +75,12 @@ DATA_THREADS = {
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
             PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-            
+
             SELECT ?entity ?entityLabel ?predicate ?object ?objectLabel WHERE {{
                 ?entity rdfs:label ?entityLabel .
                 FILTER ({label_filter})
                 ?entity ?predicate ?object .
+                FILTER(isURI(?object))
                 OPTIONAL {{ ?object rdfs:label ?objectLabel }}
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
@@ -85,11 +93,12 @@ DATA_THREADS = {
             PREFIX hist: <http://www.example.org/korean-history#>
             PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
             PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-            
+
             SELECT ?subject ?subjectLabel ?predicate ?entity ?entityLabel WHERE {{
                 ?entity rdfs:label ?entityLabel .
                 FILTER ({label_filter})
                 ?subject ?predicate ?entity .
+                FILTER(isURI(?subject))
                 OPTIONAL {{ ?subject rdfs:label ?subjectLabel }}
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
@@ -167,11 +176,11 @@ DATA_THREADS = {
 
 def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
     """
-    Parallel Knowledge Retrieval: 5개 Thread에서 쿼리 생성 + 추론 실행을 병렬로 수행
+    Parallel Knowledge Retrieval: 5개 Thread에서 SPARQL 쿼리 생성 + 실행을 병렬로 수행
 
-    기존 multi_query_generator_node를 통합하여 효율성 향상:
-    - 기존: 쿼리 5개 순차 생성(~10초) → 추론 5개 병렬 실행(~3초) = ~13초
-    - 개선: 쿼리생성+추론을 Thread별로 동시 실행 = ~3-5초
+    성능 최적화:
+    - 쿼리 생성과 실행을 Thread별로 동시 처리 (~3-5초)
+    - ThreadPoolExecutor로 병렬 실행
 
     프로퍼티 필터링:
     - classify_node에서 선택된 프로퍼티 그룹으로 SPARQL FILTER 적용
@@ -185,7 +194,8 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
     query_type = state.get("query_type", "causal")
     entities = state.get("extracted_entities", [])
     hypothetical_triples = state.get("hypothetical_triples", [])
-    
+    test_config = state.get("test_config")  # 테스트 설정
+
     # 질문에서 핵심 키워드 추출 (kiwipiepy 사용)
     try:
         from kiwipiepy import Kiwi
@@ -197,7 +207,7 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
         # kiwipiepy 없으면 기본 키워드 추출
         import re
         core_keywords = re.findall(r'[가-힣]{2,}', query)
-    
+
     # 엔티티를 핵심 키워드와의 관련도로 정렬
     # 핵심 키워드가 엔티티 이름에 포함되면 우선순위 높임
     def entity_priority(entity):
@@ -210,27 +220,41 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
         if entity.get("uri"):
             score += 1
         return score
-    
+
     entities_sorted = sorted(entities, key=entity_priority, reverse=True)
-    
+
     # 선택된 프로퍼티 (classify_node에서 전달)
     selected_properties = state.get("selected_properties", [])
     selected_groups = state.get("selected_property_groups", [])
-    
+
     # Thread 가중치 설정
     thread_weights = THREAD_WEIGHTS.get(query_type, THREAD_WEIGHTS["causal"])
-    
-    print(f"\n{'='*70}")
-    print(f"[3/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
-    print(f"{'='*70}")
-    print(f"  ├─ Thread 수: {len(DATA_THREADS)}개")
-    print(f"  ├─ 엔티티: {len(entities)}개")
+
+    # 실행할 Thread 선택 (test_config에 따라)
+    if test_config and "aggregator_threads" in test_config:
+        thread_config = test_config["aggregator_threads"]
+        active_threads = [t for t, enabled in thread_config.items() if enabled]
+        print(f"\n{'='*70}")
+        print(f"[3/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
+        print(f"{'='*70}")
+        print(f"  ├─ [테스트 모드] 활성화된 Thread:")
+        for thread in active_threads:
+            print(f"  │  └─ {thread}: ON")
+        print(f"  ├─ 엔티티: {len(entities)}개")
+    else:
+        active_threads = list(DATA_THREADS.keys())
+        print(f"\n{'='*70}")
+        print(f"[3/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
+        print(f"{'='*70}")
+        print(f"  ├─ [일반 모드] Thread 수: {len(DATA_THREADS)}개")
+        print(f"  ├─ 엔티티: {len(entities)}개")
+
     if selected_groups:
         print(f"  └─ 프로퍼티 필터: {', '.join(selected_groups[:3])}{'...' if len(selected_groups) > 3 else ''} ({len(selected_groups)}개)")
     start_time = time.time()
-    
+
     # ThreadPoolExecutor로 병렬 실행 (템플릿 기반 SPARQL 쿼리)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(active_threads)) as executor:
         futures = {
             executor.submit(
                 execute_unified_thread,
@@ -242,7 +266,7 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
                 thread_config=DATA_THREADS[thread_type],
                 selected_properties=selected_properties  # 프로퍼티 필터 전달
             ): thread_type
-            for thread_type in DATA_THREADS.keys()
+            for thread_type in active_threads  # 활성화된 Thread만 실행
         }
         
         # 결과 수집
@@ -483,7 +507,7 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
                 continue
 
             # 양방향 BFS 실행
-            paths = find_bidirectional_paths(uri_a, uri_b, max_depth=5)
+            paths = find_bidirectional_paths(uri_a, uri_b, max_depth=3)
             
             if paths:
                 paths_found += len(paths)
@@ -529,14 +553,14 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
     return bindings
 
 
-def find_bidirectional_paths(entity_a_uri: str, entity_b_uri: str, max_depth: int = 5) -> list:
+def find_bidirectional_paths(entity_a_uri: str, entity_b_uri: str, max_depth: int = 3) -> list:
     """
     양방향 BFS로 두 엔티티 간 최단 경로 탐색
 
     Args:
         entity_a_uri: 시작 엔티티 URI (예: hist:Person_정약용)
         entity_b_uri: 목표 엔티티 URI (예: hist:Person_사도세자)
-        max_depth: 최대 탐색 깊이 (기본 5)
+        max_depth: 최대 탐색 깊이 (기본 3)
 
     Returns:
         경로 리스트 [{"path": [uri1, uri2, ..., uriN], "length": N, "predicates": [...]}]
@@ -637,6 +661,17 @@ def get_1hop_neighbors(entity_uri: str, timeout: int = 2) -> list:
         [(neighbor_uri, predicate), ...]
     """
 
+    # URI 형식 처리: hist:Entity_xxx 형태면 그대로 사용, full URI면 <> 감싸기
+    if entity_uri.startswith("hist:"):
+        # PREFIX 형식 (hist:Person_xxx) - 그대로 사용
+        entity_ref = entity_uri
+    elif entity_uri.startswith("http://"):
+        # Full URI 형식 - <> 감싸기
+        entity_ref = f"<{entity_uri}>"
+    else:
+        # 기타 형식 - hist: prefix 추가
+        entity_ref = f"hist:{entity_uri}"
+
     sparql = f"""
         PREFIX hist: <http://www.example.org/korean-history#>
         PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -645,7 +680,7 @@ def get_1hop_neighbors(entity_uri: str, timeout: int = 2) -> list:
         SELECT DISTINCT ?neighbor ?predicate WHERE {{
             {{
                 # 나가는 관계
-                <{entity_uri}> ?predicate ?neighbor .
+                {entity_ref} ?predicate ?neighbor .
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
                 FILTER(isURI(?neighbor))
@@ -653,9 +688,10 @@ def get_1hop_neighbors(entity_uri: str, timeout: int = 2) -> list:
             UNION
             {{
                 # 들어오는 관계
-                ?neighbor ?predicate <{entity_uri}> .
+                ?neighbor ?predicate {entity_ref} .
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
+                FILTER(isURI(?neighbor))
             }}
         }} LIMIT 50
     """

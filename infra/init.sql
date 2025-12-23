@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS korean_history (
 CREATE TABLE IF NOT EXISTS "user" (
     id SERIAL PRIMARY KEY,
     nickname VARCHAR(30) UNIQUE,
-    profile_image VARCHAR(100) NULL,
+    profile_image TEXT NULL,
     sign_up_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     email TEXT UNIQUE NOT NULL,
     permission VARCHAR(50) NOT NULL DEFAULT 'user',
@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS video (
     upload_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     tags TEXT[] NULL,
     likes_count INT NOT NULL DEFAULT 0,
-    comments_count INT NOT NULL DEFAULT 0
+    comments_count INT NOT NULL DEFAULT 0,
+    thumbnail_url TEXT NULL
 );
 
 -- 시청 기록 관리 테이블 생성
@@ -78,7 +79,13 @@ CREATE TABLE IF NOT EXISTS likes (
     video_id INT NULL REFERENCES video(id) ON DELETE CASCADE,
     comment_id INT NULL REFERENCES comment(id) ON DELETE CASCADE,
     reply_id INT NULL REFERENCES reply(id) ON DELETE CASCADE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_at_least_one_not_null
+        CHECK (
+            video_id IS NOT NULL
+            OR comment_id IS NOT NULL
+            OR reply_id IS NOT NULL
+        )
 );
 
 -- 검색 기록 테이블 생성
@@ -95,7 +102,7 @@ ON korean_history
 USING hnsw (embedding vector_cosine_ops);
 
 -- 초기 영상 데이터 삽입
-INSERT INTO video (title, video_url, tags, likes_count, comments_count)
+INSERT INTO video (title, video_url, tags, likes_count, comments_count, thumbnail_url)
 VALUES 
-    ('조선시대 한글 창제의 비밀', '/videos/selected_scene_1_video.mp4', ARRAY['세종', '한글', '발명품'], 0, 0)
+    ('임진왜란_짧동', 'http://localhost:3000//videos/selected_scene_2_video.mp4', ARRAY['임진왜란', '역사', '전쟁'], 0, 0,'/thumbnail_images/imjin.png'),
 ON CONFLICT DO NOTHING;

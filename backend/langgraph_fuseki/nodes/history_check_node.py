@@ -11,6 +11,7 @@ from pathlib import Path
 from langchain_openai import ChatOpenAI
 
 from backend.langgraph_fuseki.state import GraphState
+from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
 
 
 def history_check_node(state: GraphState) -> GraphState:
@@ -74,6 +75,11 @@ def history_check_node(state: GraphState) -> GraphState:
 
     try:
         response = llm.invoke(history_check_prompt)
+        
+        # 토큰 사용량 추출 및 state에 누적
+        token_update = extract_and_accumulate_tokens(state, response)
+        state.update(token_update)
+        
         content = response.content.strip()
 
         # JSON 파싱

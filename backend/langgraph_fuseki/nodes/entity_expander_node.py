@@ -21,6 +21,7 @@ import json
 import requests
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
+from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
 
 # 한국어 형태소 분석기 (조사/어미 자동 제거)
 try:
@@ -47,7 +48,7 @@ def get_title_vector_service():
     if _title_vector_service is None and USE_PGVECTOR:
         try:
             # load_title_embeddings.py와 동일한 import 방식 사용
-            from backend.db_pipeline.vectordb.services.title_vector_service import TitleVectorService
+            from backend.db_pipeline.postgres.services.title_vector_service import TitleVectorService
             _title_vector_service = TitleVectorService()
             print("✅ 제목 임베딩 pgvector 서비스 초기화 완료")
         except ImportError:
@@ -475,6 +476,11 @@ def extract_historical_keywords_with_llm(query: str, include_query_type: bool = 
 키워드가 없으면 빈 문자열 출력"""
 
         response = llm.invoke(prompt)
+        
+        # 토큰 사용량 추출 (state가 전달된 경우에만)
+        # 이 함수는 state를 받지 않으므로, 호출하는 곳에서 토큰을 추출해야 함
+        # 하지만 함수 시그니처를 변경하지 않고, 호출하는 곳에서 처리
+        
         content = response.content.strip()
         
         # 파싱
@@ -542,7 +548,7 @@ def get_ttl_labels_by_type(ttl_data: dict) -> dict:
     return labels_by_type
 
 
-def expand_keywords_with_llm(keywords: list, query: str) -> list:
+def expand_keywords_with_llm(keywords: list, query: str, state=None) -> list:
     """
     LLM으로 키워드를 구체적인 인스턴스로 확장
     
@@ -602,6 +608,12 @@ JSON 형식으로 출력하세요:
 확장할 수 없으면 빈 객체로 출력하세요."""
         
         response = llm.invoke(prompt)
+        
+        # 토큰 사용량 추출 및 state에 누적
+        if state is not None:
+            token_update = extract_and_accumulate_tokens(state, response)
+            state.update(token_update)
+        
         content = response.content.strip()
         
         # JSON 파싱
@@ -759,7 +771,7 @@ def entity_expander_node(state: GraphState) -> GraphState:
         expanded_keywords = expanded_keywords_from_classify
     else:
         # fallback: 직접 확장 (classify_node가 실패한 경우)
-        expanded_keywords = expand_keywords_with_llm(query_keywords, query)
+        expanded_keywords = expand_keywords_with_llm(query_keywords, query, state=state)
 
     # 원본 키워드와 확장된 키워드 병합
     all_keywords = list(set(query_keywords + expanded_keywords))
@@ -1016,6 +1028,11 @@ def entity_expander_node(state: GraphState) -> GraphState:
 
         try:
             response = llm.invoke(extraction_prompt)
+            
+            # 토큰 사용량 추출 및 state에 누적
+            token_update = extract_and_accumulate_tokens(state, response)
+            state.update(token_update)
+            
             content = response.content.strip()
             
             # JSON 파싱
