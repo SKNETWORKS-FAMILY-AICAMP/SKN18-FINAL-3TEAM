@@ -39,3 +39,19 @@ export const createVideo = async (description) => {
   });
   return response.data;
 };
+
+// 영상 수정 (관리자 전용)
+export const updateVideo = async (videoId, formData) => {
+  const response = await api.patch(`/api/video/${videoId}/update/`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+  return response.data;
+};
+
+// 영상 삭제 (관리자 전용)
+export const deleteVideo = async (videoId) => {
+  const response = await api.delete(`/api/video/${videoId}/delete/`);
+  return response.data;
+};

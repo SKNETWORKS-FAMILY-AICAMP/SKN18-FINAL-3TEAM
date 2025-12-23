@@ -1,5 +1,5 @@
 """
-vectordb/neo4j 모두에서 참조하는 공통 설정 파일
+postgres/neo4j 모두에서 참조하는 공통 설정 파일
 """
 import os
 from dotenv import load_dotenv, find_dotenv

@@ -193,6 +193,11 @@ def scene_split_node(state: GraphState) -> GraphState:
 
     scenes: List[Dict[str, Any]] = script_json.get("scenes", [])
 
+    # 결과 터미널 출력
+    print("[DEBUG] scene")
+    print(f"Scene:\n{scenes}")
+    print("-" * 60)
+
     return {
         **state,
         "scene_script": script_json,  # 전체 JSON (title + scenes)

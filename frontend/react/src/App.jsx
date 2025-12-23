@@ -4,10 +4,12 @@ import Header from "./components/layout/Header";
 import ExpandableSearch from "./features/search/components/ExpandableSearch";
 import MainPage from "./pages/MainPage";
 import VideoDetailPage from "./pages/VideoDetailPage";
+import SearchResultPage from "./pages/SearchResultPage";
 import MyPage from "./pages/MyPage";
 import AllCommentsPage from "./pages/AllCommentsPage";
 import ProfileEditPage from "./pages/ProfileEditPage";
 import AdminPage from "./pages/AdminPage";
+import VideoEditPage from "./pages/admin/VideoEditPage";
 import Chatbot from "./pages/Chatbot";
 import VideoCreatePage from "./pages/VideoCreatePage";
 import ChatbotButton from "./components/common/ChatbotButton";
@@ -22,7 +24,17 @@ const App = () => {
   const getInitialPage = () => {
     const hash = window.location.hash.replace("#", "");
     if (hash) {
-      const [page, param] = hash.split("/");
+      const parts = hash.split("/");
+      const [page, param, subPage, subParam] = parts;
+
+      // 영상 편집 페이지 (#admin/video/edit/123)
+      if (page === "admin" && param === "video" && subPage === "edit" && subParam) {
+        return {
+          page: "admin-video-edit",
+          videoId: parseInt(subParam),
+          searchQuery: "",
+        };
+      }
 
       // 영상 상세 페이지
       if (page === "video" && param) {
@@ -60,6 +72,7 @@ const App = () => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [newChatTrigger, setNewChatTrigger] = useState(0);
 
   // URL 변경 감지 (뒤로가기/앞으로가기 지원)
   useEffect(() => {
@@ -181,6 +194,8 @@ const App = () => {
         "profile-edit",
         "all-comments",
         "admin",
+        "question",
+        "video-create",
       ];
       if (authRequiredPages.includes(currentPage)) {
         setCurrentPage("main");
@@ -200,6 +215,8 @@ const App = () => {
         "profile-edit",
         "all-comments",
         "admin",
+        "question",
+        "video-create",
       ];
       if (authRequiredPages.includes(currentPage)) {
         setCurrentPage("main");
@@ -214,7 +231,13 @@ const App = () => {
     setUser(updatedUser);
   }, []);
 
-  const handleNavigate = (page, videoId = null) => {
+  const handleNavigate = (page, videoId = null, options = {}) => {
+    if (!isLoggedIn && (page === "question" || page === "video-create")) {
+      return;
+    }
+    if (options.newChat) {
+      setNewChatTrigger((prev) => prev + 1);
+    }
     setCurrentPage(page);
     updateURL(page, videoId);
     // 페이지 전환 시 스크롤을 맨 위로 이동
@@ -289,6 +312,14 @@ const App = () => {
             />
           )}
 
+          {currentPage === "search" && (
+            <SearchResultPage
+              query={searchQuery}
+              onVideoClick={handleVideoClick}
+              isLoggedIn={isLoggedIn}
+            />
+          )}
+
           {currentPage === "mypage" && (
             <MyPage onNavigate={handleNavigate} user={user} />
           )}
@@ -309,9 +340,17 @@ const App = () => {
             <AdminPage onNavigate={handleNavigate} user={user} />
           )}
 
+          {currentPage === "admin-video-edit" && (
+            <VideoEditPage videoId={selectedVideoId} />
+          )}
+
           {currentPage === "question" && (
             <div style={{ overflow: "hidden", height: "calc(100vh - 76px)" }}>
-              <Chatbot onNavigate={handleNavigate} user={user} />
+              <Chatbot
+                onNavigate={handleNavigate}
+                user={user}
+                newChatTrigger={newChatTrigger}
+              />
             </div>
           )}
 
@@ -320,8 +359,8 @@ const App = () => {
           )}
         </div>
 
-        {/* 챗봇 버튼 (모든 페이지에서 표시) */}
-        <ChatbotButton onNavigate={handleNavigate} />
+        {/* 챗봇 버튼 (로그인 시에만 표시) */}
+        {isLoggedIn && <ChatbotButton onNavigate={handleNavigate} />}
       </div>
     </>
   );

@@ -75,8 +75,26 @@ def create_video_from_image_fal(image_path: str, output_path: str, prompt: str =
         # Unity 배경용: 자연스러운 움직임 + 전투 효과 허용
         
         # 전투/액션 효과 키워드 감지
-        action_keywords = ['battle', 'fight', 'attack', 'war', 'arrow', 'fire', 'explosion', 'cannon', 'combat', 'charge', 'shoot', 'strike', 'clash', 'siege', 'gun', 'blast', 'shell', '전투', '공격', '화살', '포탄', '폭발', '발사', '총', '사격']
+        action_keywords = [
+            # 영어 전투 키워드
+            'battle', 'fight', 'attack', 'war', 'combat', 'charge', 'strike', 'clash',
+            'siege', 'invasion', 'assault', 'defense', 'warfare',
+            # 무기/효과 (구체적으로)
+            'arrow', 'arrows flying', 'explosion', 'cannon', 'shoot', 'shooting',
+            'blast', 'shell', 'gunfire', 'cannon fire',
+            # 한국어 전투 키워드
+            '전투', '전쟁', '공격', '방어', '침략', '격전', '화살', '포탄',
+            '폭발', '발사', '사격', '포격', '돌격'
+        ]
+
+        # 평화 키워드 감지 (전투 효과 제외)
+        peace_keywords = ['peaceful', 'serene', 'calm', 'tranquil', '평화', '평온', '고요']
+        has_peace = any(keyword in prompt.lower() for keyword in peace_keywords)
         has_action = any(keyword in prompt.lower() for keyword in action_keywords)
+
+        # 평화 장면이면 전투 효과 무조건 제외
+        if has_peace:
+            has_action = False
         
         # 액션 장면: 전투 효과 최우선! (맨 앞에 배치)
         if has_action:

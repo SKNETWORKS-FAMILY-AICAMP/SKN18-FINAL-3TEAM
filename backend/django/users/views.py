@@ -26,6 +26,7 @@ from .serializers import (
     AdminUserSerializer,
     AdminUserUpdateSerializer,
 )
+from config.permissions import IsAdminUser
 
 
 # ============================================
@@ -180,21 +181,6 @@ def delete_account(request):
         print(f"❌ 회원탈퇴 오류: {e}")
         print(traceback.format_exc())
         return Response({'error': f'회원탈퇴 처리 중 오류가 발생했습니다: {str(e)}'}, status=500)
-
-
-# ============================================
-# 커스텀 권한 클래스
-# ============================================
-from rest_framework.permissions import BasePermission
-
-
-class IsAdminUser(BasePermission):
-    """관리자(permission='admin')만 접근 가능"""
-    def has_permission(self, request, view):
-        return (
-            request.user.is_authenticated and
-            request.user.permission == 'admin'
-        )
 
 
 # ============================================

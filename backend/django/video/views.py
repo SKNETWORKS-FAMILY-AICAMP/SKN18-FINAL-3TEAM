@@ -7,30 +7,16 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.generics import ListAPIView, RetrieveAPIView, CreateAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView, CreateAPIView, UpdateAPIView, DestroyAPIView
 from openai import OpenAI
 from dotenv import load_dotenv
 
 from .models import Video
 from .serializers import VideoSerializer, VideoDetailSerializer, VideoCreateSerializer
+from config.permissions import IsAdminUser
 
 # .env 파일 로드
 load_dotenv()
-
-
-# ============================================
-# 커스텀 권한 클래스
-# ============================================
-from rest_framework.permissions import BasePermission
-
-
-class IsAdminUser(BasePermission):
-    """관리자(permission='admin')만 접근 가능"""
-    def has_permission(self, request, view):
-        return (
-            request.user.is_authenticated and
-            request.user.permission == 'admin'
-        )
 
 
 # ============================================
@@ -59,10 +45,18 @@ class VideoListView(ListAPIView):
         else:
             queryset = queryset.order_by('-upload_date')
         
-        # 태그 필터
+        # 태그 필터 (부분 일치 지원)
         tag = self.request.query_params.get('tag', '')
         if tag:
-            queryset = queryset.filter(tags__contains=[tag])
+            queryset = queryset.extra(
+                where=["""
+                    EXISTS (
+                        SELECT 1 FROM unnest(tags) AS t
+                        WHERE t ILIKE %s
+                    )
+                """],
+                params=[f'%{tag}%']
+            )
         
         return queryset
     
@@ -111,6 +105,28 @@ class VideoUploadView(CreateAPIView):
         from django.core.files.storage import default_storage
         from django.conf import settings
 
+        thumbnail_url = None
+
+        # 썸네일 파일 처리
+        if 'thumbnail_file' in request.FILES:
+            thumbnail_file = request.FILES['thumbnail_file']
+
+            # 썸네일 저장 경로 생성
+            thumbnail_dir = 'thumbnails'
+            os.makedirs(os.path.join(settings.MEDIA_ROOT, thumbnail_dir), exist_ok=True)
+
+            # 파일명 생성 (중복 방지)
+            import time
+            file_extension = os.path.splitext(thumbnail_file.name)[1]
+            file_name = f"{int(time.time())}_thumbnail{file_extension}"
+            file_path = os.path.join(thumbnail_dir, file_name)
+
+            # 파일 저장
+            saved_thumbnail_path = default_storage.save(file_path, thumbnail_file)
+
+            # URL 생성
+            thumbnail_url = request.build_absolute_uri(f"{settings.MEDIA_URL}{saved_thumbnail_path}")
+
         # 파일 업로드인 경우
         if 'video_file' in request.FILES:
             video_file = request.FILES['video_file']
@@ -135,11 +151,14 @@ class VideoUploadView(CreateAPIView):
             data = {
                 'title': request.data.get('title'),
                 'video_url': video_url,
-                'tags': request.data.getlist('tags[]') if 'tags[]' in request.data else []
+                'tags': request.data.getlist('tags[]') if 'tags[]' in request.data else [],
+                'thumbnail_url': thumbnail_url
             }
         else:
             # URL 입력인 경우
-            data = request.data
+            data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+            if thumbnail_url:
+                data['thumbnail_url'] = thumbnail_url
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
@@ -149,6 +168,172 @@ class VideoUploadView(CreateAPIView):
             'data': VideoSerializer(serializer.instance).data,
             'message': '영상이 업로드되었습니다.'
         }, status=status.HTTP_201_CREATED)
+
+
+class VideoUpdateView(UpdateAPIView):
+    """
+    영상 수정 API
+    - 관리자만 수정 가능
+
+    PATCH /api/video/<int:pk>/
+    """
+    queryset = Video.objects.all()
+    serializer_class = VideoCreateSerializer
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def update(self, request, *args, **kwargs):
+        import os
+        from django.core.files.storage import default_storage
+        from django.conf import settings
+
+        instance = self.get_object()
+        thumbnail_url = instance.thumbnail_url  # 기존 썸네일 유지
+
+        # 썸네일 파일 처리 (새로 업로드한 경우)
+        if 'thumbnail_file' in request.FILES:
+            thumbnail_file = request.FILES['thumbnail_file']
+
+            # 썸네일 저장 경로 생성
+            thumbnail_dir = 'thumbnails'
+            os.makedirs(os.path.join(settings.MEDIA_ROOT, thumbnail_dir), exist_ok=True)
+
+            # 파일명 생성 (중복 방지)
+            import time
+            file_extension = os.path.splitext(thumbnail_file.name)[1]
+            file_name = f"{int(time.time())}_thumbnail{file_extension}"
+            file_path = os.path.join(thumbnail_dir, file_name)
+
+            # 파일 저장
+            saved_thumbnail_path = default_storage.save(file_path, thumbnail_file)
+
+            # URL 생성
+            thumbnail_url = request.build_absolute_uri(f"{settings.MEDIA_URL}{saved_thumbnail_path}")
+
+        # 영상 파일 처리 (새로 업로드한 경우)
+        if 'video_file' in request.FILES:
+            video_file = request.FILES['video_file']
+
+            # 파일 저장 경로 생성
+            upload_dir = 'videos'
+            os.makedirs(os.path.join(settings.MEDIA_ROOT, upload_dir), exist_ok=True)
+
+            # 파일명 생성 (중복 방지)
+            import time
+            file_extension = os.path.splitext(video_file.name)[1]
+            file_name = f"{int(time.time())}_{video_file.name}"
+            file_path = os.path.join(upload_dir, file_name)
+
+            # 파일 저장
+            saved_path = default_storage.save(file_path, video_file)
+
+            # URL 생성
+            video_url = request.build_absolute_uri(f"{settings.MEDIA_URL}{saved_path}")
+
+            # 데이터 준비
+            data = {
+                'title': request.data.get('title'),
+                'video_url': video_url,
+                'tags': request.data.getlist('tags[]') if 'tags[]' in request.data else [],
+                'thumbnail_url': thumbnail_url
+            }
+        else:
+            # URL 입력 또는 기존 데이터 수정
+            data = {}
+            if 'title' in request.data:
+                data['title'] = request.data.get('title')
+            if 'video_url' in request.data:
+                data['video_url'] = request.data.get('video_url')
+            if 'tags[]' in request.data:
+                data['tags'] = request.data.getlist('tags[]')
+            elif 'tags' in request.data:
+                data['tags'] = request.data.get('tags')
+            if thumbnail_url:
+                data['thumbnail_url'] = thumbnail_url
+
+        serializer = self.get_serializer(instance, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response({
+            'data': VideoSerializer(serializer.instance).data,
+            'message': '영상이 수정되었습니다.'
+        }, status=status.HTTP_200_OK)
+
+
+class VideoDeleteView(DestroyAPIView):
+    """
+    영상 삭제 API
+    - 관리자만 삭제 가능
+
+    DELETE /api/video/<int:pk>/
+    """
+    queryset = Video.objects.all()
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        video_title = instance.title
+        self.perform_destroy(instance)
+
+        return Response({
+            'message': f'영상 "{video_title}"이(가) 삭제되었습니다.'
+        }, status=status.HTTP_200_OK)
+
+
+class PopularVideosView(ListAPIView):
+    """
+    인기 영상 API (임시)
+
+    GET /api/video/popular/
+    - 좋아요와 댓글 수 기준 인기 영상 반환
+    """
+    serializer_class = VideoSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        return Video.objects.all().order_by('-likes_count', '-comments_count')[:20]
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return Response({
+            'data': response.data,
+            'message': 'ok'
+        })
+
+
+class PopularTagsView(APIView):
+    """
+    인기 태그 API
+
+    GET /api/video/tags/popular/
+    - 가장 많이 사용된 태그 목록 반환 (최대 10개)
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        from collections import Counter
+
+        # 모든 비디오의 태그 수집
+        all_tags = []
+        videos = Video.objects.exclude(tags__isnull=True).exclude(tags=[])
+
+        for video in videos:
+            if video.tags:
+                all_tags.extend(video.tags)
+
+        # 태그 빈도 계산
+        tag_counter = Counter(all_tags)
+
+        # 상위 10개 태그
+        popular_tags = [
+            {'tag': tag, 'count': count}
+            for tag, count in tag_counter.most_common(10)
+        ]
+
+        return Response({
+            'data': popular_tags,
+            'message': 'ok'
+        })
 
 
 # 시스템 프롬프트 (Talchum Comedy / English Mode - Final Structured Version)
