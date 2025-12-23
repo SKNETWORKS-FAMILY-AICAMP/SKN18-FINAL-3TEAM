@@ -1,17 +1,13 @@
-# ragas_eval.py
+# ragas_eval2.py
 """
-GraphDB (Neo4j) 기반 RAG 응답을 RAGAS로 평가 (중간저장/재개 포함) - 1hop
+RAGAS 평가 - 2hop (ragas_eval3 스타일)
 
-- --debug : 디버그 로그
-- --limit : 질문 수 제한
-- --save-every : N개마다 중간 저장
-
-✅ 최종 반영
-- 질문은 한국어 고정 (question_ko → question fallback)
-- chat_1hop 메타(llm_meta_*) 기반 토큰/시간 기록
+✅ 요구사항 반영
+- ✅ chat_2hop 사용 (hop 추가 없음)
+- retry가 트리거만 돼도 retry_used=True 기록 (out["retry"]["used"])
+- raw.json에 retry/제외 여부/사유/토큰/시간 모두 기록
 - resume는 done=True만 스킵 (에러도 done 처리)
 - ✅ no_info/의미없음도 RAGAS에서 제외하지 않고 "전부 평가"
-- ✅ raw.json에 retry/제외 여부/사유/토큰/시간 모두 기록
 - ✅ scores.csv 저장 양식: idx + 점수 4개만 저장
   (context_relevance, faithfulness, answer_relevancy, response_groundedness)
 """
@@ -34,7 +30,7 @@ from typing import List, Dict, Optional
 
 import pandas as pd
 
-from backend.ragas.neo4j.chat_1hop import get_driver, answer_question_structured
+from backend.ragas.neo4j.chat_2hop import get_driver, answer_question_structured
 
 
 # =====================================================
@@ -94,9 +90,9 @@ RUN_DIR.mkdir(parents=True, exist_ok=True)
 
 QUESTIONS_PATH = DATA_DIR / "questions.jsonl"
 
-RAW_PATH = RUN_DIR / "graphdb_eval1.raw.json"
-SAMPLES_PATH = RUN_DIR / "graphdb_eval1.samples.pkl"
-SCORES_PATH = RUN_DIR / "graphdb_eval1.scores.csv"
+RAW_PATH = RUN_DIR / "graphdb_eval2.raw.json"
+SAMPLES_PATH = RUN_DIR / "graphdb_eval2.samples.pkl"
+SCORES_PATH = RUN_DIR / "graphdb_eval2.scores.csv"
 
 
 # =====================================================
@@ -113,7 +109,6 @@ def load_jsonl(path: Path):
 
 
 def pick_question(item: dict) -> str:
-    # ✅ 질문은 한국어 고정: question_ko 우선, 없으면 question
     v = item.get("question_ko")
     if isinstance(v, str) and v.strip():
         return v.strip()
@@ -136,6 +131,7 @@ def ensure_str_contexts(contexts):
     return out
 
 
+# "no info" 판별은 ✅ 기록만 하고 "평가 제외 X"
 _NOINFO_PATTERNS = [
     r"해당\s*주제에\s*대한\s*구체적\s*기록은\s*확인되지\s*않습니다",
     r"검색되지\s*않",
@@ -158,14 +154,6 @@ def is_noinfo_answer(answer: str, contexts: List[str]) -> bool:
     return False
 
 
-def safe_response_for_ragas(answer: str) -> str:
-    a = (answer or "").strip()
-    if a:
-        return a
-    # RAGAS가 빈 response에서 깨질 수 있어서 더미 문장으로 채움 (평가 대상 유지 목적)
-    return "정보를 찾을 수 없습니다."
-
-
 def load_checkpoint():
     if RAW_PATH.exists() and SAMPLES_PATH.exists():
         raw_logs = json.loads(RAW_PATH.read_text(encoding="utf-8"))
@@ -180,6 +168,14 @@ def save_checkpoint(raw_logs, samples):
     RAW_PATH.write_text(json.dumps(raw_logs, ensure_ascii=False, indent=2), encoding="utf-8")
     SAMPLES_PATH.write_bytes(pickle.dumps(samples))
     print(f"[CHECKPOINT] saved ({len(samples)} samples)")
+
+
+def safe_response_for_ragas(answer: str) -> str:
+    a = (answer or "").strip()
+    if a:
+        return a
+    # RAGAS가 빈 response에서 깨질 수 있어서 더미 문장으로 채움 (평가 대상 유지 목적)
+    return "정보를 찾을 수 없습니다."
 
 
 def pick_col(df: pd.DataFrame, candidates: List[str]) -> Optional[str]:
@@ -312,22 +308,27 @@ def main():
                 "question": q,
                 "cypher": out.get("cypher"),
 
+                # ✅ retry 기록
                 "retry_used": retry_used,
                 "retry": retry_obj,
                 "retry_strategy": retry_obj.get("strategy"),
 
+                # ✅ answer / contexts
                 "answer": answer_raw,
                 "answer_for_eval": answer_for_eval,
                 "n_contexts": len(contexts),
 
+                # ✅ 평가 제외는 안 하지만, 상태/사유는 기록
                 "excluded_from_eval": excluded,
                 "exclude_reason": "no_info_answer" if excluded else None,
 
+                # ✅ 답변 생성만
                 "answer_elapsed_sec": meta_ans.get("elapsed_sec"),
                 "answer_input_tokens": meta_ans.get("input_tokens"),
                 "answer_output_tokens": meta_ans.get("output_tokens"),
                 "answer_total_tokens": meta_ans.get("total_tokens"),
 
+                # ✅ 번역+답변 총합
                 "total_elapsed_sec": meta_total.get("elapsed_sec"),
                 "total_input_tokens": meta_total.get("input_tokens"),
                 "total_output_tokens": meta_total.get("output_tokens"),
@@ -393,7 +394,7 @@ def main():
         col_grd = "response_groundedness"
 
     df_out = df_merged[["idx", col_ctx, col_fai, col_ans, col_grd]].copy()
-    # 컬럼명 통일
+    # 컬럼명 통일(분석 편하게)
     df_out = df_out.rename(columns={
         col_ctx: "context_relevance",
         col_fai: "faithfulness",
