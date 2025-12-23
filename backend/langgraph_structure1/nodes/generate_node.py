@@ -69,7 +69,7 @@ def generate_node(state: GraphState) -> GraphState:
     를 기반으로 최종 답변(final_answer)을 생성하는 노드.
     """
     question = state.get("query")
-    t0 = state.get("t0")
+    t0 = state.get("t0", time.perf_counter())
     
     vector_evidences: List[Evidence] = state.get("vector_evidences", [])
     neo4j_results: List[Dict[str, Any]] = state.get("neo4j_results", [])
