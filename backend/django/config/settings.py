@@ -276,6 +276,12 @@ ACCOUNT_ADAPTER = 'users.adapters.CustomAccountAdapter'
 # 소셜 토큰을 DB에 저장 (socialaccount_socialtoken)
 SOCIALACCOUNT_STORE_TOKENS = True
 
+# 배경 파일(이미지/영상) 저장 설정
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# 유니티가 접속할 내 서버(local) 주소
+MY_SERVER_URL = "http://127.0.0.1:8000"
 # Celery 앱 설정
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)

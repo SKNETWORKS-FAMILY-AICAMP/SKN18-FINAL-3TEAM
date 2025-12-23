@@ -32,6 +32,7 @@ const MyPage = ({ onNavigate, user }) => {
                 id: w.id,
                 title: w.video_title || "제목 없음",
                 videoId: w.video,
+                thumbnail_url: w.video_thumbnail || null,
               });
             }
           });

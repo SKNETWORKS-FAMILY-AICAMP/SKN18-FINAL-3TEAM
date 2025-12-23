@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS watching_history (
 -- 댓글 관리 테이블 생성
 CREATE TABLE IF NOT EXISTS comment (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    user_id INT NULL REFERENCES "user"(id) ON DELETE SET NULL,
     video_id INT NOT NULL REFERENCES video(id) ON DELETE CASCADE,
     comment_content TEXT NOT NULL,
     comment_likes_count INT NOT NULL DEFAULT 0,
@@ -66,13 +66,15 @@ CREATE TABLE IF NOT EXISTS comment (
 CREATE TABLE IF NOT EXISTS reply (
     id SERIAL PRIMARY KEY,
     comment_id INT NOT NULL REFERENCES comment(id) ON DELETE CASCADE,
-    user_id INT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+    user_id INT NULL REFERENCES "user"(id) ON DELETE SET NULL,
     reply_content TEXT NOT NULL,
     parent_reply_id INT NULL DEFAULT NULL REFERENCES reply(id) ON DELETE CASCADE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 좋아요 관리 테이블 생성
+-- 참고: 좋아요는 사용자 삭제 시 함께 삭제 (CASCADE 유지)
+-- 누가 좋아요 했는지 기록이 중요하지 않기 때문
 CREATE TABLE IF NOT EXISTS likes (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,

@@ -10,6 +10,7 @@ import {
   createSearchHistory,
 } from "../../../api/activityApi";
 import { getPopularTags, getPopularVideos } from "../../../api/videoApi";
+import { getThumbnailUrl } from "../../../utils/imageUtils";
 
 const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVideoClick }) => {
   const [searchValue, setSearchValue] = useState("");
@@ -43,6 +44,7 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
               id: v.id,
               title: v.title,
               tags: v.tags ? v.tags.map((t) => `#${t}`).join(" ") : "",
+              thumbnail_url: v.thumbnail_url || null,
             }))
           );
         }
@@ -522,7 +524,6 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
                           style={{
                             width: "140px",
                             height: "180px",
-                            backgroundColor: COLORS.lightGray,
                             borderRadius: "8px",
                             marginBottom: "10px",
                             overflow: "hidden",
@@ -531,11 +532,19 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            background: `linear-gradient(135deg, hsl(${
-                              idx * 25 + 200
-                            }, 15%, 92%) 0%, hsl(${
-                              idx * 25 + 220
-                            }, 20%, 88%) 100%)`,
+                            ...(video.thumbnail_url
+                              ? {
+                                  backgroundImage: `url(${getThumbnailUrl(video.thumbnail_url)})`,
+                                  backgroundSize: "cover",
+                                  backgroundPosition: "center",
+                                }
+                              : {
+                                  background: `linear-gradient(135deg, hsl(${
+                                    idx * 25 + 200
+                                  }, 15%, 92%) 0%, hsl(${
+                                    idx * 25 + 220
+                                  }, 20%, 88%) 100%)`,
+                                }),
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.transform = "scale(1.04)";
@@ -547,14 +556,16 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
                             e.currentTarget.style.boxShadow = "none";
                           }}
                         >
-                          <svg
-                            width="32"
-                            height="32"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                          >
-                            <polygon points="5,3 19,12 5,21" fill="#ccc" />
-                          </svg>
+                          {!video.thumbnail_url && (
+                            <svg
+                              width="32"
+                              height="32"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                            >
+                              <polygon points="5,3 19,12 5,21" fill="#ccc" />
+                            </svg>
+                          )}
                         </div>
                         <div
                           style={{

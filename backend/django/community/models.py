@@ -15,7 +15,8 @@ class Comment(models.Model):
     # id는 Django 기본 pk 사용
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
         db_column='user_id',
         related_name='comments',
         verbose_name='작성자'
@@ -48,7 +49,8 @@ class Comment(models.Model):
         verbose_name_plural = '댓글들'
 
     def __str__(self):
-        return f"{self.user.display_name}: {self.comment_content[:30]}"
+        username = self.user.display_name if self.user else "탈퇴한 사용자"
+        return f"{username}: {self.comment_content[:30]}"
 
 
 class Reply(models.Model):
@@ -70,7 +72,8 @@ class Reply(models.Model):
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
         db_column='user_id',
         related_name='replies',
         verbose_name='작성자'
@@ -100,7 +103,8 @@ class Reply(models.Model):
         verbose_name_plural = '답글들'
 
     def __str__(self):
-        return f"{self.user.display_name}: {self.reply_content[:30]}"
+        username = self.user.display_name if self.user else "탈퇴한 사용자"
+        return f"{username}: {self.reply_content[:30]}"
 
 
 class Likes(models.Model):
@@ -163,4 +167,5 @@ class Likes(models.Model):
 
     def __str__(self):
         target = self.video or self.comment or self.reply
-        return f"{self.user.display_name} likes {target}"
+        username = self.user.display_name if self.user else "알 수 없음"
+        return f"{username} likes {target}"
