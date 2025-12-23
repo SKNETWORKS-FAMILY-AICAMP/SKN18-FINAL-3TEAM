@@ -114,7 +114,7 @@ def route_classify(state: GraphState) -> str:
     if query_type == "hybrid":
         return "hybrid_node"
     elif query_type == "no_related":
-        return END
+        return "reaction_node"
     else:
         raise ValueError(f"지원하지 않는 query_type={query_type}")
 

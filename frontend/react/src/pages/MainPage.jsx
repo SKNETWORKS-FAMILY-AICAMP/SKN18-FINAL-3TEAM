@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { COLORS } from "../constants/theme";
 import VideoGrid from "../features/video/components/VideoGrid";
 import { getVideos, getPopularVideos } from "../api/videoApi";
+import IntroVideo from "../components/intro/IntroVideo";
 
 const MainPage = ({ isLoggedIn, onVideoClick }) => {
   const [videos, setVideos] = useState([]);
@@ -53,6 +54,9 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
         overflowX: "hidden",
       }}
     >
+      {/* 새로 추가한 인트로 비디오 로직 */}
+      <IntroVideo /> 
+
       <div
         style={{
           marginBottom: "40px",
