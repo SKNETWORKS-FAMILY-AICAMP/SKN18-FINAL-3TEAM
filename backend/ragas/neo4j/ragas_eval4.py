@@ -1,19 +1,15 @@
-# ragas_eval.py
+# ragas_eval4.py
 """
-GraphDB (Neo4j) 기반 RAG 응답을 RAGAS로 평가 (중간저장/재개 포함) - 1hop
-
-- --debug : 디버그 로그
-- --limit : 질문 수 제한
-- --save-every : N개마다 중간 저장
+RAGAS 평가 - 4hop
 
 ✅ 최종 반영
-- 질문은 한국어 고정 (question_ko → question fallback)
-- chat_1hop 메타(llm_meta_*) 기반 토큰/시간 기록
-- resume는 done=True만 스킵 (에러도 done 처리)
+- retry가 트리거만 돼도 retry_used=True 기록 (out["retry"]["used"])
+- raw.json에 retry/제외 여부/사유/토큰/시간 + ✅ cypher_1/cypher_retry/cypher_final 모두 기록
+- resume는 done=True만 스킵 (에러는 done=False로 남겨 재시도)
 - ✅ no_info/의미없음도 RAGAS에서 제외하지 않고 "전부 평가"
-- ✅ raw.json에 retry/제외 여부/사유/토큰/시간 모두 기록
 - ✅ scores.csv 저장 양식: idx + 점수 4개만 저장
   (context_relevance, faithfulness, answer_relevancy, response_groundedness)
+- ragas 버전에 따라 nv_*로 컬럼명이 바뀌어도 자동 대응
 """
 
 # ===== FORCE PROJECT ROOT INTO PYTHONPATH (MUST BE FIRST) =====
@@ -34,7 +30,7 @@ from typing import List, Dict, Optional
 
 import pandas as pd
 
-from backend.ragas.neo4j.chat_1hop import get_driver, answer_question_structured
+from backend.ragas.neo4j.chat_4hop import get_driver, answer_question_structured
 
 
 # =====================================================
@@ -94,9 +90,9 @@ RUN_DIR.mkdir(parents=True, exist_ok=True)
 
 QUESTIONS_PATH = DATA_DIR / "questions.jsonl"
 
-RAW_PATH = RUN_DIR / "graphdb_eval1.raw.json"
-SAMPLES_PATH = RUN_DIR / "graphdb_eval1.samples.pkl"
-SCORES_PATH = RUN_DIR / "graphdb_eval1.scores.csv"
+RAW_PATH = RUN_DIR / "graphdb_eval4.raw.json"
+SAMPLES_PATH = RUN_DIR / "graphdb_eval4.samples.pkl"
+SCORES_PATH = RUN_DIR / "graphdb_eval4.scores.csv"
 
 
 # =====================================================
@@ -113,7 +109,6 @@ def load_jsonl(path: Path):
 
 
 def pick_question(item: dict) -> str:
-    # ✅ 질문은 한국어 고정: question_ko 우선, 없으면 question
     v = item.get("question_ko")
     if isinstance(v, str) and v.strip():
         return v.strip()
@@ -162,7 +157,6 @@ def safe_response_for_ragas(answer: str) -> str:
     a = (answer or "").strip()
     if a:
         return a
-    # RAGAS가 빈 response에서 깨질 수 있어서 더미 문장으로 채움 (평가 대상 유지 목적)
     return "정보를 찾을 수 없습니다."
 
 
@@ -248,8 +242,8 @@ def main():
     raw_logs, samples, done_idxs = load_checkpoint()
     driver = get_driver()
 
-    # ✅ idx -> sample_pos (전부 평가이므로 1:1 매핑)
-    sample_index_map: Dict[int, int] = {}
+    processed = 0
+    sample_index_map: Dict[int, int] = {}  # idx -> sample_pos
 
     try:
         for idx, item in enumerate(items, start=1):
@@ -264,7 +258,8 @@ def main():
                     "error": "empty_question",
                     "done": True,
                 })
-                if idx % args.save_every == 0:
+                processed += 1
+                if processed % args.save_every == 0:
                     save_checkpoint(raw_logs, samples)
                 continue
 
@@ -277,9 +272,10 @@ def main():
                     "idx": idx,
                     "question": q,
                     "error": repr(e),
-                    "done": True,  # ✅ 에러도 done 처리
+                    "done": False,  # ✅ 에러는 재시도
                 })
-                if idx % args.save_every == 0:
+                processed += 1
+                if processed % args.save_every == 0:
                     save_checkpoint(raw_logs, samples)
                 continue
 
@@ -292,7 +288,7 @@ def main():
 
             excluded = is_noinfo_answer(answer_raw, contexts)  # ✅ 기록만 (평가 제외 X)
 
-            # ✅ 무조건 samples에 추가 (전부 평가)
+            # ✅ samples 추가 + idx 매핑
             sample_pos = len(samples)
             sample_index_map[idx] = sample_pos
             samples.append(
@@ -310,11 +306,18 @@ def main():
             raw_logs.append({
                 "idx": idx,
                 "question": q,
-                "cypher": out.get("cypher"),
+
+                # ✅ 특이케이스: retry cypher 로깅
+                "cypher_1": out.get("cypher_1") or out.get("cypher"),
+                "cypher_retry": out.get("cypher_retry") or retry_obj.get("cypher_retry"),
+                "cypher_final": out.get("cypher_final") or out.get("cypher"),
 
                 "retry_used": retry_used,
                 "retry": retry_obj,
                 "retry_strategy": retry_obj.get("strategy"),
+                "retry_triggered": bool(retry_obj.get("triggered")),
+                "retry_executed": bool(retry_obj.get("executed")),
+                "retry_applied": bool(retry_obj.get("applied")),
 
                 "answer": answer_raw,
                 "answer_for_eval": answer_for_eval,
@@ -336,7 +339,8 @@ def main():
                 "done": True,
             })
 
-            if idx % args.save_every == 0:
+            processed += 1
+            if processed % args.save_every == 0:
                 save_checkpoint(raw_logs, samples)
 
     finally:
@@ -344,7 +348,6 @@ def main():
 
     save_checkpoint(raw_logs, samples)
 
-    # raw 전체
     df_all = pd.DataFrame(raw_logs).sort_values("idx").reset_index(drop=True)
 
     metrics = [m for m in [
@@ -359,7 +362,6 @@ def main():
         result = evaluate(dataset=dataset, metrics=metrics)
         df_scores = result.to_pandas().reset_index(drop=True)
 
-        # scores row index == sample_pos -> idx 복원
         pos_to_idx = {pos: idx for idx, pos in sample_index_map.items()}
         df_scores["idx"] = df_scores.index.map(lambda i: pos_to_idx.get(i))
         df_scores = df_scores.dropna(subset=["idx"])
@@ -369,16 +371,12 @@ def main():
     else:
         df_merged = df_all.copy()
 
-    # =====================================================
-    # ✅ scores.csv 저장: idx + 점수 4개만
-    # (ragas 버전에 따라 nv_* 로 바뀌어도 자동 대응)
-    # =====================================================
+    # ✅ scores.csv: idx + 점수 4개만 (nv_* 자동 대응)
     col_ctx = pick_col(df_merged, ["context_relevance", "nv_context_relevance", "context_relevancy", "nv_context_relevancy"])
     col_fai = pick_col(df_merged, ["faithfulness", "nv_faithfulness"])
     col_ans = pick_col(df_merged, ["answer_relevancy", "nv_answer_relevancy", "response_relevancy", "nv_response_relevancy"])
     col_grd = pick_col(df_merged, ["response_groundedness", "nv_response_groundedness", "groundedness", "nv_groundedness"])
 
-    # 없으면 빈 컬럼 만들어서 "항상 4개" 형태 유지
     if col_ctx is None:
         df_merged["context_relevance"] = float("nan")
         col_ctx = "context_relevance"
@@ -393,7 +391,6 @@ def main():
         col_grd = "response_groundedness"
 
     df_out = df_merged[["idx", col_ctx, col_fai, col_ans, col_grd]].copy()
-    # 컬럼명 통일
     df_out = df_out.rename(columns={
         col_ctx: "context_relevance",
         col_fai: "faithfulness",
