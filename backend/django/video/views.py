@@ -88,7 +88,8 @@ async def generate_scenario(request):
         app = create_graph_flow()
         initial_state = {
             "query": topic,
-            "asset_context": asset_context_prompt 
+            "asset_context": asset_context_prompt ,
+            "tag": "video"
         }
 
         print("🔹 [View] LangGraph 실행 시작... (검색 및 생성 중)")
