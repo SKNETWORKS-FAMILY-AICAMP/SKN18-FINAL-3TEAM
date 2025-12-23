@@ -12,6 +12,7 @@ class VideoSearchSerializer(serializers.ModelSerializer):
             'id',
             'title',
             'video_url',
+            'thumbnail_url',
             'upload_date',
             'tags',
             'likes_count',
