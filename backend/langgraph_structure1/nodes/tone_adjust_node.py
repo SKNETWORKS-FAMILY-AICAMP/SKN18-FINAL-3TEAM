@@ -173,16 +173,39 @@ def tone_adjust_node(state: GraphState) -> GraphState:
     if not TONE_PROMPT:
         TONE_PROMPT = "SYSTEM: Please refine the following text."
 
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        response_format={"type": "text"},
-        messages=[
-            {"role": "system", "content": TONE_PROMPT},
-            {"role": "user", "content": user_content},
-        ],
-    )
+    # tag이 video일 때는 스트리밍 없이 한 번에 처리
+    stream_callback = None if tag == "video" else state.get("stream_callback")
+    usage = None
 
-    transformed_text = response.choices[0].message.content.strip()
+    if stream_callback:
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            response_format={"type": "text"},
+            messages=[
+                {"role": "system", "content": TONE_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+            stream=True,
+        )
+        chunks = []
+        for chunk in response:
+            delta = chunk.choices[0].delta.content or ""
+            if delta:
+                stream_callback(delta)
+                chunks.append(delta)
+        transformed_text = "".join(chunks).strip()
+    else:
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            response_format={"type": "text"},
+            messages=[
+                {"role": "system", "content": TONE_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+        )
+
+        transformed_text = response.choices[0].message.content.strip()
+        usage = response.usage
 
     # 결과 터미널 출력
     logger.info("[tone_adjust_node] Transformed Text:\n%s", transformed_text)
@@ -215,5 +238,15 @@ def route_tone_adjust_node(state: GraphState) -> str:
     return END
 
 if __name__ == "__main__":
-    # 테스트 코드 생략 (필요하면 그대로 두셔도 됩니다)
-    pass
+    # 테스트 코드
+
+    dummy_state : GraphState = {
+        "final_answer": "임진왜란은 1592년부터 1598년까지 일본이 조선을 침략한 전쟁으로, 외부의 팽창주의적 세력과 내부의 정치적·사회적 분열이 맞물리며 발발했 습니다. 근본적 원인으로는 일본 측의 팽창주의적 의도와 함께 조선 내부의 분열이 방어 역량을 약화시킨 점이 지목됩니다. 이러한 배경은 한 반도에 대한 외세의 침입을 초래했고, 전쟁 발발의 구조적 원인으로 역사적 논의의 중심이 되었습니다.\
+        전쟁이 전개되는 동안 조선 수군의 역할이 특히 두드러졌는데, 이순신 장군이 조선 수군을 이끌며 많은 승리를 거두어 전쟁 전체의 흐름에 중 요한 영향을 미쳤습니다. 해상에서의 연속된 승리는 적의 작전 수행에 장애가 되었고, 전쟁 중 조선이 여러 차례 위기에서 버틸 수 있었던 주 요 요인으로 평가됩니다. 전투는 수년간 계속되었고, 해상 전투에서의 성과는 전쟁 양상과 국면 전환에 중요한 변수가 되었습니다.\
+        임진왜란은 일본의 팽창주의가 한반도에 실제적 위협이 될 수 있음을 드러냈고, 내부 분열이 국가의 위기 대응 능력을 약화시킨다는 점을 분명히 했다는 의미를 남겼습니다. 또한 전쟁 과정에서 나타난 군사적·전략적 역량의 중요성은 이후 역사적 교훈으로 자리잡았으며, 이 시기의 경 험은 한국사에서 국가 안보와 통합의 필요성을 생각하게 하는 중요한 사건으로 평가됩니다.",
+        "tag": "video",
+    }
+
+    result_state = tone_adjust_node(dummy_state)
+    print("=== Tone Adjust Node Result ===")   
+    print(result_state["tone_corrected_answer"])
