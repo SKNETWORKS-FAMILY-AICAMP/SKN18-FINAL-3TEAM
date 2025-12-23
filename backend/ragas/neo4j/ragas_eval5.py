@@ -1,19 +1,17 @@
-# ragas_eval.py
+# ragas_eval5.py
 """
-GraphDB (Neo4j) 기반 RAG 응답을 RAGAS로 평가 (중간저장/재개 포함) - 1hop
+GraphDB (Neo4j) 기반 RAG 응답을 RAGAS로 평가 (중간저장/재개 포함) - 5hop 버전
 
 - --debug : 디버그 로그
 - --limit : 질문 수 제한
-- --save-every : N개마다 중간 저장
+- --save-every : N개 처리마다 중간 저장 (idx 기준 아님: resume/skip 섞여도 안정)
 
-✅ 최종 반영
-- 질문은 한국어 고정 (question_ko → question fallback)
-- chat_1hop 메타(llm_meta_*) 기반 토큰/시간 기록
-- resume는 done=True만 스킵 (에러도 done 처리)
-- ✅ no_info/의미없음도 RAGAS에서 제외하지 않고 "전부 평가"
-- ✅ raw.json에 retry/제외 여부/사유/토큰/시간 모두 기록
-- ✅ scores.csv 저장 양식: idx + 점수 4개만 저장
-  (context_relevance, faithfulness, answer_relevancy, response_groundedness)
+✅ 변경점
+- resume 시 "성공(answer 존재)"한 idx만 done 처리 (에러 idx는 재시도)
+- OpenAI/파이프라인 에러를 raw.json에 기록 + debug 출력
+- metrics: context_relevance, faithfulness (+있으면 answer_relevancy/groundedness도 추가)
+- ✅ chat_5hop 사용
+- ✅ raw.json에 답변 생성 시간/토큰(입력/출력/합계) 기록
 """
 
 # ===== FORCE PROJECT ROOT INTO PYTHONPATH (MUST BE FIRST) =====
@@ -22,6 +20,7 @@ from pathlib import Path
 
 THIS_DIR = Path(__file__).resolve()
 PROJECT_ROOT = THIS_DIR.parents[3]
+
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -29,13 +28,10 @@ import json
 import argparse
 import importlib
 import pickle
-import re
-from typing import List, Dict, Optional
+from typing import List
 
-import pandas as pd
-
-from backend.ragas.neo4j.chat_1hop import get_driver, answer_question_structured
-
+# ✅ 5hop 모듈
+from backend.ragas.neo4j.chat_5hop import get_driver, answer_question_structured
 
 # =====================================================
 # RAGAS safe import
@@ -46,7 +42,6 @@ def _import_attr(module_name: str, attr_name: str):
         return getattr(mod, attr_name)
     except Exception:
         return None
-
 
 def _resolve_metric(module_name: str, candidates: List[str], debug=False):
     mod = importlib.import_module(module_name)
@@ -67,7 +62,6 @@ def _resolve_metric(module_name: str, candidates: List[str], debug=False):
         return obj
     return None
 
-
 def _resolve_evaluate(debug=False):
     fn = _import_attr("ragas", "evaluate")
     if fn:
@@ -81,7 +75,6 @@ def _resolve_evaluate(debug=False):
         return fn
     raise ImportError("Cannot resolve ragas.evaluate")
 
-
 # =====================================================
 # Paths
 # =====================================================
@@ -94,10 +87,9 @@ RUN_DIR.mkdir(parents=True, exist_ok=True)
 
 QUESTIONS_PATH = DATA_DIR / "questions.jsonl"
 
-RAW_PATH = RUN_DIR / "graphdb_eval1.raw.json"
-SAMPLES_PATH = RUN_DIR / "graphdb_eval1.samples.pkl"
-SCORES_PATH = RUN_DIR / "graphdb_eval1.scores.csv"
-
+RAW_PATH = RUN_DIR / "graphdb_eval5.raw.json"
+SAMPLES_PATH = RUN_DIR / "graphdb_eval5.samples.pkl"
+SCORES_PATH = RUN_DIR / "graphdb_eval5.scores.csv"
 
 # =====================================================
 # Utils
@@ -111,17 +103,21 @@ def load_jsonl(path: Path):
                 rows.append(json.loads(line))
     return rows
 
-
 def pick_question(item: dict) -> str:
-    # ✅ 질문은 한국어 고정: question_ko 우선, 없으면 question
+    """
+    ✅ 질문은 무조건 한국어(question_ko)만 사용
+    - 없으면 question(한국어일 가능성)로 fallback
+    - 그래도 없으면 빈 문자열
+    """
     v = item.get("question_ko")
     if isinstance(v, str) and v.strip():
         return v.strip()
+
     v = item.get("question")
     if isinstance(v, str) and v.strip():
         return v.strip()
-    return ""
 
+    return ""
 
 def ensure_str_contexts(contexts):
     out = []
@@ -135,59 +131,19 @@ def ensure_str_contexts(contexts):
                 out.append(str(c))
     return out
 
-
-_NOINFO_PATTERNS = [
-    r"해당\s*주제에\s*대한\s*구체적\s*기록은\s*확인되지\s*않습니다",
-    r"검색되지\s*않",
-    r"알\s*수\s*없",
-    r"확인할\s*수\s*없",
-]
-
-
-def is_noinfo_answer(answer: str, contexts: List[str]) -> bool:
-    a = (answer or "").strip()
-    if not a:
-        return True
-    if contexts and any(("검색되지 않았습니다" in c) for c in contexts):
-        return True
-    for p in _NOINFO_PATTERNS:
-        if re.search(p, a):
-            return True
-    if len(a) < 15:
-        return True
-    return False
-
-
-def safe_response_for_ragas(answer: str) -> str:
-    a = (answer or "").strip()
-    if a:
-        return a
-    # RAGAS가 빈 response에서 깨질 수 있어서 더미 문장으로 채움 (평가 대상 유지 목적)
-    return "정보를 찾을 수 없습니다."
-
-
 def load_checkpoint():
     if RAW_PATH.exists() and SAMPLES_PATH.exists():
         raw_logs = json.loads(RAW_PATH.read_text(encoding="utf-8"))
         samples = pickle.loads(SAMPLES_PATH.read_bytes())
-        done_idxs = {r["idx"] for r in raw_logs if "idx" in r and r.get("done") is True}
-        print(f"[INFO] Resume from checkpoint: {len(done_idxs)} done items loaded")
+        done_idxs = {r["idx"] for r in raw_logs if "idx" in r and "answer" in r}
+        print(f"[INFO] Resume from checkpoint: {len(done_idxs)} success samples loaded")
         return raw_logs, samples, done_idxs
     return [], [], set()
-
 
 def save_checkpoint(raw_logs, samples):
     RAW_PATH.write_text(json.dumps(raw_logs, ensure_ascii=False, indent=2), encoding="utf-8")
     SAMPLES_PATH.write_bytes(pickle.dumps(samples))
     print(f"[CHECKPOINT] saved ({len(samples)} samples)")
-
-
-def pick_col(df: pd.DataFrame, candidates: List[str]) -> Optional[str]:
-    for c in candidates:
-        if c in df.columns:
-            return c
-    return None
-
 
 # =====================================================
 # Main
@@ -248,8 +204,7 @@ def main():
     raw_logs, samples, done_idxs = load_checkpoint()
     driver = get_driver()
 
-    # ✅ idx -> sample_pos (전부 평가이므로 1:1 매핑)
-    sample_index_map: Dict[int, int] = {}
+    processed = 0  # ✅ idx가 아니라 "처리된 개수" 기준 저장
 
     try:
         for idx, item in enumerate(items, start=1):
@@ -258,14 +213,6 @@ def main():
 
             q = pick_question(item)
             if not q:
-                raw_logs.append({
-                    "idx": idx,
-                    "question": "",
-                    "error": "empty_question",
-                    "done": True,
-                })
-                if idx % args.save_every == 0:
-                    save_checkpoint(raw_logs, samples)
                 continue
 
             try:
@@ -273,32 +220,18 @@ def main():
             except Exception as e:
                 if debug:
                     print("[PIPELINE ERROR]", repr(e))
-                raw_logs.append({
-                    "idx": idx,
-                    "question": q,
-                    "error": repr(e),
-                    "done": True,  # ✅ 에러도 done 처리
-                })
-                if idx % args.save_every == 0:
+                raw_logs.append({"idx": idx, "error": repr(e), "question": q})
+                processed += 1
+                if processed % args.save_every == 0:
                     save_checkpoint(raw_logs, samples)
                 continue
 
             contexts = ensure_str_contexts(out.get("contexts"))
-            answer_raw = (out.get("answer") or "").strip()
-            answer_for_eval = safe_response_for_ragas(answer_raw)
 
-            retry_obj = out.get("retry") or {}
-            retry_used = bool(retry_obj.get("used"))  # ✅ 트리거만 돼도 true
-
-            excluded = is_noinfo_answer(answer_raw, contexts)  # ✅ 기록만 (평가 제외 X)
-
-            # ✅ 무조건 samples에 추가 (전부 평가)
-            sample_pos = len(samples)
-            sample_index_map[idx] = sample_pos
             samples.append(
                 SingleTurnSample(
                     user_input=out.get("question_ko", q),
-                    response=answer_for_eval,
+                    response=out["answer"],
                     retrieved_contexts=contexts,
                     reference=item.get("reference"),
                 )
@@ -310,33 +243,24 @@ def main():
             raw_logs.append({
                 "idx": idx,
                 "question": q,
-                "cypher": out.get("cypher"),
-
-                "retry_used": retry_used,
-                "retry": retry_obj,
-                "retry_strategy": retry_obj.get("strategy"),
-
-                "answer": answer_raw,
-                "answer_for_eval": answer_for_eval,
+                "answer": out["answer"],
                 "n_contexts": len(contexts),
 
-                "excluded_from_eval": excluded,
-                "exclude_reason": "no_info_answer" if excluded else None,
-
+                # ✅ 답변 생성만
                 "answer_elapsed_sec": meta_ans.get("elapsed_sec"),
                 "answer_input_tokens": meta_ans.get("input_tokens"),
                 "answer_output_tokens": meta_ans.get("output_tokens"),
                 "answer_total_tokens": meta_ans.get("total_tokens"),
 
+                # ✅ 번역+답변 총합
                 "total_elapsed_sec": meta_total.get("elapsed_sec"),
                 "total_input_tokens": meta_total.get("input_tokens"),
                 "total_output_tokens": meta_total.get("output_tokens"),
                 "total_tokens": meta_total.get("total_tokens"),
-
-                "done": True,
             })
 
-            if idx % args.save_every == 0:
+            processed += 1
+            if processed % args.save_every == 0:
                 save_checkpoint(raw_logs, samples)
 
     finally:
@@ -344,8 +268,11 @@ def main():
 
     save_checkpoint(raw_logs, samples)
 
-    # raw 전체
-    df_all = pd.DataFrame(raw_logs).sort_values("idx").reset_index(drop=True)
+    if not samples:
+        print("[ERROR] no samples generated")
+        return
+
+    dataset = EvaluationDataset(samples=samples)
 
     metrics = [m for m in [
         metric_context_relevance,
@@ -354,60 +281,17 @@ def main():
         metric_groundedness
     ] if m is not None]
 
-    if samples and metrics:
-        dataset = EvaluationDataset(samples=samples)
-        result = evaluate(dataset=dataset, metrics=metrics)
-        df_scores = result.to_pandas().reset_index(drop=True)
+    if not metrics:
+        print("[ERROR] no valid metrics resolved")
+        return
 
-        # scores row index == sample_pos -> idx 복원
-        pos_to_idx = {pos: idx for idx, pos in sample_index_map.items()}
-        df_scores["idx"] = df_scores.index.map(lambda i: pos_to_idx.get(i))
-        df_scores = df_scores.dropna(subset=["idx"])
-        df_scores["idx"] = df_scores["idx"].astype(int)
+    result = evaluate(dataset=dataset, metrics=metrics)
 
-        df_merged = df_all.merge(df_scores, on="idx", how="left")
-    else:
-        df_merged = df_all.copy()
-
-    # =====================================================
-    # ✅ scores.csv 저장: idx + 점수 4개만
-    # (ragas 버전에 따라 nv_* 로 바뀌어도 자동 대응)
-    # =====================================================
-    col_ctx = pick_col(df_merged, ["context_relevance", "nv_context_relevance", "context_relevancy", "nv_context_relevancy"])
-    col_fai = pick_col(df_merged, ["faithfulness", "nv_faithfulness"])
-    col_ans = pick_col(df_merged, ["answer_relevancy", "nv_answer_relevancy", "response_relevancy", "nv_response_relevancy"])
-    col_grd = pick_col(df_merged, ["response_groundedness", "nv_response_groundedness", "groundedness", "nv_groundedness"])
-
-    # 없으면 빈 컬럼 만들어서 "항상 4개" 형태 유지
-    if col_ctx is None:
-        df_merged["context_relevance"] = float("nan")
-        col_ctx = "context_relevance"
-    if col_fai is None:
-        df_merged["faithfulness"] = float("nan")
-        col_fai = "faithfulness"
-    if col_ans is None:
-        df_merged["answer_relevancy"] = float("nan")
-        col_ans = "answer_relevancy"
-    if col_grd is None:
-        df_merged["response_groundedness"] = float("nan")
-        col_grd = "response_groundedness"
-
-    df_out = df_merged[["idx", col_ctx, col_fai, col_ans, col_grd]].copy()
-    # 컬럼명 통일
-    df_out = df_out.rename(columns={
-        col_ctx: "context_relevance",
-        col_fai: "faithfulness",
-        col_ans: "answer_relevancy",
-        col_grd: "response_groundedness",
-    })
-
-    df_out.to_csv(SCORES_PATH, index=False, encoding="utf-8-sig")
+    df = result.to_pandas()
+    df.to_csv(SCORES_PATH, index=False, encoding="utf-8-sig")
 
     print("\n=== DONE ===")
-    print(f"[INFO] total items  : {len(df_all)}")
-    print(f"[INFO] eval samples : {len(samples)}")
-    print(f"[INFO] saved        : {SCORES_PATH}")
-
+    print(df)
 
 if __name__ == "__main__":
     main()
