@@ -5,62 +5,63 @@ from backend.langgraph_structure1.nodes.generate_node import generate_node
 from backend.langgraph_structure1.nodes.tone_adjust_node import tone_adjust_node, route_tone_adjust_node
 from backend.langgraph_structure1.nodes.scene_split_node import scene_split_node
 from backend.langgraph_structure1.rag.hybrid_node import hybrid_node
-# [HEAD 기능] 배경 생성 노드 임포트 유지
-from backend.langgraph_structure1.nodes.background_gen_node import background_gen_node
 
+# [병합 완료] 두 노드 모두 임포트
+from backend.langgraph_structure1.nodes.background_gen_node import background_gen_node
+from backend.langgraph_structure1.nodes.reaction_node import reaction_node
 
 def create_graph_flow():
     # 그래프에 사용할 변수 정의
     workflow = StateGraph(GraphState)
 
-    # 노드 추가
+    # 1. 노드 추가 (모두 다 추가)
     workflow.add_node("classify_node", classify_node)
     workflow.add_node("generate_node", generate_node)
     workflow.add_node("tone_adjust_node", tone_adjust_node)
     workflow.add_node("scene_split_node", scene_split_node)
-    workflow.add_node("background_gen_node", background_gen_node) # 배경 생성 노드 추가
-
-    # 하이브리드 노드 추가
     workflow.add_node("hybrid_node", hybrid_node)
+    
+    # 신규 노드들 등록
+    workflow.add_node("reaction_node", reaction_node)           # 리액션용
+    workflow.add_node("background_gen_node", background_gen_node) # 배경 생성용
 
-    # 노드 연결(엣지 추가)
+    # 2. 엣지(연결) 설정
     workflow.set_entry_point("classify_node")
 
-    # classify_node → hybrid_node 또는 END 로 분기
+    # [분기점 1] 분류 노드에서 갈림길
+    # - 질문/영상 요청 -> hybrid_node
+    # - 단순 리액션 -> reaction_node
     workflow.add_conditional_edges(
         "classify_node",
         route_classify,
         { 
             "hybrid_node": "hybrid_node",
-            END: END,
+            "reaction_node": "reaction_node",
         },
     )
 
-    workflow.add_edge("hybrid_node", "generate_node")
+    # [경로 A] 리액션 경로
+    workflow.add_edge("reaction_node", END)
 
-    # 말투 및 scene 분리 노드 연결
+    # [경로 B] 영상 생성 경로
+    workflow.add_edge("hybrid_node", "generate_node")
     workflow.add_edge("generate_node", "tone_adjust_node")
 
-    # [충돌 해결 구간]
-    # 1. DEV의 안전장치(조건부 엣지)를 먼저 적용
-    # 말투 수정이 잘 되었는지 확인 후 분기
+    # 말투 수정 검사 (안전장치 유지)
     workflow.add_conditional_edges(
         "tone_adjust_node",
         route_tone_adjust_node,
         { 
-            "scene_split_node": "scene_split_node", # 성공 시 장면 분리로 이동
-            END: END,                               # 실패 시 여기서 종료
+            "scene_split_node": "scene_split_node", # 성공 시 장면 분리로
+            END: END,                               # 실패 시 종료
         },
     )
 
-    # 2. HEAD의 추가 기능 연결
-    # 장면 분리가 끝나면 -> 바로 끝내지 말고 -> 배경 생성 노드로 이동
+    # [복구 완료] 장면 분리 -> 배경 생성 -> 종료
     workflow.add_edge("scene_split_node", "background_gen_node")
-    
-    # 3. 배경 생성이 끝나면 종료
     workflow.add_edge("background_gen_node", END)
 
-    # 4) 그래프 compile
+    # 그래프 compile
     graph = workflow.compile()
     
     return graph
