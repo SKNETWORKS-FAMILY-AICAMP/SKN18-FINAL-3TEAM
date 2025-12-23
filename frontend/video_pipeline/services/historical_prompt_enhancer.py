@@ -1,22 +1,29 @@
 """
 역사적 프롬프트 강화 모듈
 - 한국어 역사 용어를 시대가 명확한 영어로 변환
-- 임진왜란 배경을 정확하게 인식하도록 프롬프트 보강
+- 상황에 따라 평화로운 조선/임진왜란 배경을 유동적으로 적용
 - 현대 군인/무기 등장 방지
 """
 
+# 1. 평화로운 조선 시대 배경 (기본값)
+JOSEON_GENERAL_CONTEXT = """
+HISTORICAL CONTEXT:
+- Period: Joseon Dynasty 15th-16th century Korea (Pre-war or peaceful period)
+- Architecture: Traditional Korean palace, Hanok, stone walls, wooden structures
+- Atmosphere: Majestic, serene, scholarly, or daily life
+- Costume: Traditional Hanbok, court official robes (Gwanbok)
+- STRICT: NO modern elements, NO western buildings, NO electricity, NO concrete
+"""
 
-# 임진왜란 (1592-1598) 역사적 배경 정보
-IMJIN_WAR_CONTEXT = """CRITICAL HISTORICAL CONTEXT - Imjin War (1592-1598):
-- Period: Joseon Dynasty 16th century Korea (1592-1598 war period)
-- Korean side: Joseon Dynasty soldiers in traditional Korean armor (두정갑, 찰갑, traditional helmet 투구)
-- Japanese side: 16th century Japanese samurai in traditional samurai armor and equipment
-- Weapons: Traditional weapons ONLY (bows, arrows, swords, spears, polearms, NO guns except matchlock arquebus)
-- Architecture: Traditional Korean fortress architecture (석성, wooden gates, watchtowers)
-- Setting: Historical battlefield, fortress, coastal areas of Korea
-- STRICT: NO modern military, NO modern weapons, NO contemporary clothing, NO 20th/21st century elements
-- Time period: 16th century East Asia ONLY"""
-
+# 2. 임진왜란 전쟁 배경 (전투 키워드 감지 시 발동)
+IMJIN_WAR_CONTEXT = """
+CRITICAL HISTORICAL CONTEXT - Imjin War (1592-1598):
+- Period: Joseon Dynasty 16th century Korea (War period)
+- Participants: Joseon soldiers vs Japanese samurai invaders
+- Atmosphere: Battlefield, smoke, tension, urgency
+- Weapons: Bows, arrows, swords, spears, traditional cannons (No modern guns)
+- STRICT: NO modern military, NO tanks, NO rifles, NO camouflage uniforms
+"""
 
 # 한국어 → 시대 명확한 영어 변환 사전
 KOREAN_HISTORICAL_TERMS = {
@@ -42,122 +49,71 @@ KOREAN_HISTORICAL_TERMS = {
     '군인': '16th century soldiers',
     '장군': 'historical Korean general in traditional armor',
     '무사': '16th century warrior in traditional equipment',
-    '사무라이': '16th century samurai warrior',
     
-    # 인물 (임진왜란 주요 인물)
+    # 인물
     '이순신': 'Admiral Yi Sun-sin in traditional Korean naval commander armor',
     '권율': 'General Gwon Yul in traditional Korean military commander armor',
-    '김시민': 'General Kim Si-min in traditional Korean commander armor',
+    '세종': 'King Sejong the Great of Joseon Dynasty',
+    '세종대왕': 'King Sejong the Great in royal dragon robe',
+    '장영실': 'Jang Yeong-sil, historical scientist of Joseon',
     
     # 장소/지명
-    '부산진': 'Busanjin Fortress traditional Korean fortification',
-    '동래성': 'Dongnae Fortress traditional Korean stone fortress',
-    '상주': 'Sangju traditional Korean fortress area',
-    '행주산성': 'Haengju Mountain Fortress traditional Korean fortification',
-    '진주성': 'Jinju Fortress traditional Korean castle',
+    '궁': 'traditional Korean palace',
+    '경복궁': 'Gyeongbokgung Palace',
     '한성': 'Hanseong (Seoul) Joseon Dynasty capital city',
-    '평양성': 'Pyongyang Fortress traditional Korean fortification',
-    
-    # 건축물/시설
     '성': 'traditional Korean fortress with stone walls',
     '산성': 'traditional Korean mountain fortress',
-    '석성': 'traditional stone fortress',
-    '성곽': 'traditional fortress walls',
-    '성문': 'traditional Korean fortress gate',
-    '망루': 'traditional watchtower',
-    '진지': 'historical military position',
     
     # 무기/장비
     '활': 'traditional Korean bow',
     '화살': 'traditional arrows',
     '칼': 'traditional Korean sword',
-    '검': 'traditional sword',
     '창': 'traditional spear',
-    '장창': 'traditional Korean long spear',
-    '갑옷': 'traditional Korean armor',
-    '투구': 'traditional Korean helmet',
-    '방패': 'traditional shield',
     '총통': 'traditional Korean cannon',
-    '화포': 'traditional artillery',
-    
-    # 일반 용어
-    '군복': 'traditional military clothing of 16th century',
-    '군장': 'traditional military equipment',
-    '깃발': 'traditional military banner',
-    '진영': 'historical military camp',
+    '신기전': 'Singijeon (traditional rocket arrow launcher)',
 }
 
-
 def detect_korean_content(text: str) -> bool:
-    """
-    텍스트에 한국어가 포함되어 있는지 확인
-    
-    Args:
-        text: 확인할 텍스트
-    
-    Returns:
-        한국어 포함 여부
-    """
-    # 한글 유니코드 범위: AC00-D7A3
+    """텍스트에 한국어가 포함되어 있는지 확인"""
     for char in text:
         if '\uAC00' <= char <= '\uD7A3':
             return True
     return False
 
-
 def translate_historical_terms(text: str) -> str:
-    """
-    한국어 역사 용어를 시대가 명확한 영어로 변환
-    
-    Args:
-        text: 원본 텍스트 (한국어 포함 가능)
-    
-    Returns:
-        변환된 텍스트
-    """
+    """한국어 역사 용어를 시대가 명확한 영어로 변환"""
     if not detect_korean_content(text):
         return text
     
     translated_text = text
-    replacements = []
     
-    # 길이가 긴 순서대로 변환 (부분 매칭 방지)
+    # 길이가 긴 순서대로 변환
     sorted_terms = sorted(KOREAN_HISTORICAL_TERMS.items(), key=lambda x: len(x[0]), reverse=True)
     
     for korean_term, english_term in sorted_terms:
         if korean_term in translated_text:
             translated_text = translated_text.replace(korean_term, english_term)
-            replacements.append(f"'{korean_term}' → '{english_term[:40]}...'")
-    
-    if replacements:
-        print(f"    🔄 한국어 역사 용어 변환:")
-        for replacement in replacements[:5]:  # 처음 5개만 표시
-            print(f"       {replacement}")
-        if len(replacements) > 5:
-            print(f"       ... 외 {len(replacements) - 5}개 더")
     
     return translated_text
 
-
+# [Dev 브랜치 기능 흡수] 강력한 전투 감지 로직
 def is_battle_scene(prompt: str) -> bool:
     """
     프롬프트가 전투/전쟁 장면인지 판단
-
     Args:
         prompt: 원본 프롬프트
-
     Returns:
         전투 장면 여부
     """
-    # 전투 관련 키워드
+    # 전투 관련 키워드 (Dev 브랜치에서 가져옴)
     battle_keywords = [
         # 영어
         'battle', 'fight', 'attack', 'war', 'combat', 'charge', 'strike', 'clash',
         'siege', 'invasion', 'assault', 'defense', 'arrow', 'fire', 'explosion',
-        'cannon', 'shoot', 'blast', 'shell', 'victory', 'defeat',
+        'cannon', 'shoot', 'blast', 'shell', 'victory', 'defeat', 'killing', 'blood',
         # 한국어
         '전투', '전쟁', '공격', '방어', '침략', '함락', '승전', '대첩', '격전',
-        '화살', '포탄', '폭발', '발사', '사격', '포격', '돌격', '수성',
+        '화살', '포탄', '폭발', '발사', '사격', '포격', '돌격', '수성', '살육',
         # 임진왜란 특정 전투
         '부산진', '동래성', '상주', '행주', '진주성', '한산도', '명량'
     ]
@@ -168,95 +124,43 @@ def is_battle_scene(prompt: str) -> bool:
 
 def enhance_with_historical_context(prompt: str, is_image_prompt: bool = True) -> str:
     """
-    프롬프트에 임진왜란 역사적 배경 추가
-
-    Args:
-        prompt: 원본 프롬프트
-        is_image_prompt: 이미지 생성용인지 (True) 영상 생성용인지 (False)
-
-    Returns:
-        강화된 프롬프트
+    프롬프트에 조선시대/임진왜란 역사적 배경 추가
     """
     # 1단계: 한국어 용어 변환
     enhanced = translate_historical_terms(prompt)
-
-    # 2단계: 원본 프롬프트 분석 (전투/평화 판단)
-    is_battle = is_battle_scene(prompt)
-
-    # 3단계: 역사적 배경 추가
-    if is_image_prompt:
-        historical_suffix = """
-HISTORICAL SETTING REQUIREMENTS:
-- Joseon Dynasty 16th century Korea (1592-1598 Imjin War period)
-- Traditional Korean architecture (stone fortresses, wooden structures, traditional gates)
-- Soldiers in authentic period armor: Korean (두정갑/찰갑), Japanese (samurai armor)
-- Traditional weapons only: bows, arrows, swords, spears, traditional cannons
-- 16th century East Asian warfare atmosphere
-- NO modern elements: NO modern soldiers, NO modern weapons, NO contemporary clothing
-- Historical accuracy in costumes, architecture, and military equipment"""
+    
+    # 2단계: 전쟁 키워드 감지 (Dev 브랜치의 강력한 함수 사용)
+    is_war_scene = is_battle_scene(prompt)
+    
+    # 3단계: 상황에 맞는 컨텍스트 주입 (작성자님의 깔끔한 상수 사용)
+    if is_war_scene:
+        # 전쟁 상황
+        context_suffix = IMJIN_WAR_CONTEXT
+        if not is_image_prompt: # 영상용이면 더 짧게
+            context_suffix = "Setting: Fierce battlefield of Imjin War (1592). Smoke, fire, combat atmosphere."
+        print(f"    ⚔️ [History] 전투 장면 감지 -> 임진왜란 컨텍스트 적용")
     else:
-        # 영상 생성용: 전투/평화에 따라 다른 배경 추가
-        if is_battle:
-            # 전투 장면: 전투 키워드 포함
-            historical_suffix = """
-STRICT HISTORICAL PERIOD: Joseon Dynasty 16th century Korea, Imjin War 1592-1598 battle scene, traditional Korean and Japanese armor and weapons of the period, warfare atmosphere, NO modern military elements whatsoever"""
-            print(f"    ⚔️ 전투 장면 감지: 전투 효과 적용")
-        else:
-            # 평화로운 장면: 전투 키워드 제외
-            historical_suffix = """
-STRICT HISTORICAL PERIOD: Joseon Dynasty 16th century Korea peaceful scene, traditional Korean architecture and clothing of the period, serene atmosphere, NO modern elements whatsoever"""
-            print(f"    🏯 평화 장면 감지: 평화로운 효과 적용")
-
-    enhanced_prompt = f"{enhanced}. {historical_suffix}"
-
+        # 평화/일반 상황
+        context_suffix = JOSEON_GENERAL_CONTEXT
+        if not is_image_prompt: # 영상용이면 더 짧게
+            context_suffix = "Setting: Peaceful Joseon Dynasty scenery. Nature, palace, quiet atmosphere."
+        print(f"    🏯 [History] 평화 장면 감지 -> 조선시대 컨텍스트 적용")
+    
+    enhanced_prompt = f"{enhanced}. {context_suffix}"
+    
     return enhanced_prompt
 
-
 def add_anti_modern_negative_prompt() -> str:
-    """
-    현대 요소를 차단하는 네거티브 프롬프트 반환
-    
-    Returns:
-        현대 요소 차단용 네거티브 프롬프트
-    """
-    return """modern soldiers, modern military, contemporary uniforms, modern weapons, guns, rifles, machine guns, tanks, helicopters, modern equipment, 20th century, 21st century, present day, contemporary clothing, modern architecture, anachronistic elements, wrong historical period, modern military gear, tactical vest, combat helmet, camouflage uniform"""
-
+    """현대 요소 차단용 네거티브 프롬프트"""
+    return """modern soldiers, modern military, contemporary uniforms, modern weapons, guns, rifles, machine guns, tanks, helicopters, modern equipment, 20th century, 21st century, present day, contemporary clothing, modern architecture, power lines, cars, buildings, text, subtitle, watermark"""
 
 def process_scene_prompt(scene_prompt: str, is_image: bool = True) -> tuple:
-    """
-    장면 프롬프트를 처리하여 강화된 프롬프트와 네거티브 프롬프트 반환
+    """장면 프롬프트를 처리하여 강화된 프롬프트와 네거티브 프롬프트 반환"""
+    enhanced_prompt, _ = enhance_with_historical_context(scene_prompt, is_image_prompt=is_image), None
+    # 위 함수 리턴값이 str이므로 튜플 언패킹 수정 (enhanced_prompt만 받음)
     
-    Args:
-        scene_prompt: 원본 장면 프롬프트
-        is_image: 이미지 생성용인지 (True) 영상 생성용인지 (False)
-    
-    Returns:
-        (강화된 프롬프트, 현대 요소 차단 네거티브 프롬프트) 튜플
-    """
+    # enhance_with_historical_context가 str만 반환하므로 다시 호출
     enhanced_prompt = enhance_with_historical_context(scene_prompt, is_image_prompt=is_image)
     negative_prompt = add_anti_modern_negative_prompt()
     
     return enhanced_prompt, negative_prompt
-
-
-# 사용 예시
-if __name__ == "__main__":
-    # 테스트
-    test_prompts = [
-        "부산진 함락. 일본군 공격과 조선군 방어가 충돌하는 순간",
-        "행주대첩. 권율 장군과 조선군이 산성을 지키는 장면",
-        "이순신 장군이 왜군과 해전을 벌이는 장면",
-    ]
-    
-    print("="*60)
-    print("시대 배경 인식 강화 테스트")
-    print("="*60)
-    
-    for i, prompt in enumerate(test_prompts, 1):
-        print(f"\n[테스트 {i}]")
-        print(f"원본: {prompt}")
-        enhanced, negative = process_scene_prompt(prompt, is_image=True)
-        print(f"\n강화된 프롬프트:\n{enhanced[:200]}...")
-        print(f"\n네거티브 프롬프트:\n{negative[:150]}...")
-        print("-"*60)
-
