@@ -104,6 +104,51 @@ def deduplicate_and_select_top_evidences(evidences: list, top_k: int = 5) -> lis
     return sorted_evidences[:top_k]
 
 
+def format_convergence_nodes(convergence_nodes: list) -> str:
+    """
+    수렴 노드 정보를 포맷팅하여 프롬프트에 추가
+
+    Args:
+        convergence_nodes: 수렴 노드 리스트
+
+    Returns:
+        포맷팅된 수렴 노드 정보 문자열
+    """
+    if not convergence_nodes:
+        return ""
+
+    formatted = []
+    for i, node in enumerate(convergence_nodes[:5], 1):  # 최대 5개만
+        label = node.get("label", "")
+        node_type = node.get("type", "")
+        connected = ", ".join(node.get("connected_entities", []))
+        properties = node.get("properties", {})
+        relations = node.get("relations", [])
+
+        # 기본 정보
+        node_desc = f"[수렴노드 {i}] {label}"
+        if node_type:
+            node_desc += f" ({node_type})"
+        node_desc += f" - 연결된 엔티티: {connected}"
+
+        # 주요 속성 추가
+        prop_parts = []
+        for key, value in list(properties.items())[:3]:  # 최대 3개 속성
+            key_clean = key.replace("has", "").replace("_", " ")
+            prop_parts.append(f"{key_clean}: {value}")
+        if prop_parts:
+            node_desc += f", 속성: {', '.join(prop_parts)}"
+
+        # 주요 관계 추가
+        if relations:
+            rel_parts = [f"{r['predicate']} → {r['related']}" for r in relations[:3]]
+            node_desc += f", 관계: {', '.join(rel_parts)}"
+
+        formatted.append(node_desc)
+
+    return "\n".join(formatted)
+
+
 def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
     """근거를 학술적 서적 스타일로 포맷팅
 
@@ -404,6 +449,7 @@ def story_generator_node(state: GraphState) -> GraphState:
     evidences = state.get("evidences", [])
     causal_chains = state.get("causal_chains", [])
     extracted_entities = state.get("extracted_entities", [])
+    convergence_nodes = state.get("convergence_nodes", [])  # 수렴 노드
 
     llm = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL"),
@@ -413,6 +459,8 @@ def story_generator_node(state: GraphState) -> GraphState:
     print(f"\n{'='*70}")
     print(f"[Stage 6/6] 스토리 생성 (Story Generator)")
     print(f"{'='*70}")
+    if convergence_nodes:
+        print(f"  ├─ 수렴 노드: {len(convergence_nodes)}개 (핵심 연결 노드 사용)")
 
     # 근거가 없는 경우 처리
     if not evidences or len(evidences) == 0:
@@ -498,6 +546,12 @@ def story_generator_node(state: GraphState) -> GraphState:
             intent_info += f"\n관련 키워드: {', '.join(relation_keywords)}"
         intent_info += "\n→ 근거에서 이 의도와 관련된 정보를 우선적으로 사용하세요.\n"
 
+    # 수렴 노드 정보 추가
+    convergence_info = ""
+    if convergence_nodes:
+        convergence_formatted = format_convergence_nodes(convergence_nodes)
+        convergence_info = f"\n## 핵심 연결 노드 (수렴 노드)\n다음은 여러 엔티티를 연결하는 중요한 노드들입니다. 이 노드들을 답변에서 명시적으로 언급하고 설명하세요.\n\n{convergence_formatted}\n\n→ 이 수렴 노드들은 여러 인물/사건을 연결하는 중심 역할을 하므로, 답변에서 이들의 역할과 관계를 반드시 설명하세요.\n"
+
     story_prompt = f"""당신은 조선시대 역사를 전문적으로 설명하는 역사가입니다.
 
 ## 질문 (반드시 이 질문에 직접 답변하세요)
@@ -505,6 +559,7 @@ def story_generator_node(state: GraphState) -> GraphState:
 
 {entity_info_text}
 {intent_info}
+{convergence_info}
 
 **중요: 위 질문에 대한 명확하고 직접적인 답변을 반드시 제공하세요.**
 

@@ -1,89 +1,222 @@
-# 엔티티 관련성 점수 매기기 방식 (Scoring Methodology)
+# 점수 계산 방법론 (Scoring Methodology)
 
-> 한국사 RAG 시스템에서 엔티티 관련성을 정량화하는 하이브리드 점수 계산 방법론
+> 한국사 RAG 시스템의 엔티티 관련성 정량화 체계
 
 ---
 
 ## 📋 목차
 
 1. [개요](#개요)
-2. [핵심 개념](#핵심-개념)
-3. [점수 계산 흐름도](#점수-계산-흐름도)
-4. [하이브리드 점수 계산 공식](#하이브리드-점수-계산-공식)
-5. [코사인 유사도 직접 사용](#코사인-유사도-직접-사용)
-6. [확장 방법별 점수 책정](#확장-방법별-점수-책정)
-7. [실제 적용 예시](#실제-적용-예시)
-8. [버전 히스토리](#버전-히스토리)
+2. [전체 파이프라인에서의 점수 계산](#전체-파이프라인에서의-점수-계산)
+3. [3단계 가중치 시스템](#3단계-가중치-시스템)
+4. [Semantic Expansion 점수 계산](#semantic-expansion-점수-계산)
+5. [Path Evidence Aggregation 점수 계산](#path-evidence-aggregation-점수-계산)
+6. [베이스라인 테스트](#베이스라인-테스트)
+7. [향후 실험 계획](#향후-실험-계획)
 
 ---
 
 ## 개요
 
-한국사 RAG 시스템은 4가지 방법으로 엔티티를 확장하며, 각 엔티티의 관련성을 정량화하여 우선순위를 결정합니다:
+### 점수 계산의 목적
 
-- **SPARQL 기반 확장** (temporal, category, causal_chain): 온톨로지 관계 기반
-- **pgvector 확장**: 벡터 임베딩 유사도 기반
+온톨로지 그래프에서 추출된 근거(evidence)들의 **관련성(relevance)**을 평가하여, 질문에 가장 적합한 근거를 선별합니다.
 
-**핵심 과제:**
+### 핵심 원칙
 
-- SPARQL은 벡터 유사도를 제공하지 않음 → 고정 점수 필요
-- pgvector는 코사인 유사도를 제공 → 직접 활용
-
-**해결책: 하이브리드 점수 (ver2)**
-
-- 고정 점수(안정성) + 실제 유사도(정확성)의 가중평균
-- SPARQL은 유사도 없으므로 고정 점수로 fallback
-- pgvector는 코사인 유사도를 직접 사용하여 하이브리드 계산
+1. **다층 가중치 구조**: Semantic Expansion → Thread Type → Entity Boost
+2. **설정 기반 점수**: 모든 가중치는 환경변수로 제어 가능
+3. **SPARQL 연결 분석**: 키워드가 연결된 노드에 있으면 추가 점수
+4. **수렴 노드 감지**: 여러 엔티티를 연결하는 노드에 보너스
 
 ---
 
-## 핵심 개념
+## 전체 파이프라인에서의 점수 계산
 
-### 1️⃣ **코사인 거리 (Cosine Distance)**
+### 점수 계산이 발생하는 단계
 
-**정의:** 두 벡터 간의 각도 차이를 측정
+```
+[Stage 0/6] History Check
+   └─ 점수 계산 없음
 
-$$
-\text{Cosine Distance} = 1 - \text{Cosine Similarity} = 1 - \frac{A \cdot B}{||A|| \times ||B||}
-$$
+[Stage 1/6] Query Classification
+   └─ 점수 계산 없음
 
-**특징:**
+[Stage 1.5/6] User Intent Clarification
+   └─ 점수 계산 없음
 
-- **값이 작을수록** 두 벡터가 더 유사함
-- pgvector의 `<=>` 연산자가 코사인 거리 계산
-- 범위: `[0, 2]` (0 = 완전히 동일, 2 = 정반대 방향)
-- **정규화된 벡터 (OpenAI 임베딩)에 최적화**
+[Stage 2/6] Entity Extraction
+   ├─ base_score: TTL 매칭 점수 (1.0 / 0.7 / 0.3)
+   ├─ name_match_boost: 키워드별 +0.5
+   └─ sparql_connected_bonus: 연결 노드 분석 (+0.1/match, 최대 +0.3)
+   📊 출력: query_entities (각 엔티티에 base_score 포함)
 
-**PostgreSQL 예시:**
+[Stage 3/6] Semantic Expansion ⭐ 1차 점수 계산
+   ├─ 4가지 확장 방법 (causal_chain, temporal, category, pgvector)
+   ├─ 각 방법별 relevance_score 계산
+   ├─ sparql_connected_bonus 추가
+   └─ semantic_weight 적용 (FIXED_SCORE_*)
+   📊 출력: expanded_entities (각 엔티티에 relevance_score 포함)
 
-```sql
-SELECT content, (embedding <=> query_vector) AS cosine_dist
-FROM korean_history
-ORDER BY cosine_dist ASC  -- 거리 오름차순 = 유사도 내림차순
-LIMIT 10;
+[Stage 4/6] Parallel Knowledge Retrieval
+   └─ 점수 계산 없음 (5개 스레드에서 SPARQL 쿼리만 실행)
+   📊 출력: thread_results (각 스레드별 raw triples)
+
+[Stage 5/6] Path Evidence Aggregation ⭐ 2차 점수 계산 (최종)
+   ├─ base_weight: Thread Type Weight 적용
+   ├─ relevance_score: 트리플 관련성 평가
+   ├─ entity_boost: 질문 엔티티 매칭 품질 반영
+   ├─ convergence_bonus: 수렴 노드 감지 (×1.1)
+   └─ final_weight = base_weight × relevance_score × entity_boost × convergence
+   📊 출력: all_paths (각 근거에 weight 포함, 상위 15개 선택)
+
+[Stage 6/6] Story Generator
+   └─ 점수 계산 없음 (상위 15개 근거로 LLM 답변 생성)
 ```
 
-**OpenAI 임베딩과의 관계:**
+---
 
-OpenAI `text-embedding-3-small`은 정규화된 벡터 반환 (`||벡터|| = 1`)
+## 3단계 가중치 시스템
 
-- 코사인 거리: **내적 연산만** 필요 → 빠름 ⚡
-- L2 거리: 뺄셈 + 제곱 + 합 + 제곱근 → 느림 🐌
-- **성능 차이: 약 15-30% 향상**
+### Level 1: Semantic Expansion Weights
+
+**목적**: 의미론적 확장 방법의 중요도 반영
+
+**4가지 방법**:
+- `causal_chain`: 인과관계 체인 (예: leadsTo, causedBy)
+- `temporal`: 시간적 맥락 (±10년 범위)
+- `category`: 카테고리 분류 (동일 주제/유형)
+- `pgvector`: 벡터 유사도 (임베딩 검색)
+
+**설정 위치**: `config.py` → `FIXED_SCORE_*`
+
+**현재 값**: 모두 **1.0** (베이스라인 테스트)
 
 ---
 
-### 2️⃣ **코사인 유사도 (Cosine Similarity)**
+### Level 2: Thread Type Weights
 
-**정의:** 두 벡터 간의 방향 유사도 (0-1 범위)
+**목적**: 5개 병렬 검색 스레드의 상대적 중요도 반영
 
-**코사인 거리 → 유사도 변환 공식:**
+**5가지 스레드**:
+- `outgoing_relations`: A → B (나가는 관계)
+- `incoming_relations`: B → A (들어오는 관계)
+- `entity_properties`: A → "literal" (속성 값)
+- `connected_entities`: A → B → C (2-hop 연결)
+- `type_and_summary`: rdf:type, Summary (타입 및 요약)
 
-$$
-\text{Cosine Similarity} = 1 - \text{Cosine Distance}
-$$
+**설정 위치**: `config.py` → `THREAD_WEIGHT_*`
 
-**변환 테이블:**
+**현재 값**: 모두 **1.0** (베이스라인 테스트)
+
+---
+
+### Level 3: Entity Boost
+
+**목적**: 질문 엔티티와의 매칭 품질 반영
+
+**3가지 모드**:
+- `exact_match`: 정확히 일치
+- `partial_match`: 부분 일치
+- `normalized_match`: 정규화 일치
+
+**설정 위치**: `config.py` → `QUERY_ENTITY_MATCH_BOOST_*`
+
+**현재 값**: 모두 **1.0** (베이스라인 테스트)
+
+---
+
+## Semantic Expansion 점수 계산
+
+### 계산 흐름
+
+```
+원본 엔티티 (예: "세조 즉위")
+   ↓
+4가지 확장 방법 병렬 실행
+   ↓
+각 확장된 엔티티마다 relevance_score 계산
+   ↓
+SPARQL 연결 분석으로 보너스 추가
+   ↓
+semantic_weight 적용
+   ↓
+최종 relevance_score
+```
+
+### 방법별 점수 계산 로직
+
+#### 1. Causal Chain (인과관계 체인)
+
+**SPARQL 쿼리**: `leadsTo`, `causedBy`, `triggeredBy` 관계 추적
+
+**점수 계산**:
+```
+relevance_score = 1.0 (기본값)
++ SPARQL 연결 분석 보너스 (최대 +0.3)
+× FIXED_SCORE_CAUSAL_CHAIN (현재 1.0)
+```
+
+**예시**:
+- 질문: "세조 즉위의 원인은?"
+- 확장: "계유정난" (causedBy 관계)
+- 점수: 1.0 + 0.2 (SPARQL 연결) × 1.0 = **1.2**
+
+---
+
+#### 2. Temporal (시간적 맥락)
+
+**SPARQL 쿼리**: ±10년 범위 내 엔티티 검색 (`hasYear` 속성 활용)
+
+**점수 계산**:
+```
+relevance_score = 1.0 (기본값)
++ SPARQL 연결 분석 보너스 (최대 +0.3)
+× FIXED_SCORE_TEMPORAL (현재 1.0)
+```
+
+**예시**:
+- 질문: "임진왜란의 영향은?" (1592년)
+- 확장: "광해군 즉위" (1608년, +16년)
+- 점수: 1.0 + 0.1 × 1.0 = **1.1**
+
+---
+
+#### 3. Category (카테고리)
+
+**SPARQL 쿼리**: `hasCategory` 속성으로 동일 유형 검색
+
+**점수 계산**:
+```
+relevance_score = 1.0 (기본값)
++ SPARQL 연결 분석 보너스 (최대 +0.3)
+× FIXED_SCORE_CATEGORY (현재 1.0)
+```
+
+**예시**:
+- 질문: "강화도 조약의 배경은?" (카테고리: 조약)
+- 확장: "병자수호조약" (동일 카테고리)
+- 점수: 1.0 × 1.0 = **1.0**
+
+---
+
+#### 4. Pgvector (벡터 유사도)
+
+**pgvector 쿼리**: 코사인 거리 기반 유사 엔티티 검색
+
+**점수 계산** (하이브리드):
+```
+relevance_score = 고정 점수 × α + 코사인 유사도 × (1 - α)
+                = 0.65 × 0.6 + similarity × 0.4
+                = 0.39 + similarity × 0.4
+```
+
+**예시**:
+- 질문: "을미사변의 원인은?"
+- 확장: "명성황후 시해" (코사인 유사도 0.880)
+- 점수: 0.39 + (0.880 × 0.4) = **0.742**
+
+### 코사인 거리 vs 유사도
 
 | Cosine Distance | Cosine Similarity | 해석           |
 | --------------- | ----------------- | -------------- |
@@ -92,649 +225,369 @@ $$
 | 0.2             | 0.800             | 유사           |
 | 0.5             | 0.500             | 보통           |
 | 1.0             | 0.000             | 무관           |
-| 2.0             | -1.000            | 정반대 (극히 드뭄) |
 
-**특징:**
-
-- **값이 클수록** 더 유사함 (거리와 반대)
-- 범위: `[-1, 1]` (정규화 임베딩에서는 `[0, 1]`)
-- 벡터의 **방향만** 고려 (크기 무시)
-- OpenAI 임베딩에 **최적화된 메트릭**
+**변환 공식**: `Cosine Similarity = 1 - Cosine Distance`
 
 ---
 
-### 3️⃣ **고정 점수 (Fixed Score)**
+### SPARQL 연결 분석 보너스
 
-**정의:** 확장 방법(expansion method)에 따라 미리 정해진 기준 점수
+모든 확장 방법에 공통으로 적용되는 추가 점수입니다.
 
-**목적:**
-
-- SPARQL 기반 확장은 벡터 유사도가 없으므로 고정 점수 사용
-- 온톨로지 관계의 의미론적 중요도 반영
-- 점수의 안정성 보장
-
-**확장 방법별 고정 점수:**
-
-```python
-FIXED_SCORES = {
-    "causal_chain": 0.95,   # 인과관계 (가장 높은 관련성)
-    "temporal": 0.85,       # 시간적 맥락 (높은 관련성)
-    "category": 0.75,       # 카테고리 (중간 관련성)
-    "pgvector": 0.65        # 벡터 유사도 (보통 관련성)
-}
+**로직**:
+```
+1. 확장된 엔티티의 연결 노드 조회 (SPARQL)
+2. 각 연결 노드에 질문 키워드가 포함되어 있는지 확인
+3. 포함될 때마다 +0.1 (최대 +0.3)
 ```
 
-**설계 원칙:**
+**예시**:
+```
+확장 엔티티: "계유정난"
+연결 노드:
+  - "계유정난" --involves--> "세조" (키워드 "세조" 포함) → +0.1
+  - "계유정난" --involves--> "단종" (키워드 "세조" 미포함) → +0.0
+  - "계유정난" --Summary--> "세조가 단종을 폐위..." (키워드 "세조" 포함) → +0.1
 
-- 인과관계(`leadsTo`, `causedBy`) → 직접적 관련성 → **0.95** (최고)
-- 시간적 맥락(±10년) → 간접적 관련성 → **0.85**
-- 카테고리(동일 주제) → 배경 지식 → **0.75**
-- pgvector(벡터 검색) → 의미적 유사성 → **0.65** (기준)
+총 보너스: +0.2
+```
 
 ---
 
-### 4️⃣ **하이브리드 점수 (Hybrid Score)**
+## Path Evidence Aggregation 점수 계산
 
-**정의:** 고정 점수와 실제 유사도를 가중평균한 최종 관련성 점수
+### 계산 흐름
 
-**공식:**
+```
+5개 Thread 결과 (triples)
+   ↓
+각 트리플마다 개별 점수 계산
+   ↓
+base_weight (Thread Type)
+   ↓
+relevance_score (트리플 관련성)
+   ↓
+entity_boost (엔티티 매칭 품질)
+   ↓
+convergence_bonus (수렴 노드 감지)
+   ↓
+final_weight = base × relevance × boost × convergence
+   ↓
+상위 15개 선택
+```
 
-$$
-\text{Hybrid Score} = (\text{Fixed Score} \times \alpha) + (\text{Similarity} \times (1 - \alpha))
-$$
+### 단계별 점수 계산
 
-**파라미터:**
+#### 1. Base Weight (Thread Type)
 
-- **α (alpha)**: 고정 점수 가중치 (0-1)
-  - `α = 0.6` (기본): 고정 60%, 유사도 40%
-  - `α = 0.8`: 고정 우선 (안정성 중시)
-  - `α = 0.4`: 유사도 우선 (정확도 중시)
+**목적**: 스레드 유형별 기본 가중치
 
-**fallback 처리:**
+**계산**:
+```
+base_weight = thread_weights.get(thread_type, 1.0)
+```
 
-```python
-if similarity is None:
-    return fixed_score  # SPARQL 기반 확장
+**현재 값** (모두 1.0):
+- `outgoing_relations`: 1.0
+- `incoming_relations`: 1.0
+- `entity_properties`: 1.0
+- `connected_entities`: 1.0
+- `type_and_summary`: 1.0
+
+---
+
+#### 2. Relevance Score (트리플 관련성)
+
+**목적**: 트리플 (subject, predicate, object)과 질문의 관련성 평가
+
+**3가지 평가 기준**:
+
+**A. 엔티티 매칭** (×1.5)
+```
+subject 또는 object가 질문 엔티티에 포함되면 ×1.5
+```
+
+**B. 키워드 포함** (×1.3)
+```
+subject, predicate, object 중 하나라도 질문 키워드 포함 시 ×1.3
+```
+
+**C. Property Groups 매칭** (×1.2)
+```
+predicate가 선택된 property_groups에 속하면 ×1.2
+```
+
+**계산 순서**:
+```
+1. 기본 점수 = 1.0
+2. 엔티티 매칭 체크 → 1.0 × 1.5 = 1.5
+3. 키워드 포함 체크 → 1.5 × 1.3 = 1.95
+4. Property Groups 매칭 → 1.95 × 1.2 = 2.34
+
+최종 relevance_score = 2.34
+```
+
+**예시**:
+```
+질문: "세조의 재위 기간은?"
+키워드: ["세조", "재위", "기간"]
+질문 엔티티: ["세조"]
+
+트리플: ("세조", "hasReignStart", "1455")
+
+1. 엔티티 매칭: "세조" in query_entities → ×1.5
+2. 키워드 포함: "재위" not in triple → ×1.0
+3. Property Groups: "hasReignStart" in "재위" 그룹 → ×1.2
+
+relevance_score = 1.0 × 1.5 × 1.0 × 1.2 = 1.8
+```
+
+---
+
+#### 3. Entity Boost (엔티티 매칭 품질)
+
+**목적**: 질문 엔티티와의 매칭 품질 반영
+
+**계산**:
+```
+if subject in query_entities or object in query_entities:
+    entity_boost = QUERY_ENTITY_MATCH_BOOST_EXACT  # 현재 1.0
 else:
-    return (fixed_score * alpha) + (similarity * (1 - alpha))
+    entity_boost = 1.0
+```
+
+**현재**: 모든 boost 값이 1.0이므로 실질적 영향 없음 (베이스라인)
+
+---
+
+#### 4. Convergence Bonus (수렴 노드 감지)
+
+**목적**: 여러 질문 엔티티를 연결하는 중요 노드 발견
+
+**로직**:
+```
+1. 모든 트리플에서 노드별 연결 엔티티 수 계산
+2. 2개 이상의 질문 엔티티와 연결된 노드 → 수렴 노드
+3. 수렴 노드가 포함된 트리플 → ×1.1
+```
+
+**예시**:
+```
+질문: "세조와 단종의 관계는?"
+질문 엔티티: ["세조", "단종"]
+
+트리플 분석:
+  - ("계유정난", "involves", "세조")
+  - ("계유정난", "involves", "단종")
+
+수렴 노드: "계유정난" (2개 엔티티 모두와 연결)
+
+트리플: ("계유정난", "Summary", "1453년 수양대군이...")
+convergence_bonus = 1.1
 ```
 
 ---
 
-## 점수 계산 흐름도
+### 최종 Weight 계산
 
-### 🔄 LangGraph 노드별 점수 계산 흐름
-
-```mermaid
-graph TB
-    Start([사용자 질문]) --> ClassifyNode[Classify Node]
-    ClassifyNode --> |query_intent| EntityExtractor[Entity Extractor Node]
-
-    EntityExtractor --> |extracted_entities| SemanticExpander[Semantic Expander Node]
-
-    SemanticExpander --> Method{확장 방법 선택}
-
-    Method -->|1| Temporal[Temporal Context<br/>시간적 맥락 확장]
-    Method -->|2| Category[Category<br/>카테고리 확장]
-    Method -->|3| Causal[Causal Chain<br/>인과관계 확장]
-    Method -->|4| PGVector[PGVector<br/>벡터 유사도 확장]
-
-    Temporal --> TemporalScore{유사도 존재?}
-    TemporalScore -->|No| TempFixed["고정 점수만 사용<br/>score = 0.85"]
-
-    Category --> CategoryScore{유사도 존재?}
-    CategoryScore -->|No| CatFixed["고정 점수만 사용<br/>score = 0.75"]
-
-    Causal --> CausalScore{유사도 존재?}
-    CausalScore -->|No| CausFixed["고정 점수만 사용<br/>score = 0.95"]
-
-    PGVector --> PGSearch["similarity_search_with_score()<br/>코사인 유사도 직접 획득"]
-    PGSearch --> PGHybrid["하이브리드 점수 계산<br/>(0.65 × 0.6) + (similarity × 0.4)"]
-
-    TempFixed --> Merge[엔티티 병합 및 정렬]
-    CatFixed --> Merge
-    CausFixed --> Merge
-    PGHybrid --> Merge
-
-    Merge --> Sort["relevance_score 내림차순 정렬"]
-    Sort --> Output["expanded_entities<br/>(점수 순 정렬됨)"]
-
-    Output --> KnowledgeRetrieval[Knowledge Retrieval Nodes]
-
-    style Temporal fill:#E8F5E9
-    style Category fill:#FFF3E0
-    style Causal fill:#FCE4EC
-    style PGVector fill:#E3F2FD
-    style PGHybrid fill:#1976D2,color:#fff
-    style TempFixed fill:#4CAF50,color:#fff
-    style CatFixed fill:#FF9800,color:#fff
-    style CausFixed fill:#E91E63,color:#fff
+```
+final_weight = base_weight × relevance_score × entity_boost × convergence_bonus
 ```
 
-### 📊 점수 계산 상세 흐름
+**전체 예시**:
+```
+트리플: ("세조", "hasReignStart", "1455")
 
-```mermaid
-flowchart TD
-    A[엔티티 확장 시작] --> B{확장 방법?}
+base_weight = 1.0 (outgoing_relations)
+relevance_score = 1.8 (엔티티 매칭 + Property Groups)
+entity_boost = 1.0 (현재 baseline)
+convergence_bonus = 1.0 (수렴 노드 아님)
 
-    B -->|SPARQL 기반| C[temporal/category/causal]
-    B -->|벡터 기반| D[pgvector]
-
-    C --> C1["SPARQL 쿼리 실행<br/>(Fuseki)"]
-    C1 --> C2["관련 엔티티 획득<br/>(유사도 없음)"]
-    C2 --> C3["calculate_hybrid_score(None, method)"]
-    C3 --> C4{similarity is None?}
-    C4 -->|Yes| C5["return FIXED_SCORES[method]<br/>temporal: 0.85<br/>category: 0.75<br/>causal_chain: 0.95"]
-
-    D --> D1["pgvector.similarity_search_with_score()"]
-    D1 --> D2["(Document, Cosine Similarity) 획득<br/>1 - cosine_distance"]
-    D2 --> D4["calculate_hybrid_score(similarity, 'pgvector')"]
-    D4 --> D5["fixed = 0.65<br/>alpha = 0.6"]
-    D5 --> D6["score = (0.65 × 0.6) + (similarity × 0.4)<br/>= 0.39 + (similarity × 0.4)"]
-
-    C5 --> E[점수 할당 완료]
-    D6 --> E
-
-    E --> F["expanded_entities에 추가<br/>relevance_score 포함"]
-    F --> G["점수 내림차순 정렬"]
-    G --> H[상위 엔티티 우선 처리]
-
-    style C5 fill:#4CAF50,color:#fff
-    style D6 fill:#1976D2,color:#fff
-    style G fill:#FF9800,color:#fff
+final_weight = 1.0 × 1.8 × 1.0 × 1.0 = 1.8
 ```
 
 ---
 
-## 하이브리드 점수 계산 공식
+## 베이스라인 테스트
 
-### 🧮 수식 정의
+### 현재 설정 (모든 가중치 = 1.0)
 
-```python
-def calculate_hybrid_score(similarity, expansion_method, alpha=0.6):
-    """
-    하이브리드 점수 = (고정 점수 × α) + (유사도 × (1 - α))
+```
+# Semantic Expansion Weights
+FIXED_SCORE_CAUSAL_CHAIN = 1.0
+FIXED_SCORE_TEMPORAL = 1.0
+FIXED_SCORE_CATEGORY = 1.0
+FIXED_SCORE_PGVECTOR = 1.0
 
-    Args:
-        similarity: 벡터 유사도 (0-1) 또는 None
-        expansion_method: 확장 방법 문자열
-        alpha: 고정 점수 가중치 (0-1)
+# Thread Type Weights
+THREAD_WEIGHT_OUTGOING_RELATIONS = 1.0
+THREAD_WEIGHT_INCOMING_RELATIONS = 1.0
+THREAD_WEIGHT_ENTITY_PROPERTIES = 1.0
+THREAD_WEIGHT_CONNECTED_ENTITIES = 1.0
+THREAD_WEIGHT_TYPE_AND_SUMMARY = 1.0
 
-    Returns:
-        최종 관련성 점수 (0-1)
-    """
-    FIXED_SCORES = {
-        "causal_chain": 0.95,
-        "temporal": 0.85,
-        "category": 0.75,
-        "pgvector": 0.65
-    }
-
-    fixed_score = FIXED_SCORES.get(expansion_method, 0.5)
-
-    # SPARQL 기반 확장 (유사도 없음)
-    if similarity is None:
-        return fixed_score
-
-    # pgvector 확장 (유사도 있음)
-    return (fixed_score * alpha) + (similarity * (1 - alpha))
+# Entity Boost
+QUERY_ENTITY_MATCH_BOOST_EXACT = 1.0
+QUERY_ENTITY_MATCH_BOOST_PARTIAL = 1.0
+QUERY_ENTITY_MATCH_BOOST_NORMALIZED = 1.0
 ```
 
-### 📐 alpha 값에 따른 가중치 분배
+### 베이스라인 목적
 
-| Alpha   | 고정 점수 가중치 | 유사도 가중치 | 특징                             |
-| ------- | ---------------- | ------------- | -------------------------------- |
-| 0.8     | 80%              | 20%           | 안정성 우선 (온톨로지 관계 신뢰) |
-| **0.6** | **60%**          | **40%**       | **균형** (기본값) ⭐             |
-| 0.4     | 40%              | 60%           | 정확도 우선 (실제 유사도 신뢰)   |
-| 0.0     | 0%               | 100%          | 유사도만 사용 (고정 점수 무시)   |
-| 1.0     | 100%             | 0%            | 고정 점수만 사용 (ver1 방식)     |
+**가중치 없이 순수한 성능 측정**하여, 향후 가중치 튜닝의 기준점(baseline) 확보
+
+**측정 항목**:
+- RAGAS nv_context_relevance (불필요한 컨텍스트 비율)
+- RAGAS answer_relevancy (답변 관련성)
+- RAGAS faithfulness (근거 충실도)
+
+**베이스라인 후 진행**:
+1. RAGAS 평가 결과 분석
+2. 80가지 조합 실험 (4 × 5 × 4)
+3. 최적 가중치 조합 도출
+4. 질문 유형별 가중치 설정
 
 ---
 
-## 코사인 유사도 직접 사용
+## 향후 실험 계획
 
-### 🔢 pgvector에서 코사인 유사도 계산
+### Phase 1: 베이스라인 측정 (현재)
 
-```python
-# custom_pgvector.py에서 이미 처리
-def similarity_search_with_score(self, query: str, k: int = 4):
-    """코사인 유사도를 직접 반환 (변환 불필요)"""
-    query_emb = self.embedding_fn.embed_query(query)
+**목표**: 가중치 없는 순수 성능 측정
 
-    # 코사인 거리 → 유사도 변환을 SQL에서 직접 수행
-    cur.execute("""
-        SELECT content, metadata,
-               1 - (embedding <=> %s::vector) AS similarity
-        FROM korean_history
-        ORDER BY (embedding <=> %s::vector) ASC
-        LIMIT %s
-    """, (query_emb, query_emb, k))
+**설정**: 모든 가중치 = 1.0
 
-    return [(Document(...), float(similarity)) for row in rows]
+**평가**:
+- 40개 질문 (외국인 20개 + 아이들 20개)
+- RAGAS 3가지 메트릭
+- 실행 시간 측정
+
+---
+
+### Phase 2: 단일 변수 실험
+
+**목표**: 각 가중치 레벨의 영향도 개별 측정
+
+**실험 1: Semantic Expansion Weights**
+```
+causal_chain: [1.0, 1.2, 1.4, 1.6]
+temporal, category, pgvector: 1.0 (고정)
+
+→ 4가지 조합 테스트
 ```
 
-### 📈 코사인 거리 vs 유사도 관계
-
+**실험 2: Thread Type Weights**
 ```
-Cosine Similarity vs Cosine Distance
+outgoing_relations: [1.0, 1.2, 1.4, 1.6]
+나머지: 1.0 (고정)
 
-1.0 |●
-    |   ●
-0.9 |      ●
-    |         ●
-0.8 |            ●
-    |               ●
-0.7 |                  ●
-    |                     ●
-0.6 |                        ●
-    |                           ●
-0.5 |                              ●
-    |                                 ●
-0.4 |                                    ●
-    |                                       ●
-0.3 |                                          ●
-    |                                             ●
-0.2 |                                                ●
-    |                                                   ●
-0.1 |                                                      ●
-    |                                                         ●
-0.0 |____________________________________________________________●
-    0.0  0.1  0.2  0.3  0.4  0.5  0.6  0.7  0.8  0.9  1.0
-                     Cosine Distance
-
-    Similarity = 1 - Distance (완벽한 선형 관계)
+→ 5개 스레드 × 4가지 값 = 20가지 조합
 ```
 
-### 🎯 실전 예시
+**실험 3: Entity Boost**
+```
+exact_match: [1.0, 1.2, 1.5, 2.0]
+나머지: 1.0 (고정)
 
-**질문:** "을미사변의 원인은?"
-
-**pgvector 검색 결과 (코사인 유사도 직접 반환):**
-
-| 엔티티        | Cosine Distance | Cosine Similarity | 해석           |
-| ------------- | --------------- | ----------------- | -------------- |
-| 명성황후 시해 | 0.12            | 0.880             | 매우 관련 높음 |
-| 아관파천      | 0.18            | 0.820             | 관련 높음      |
-| 갑오개혁      | 0.25            | 0.750             | 관련 있음      |
-| 청일전쟁      | 0.35            | 0.650             | 보통 관련      |
-| 동학농민운동  | 0.50            | 0.500             | 약간 관련      |
-
-**사용 코드:**
-
-```python
-# similarity는 이미 코사인 유사도로 변환됨 (0-1 범위)
-for doc, similarity in doc_scores:
-    print(f"{doc.metadata['title']}: similarity={similarity:.3f}")
+→ 4가지 조합
 ```
 
 ---
 
-## 확장 방법별 점수 책정
+### Phase 3: 조합 실험
 
-### 1️⃣ **시간적 맥락 확장 (Temporal Context)**
+**목표**: 최적 가중치 조합 발견
 
-**SPARQL 쿼리:**
-
-```sparql
-SELECT ?entity ?label ?year WHERE {
-    ?entity hist:hasYear ?year .
-    ?entity rdfs:label ?label .
-    FILTER(?year >= {min_year} && ?year <= {max_year})
-}
+**실험 설계**:
+```
+4 (semantic) × 5 (thread) × 4 (boost) = 80가지 조합
 ```
 
-**점수 계산:**
-
-```python
-# 유사도 없음 (SPARQL 기반)
-"relevance_score": calculate_hybrid_score(None, "temporal")
-# → return FIXED_SCORES["temporal"] = 0.85
+**병렬 실행**:
+```bash
+# 8개 워커로 병렬 실행
+./backend/ragas/fuseki/run_parallel.sh 0 10
 ```
 
-**예시:**
-
-- 질문: "임진왜란의 영향은?" (1592년)
-- 확장 엔티티: 광해군 즉위 (1608년) → 점수 **0.85**
+**평가 기준**:
+1. nv_context_relevance 최대화 (불필요한 컨텍스트 최소화)
+2. answer_relevancy 유지/향상
+3. faithfulness 유지/향상
+4. 실행 시간 ≤ 30초
 
 ---
 
-### 2️⃣ **카테고리 확장 (Category)**
+### Phase 4: 질문 유형별 가중치
 
-**SPARQL 쿼리:**
+**목표**: 질문 유형에 따라 동적으로 가중치 조정
 
-```sparql
-SELECT ?entity ?label WHERE {
-    ?entity hist:hasCategory "{category}" .
-    ?entity rdfs:label ?label .
-}
+**질문 유형**:
+- `causal`: 인과관계 중심
+- `factual`: 사실 확인 중심
+- `deep_analysis`: 심층 분석 중심
+- `comparative`: 비교 분석 중심
+
+**가중치 전략 예시**:
 ```
+causal 질문:
+  - FIXED_SCORE_CAUSAL_CHAIN = 1.5 (강화)
+  - THREAD_WEIGHT_INCOMING_RELATIONS = 1.3 (원인 추적)
 
-**점수 계산:**
+factual 질문:
+  - THREAD_WEIGHT_ENTITY_PROPERTIES = 1.4 (속성 중요)
+  - THREAD_WEIGHT_TYPE_AND_SUMMARY = 1.3 (기본 정보)
 
-```python
-"relevance_score": calculate_hybrid_score(None, "category")
-# → return FIXED_SCORES["category"] = 0.75
-```
-
-**예시:**
-
-- 질문: "강화도 조약의 배경은?" (카테고리: 조약)
-- 확장 엔티티: 병자수호조약, 한미수호조약 → 점수 **0.75**
-
----
-
-### 3️⃣ **인과관계 체인 확장 (Causal Chain)**
-
-**SPARQL 쿼리:**
-
-```sparql
-SELECT ?related ?label WHERE {
-    {
-        <{uri}> ?predicate ?related .
-        FILTER(?predicate IN (hist:leadsTo, hist:causedBy, hist:triggeredBy))
-    }
-    UNION
-    {
-        ?related ?predicate <{uri}> .
-        FILTER(?predicate IN (hist:leadsTo, hist:causedBy))
-    }
-}
-```
-
-**점수 계산:**
-
-```python
-"relevance_score": calculate_hybrid_score(None, "causal_chain")
-# → return FIXED_SCORES["causal_chain"] = 0.95
-```
-
-**예시:**
-
-- 질문: "갑신정변의 원인은?"
-- 확장 엔티티 (leadsTo): 갑신정변 → 한성조약 → 점수 **0.95**
-
----
-
-### 4️⃣ **pgvector 벡터 유사도 확장**
-
-**PostgreSQL 쿼리 (코사인 거리 사용):**
-
-```sql
-SELECT content, metadata,
-       1 - (embedding <=> query_vector) AS similarity
-FROM korean_history
-ORDER BY (embedding <=> %s::vector) ASC
-LIMIT 15;
-```
-
-**점수 계산 (하이브리드):**
-
-```python
-# similarity는 이미 코사인 유사도 (0-1 범위)
-# CustomPGVector에서 이미 변환됨: 1 - cosine_distance
-
-# 하이브리드 점수 계산
-score = calculate_hybrid_score(similarity, "pgvector", alpha=0.6)
-# → (0.65 × 0.6) + (similarity × 0.4)
-# → 0.39 + (similarity × 0.4)
-```
-
-**예시 (alpha=0.6):**
-
-| Cosine Distance | Cosine Similarity | 하이브리드 점수 | 계산식               |
-| --------------- | ----------------- | --------------- | -------------------- |
-| 0.05            | 0.950             | **0.770**       | 0.39 + (0.950 × 0.4) |
-| 0.12            | 0.880             | **0.742**       | 0.39 + (0.880 × 0.4) |
-| 0.20            | 0.800             | **0.710**       | 0.39 + (0.800 × 0.4) |
-| 0.35            | 0.650             | **0.650**       | 0.39 + (0.650 × 0.4) |
-| 0.50            | 0.500             | **0.590**       | 0.39 + (0.500 × 0.4) |
-
-**코드:**
-
-```python
-doc_scores = pgvector.similarity_search_with_score(query=query, k=15)
-
-for doc, similarity in doc_scores:
-    # similarity는 이미 코사인 유사도로 변환됨 (변환 불필요)
-    relevance_score = calculate_hybrid_score(similarity, "pgvector")
-
-    expanded_entities.append({
-        "name": doc.metadata["title"],
-        "pgvector_similarity": similarity,
-        "relevance_score": relevance_score
-    })
+deep_analysis 질문:
+  - THREAD_WEIGHT_CONNECTED_ENTITIES = 1.5 (연결 관계 중요)
+  - QUERY_ENTITY_MATCH_BOOST_EXACT = 1.3 (정확한 매칭)
 ```
 
 ---
 
-## 실제 적용 예시
+### Phase 5: 실시간 튜닝
 
-### 📝 케이스 스터디: "을미사변의 원인은?"
+**목표**: 사용자 피드백 기반 가중치 자동 조정
 
-#### **1단계: Entity Extractor Node**
-
-```python
-extracted_entities = [
-    {"name": "을미사변", "uri": "hist:UlmiIncident", "type": "Event"}
-]
-```
-
-#### **2단계: Semantic Expander Node - 4가지 확장**
-
-##### **A. 시간적 맥락 확장 (1895년 ±10년)**
-
-```python
-temporal_entities = [
-    {
-        "name": "갑오개혁",
-        "expansion_method": "temporal",
-        "relevance_score": 0.85  # calculate_hybrid_score(None, "temporal")
-    },
-    {
-        "name": "청일전쟁",
-        "expansion_method": "temporal",
-        "relevance_score": 0.85
-    }
-]
-```
-
-##### **B. 카테고리 확장 (정치사건)**
-
-```python
-category_entities = [
-    {
-        "name": "갑신정변",
-        "expansion_method": "category",
-        "relevance_score": 0.75  # calculate_hybrid_score(None, "category")
-    }
-]
-```
-
-##### **C. 인과관계 확장 (causedBy)**
-
-```python
-causal_entities = [
-    {
-        "name": "아관파천",
-        "expansion_method": "causal_chain",
-        "causal_relation": "leadsTo",
-        "relevance_score": 0.95  # calculate_hybrid_score(None, "causal_chain")
-    }
-]
-```
-
-##### **D. pgvector 벡터 유사도 확장**
-
-```python
-pgvector_entities = [
-    {
-        "name": "명성황후 시해",
-        "expansion_method": "pgvector",
-        "pgvector_similarity": 0.880,  # 코사인 유사도 (직접 반환)
-        "relevance_score": 0.742  # (0.65 × 0.6) + (0.880 × 0.4)
-    },
-    {
-        "name": "고종황제",
-        "expansion_method": "pgvector",
-        "pgvector_similarity": 0.820,  # 코사인 유사도
-        "relevance_score": 0.718  # (0.65 × 0.6) + (0.820 × 0.4)
-    },
-    {
-        "name": "러시아 공사관",
-        "expansion_method": "pgvector",
-        "pgvector_similarity": 0.750,  # 코사인 유사도
-        "relevance_score": 0.690  # (0.65 × 0.6) + (0.750 × 0.4)
-    }
-]
-```
-
-#### **3단계: 엔티티 병합 및 점수 순 정렬**
-
-```python
-expanded_entities = [
-    {"name": "아관파천",      "method": "causal_chain", "score": 0.95},  # 1위
-    {"name": "갑오개혁",       "method": "temporal",     "score": 0.85},  # 2위
-    {"name": "청일전쟁",       "method": "temporal",     "score": 0.85},  # 2위
-    {"name": "갑신정변",       "method": "category",     "score": 0.75},  # 4위
-    {"name": "명성황후 시해",  "method": "pgvector",     "score": 0.742}, # 5위 (코사인 유사도)
-    {"name": "고종황제",       "method": "pgvector",     "score": 0.718}, # 6위 (코사인 유사도)
-    {"name": "러시아 공사관",  "method": "pgvector",     "score": 0.690}  # 7위 (코사인 유사도)
-]
-```
-
-#### **4단계: 최종 RAG 컨텍스트 구성**
-
-```
-[질문] 을미사변의 원인은?
-
-[관련 엔티티 - 점수 순]
-1. 아관파천 (인과관계, 0.95) ⭐ 직접적 결과
-2. 갑오개형 (시간적, 0.85)
-3. 청일전쟁 (시간적, 0.85)
-4. 갑신정변 (카테고리, 0.75)
-5. 명성황후 시해 (벡터, 0.698) ⭐ 핵심 사건
-6. 고종황제 (벡터, 0.640)
-7. 러시아 공사관 (벡터, 0.590)
-
-→ Knowledge Retrieval에서 상위 엔티티 우선 검색
-```
+**방법**:
+1. 사용자 만족도 수집 (👍/👎)
+2. 불만족 케이스 분석
+3. 가중치 미세 조정 (±0.1)
+4. A/B 테스트로 검증
 
 ---
 
-## 버전 히스토리
+## 요약
 
-### 🚫 **ver0 - 초기 (문제 있음)**
+### 점수 계산 핵심 흐름
 
-**문제:**
-
-```python
-"relevance_score": similarity * 0.8  # ❌ 0.8 곱하면 점수 감소!
+```
+[Stage 3] Semantic Expansion
+   ↓ relevance_score (4가지 방법)
+   ↓ + SPARQL 연결 분석 보너스
+   ↓ × semantic_weight
+   ↓
+[Stage 5] Path Evidence Aggregation
+   ↓ base_weight (Thread Type)
+   ↓ × relevance_score (트리플 관련성)
+   ↓ × entity_boost (매칭 품질)
+   ↓ × convergence_bonus (수렴 노드)
+   ↓
+final_weight → 상위 15개 선택
 ```
 
-**예시:**
+### 현재 상태
 
-- 벡터 유사도 0.9 → 0.9 × 0.8 = **0.72** (감소!)
-- 관련도가 높을수록 점수가 낮아지는 논리적 모순
+- **모든 가중치 = 1.0** (베이스라인 테스트)
+- **실질적 차별화 요소**: SPARQL 연결 분석, 트리플 관련성 평가, 수렴 노드 감지
+- **다음 단계**: RAGAS 평가 → 80가지 조합 실험 → 최적 가중치 도출
 
-**문제점:**
+### 문서 참고
 
-- 0 < x < 1을 곱하면 점수 **감소** (패널티)
-- 부스트가 아닌 페널티 효과
-
----
-
-### ✅ **ver1 - 고정 가중치 × 배수 (개선)**
-
-**개선:**
-
-```python
-RELEVANCE_MULTIPLIERS = {
-    "causal_chain": 1.9,
-    "temporal": 1.7,
-    "category": 1.5,
-    "pgvector": 1.3
-}
-BASE_SCORE = 0.5
-
-"relevance_score": BASE_SCORE * RELEVANCE_MULTIPLIERS["causal_chain"]
-# → 0.5 × 1.9 = 0.95
-```
-
-**장점:**
-
-- ✅ 1 이상의 배수로 점수 **증가** (논리적)
-- ✅ 단순하고 예측 가능
-- ✅ 디버깅 용이
-
-**한계:**
-
-- ❌ 실제 벡터 유사도 무시
-- ❌ 모든 pgvector 결과에 동일한 점수 (0.65)
-
----
-
-### ⭐ **ver2 - 하이브리드 (현재) [2025-12-07]**
-
-**공식:**
-
-```python
-def calculate_hybrid_score(similarity, expansion_method, alpha=0.6):
-    fixed_score = FIXED_SCORES[expansion_method]
-    if similarity is None:
-        return fixed_score
-    return (fixed_score * alpha) + (similarity * (1 - alpha))
-```
-
-**장점:**
-
-- ✅ **고정 점수의 안정성** + **실제 유사도의 정확성** 결합
-- ✅ alpha 값으로 밸런스 조정 가능
-- ✅ SPARQL 확장은 고정 점수로 fallback
-- ✅ pgvector 확장은 실제 코사인 거리 활용
-
-**적용:**
-
-- SPARQL (temporal, category, causal_chain): 고정 점수만
-- pgvector: 코사인 거리 → 유사도 변환 → 하이브리드 계산
-
-**예시:**
-
-```python
-# SPARQL 기반
-calculate_hybrid_score(None, "temporal")
-→ 0.85
-
-# pgvector 기반 (cosine distance = 0.12)
-similarity = 1 - 0.12 = 0.880  # 코사인 유사도
-calculate_hybrid_score(0.880, "pgvector", alpha=0.6)
-→ (0.65 × 0.6) + (0.880 × 0.4) = 0.742
-```
-
----
-
-## 참고 자료
-
-### 📚 관련 문서
-
+- [conversational_intent_clarification.md](./conversational_intent_clarification.md) - 대화형 의도 확인 시스템
 - [README.md](./README.md) - 전체 시스템 아키텍처
-- [semantic_expander_node.py](../nodes/semantic_expander_node.py) - 점수 계산 구현
-- [custom_pgvector.py](../../db_pipeline/services/custom_pgvector.py) - 코사인 거리 검색
-
-### 🔧 핵심 파일
-
-- `semantic_expander_node.py:36-62` - `calculate_hybrid_score()` 함수
-- `semantic_expander_node.py:403-447` - pgvector 확장 + 하이브리드 점수
-- `custom_pgvector.py:143-170` - `similarity_search_with_score()` 구현
-
-### 📊 수식 참고
-
-- 코사인 거리: [Cosine Similarity](https://en.wikipedia.org/wiki/Cosine_similarity)
-- 하이브리드 점수: 가중평균 (Weighted Average)
-- pgvector 연산자: [pgvector Operators](https://github.com/pgvector/pgvector#vector-operators)
+- [WEIGHTS_ANALYSIS.md](../../ragas/fuseki/WEIGHTS_ANALYSIS.md) - 가중치 실험 결과 (실험 후 작성 예정)
 
 ---
 
-**작성일:** 2025-12-07
-**버전:** ver2 (하이브리드 점수)
-**작성자:** Claude Code
+**최종 업데이트**: 2025-12-23
+**현재 버전**: Phase 1 (베이스라인 테스트)

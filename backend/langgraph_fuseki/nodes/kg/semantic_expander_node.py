@@ -47,36 +47,77 @@ FIXED_SCORES = {
     "pgvector": FIXED_SCORE_PGVECTOR
 }
 
-def calculate_relevance_score(similarity, expansion_method):
+def calculate_relevance_score(similarity, expansion_method, **kwargs):
     """
-    관련성 점수 계산:
-    - pgvector 확장: 벡터 유사도가 있으면 유사도 × 가중치, 없으면 가중치 사용
-    - 다른 확장 방법: 가중치 사용
+    관련성 점수 계산 (SPARQL 결과 기반 세분화):
+    - temporal: 연도 거리(year_distance)로 근접도 계산
+    - causal_chain: hop 수(hop_count)로 감쇠 계산
+    - category: 타입 일치(same_type)로 보정
+    - pgvector: 벡터 유사도가 있으면 유사도 × 가중치
 
     Args:
         similarity: 벡터 유사도 (0-1) 또는 None
         expansion_method: 확장 방법 ("causal_chain", "temporal", "category", "pgvector")
+        **kwargs: SPARQL 결과 메타데이터
+            - year_distance: 연도 거리 (temporal용)
+            - hop_count: hop 수 (causal_chain용)
+            - same_type: 타입 일치 여부 (category용)
 
     Returns:
-        관련성 점수 (0-1)
+        관련성 점수 (0-1 범위)
 
     Examples:
+        >>> calculate_relevance_score(None, "temporal", year_distance=2)
+        0.9  # 2년 차이: 가중치(1.0) × proximity_factor(0.9) = 0.9
+
+        >>> calculate_relevance_score(None, "temporal", year_distance=15)
+        0.25  # 15년 차이: 가중치(1.0) × proximity_factor(0.25) = 0.25
+
+        >>> calculate_relevance_score(None, "causal_chain", hop_count=1)
+        1.0  # 1-hop: 가중치(1.0) × decay_factor(1.0) = 1.0
+
+        >>> calculate_relevance_score(None, "causal_chain", hop_count=3)
+        0.81  # 3-hop: 가중치(1.0) × decay_factor(0.9^2) = 0.81
+
+        >>> calculate_relevance_score(None, "category", same_type=True)
+        1.0  # 동일 타입: 가중치(1.0) × 1.0 = 1.0
+
+        >>> calculate_relevance_score(None, "category", same_type=False)
+        0.8  # 다른 타입: 가중치(1.0) × 0.8 = 0.8
+
         >>> calculate_relevance_score(0.88, "pgvector")
         0.88  # 유사도(0.88) × 가중치(1.0) = 0.88
-
-        >>> calculate_relevance_score(None, "pgvector")
-        1.0  # 벡터 유사도 없으면 가중치만 사용
-
-        >>> calculate_relevance_score(None, "temporal")
-        1.0  # 가중치 사용
     """
     weight = FIXED_SCORES.get(expansion_method, 1.0)
-    
-    # pgvector 확장이고 벡터 유사도가 있고 USE_VECTOR_SIMILARITY_SCORE=true이면 유사도 × 가중치
-    if expansion_method == "pgvector" and similarity is not None and USE_VECTOR_SIMILARITY_SCORE:
-        return similarity * weight
 
-    # 그 외의 경우 가중치만 사용
+    # Temporal: 연도 거리로 근접도 계산
+    if expansion_method == "temporal":
+        year_distance = kwargs.get("year_distance", 10)
+        # 연도 거리가 가까울수록 높은 점수 (0년: 1.0, 10년: 0.5, 20년 이상: 0.0)
+        proximity_factor = max(0.0, 1.0 - (year_distance / 20.0))
+        return weight * proximity_factor
+
+    # Causal Chain: hop 수로 감쇠 계산
+    elif expansion_method == "causal_chain":
+        hop_count = kwargs.get("hop_count", 1)
+        # hop이 적을수록 높은 점수 (1-hop: 1.0, 2-hop: 0.9, 3-hop: 0.81)
+        decay_factor = 0.9 ** (hop_count - 1)
+        return weight * decay_factor
+
+    # Category: 타입 일치로 보정
+    elif expansion_method == "category":
+        same_type = kwargs.get("same_type", True)
+        # 동일 타입이면 1.0, 다른 타입이면 0.8
+        type_factor = 1.0 if same_type else 0.8
+        return weight * type_factor
+
+    # Pgvector: 벡터 유사도 사용
+    elif expansion_method == "pgvector":
+        if similarity is not None and USE_VECTOR_SIMILARITY_SCORE:
+            return similarity * weight
+        return weight
+
+    # 기타: 가중치만 사용
     return weight
 
 
@@ -250,9 +291,18 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
                     uri = binding.get("entity", {}).get("value", "")
                     label = binding.get("label", {}).get("value", "")
                     entity_type = binding.get("type", {}).get("value", "").split("#")[-1]
+                    result_year_str = binding.get("year", {}).get("value", "")
 
                     if uri not in seen and label:
                         seen.add(uri)
+
+                        # 연도 거리 계산
+                        try:
+                            result_year = int(result_year_str)
+                            year_distance = abs(year - result_year)
+                        except (ValueError, TypeError):
+                            year_distance = 10  # 기본값
+
                         expanded_entities.append({
                             "type": entity_type,
                             "name": label,
@@ -260,7 +310,8 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
                             "matched": True,
                             "expansion_method": "temporal",
                             "expansion_source": entity.get("name"),
-                            "relevance_score": calculate_relevance_score(None, "temporal")  # 가중치 사용
+                            "year_distance": year_distance,
+                            "relevance_score": calculate_relevance_score(None, "temporal", year_distance=year_distance)
                         })
         except:
             pass
@@ -286,6 +337,7 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
     for entity in entities[:8]:  # 상위 8개만
         uri = entity.get("uri")
         entity_name = entity.get("name", "")
+        source_entity_type = entity.get("type", "")
         if not uri:
             continue
 
@@ -386,6 +438,10 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
 
                     if uri_new not in seen and label:
                         seen.add(uri_new)
+
+                        # 타입 일치 여부 확인
+                        same_type = (entity_type == source_entity_type) if source_entity_type else True
+
                         expanded_entities.append({
                             "type": entity_type,
                             "name": label,
@@ -394,7 +450,8 @@ def expand_by_category(entities: list, ttl_data: dict) -> list:
                             "expansion_method": "category",
                             "expansion_source": entity.get("name"),
                             "category": category,
-                            "relevance_score": calculate_relevance_score(None, "category")  # 가중치 사용
+                            "same_type": same_type,
+                            "relevance_score": calculate_relevance_score(None, "category", same_type=same_type)
                         })
             else:
                 print(f"  │  │  └─ 동일 카테고리 검색 실패 (HTTP {response2.status_code})")
@@ -540,6 +597,11 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
 
                     if uri_related not in seen and label:
                         seen.add(uri_related)
+
+                        # 현재 SPARQL은 직접 연결만 조회하므로 hop_count=1
+                        # 향후 다중 hop SPARQL 구현 시 hop_count를 동적으로 계산 가능
+                        hop_count = 1
+
                         expanded_entities.append({
                             "type": entity_type,
                             "name": label,
@@ -548,7 +610,8 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                             "expansion_method": "causal_chain",
                             "expansion_source": entity.get("name"),
                             "causal_relation": predicate,
-                            "relevance_score": calculate_relevance_score(None, "causal_chain")  # 가중치 사용
+                            "hop_count": hop_count,
+                            "relevance_score": calculate_relevance_score(None, "causal_chain", hop_count=hop_count)
                         })
             else:
                 print(f"  │  │  └─ SPARQL 실패 (HTTP {response.status_code})")

@@ -154,17 +154,21 @@ def calculate_improved_relevance_score(path_data: dict, query_entities: list = N
     return score
 
 
-def detect_convergence_nodes(inference_paths: dict, query_entities: list) -> dict:
+def detect_convergence_nodes(inference_paths: dict, query_entities: list) -> list:
     """
-    수렴 노드 감지: 여러 쿼리 엔티티를 연결하는 중간 노드 찾기
+    수렴 노드 감지 및 상세 정보 조회: 여러 쿼리 엔티티를 연결하는 중간 노드 찾기
 
     Args:
         inference_paths: 쓰레드별 추론 경로
         query_entities: 추출된 엔티티 목록
 
     Returns:
-        {node_uri: {"count": N, "connected_entities": [...], "boost": 2.0}}
+        수렴 노드 리스트 (각 노드의 URI, 연결된 엔티티, 속성, 관계 정보 포함)
+        [{"uri": "...", "label": "...", "count": N, "connected_entities": [...],
+          "properties": {...}, "relations": [...]}]
     """
+    from backend.langgraph_fuseki.config import FUSEKI_URL
+    import requests
 
     entity_connections = {}  # node_uri → set of query entities it connects
 
@@ -175,7 +179,7 @@ def detect_convergence_nodes(inference_paths: dict, query_entities: list) -> dic
 
             # connected_entities 쓰레드에서 수렴 노드 추출
             if thread_type == "connected_entities":
-                convergence_node = raw_data.get("convergence_node")# ==========(,default)인지 체크해볼것 ============
+                convergence_node = raw_data.get("convergence_node")
                 entity1_label = raw_data.get("label1", "")
                 entity2_label = raw_data.get("label2", "")
 
@@ -201,16 +205,133 @@ def detect_convergence_nodes(inference_paths: dict, query_entities: list) -> dic
                             entity_connections[entity_uri].add(query_name)
 
     # 수렴 노드 필터링 (2개 이상의 쿼리 엔티티를 연결)
-    convergence_nodes = {}
+    convergence_candidates = {}
     for node_uri, connected_entities in entity_connections.items():
         if len(connected_entities) >= 2:
-            convergence_nodes[node_uri] = {
+            convergence_candidates[node_uri] = {
                 "count": len(connected_entities),
-                "connected_entities": list(connected_entities),
-                "boost": 1.1  # 1.1배 가중치 부스트
+                "connected_entities": list(connected_entities)
             }
 
-    return convergence_nodes
+    if not convergence_candidates:
+        return []
+
+    # 각 수렴 노드에 대해 추가 SPARQL 조회
+    convergence_nodes_with_details = []
+
+    for node_uri, info in convergence_candidates.items():
+        # URI 형식 처리
+        if node_uri.startswith("hist:"):
+            uri_sparql = node_uri
+        elif node_uri.startswith("http://"):
+            uri_sparql = f"<{node_uri}>"
+        elif node_uri.startswith("<"):
+            uri_sparql = node_uri
+        else:
+            uri_sparql = f"<{node_uri}>"
+
+        # SPARQL 쿼리: 수렴 노드의 속성 및 관계 조회
+        sparql_query = f"""
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+            SELECT ?label ?type ?predicate ?value ?relatedLabel WHERE {{
+                # 노드 라벨
+                OPTIONAL {{ {uri_sparql} rdfs:label ?label . }}
+
+                # 노드 타입
+                OPTIONAL {{ {uri_sparql} rdf:type ?type . }}
+
+                # 노드의 속성 (리터럴 값)
+                OPTIONAL {{
+                    {uri_sparql} ?predicate ?value .
+                    FILTER(isLiteral(?value))
+                    FILTER(?predicate != rdfs:label)
+                }}
+
+                # 노드의 관계 (다른 엔티티와의 연결)
+                OPTIONAL {{
+                    {{
+                        {uri_sparql} ?predicate ?related .
+                        ?related rdfs:label ?relatedLabel .
+                        FILTER(?predicate != rdf:type && ?predicate != rdfs:label)
+                    }}
+                    UNION
+                    {{
+                        ?related ?predicate {uri_sparql} .
+                        ?related rdfs:label ?relatedLabel .
+                        FILTER(?predicate != rdf:type && ?predicate != rdfs:label)
+                    }}
+                }}
+            }} LIMIT 50
+        """
+
+        try:
+            response = requests.post(
+                f"{FUSEKI_URL}/sparql",
+                data={"query": sparql_query},
+                headers={"Accept": "application/sparql-results+json"},
+                timeout=3
+            )
+
+            if response.status_code == 200:
+                results = response.json()
+                bindings = results.get("results", {}).get("bindings", [])
+
+                # 결과 파싱
+                node_label = ""
+                node_type = ""
+                properties = {}
+                relations = []
+
+                for binding in bindings:
+                    if not node_label and binding.get("label"):
+                        node_label = binding.get("label", {}).get("value", "")
+
+                    if not node_type and binding.get("type"):
+                        node_type = binding.get("type", {}).get("value", "").split("#")[-1]
+
+                    # 속성 추가
+                    predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
+                    value = binding.get("value", {}).get("value", "")
+                    if predicate and value and predicate not in properties:
+                        properties[predicate] = value
+
+                    # 관계 추가
+                    related_label = binding.get("relatedLabel", {}).get("value", "")
+                    if predicate and related_label:
+                        relation_key = f"{predicate}:{related_label}"
+                        if relation_key not in [r["key"] for r in relations]:
+                            relations.append({
+                                "predicate": predicate,
+                                "related": related_label,
+                                "key": relation_key
+                            })
+
+                convergence_nodes_with_details.append({
+                    "uri": node_uri,
+                    "label": node_label or extract_label_from_uri(node_uri),
+                    "type": node_type,
+                    "count": info["count"],
+                    "connected_entities": info["connected_entities"],
+                    "properties": properties,
+                    "relations": relations[:10]  # 관계는 최대 10개만
+                })
+
+        except Exception as e:
+            # SPARQL 실패 시 기본 정보만 포함
+            convergence_nodes_with_details.append({
+                "uri": node_uri,
+                "label": extract_label_from_uri(node_uri),
+                "type": "",
+                "count": info["count"],
+                "connected_entities": info["connected_entities"],
+                "properties": {},
+                "relations": []
+            })
+
+    return convergence_nodes_with_details
 
 
 def extract_label_from_uri(uri: str) -> str:
@@ -589,21 +710,33 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     query_entities = state.get("extracted_entities", [])
     test_config = state.get("test_config")  # 테스트 설정
 
-    # 엔티티 부스트 모드 추출
+    # 테스트 설정 추출
     entity_boost_mode = None
-    if test_config and "entity_boost_mode" in test_config:
-        entity_boost_mode = test_config["entity_boost_mode"]
+    thread_config = None
+    if test_config:
+        entity_boost_mode = test_config.get("entity_boost_mode")
+        thread_config = test_config.get("aggregator_threads")
 
     print(f"\n{'='*70}")
     print(f"[Stage 5/6] 경로 추출 및 근거 통합 (Path Evidence Aggregator)")
     print(f"{'='*70}")
     if entity_boost_mode:
         print(f"  ├─ [테스트 모드] Entity Boost Mode: {entity_boost_mode}")
+    if thread_config:
+        print(f"  ├─ [테스트 모드] 활성화된 Thread:")
+        for thread, enabled in thread_config.items():
+            if enabled:
+                print(f"  │  └─ {thread}: ON")
 
     # 1. Thread별 경로 추출
     inference_paths = {}
 
     for thread_type, result in parallel_results.items():
+        # test_config에서 Thread 비활성화 확인
+        if thread_config and not thread_config.get(thread_type, True):
+            print(f"  ├─ {thread_type}: SKIPPED (테스트 모드로 비활성화)")
+            inference_paths[thread_type] = []
+            continue
         bindings = result.get("bindings", [])
 
         if not bindings:
@@ -634,15 +767,20 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     total_paths = sum(len(paths) for paths in inference_paths.values())
     print(f"  ├─ 경로 추출 완료: {total_paths}개 경로")
 
-    # 2. 수렴 노드 감지
-    convergence_nodes = detect_convergence_nodes(inference_paths, query_entities)
+    # 2. 수렴 노드 감지 및 상세 정보 조회
+    convergence_nodes_list = detect_convergence_nodes(inference_paths, query_entities)
 
-    if convergence_nodes:
-        print(f"  ├─ 수렴 노드 감지: {len(convergence_nodes)}개")
-        for i, (node_uri, info) in enumerate(list(convergence_nodes.items())[:3], 1):
-            node_label = extract_label_from_uri(node_uri)
-            connected = ", ".join(info["connected_entities"][:3])
-            print(f"  │  {i}. {node_label} (연결: {connected})")
+    # 수렴 노드 URI를 집합으로 변환 (빠른 검색용)
+    convergence_node_uris = {node["uri"] for node in convergence_nodes_list}
+
+    if convergence_nodes_list:
+        print(f"  ├─ 수렴 노드 감지: {len(convergence_nodes_list)}개")
+        for i, node_info in enumerate(convergence_nodes_list[:3], 1):
+            node_label = node_info["label"]
+            connected = ", ".join(node_info["connected_entities"][:3])
+            props_count = len(node_info.get("properties", {}))
+            rels_count = len(node_info.get("relations", []))
+            print(f"  │  {i}. {node_label} (연결: {connected}, 속성: {props_count}개, 관계: {rels_count}개)")
 
     # 3. 모든 Thread의 경로를 하나로 병합
     all_evidences = []
@@ -651,14 +789,9 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
         for path in paths:
             final_weight = path.get("weight", 0.2)
 
-            # 수렴 노드 부스트 적용
+            # 수렴 노드 플래그 (부스트는 제거됨)
             raw_data = path.get("raw_data", {})
             convergence_node = raw_data.get("convergence_node")
-
-            if convergence_node and convergence_node in convergence_nodes:
-                boost = convergence_nodes[convergence_node]["boost"]
-                final_weight *= boost
-                path["convergence_boost"] = boost
 
             evidence = {
                 "type": thread_type,
@@ -667,7 +800,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
                 "relevance_score": path.get("relevance_score", 1.0),
                 "source": f"Thread: {thread_type}",
                 "raw_data": path,
-                "is_convergence": convergence_node in convergence_nodes if convergence_node else False
+                "is_convergence": convergence_node in convergence_node_uris if convergence_node else False
             }
 
             all_evidences.append(evidence)
@@ -783,6 +916,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
         **state,
         "inference_paths": inference_paths,
         "evidences": top_evidences,
+        "convergence_nodes": convergence_nodes_list,
         "executed_nodes": state.get("executed_nodes", []) + ["path_evidence_aggregator"],
         "node_execution_times": node_times
     }

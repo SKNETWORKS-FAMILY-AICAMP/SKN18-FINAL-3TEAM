@@ -92,6 +92,20 @@ class GraphState(TypedDict):
     #     ...
     # ]
 
+    convergence_nodes: NotRequired[List[Dict[str, Any]]]  # 수렴 노드 (여러 엔티티를 연결하는 중요 노드)
+    # [
+    #     {
+    #         "uri": "hist:Event_xxx",
+    #         "label": "임진왜란",
+    #         "type": "Event",
+    #         "count": 3,
+    #         "connected_entities": ["이순신", "원균", "선조"],
+    #         "properties": {"hasYear": "1592", "hasCategory": "전쟁"},
+    #         "relations": [{"predicate": "leadsTo", "related": "정유재란"}, ...]
+    #     },
+    #     ...
+    # ]
+
     # ========== 7단계: 최종 생성 ==========
     final_answer: NotRequired[str]  # 최종 스토리 답변
     answer_with_sources: NotRequired[Dict[str, Any]]  # 근거 포함 답변
