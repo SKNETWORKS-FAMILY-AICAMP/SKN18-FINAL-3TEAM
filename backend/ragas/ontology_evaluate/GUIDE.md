@@ -240,6 +240,49 @@ python experiments/run_grid_search.py \
 
 ---
 
+### Step 7: Intent-Aware 평가 실행 ✅ NEW
+
+**작업 내용**: Query type에 따라 메트릭에 다른 가중치를 적용하는 평가 실행
+
+**실행 명령**:
+```bash
+cd backend/ragas/ontology_evaluate
+
+# Intent-aware 평가 활성화 (기본값)
+python experiments/run_baseline.py \
+    --group semantic_expander \
+    --queries data/test_queries.json
+
+# Intent-aware 평가 비활성화 (비교용)
+python experiments/run_baseline.py \
+    --group semantic_expander \
+    --queries data/test_queries.json \
+    --no-intent-aware
+```
+
+**출력 예시**:
+```
+======================================================================
+Intent-Aware 평가 요약
+======================================================================
+  causal         : 0.847 (n=10)
+  comparative    : 0.901 (n=10)
+  deep_analysis  : 0.823 (n=10)
+  factual        : 0.756 (n=10)
+======================================================================
+```
+
+**예상 결과**:
+- Comparative 쿼리가 가장 높은 점수 (수렴 노드 중요도 높음)
+- Factual 쿼리가 가장 낮은 점수 (수렴 노드 중요도 낮음)
+- Causal/Deep Analysis 쿼리는 중간 점수
+
+**상세 가이드**: [INTENT_AWARE_USAGE.md](./INTENT_AWARE_USAGE.md)
+
+**예상 작업량**: 30분 (Step 4 완료 후)
+
+---
+
 ## 3. ontology_evaluate/ 코드 설명
 
 ### 📁 디렉토리별 역할
@@ -249,6 +292,10 @@ ontology_evaluate/
 ├── baseline_ablation.py        # Ablation 실험 설정 생성기
 ├── build_queries_persona.py    # Intent별 테스트 질문 생성
 ├── evaluators/                 # 평가 메트릭 구현
+│   ├── intent_aware_evaluator.py  # NEW: Intent-aware 평가자
+│   ├── l1_schema_compliance.py
+│   ├── l2_path_quality.py
+│   └── l3_terminal_knowledge.py
 ├── utils/                      # 유틸리티
 ├── experiments/                # 실험 실행 스크립트
 └── data/                       # 데이터
@@ -370,6 +417,97 @@ PersonaQueryBuilder.save_to_json("data/test_queries.json")
 ---
 
 ### 3️⃣ `evaluators/` - 평가 메트릭 구현
+
+#### `intent_aware_evaluator.py` ✅ NEW
+
+**역할**: Query type에 따라 메트릭에 다른 가중치를 적용하는 평가자
+
+**주요 클래스**:
+
+##### `IntentWeightConfig`
+```python
+@dataclass
+class IntentWeightConfig:
+    tbox_consistency_weight: float
+    intent_preservation_weight: float
+    relation_coherence_weight: float
+    triple_validity_weight: float
+    evidence_diversity_weight: float
+    convergence_utilization_weight: float
+```
+
+##### `IntentAwareEvaluator`
+
+**메서드**:
+- `evaluate(query_type, raw_metrics)`: Query type에 따라 가중치 적용 후 최종 점수 계산
+
+**가중치 프리셋**:
+```python
+INTENT_WEIGHT_PRESETS = {
+    "factual": IntentWeightConfig(
+        convergence_utilization_weight=0.5,  # 낮음
+        tbox_consistency_weight=1.5,         # 높음
+        ...
+    ),
+    "causal": IntentWeightConfig(
+        convergence_utilization_weight=1.5,  # 매우 높음
+        relation_coherence_weight=1.3,       # 높음
+        ...
+    ),
+    "comparative": IntentWeightConfig(
+        convergence_utilization_weight=1.6,  # 가장 높음
+        evidence_diversity_weight=1.4,       # 매우 높음
+        ...
+    ),
+    "deep_analysis": IntentWeightConfig(
+        intent_preservation_weight=1.5,      # 가장 높음
+        relation_coherence_weight=1.4,       # 높음
+        ...
+    )
+}
+```
+
+**출력**:
+```python
+{
+    "query_type": "causal",
+    "raw_metrics": {...},
+    "weights": {
+        "convergence_utilization": 0.234,  # 정규화된 가중치
+        "intent_preservation": 0.218,
+        ...
+    },
+    "weighted_metrics": {
+        "convergence_utilization": 0.187,  # raw × weight
+        "intent_preservation": 0.185,
+        ...
+    },
+    "final_score": 0.847  # sum(weighted_metrics)
+}
+```
+
+**사용 예시**:
+```python
+from ragas.ontology_evaluate.evaluators.intent_aware_evaluator import IntentAwareEvaluator
+
+evaluator = IntentAwareEvaluator()
+
+raw_metrics = {
+    "tbox_consistency": 0.90,
+    "intent_preservation": 0.85,
+    "relation_coherence": 0.88,
+    "triple_validity": 0.82,
+    "evidence_diversity": 0.75,
+    "convergence_utilization": 0.80
+}
+
+result = evaluator.evaluate("causal", raw_metrics)
+print(f"Final Score: {result['final_score']:.3f}")  # 0.847
+```
+
+**상세 가이드**: [INTENT_AWARE_USAGE.md](./INTENT_AWARE_USAGE.md)
+
+---
 
 #### `l1_schema_compliance.py`
 

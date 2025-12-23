@@ -7,10 +7,15 @@
 ```
 ontology_evaluate/
 ├── README.md                          # 이 파일
+├── GUIDE.md                           # 구현 가이드 (LangGraph 연동 방법)
+├── REDESIGN_PROPOSAL.md               # test_config 및 평가 프레임워크 재설계 제안
+├── INTENT_AWARE_USAGE.md              # Intent-aware 평가 사용 가이드
+├── INTENT_AWARE_QUERY_VALIDATION.md   # 테스트 쿼리 검증 보고서
 ├── baseline_ablation.py               # Ablation Study 설정 생성기
 ├── build_queries_persona.py           # Intent별 테스트 질문 생성
 ├── evaluators/                        # 평가 메트릭 구현
 │   ├── __init__.py
+│   ├── intent_aware_evaluator.py      # Intent-aware 평가자 (query_type별 가중치)
 │   ├── l1_schema_compliance.py        # L1: TBox Consistency
 │   ├── l2_path_quality.py             # L2: Intent Preservation, Relation Coherence
 │   └── l3_terminal_knowledge.py       # L3: Terminal Triple Validity, Evidence Diversity, Convergence
@@ -20,7 +25,7 @@ ontology_evaluate/
 │   └── result_analyzer.py             # 결과 분석 도구
 ├── experiments/                       # 실험 스크립트
 │   ├── __init__.py
-│   ├── run_baseline.py                # Phase 1: Ablation Study 실행
+│   ├── run_baseline.py                # Phase 1: Ablation Study 실행 (Intent-aware 지원)
 │   └── run_grid_search.py             # Phase 2: Grid Search 실행
 └── data/                              # 테스트 데이터셋
     ├── test_queries.json              # 40개 Intent별 테스트 질문
@@ -74,7 +79,7 @@ python build_queries_persona.py
 ### 2. Baseline Ablation Study 실행
 
 ```bash
-# Semantic Expander 실험
+# Semantic Expander 실험 (Intent-aware 평가 활성화, 기본값)
 python experiments/run_baseline.py --group semantic_expander --queries data/test_queries.json
 
 # Thread 실험
@@ -83,8 +88,36 @@ python experiments/run_baseline.py --group thread --queries data/test_queries.js
 # 모든 실험
 python experiments/run_baseline.py --group all --queries data/test_queries.json
 
+# Intent-aware 평가 비활성화 (Raw 메트릭만 사용)
+python experiments/run_baseline.py --group semantic_expander --queries data/test_queries.json --no-intent-aware
+
 # 디버깅용 (5개 질문만)
 python experiments/run_baseline.py --group semantic_expander --queries data/test_queries.json --limit 5
+```
+
+**출력 예시** (Intent-aware 평가 활성화 시):
+```
+======================================================================
+Baseline Ablation Study 실행
+======================================================================
+실험 그룹: semantic_expander
+질문 파일: data/test_queries.json
+결과 저장: data/results
+Intent-aware 평가: 활성화
+======================================================================
+테스트 질문 개수: 40
+Query Type 분포: {'factual': 10, 'causal': 10, 'comparative': 10, 'deep_analysis': 10}
+
+...
+
+======================================================================
+Intent-Aware 평가 요약
+======================================================================
+  causal         : 0.847 (n=10)
+  comparative    : 0.901 (n=10)
+  deep_analysis  : 0.823 (n=10)
+  factual        : 0.756 (n=10)
+======================================================================
 ```
 
 ### 3. 결과 분석
@@ -116,6 +149,7 @@ python experiments/run_grid_search.py --baseline-results data/results/all_ablati
 | L3 | Terminal Triple Validity | `evaluators/l3_terminal_knowledge.py` | LLM Judge |
 | L3 | Evidence Diversity | `evaluators/l3_terminal_knowledge.py` | 자동 (Shannon Entropy) |
 | L3 | Convergence Utilization | `evaluators/l3_terminal_knowledge.py` | 반자동 (query_type별) |
+| **Intent-Aware** | **Query Type별 가중 평가** | `evaluators/intent_aware_evaluator.py` | **자동 (가중치 적용)** |
 
 ### 평가 메트릭 상세
 
@@ -133,8 +167,36 @@ python experiments/run_grid_search.py --baseline-results data/results/all_ablati
 - **Convergence Utilization**: 수렴 노드가 답변에 활용되었는지, query_type별 가중치 적용
   - causal: 1.5, deep_analysis: 1.3, comparative: 1.2, factual: 1.0
 
+#### Intent-Aware Evaluation (NEW)
+- **Query Type별 가중 평가**: 각 query_type에 따라 메트릭에 다른 가중치를 적용
+- **Query Type별 가중치**:
+
+| Query Type | 수렴 노드 중요도 | Intent 보존 중요도 | Schema 준수 중요도 | 특징 |
+|------------|------------------|-------------------|-------------------|------|
+| **Factual** | 0.075 (낮음) | 0.194 (높음) | 0.224 (가장 높음) | 단순 사실 확인 |
+| **Causal** | 0.234 (가장 높음) | 0.218 (매우 높음) | 0.156 (중간) | 인과관계 추론 |
+| **Comparative** | 0.253 (가장 높음) | 0.205 (높음) | 0.158 (중간) | 2개 엔티티 비교 |
+| **Deep Analysis** | 0.197 (높음) | 0.227 (가장 높음) | 0.152 (중간) | 심층 분석 |
+
+- **사용 예시**:
+  ```bash
+  # Intent-aware 평가 활성화 (기본값)
+  python experiments/run_baseline.py --group semantic_expander
+
+  # Intent-aware 평가 비활성화
+  python experiments/run_baseline.py --group semantic_expander --no-intent-aware
+  ```
+- **상세 가이드**: [INTENT_AWARE_USAGE.md](./INTENT_AWARE_USAGE.md)
+
 ## 참고 문서
 
+### 평가 프레임워크
+- [GUIDE.md](./GUIDE.md): 구현 가이드 (LangGraph 연동 방법, 단계별 실행)
+- [INTENT_AWARE_USAGE.md](./INTENT_AWARE_USAGE.md): Intent-aware 평가 사용 가이드
+- [INTENT_AWARE_QUERY_VALIDATION.md](./INTENT_AWARE_QUERY_VALIDATION.md): 테스트 쿼리 검증 보고서
+- [REDESIGN_PROPOSAL.md](./REDESIGN_PROPOSAL.md): test_config 재설계 제안 및 향후 계획
+
+### 상세 문서
 - `../../langgraph_fuseki/docs/ontology_rag_evaluation.md`: 평가 프레임워크 상세 설명
 - `../../langgraph_fuseki/docs/scoring_methodology.md`: 점수 계산 방법론
 
