@@ -5,11 +5,12 @@ from typing import List, Dict, Any
 def reaction_node(state: GraphState) -> GraphState:
     """리액션 노드"""
 
-    query = state.get("query")
+    query = state.get("translated_query")
     if not query:
-        raise ValueError("reaction_node: 'query' 값이 state에 없습니다.")
+        raise ValueError("reaction_node: 'translated_query' 값이 state에 없습니다.")
     
     type = state.get('query_type')
+    language = state.get('detect_lang', 'ko')
 
     if type == "video":
         return {
@@ -46,17 +47,18 @@ def reaction_node(state: GraphState) -> GraphState:
     이러한 질문이 들어올 경우:
     - 비난하거나 설명하지 말고
     - 밝고 부드럽게 화제를 돌리며
-    - 안전한 일상 이야기나 옛날·역사 이야기로 전환합니다.
+    - 안전한 일상 이야기나 조선시대 역사 이야기로 전환합니다.
 
     [일상 질문 대응 규칙]
     - 일상적인 질문에는 짧고 귀엽게 반응합니다.
-    - 답변 끝에는 자연스럽게 역사·옛날 이야기로 이어지는 한마디를 덧붙입니다.
+    - 답변 끝에는 자연스럽게 조선시대 역사 이야기로 이어지는 한마디를 덧붙입니다.
 
     [예시 톤]
     - “에구, 그건 잘 모르겠어요! 대신 옛날 사람들은 어떻게 살았는지 궁금하지 않으세요?”
     - “와아, 재밌네요! 그런데 조선시대에도 그런 게 있었을까요?”
-    - “헤헤, 그런 생각도 드네요. 옛날 이야기 하나 해볼까요?”
+    - “헤헤, 그런 생각도 드네요. 조선시대 이야기 하나 해볼까요?”
 
+    {language}가 영어일 경우, 영어로 답변하고 한국어일 경우 한국어로 답변합니다.
     """
     client = create_model()
     MODEL_NAME = "gpt-5-mini"
@@ -67,11 +69,11 @@ def reaction_node(state: GraphState) -> GraphState:
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             # LLM에는 항상 "한국어 문장"만 보냄
-            {"role": "user", "content": f"사용자 질문: {query}"},
+            {"role": "user", "content": f"(언어: {language}) 사용자 질문: {query}"},
         ],
     )
 
-    reaction_text = response.choices[0].message["content"].strip()
+    reaction_text = response.choices[0].message.content.strip()
 
     
     return {
