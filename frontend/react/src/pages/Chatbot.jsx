@@ -481,17 +481,21 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                 style={{
                   position: "absolute",
                   top: "50%",
-                  right: "16px",
+                  right: "12px",
                   transform: "translateY(-50%)",
-                  width: "20px",
-                  height: "20px",
-                  borderRadius: "50%",
+                  width: "18px",
+                  height: "18px",
                   border: "none",
                   background: "transparent",
                   color: COLORS.gray,
                   cursor: "pointer",
                   opacity: 0,
                   transition: "opacity 0.2s",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  lineHeight: 1,
+                  padding: 0,
                 }}
               >
                 ×
