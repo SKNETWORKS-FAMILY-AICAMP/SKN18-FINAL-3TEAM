@@ -124,7 +124,8 @@ class IntentAwareEvaluator:
     def evaluate(
         self,
         query_type: str,
-        raw_metrics: Dict[str, float]
+        raw_metrics: Dict[str, float],
+        user_selected_direction: str = None
     ) -> Dict[str, Any]:
         """
         Intent-aware 평가 수행
@@ -140,10 +141,12 @@ class IntentAwareEvaluator:
                     "evidence_diversity": 0.75,
                     "convergence_utilization": 0.80
                 }
+            user_selected_direction: 사용자가 선택한 답변 방향 (예: "time_cause", "class_person")
 
         Returns:
             {
                 "query_type": "causal",
+                "user_selected_direction": "time_cause",
                 "raw_metrics": {...},
                 "weights": {...},
                 "weighted_metrics": {...},
@@ -171,7 +174,7 @@ class IntentAwareEvaluator:
         # 최종 점수 계산
         final_score = sum(weighted_metrics.values())
 
-        return {
+        result = {
             "query_type": query_type,
             "raw_metrics": raw_metrics,
             "weights": normalized_weights,
@@ -179,6 +182,12 @@ class IntentAwareEvaluator:
             "final_score": final_score,
             "breakdown": self._get_breakdown(raw_metrics, normalized_weights, weighted_metrics)
         }
+
+        # user_selected_direction 추가 (있을 경우)
+        if user_selected_direction:
+            result["user_selected_direction"] = user_selected_direction
+
+        return result
 
     def _get_breakdown(
         self,

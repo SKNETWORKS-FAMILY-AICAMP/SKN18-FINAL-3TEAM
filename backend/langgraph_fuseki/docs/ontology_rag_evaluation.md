@@ -139,7 +139,7 @@ hop 2: "명나라 요청" → "이순신의 식습관" (Hallucinated: 0.0)
 **Intent별 Valid Relations**:
 | 질문 의도 | Valid Relations |
 |-----------|----------------|
-| 원인 | `causedBy`, `leadsTo`, `influences` |
+| 원인 | `caused`, `causes`, `leadsTo`, `ledTo` |
 | 업적 | `built`, `established`, `achieved`, `founded` |
 | 결과 | `leadsTo`, `causes`, `affects` |
 | 관계 | `participatesIn`, `involvesPerson`, `relatedTo` |
@@ -421,7 +421,7 @@ def convergence_node_utilization_score(convergence_nodes, final_answer, query_ty
 - [ ] Thread별 기여도 측정 (각 Thread 제거 실험)
 
 ### 8.2 Phase 2: 가중치 튜닝
-- [ ] `FIXED_SCORE_*` 값 실험 (temporal, causal_chain, category, pgvector)
+- [ ] `FIXED_SCORE_*` 값 실험 (temporal, causal_chain, pgvector)
 - [ ] `THREAD_WEIGHT_*` 값 실험 (5개 Thread별 가중치)
 - [ ] `QUERY_ENTITY_MATCH_BOOST_*` 값 실험
 

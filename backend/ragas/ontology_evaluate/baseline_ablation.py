@@ -16,7 +16,7 @@ class AblationConfig:
     """Ablation 실험 설정"""
 
     # Semantic Expander 비활성화 설정
-    semantic_expander: Dict[str, bool] = None  # {"temporal": True, "category": False, ...}
+    semantic_expander: Dict[str, bool] = None  # {"temporal": True, "causal_chain": False, "pgvector": True}
 
     # Thread 비활성화 설정
     aggregator_threads: Dict[str, bool] = None  # {"outgoing_relations": True, ...}
@@ -34,7 +34,6 @@ class AblationConfig:
         if self.semantic_expander is None:
             self.semantic_expander = {
                 "temporal": True,
-                "category": True,
                 "causal_chain": True,
                 "pgvector": True
             }
@@ -65,13 +64,12 @@ class AblationExperimentGenerator:
         """Semantic Expander Ablation 실험 생성
 
         Returns:
-            실험 설정 리스트 (6개):
+            실험 설정 리스트 (5개):
             1. Baseline: 모든 확장 비활성화
             2. Temporal Only
-            3. Category Only
-            4. Causal Chain Only
-            5. Pgvector Only
-            6. All Enabled (Full)
+            3. Causal Chain Only
+            4. Pgvector Only
+            5. All Enabled (Full)
         """
         experiments = []
 
@@ -79,7 +77,6 @@ class AblationExperimentGenerator:
         experiments.append(AblationConfig(
             semantic_expander={
                 "temporal": False,
-                "category": False,
                 "causal_chain": False,
                 "pgvector": False
             },
@@ -87,12 +84,11 @@ class AblationExperimentGenerator:
             description="모든 Semantic Expander 비활성화 (Entity Extractor 30개만 사용)"
         ))
 
-        # 2-5. 각 확장 방법 개별 활성화
-        expansion_methods = ["temporal", "category", "causal_chain", "pgvector"]
+        # 2-4. 각 확장 방법 개별 활성화
+        expansion_methods = ["temporal", "causal_chain", "pgvector"]
         for method in expansion_methods:
             config = {
                 "temporal": False,
-                "category": False,
                 "causal_chain": False,
                 "pgvector": False
             }
@@ -104,11 +100,10 @@ class AblationExperimentGenerator:
                 description=f"{method} 확장만 활성화"
             ))
 
-        # 6. All Enabled (Full)
+        # 5. All Enabled (Full)
         experiments.append(AblationConfig(
             semantic_expander={
                 "temporal": True,
-                "category": True,
                 "causal_chain": True,
                 "pgvector": True
             },

@@ -6,11 +6,10 @@
 
 ```
 ontology_evaluate/
-├── README.md                          # 이 파일
-├── GUIDE.md                           # 구현 가이드 (LangGraph 연동 방법)
-├── REDESIGN_PROPOSAL.md               # test_config 및 평가 프레임워크 재설계 제안
-├── INTENT_AWARE_USAGE.md              # Intent-aware 평가 사용 가이드
-├── INTENT_AWARE_QUERY_VALIDATION.md   # 테스트 쿼리 검증 보고서
+├── README.md                          # 이 파일 (개요 및 빠른 시작)
+├── GUIDE.md                           # 구현 가이드 (LangGraph 연동 방법, Intent-aware 평가 사용법 포함)
+├── WEIGHT_CALCULATION_GUIDE.md        # 가중치 계산 방법론 및 실험 설계
+├── REDESIGN_PROPOSAL.md               # 향후 계획 (Thinking Trace 구현 등)
 ├── baseline_ablation.py               # Ablation Study 설정 생성기
 ├── build_queries_persona.py           # Intent별 테스트 질문 생성
 ├── evaluators/                        # 평가 메트릭 구현
@@ -42,15 +41,16 @@ ontology_evaluate/
 
 각 요소를 비활성화하여 기여도 측정:
 
-1. **Semantic Expander 실험** (6개 설정):
+1. **Semantic Expander 실험** (5개 설정):
+
    - Baseline: 모든 확장 비활성화
-   - Temporal Only
-   - Category Only
-   - Causal Chain Only
-   - Pgvector Only
+   - Temporal Only (±10년 시간적 확장)
+   - Causal Chain Only (1-3 hop 인과관계 체인)
+   - Pgvector Only (벡터 유사도 기반)
    - All Enabled (Full)
 
 2. **Thread 실험** (6개 설정):
+
    - Baseline: 1개 Thread만 (outgoing_relations)
    - Leave-One-Out: 각 Thread 하나씩 제거 (5개)
 
@@ -71,6 +71,7 @@ python build_queries_persona.py
 ```
 
 생성된 질문: `data/test_queries.json` (40개)
+
 - factual: 10개
 - causal: 10개
 - comparative: 10개
@@ -96,6 +97,7 @@ python experiments/run_baseline.py --group semantic_expander --queries data/test
 ```
 
 **출력 예시** (Intent-aware 평가 활성화 시):
+
 ```
 ======================================================================
 Baseline Ablation Study 실행
@@ -141,44 +143,49 @@ python experiments/run_grid_search.py --baseline-results data/results/all_ablati
 
 ## 평가 메트릭
 
-| Level | 메트릭 | 구현 파일 | 자동/LLM Judge |
-|-------|--------|----------|----------------|
-| L1 | TBox Consistency | `evaluators/l1_schema_compliance.py` | 자동 |
-| L2 | Intent Preservation | `evaluators/l2_path_quality.py` | LLM Judge |
-| L2 | Relation Coherence | `evaluators/l2_path_quality.py` | 자동 |
-| L3 | Terminal Triple Validity | `evaluators/l3_terminal_knowledge.py` | LLM Judge |
-| L3 | Evidence Diversity | `evaluators/l3_terminal_knowledge.py` | 자동 (Shannon Entropy) |
-| L3 | Convergence Utilization | `evaluators/l3_terminal_knowledge.py` | 반자동 (query_type별) |
+| Level            | 메트릭                     | 구현 파일                              | 자동/LLM Judge         |
+| ---------------- | -------------------------- | -------------------------------------- | ---------------------- |
+| L1               | TBox Consistency           | `evaluators/l1_schema_compliance.py`   | 자동                   |
+| L2               | Intent Preservation        | `evaluators/l2_path_quality.py`        | LLM Judge              |
+| L2               | Relation Coherence         | `evaluators/l2_path_quality.py`        | 자동                   |
+| L3               | Terminal Triple Validity   | `evaluators/l3_terminal_knowledge.py`  | LLM Judge              |
+| L3               | Evidence Diversity         | `evaluators/l3_terminal_knowledge.py`  | 자동 (Shannon Entropy) |
+| L3               | Convergence Utilization    | `evaluators/l3_terminal_knowledge.py`  | 반자동 (query_type별)  |
 | **Intent-Aware** | **Query Type별 가중 평가** | `evaluators/intent_aware_evaluator.py` | **자동 (가중치 적용)** |
 
 ### 평가 메트릭 상세
 
 #### L1: Ontology Schema Compliance
+
 - **TBox Consistency**: 확장 경로가 온톨로지 스키마(domain/range)를 위반하지 않는지 검증
 - 점수: `1.0 - (violations / total_triples)`
 
 #### L2: Expansion Path Quality
+
 - **Intent Preservation**: 각 hop에서 질문 의도 유지 여부 (Preserve: 1.0, Enrich: 1.2, Drift: 0.5, Hallucinated: 0.0)
 - **Relation Coherence**: relation이 질문 의도와 의미적으로 일관되는지 평가
 
 #### L3: Terminal Knowledge Contribution
+
 - **Terminal Triple Validity**: 최종 도달한 triple이 질문에 기여하는지 평가 (기여함: 1.0, 간접: 0.5, 무관: 0.0)
 - **Evidence Diversity**: 5개 Thread에서 고르게 선택되었는지 Shannon Entropy로 평가
 - **Convergence Utilization**: 수렴 노드가 답변에 활용되었는지, query_type별 가중치 적용
   - causal: 1.5, deep_analysis: 1.3, comparative: 1.2, factual: 1.0
 
 #### Intent-Aware Evaluation (NEW)
+
 - **Query Type별 가중 평가**: 각 query_type에 따라 메트릭에 다른 가중치를 적용
 - **Query Type별 가중치**:
 
-| Query Type | 수렴 노드 중요도 | Intent 보존 중요도 | Schema 준수 중요도 | 특징 |
-|------------|------------------|-------------------|-------------------|------|
-| **Factual** | 0.075 (낮음) | 0.194 (높음) | 0.224 (가장 높음) | 단순 사실 확인 |
-| **Causal** | 0.234 (가장 높음) | 0.218 (매우 높음) | 0.156 (중간) | 인과관계 추론 |
-| **Comparative** | 0.253 (가장 높음) | 0.205 (높음) | 0.158 (중간) | 2개 엔티티 비교 |
-| **Deep Analysis** | 0.197 (높음) | 0.227 (가장 높음) | 0.152 (중간) | 심층 분석 |
+| Query Type        | 수렴 노드 중요도  | Intent 보존 중요도 | Schema 준수 중요도 | 특징            |
+| ----------------- | ----------------- | ------------------ | ------------------ | --------------- |
+| **Factual**       | 0.075 (낮음)      | 0.194 (높음)       | 0.224 (가장 높음)  | 단순 사실 확인  |
+| **Causal**        | 0.234 (가장 높음) | 0.218 (매우 높음)  | 0.156 (중간)       | 인과관계 추론   |
+| **Comparative**   | 0.253 (가장 높음) | 0.205 (높음)       | 0.158 (중간)       | 2개 엔티티 비교 |
+| **Deep Analysis** | 0.197 (높음)      | 0.227 (가장 높음)  | 0.152 (중간)       | 심층 분석       |
 
 - **사용 예시**:
+
   ```bash
   # Intent-aware 평가 활성화 (기본값)
   python experiments/run_baseline.py --group semantic_expander
@@ -186,17 +193,19 @@ python experiments/run_grid_search.py --baseline-results data/results/all_ablati
   # Intent-aware 평가 비활성화
   python experiments/run_baseline.py --group semantic_expander --no-intent-aware
   ```
-- **상세 가이드**: [INTENT_AWARE_USAGE.md](./INTENT_AWARE_USAGE.md)
+
+- **상세 가이드**: [GUIDE.md](./GUIDE.md)의 "Step 7: Intent-Aware 평가 실행" 섹션 참고
 
 ## 참고 문서
 
 ### 평가 프레임워크
-- [GUIDE.md](./GUIDE.md): 구현 가이드 (LangGraph 연동 방법, 단계별 실행)
-- [INTENT_AWARE_USAGE.md](./INTENT_AWARE_USAGE.md): Intent-aware 평가 사용 가이드
-- [INTENT_AWARE_QUERY_VALIDATION.md](./INTENT_AWARE_QUERY_VALIDATION.md): 테스트 쿼리 검증 보고서
-- [REDESIGN_PROPOSAL.md](./REDESIGN_PROPOSAL.md): test_config 재설계 제안 및 향후 계획
+
+- [GUIDE.md](./GUIDE.md): 구현 가이드 (LangGraph 연동 방법, 단계별 실행, Intent-aware 평가 사용법 포함)
+- [WEIGHT_CALCULATION_GUIDE.md](./WEIGHT_CALCULATION_GUIDE.md): 가중치 계산 방법론 및 실험 설계
+- [REDESIGN_PROPOSAL.md](./REDESIGN_PROPOSAL.md): 향후 계획 (Thinking Trace 구현 등)
 
 ### 상세 문서
+
 - `../../langgraph_fuseki/docs/ontology_rag_evaluation.md`: 평가 프레임워크 상세 설명
 - `../../langgraph_fuseki/docs/scoring_methodology.md`: 점수 계산 방법론
 

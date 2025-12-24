@@ -23,7 +23,7 @@
 ### 핵심 특징
 
 - **7단계 파이프라인**: 역사 필터링 → 질문 분류 → 사용자 의도 확인 → 엔티티 추출 → 의미론적 확장 → 병렬 지식 검색 → 근거 통합 → 스토리 생성
-- **대화형 의도 확인**: 질문 유형에 따라 확장 방향을 제시하고 사용자 선택을 받아 검색 정확도 향상
+- **대화형 의도 확인**: LLM이 질문을 분석하여 2-4가지 답변 방향을 자유롭게 제시하고 사용자 선택을 받아 검색 및 답변 생성에 반영
 - **하이브리드 검색**: TTL 직접 매칭 + pgvector 유사도 검색 + SPARQL 연결 노드 분석
 - **병렬 지식 검색**: 5개 Thread로 서로 다른 관점의 SPARQL 쿼리를 동시 실행
 - **3단계 가중치 시스템**: Semantic Expansion → Thread Type → Entity Boost로 점수 계산
@@ -31,14 +31,14 @@
 
 ### 주요 기술
 
-| 기술 | 역할 | 사용 |
-|------|------|------|
-| **Apache Fuseki** | SPARQL Endpoint | RDF 트리플 저장 및 쿼리 |
-| **LangGraph** | 워크플로우 관리 | 7단계 파이프라인 정의 |
-| **OpenAI GPT-4o** | LLM | 질문 분석, 키워드 확장, 스토리 생성 (총 4회) |
-| **pgvector** | 벡터 검색 | 엔티티 유사도 검색 (fallback) |
-| **kiwipiepy** | 형태소 분석 | 키워드 추출 (무료, 빠름) |
-| **RDF/OWL** | 온톨로지 | 조선시대 역사 지식 그래프 (15MB) |
+| 기술              | 역할            | 사용                                                    |
+| ----------------- | --------------- | ------------------------------------------------------- |
+| **Apache Fuseki** | SPARQL Endpoint | RDF 트리플 저장 및 쿼리                                 |
+| **LangGraph**     | 워크플로우 관리 | 7단계 파이프라인 정의                                   |
+| **OpenAI GPT**    | LLM             | 질문 분석, 키워드 확장, 방향 생성, 스토리 생성 (총 5회) |
+| **pgvector**      | 벡터 검색       | 엔티티 유사도 검색 (fallback)                           |
+| **kiwipiepy**     | 형태소 분석     | 키워드 추출 (무료, 빠름)                                |
+| **RDF/OWL**       | 온톨로지        | 조선시대 역사 지식 그래프 (15MB)                        |
 
 ---
 
@@ -70,13 +70,13 @@ graph TB
     subgraph "Data Layer"
         TTL[(korean_history_normalized.ttl<br/>15MB RDF Data)]
         Groups[property_groups.json<br/>32 Property Groups]
-        Templates[intent_clarification_templates.py<br/>확장 방향 템플릿]
+        Templates[intent_clarification_templates.py<br/>LLM 기반 방향 생성]
         Fuseki[(Apache Fuseki<br/>SPARQL Endpoint)]
         PGVector[(pgvector<br/>임베딩 검색)]
     end
 
     subgraph "External Services"
-        OpenAI[OpenAI API<br/>gpt-4o / gpt-4o-mini]
+        OpenAI[OpenAI API<br/>환경변수 OPENAI_MODEL]
     end
 
     User --> Main
@@ -93,14 +93,15 @@ graph TB
 
     N0 -.LLM 1회.-> OpenAI
     N1 -.LLM 2회 병렬.-> OpenAI
+    N1_5 -.LLM 1회 방향생성.-> OpenAI
     N1_5 -.사용자 입력.-> User
-    N6 -.LLM 1회.-> OpenAI
+    N6 -.LLM 1회 답변생성.-> OpenAI
 
     N2 -.캐시 로드.-> TTL
     N2 -.fallback.-> PGVector
     N1 -.선택.-> Groups
-    N1 -.방향 생성.-> Templates
-    N3 -.SPARQL 4회.-> Fuseki
+    N1_5 -.동적 생성.-> Templates
+    N3 -.SPARQL 3회.-> Fuseki
     N4 -.SPARQL 5회.-> Fuseki
 
     TTL -.업로드.-> Fuseki
@@ -132,7 +133,7 @@ graph TD
     Thread1 --> Merge{결과 병합}
     Thread2 --> Merge
 
-    Merge --> DirectionGen[확장 방향 생성]
+    Merge --> DirectionGen[LLM 방향 생성]
     DirectionGen --> IntentCheck{의도 확인<br/>필요?}
 
     IntentCheck -->|Yes| Clarification[Stage 1.5<br/>User Intent Clarification]
@@ -150,12 +151,10 @@ graph TD
     Top30 --> Expander[Stage 3<br/>Semantic Expander]
 
     Expander --> Temporal[시간적 확장]
-    Expander --> Category[카테고리 확장]
     Expander --> Causal[인과관계 확장]
     Expander --> Vector[벡터 유사도]
 
     Temporal --> Expanded[확장된 엔티티<br/>~75개]
-    Category --> Expanded
     Causal --> Expanded
     Vector --> Expanded
 
@@ -191,18 +190,18 @@ graph TD
 
 ### 단계별 요약
 
-| 단계 | 이름 | LLM | 사용자 입력 | SPARQL | 주요 작업 |
-|------|------|-----|----------|--------|----------|
-| **Stage 0** | History Check | ✅ 1회 | ❌ | ❌ | 조선시대 역사 질문 필터링 (비역사 질문 조기 종료) |
-| **Stage 1** | Query Classifier | ✅ 2회 병렬 | ❌ | ❌ | 질문 분석, 키워드 확장, 프로퍼티 그룹 선택, 확장 방향 생성 |
-| **Stage 1.5** | User Intent Clarification | ❌ | ✅ 필요시 | ❌ | 확장 방향 제시 및 사용자 선택 (time/class/scope/depth-based) |
-| **Stage 2** | Entity Extractor | ❌ | ❌ | ✅ N회 | TTL 매칭 + pgvector 검색 + SPARQL 스코어링 → 상위 30개 선택 |
-| **Stage 3** | Semantic Expander | ❌ | ❌ | ✅ 4회 | 시간적/카테고리/인과/벡터 기반 엔티티 확장 (30개 → ~75개) |
-| **Stage 4** | Parallel Knowledge Retrieval | ❌ | ❌ | ✅ 5회 | 5개 관점 병렬 검색 + 양방향 BFS (최대 5-hop) + 프로퍼티 FILTER |
-| **Stage 5** | Path Evidence Aggregator | ❌ | ❌ | ❌ | 경로 추출 + 근거 통합 + 수렴 노드 감지 (1.1배 부스트) → 상위 15개 선택 |
-| **Stage 6** | Story Generator | ✅ 1회 | ❌ | ❌ | 최종 스토리 생성 (-입니다 체) |
+| 단계          | 이름                         | LLM         | 사용자 입력 | SPARQL | 주요 작업                                                              |
+| ------------- | ---------------------------- | ----------- | ----------- | ------ | ---------------------------------------------------------------------- |
+| **Stage 0**   | History Check                | ✅ 1회      | ❌          | ❌     | 조선시대 역사 질문 필터링 (비역사 질문 조기 종료)                      |
+| **Stage 1**   | Query Classifier             | ✅ 2회 병렬 | ❌          | ❌     | 질문 분석, 키워드 확장, 프로퍼티 그룹 선택                             |
+| **Stage 1.5** | User Intent Clarification    | ✅ 1회      | ✅ 필요시   | ❌     | LLM이 질문 분석하여 2-4개 방향 제시, 사용자 선택                       |
+| **Stage 2**   | Entity Extractor             | ❌          | ❌          | ✅ N회 | TTL 매칭 + pgvector 검색 + SPARQL 스코어링 → 상위 30개 선택            |
+| **Stage 3**   | Semantic Expander            | ❌          | ❌          | ✅ 3회 | 시간적/인과/벡터 기반 엔티티 확장 (30개 → ~75개)                       |
+| **Stage 4**   | Parallel Knowledge Retrieval | ❌          | ❌          | ✅ 5회 | 5개 관점 병렬 검색 + 양방향 BFS (최대 3-hop) + 프로퍼티 FILTER         |
+| **Stage 5**   | Path Evidence Aggregator     | ❌          | ❌          | ❌     | 경로 추출 + 근거 통합 + 수렴 노드 감지 (1.1배 부스트) → 상위 15개 선택 |
+| **Stage 6**   | Story Generator              | ✅ 1회      | ❌          | ❌     | 선택된 방향을 반영하여 최종 스토리 생성 (-입니다 체)                   |
 
-**총 LLM 호출**: 4회 (역사 체크 1회 + Query Classifier 2회 병렬 + Story Generator 1회)
+**총 LLM 호출**: 5회 (역사 체크 1회 + Query Classifier 2회 병렬 + 방향 생성 1회 + Story Generator 1회)
 **총 SPARQL 호출**: 9 + N회 (Semantic Expander 4회 + 병렬 검색 5회 + 엔티티 스코어링 N회)
 
 ---
@@ -265,10 +264,10 @@ with ThreadPoolExecutor(max_workers=2) as executor:
 #### Thread 1: 의도 분석 + 프로퍼티 그룹 선택
 
 **작업 내용**:
+
 1. 질문 유형 분류: `causal`, `factual`, `deep_analysis`, `comparative`
 2. 핵심 의도 파악: 예) "궁궐을 건설한 왕 찾기"
 3. 프로퍼티 그룹 선택: 최대 5개 (32개 그룹 중 선택)
-4. 확장 방향 생성: 질문 유형별 전략에 따라 3-4개 방향 생성
 
 **프로퍼티 그룹 선택 로직**:
 
@@ -285,11 +284,12 @@ LLM이 관련 그룹 선택 (최대 5개)
 선택된 그룹에서 실제 프로퍼티 추출
   → ["built", "builtBy", "constructed", "founded", "established", ...]
   ↓
-SPARQL FILTER 적용 (Stage 3에서 사용)
+SPARQL FILTER 적용 (Stage 4에서 사용)
   FILTER(?predicate IN (hist:built, hist:builtBy, hist:founded, ...))
 ```
 
 **효과**:
+
 - ✅ 정확도 향상: 관련 프로퍼티만 검색 → 노이즈 감소
 - ✅ 속도 향상: FILTER로 검색 범위 축소
 - ✅ 하드코딩 없음: 데이터 추가 시 `extract_property_groups.py` 재실행만 하면 자동 업데이트
@@ -297,6 +297,7 @@ SPARQL FILTER 적용 (Stage 3에서 사용)
 #### Thread 2: 키워드 확장
 
 **작업 내용**:
+
 - 일반명사를 구체적 인스턴스로 확장 (5-10개)
 
 ```
@@ -312,96 +313,113 @@ Entity Extractor에서 TTL 매칭
   → 경복궁, 창덕궁, 태조, 세종 등 엔티티 발견
 ```
 
-#### 1-3. 확장 방향 생성
-
-질문 유형에 따라 고정된 전략으로 확장 방향 생성:
-
-| 질문 유형 | 전략 | 방향 예시 |
-|----------|------|----------|
-| `causal` | time-based | 원인/배경, 직후 사건, 장기 영향 |
-| `factual` | class-based | 인물 중심, 사건 중심, 제도 중심 |
-| `deep_analysis` | scope-based | 인적 영향, 제도적 영향, 국가적 영향, 국제적 영향 |
-| `comparative` | depth-based | 기본 정보 비교, 내용 비교, 성공/실패 분석 |
-
-**참고**: 확장 방향 템플릿은 `intent_clarification_templates.py`에 정의되어 있습니다.
-
 ---
 
 ### Stage 1.5: User Intent Clarification
 
-**역할**: 질문 유형에 따라 확장 방향을 제시하고 사용자 선택을 받아 검색 정확도 향상
+**역할**: LLM이 질문을 분석하여 최적의 답변 방향을 2-4개 자유롭게 제시하고 사용자 선택을 받아 검색 및 답변 생성에 반영
 
 #### 동작 흐름
 
 ```
-질문: "명성황후 시해사건으로 발발된 사건들은?"
+질문: "임진왜란이 조선에 미친 영향은?"
   ↓
 Stage 1: query_type = "causal" 분류
   ↓
-확장 방향 생성 (time-based 전략):
-  1️⃣ 원인 및 배경 (사건 이전)
-  2️⃣ 직후 발생한 사건 (몇 개월~1년)
-  3️⃣ 장기적 영향 (수년~수십년 후)
+LLM이 질문 분석하여 답변 방향 동적 생성:
+  - 시간축(직후 영향) + 시간축(장기 영향) + 범위(조선 내부) + 클래스(주요 인물)
   ↓
 사용자에게 제시:
 ==================================================
-"명성황후 시해사건으로 발발된 사건들은?"는
-여러 시간 관점에서 답변할 수 있어요.
+"임진왜란이 조선에 미친 영향은?"는
+여러 관점에서 답변할 수 있어요.
 
-어떤 시기의 정보가 더 궁금하신가요?
+어떤 방향의 정보가 더 궁금하신가요?
 
-1️⃣ 원인 및 배경 (사건 이전)
-   '명성황후 시해'이 일어난 정치적·사회적 배경과 원인
+1️⃣ 직후 영향
+   전쟁 직후의 사회 구조와 경제 변화
+   property_groups: ['시간', '사회', '경제', '정치']
 
-2️⃣ 직후 발생한 사건 (몇 개월~1년)
-   사건 직후 발생한 즉각적인 결과와 사건들
+2️⃣ 장기 영향
+   제도·문화의 지속적 변화와 인식의 전환
+   property_groups: ['시간', '제도', '문화', '정치', '경제']
 
-3️⃣ 장기적 영향 (수년~수십년 후)
-   사건이 조선 사회와 역사에 미친 장기적 영향
+3️⃣ 조선 내부 영향
+   인구, 재정, 제도, 외교의 변화와 재편
+   property_groups: ['정치', '경제', '사회', '제도', '외교']
+
+4️⃣ 주요 인물 영향
+   이순신, 선조 등 인물의 영향과 리더십
+   property_groups: ['인물', '직위', '참여', '리더십']
 ==================================================
 
 선택 (번호 입력):
   ↓
-사용자 선택: 2
+사용자 선택: 1
   ↓
-선택된 방향 저장: user_selected_direction = "immediate_consequence"
+선택된 방향 저장:
+  - user_selected_direction = "immediate_impact"
+  - direction_id = "immediate_impact"
+  - property_groups = ['시간', '사회', '경제', '정치']
   ↓
-Stage 2: 선택된 방향 반영하여 엔티티 검색
-  - time_direction = "after"
-  - time_scope = "short_term"
-  - property_groups = ["인과관계", "사건", "연도", "변경"]
+Stage 2: 선택된 property_groups를 SPARQL FILTER에 적용
+Stage 6: 선택된 방향을 프롬프트에 반영하여 답변 생성
 ```
 
-#### 4가지 전략
+#### LLM 기반 자유 조합 방식
 
-**1. Time-based (시간축 기반)** - causal 질문용
-- 원인/배경 (before)
-- 직후 사건 (short-term after)
-- 장기 영향 (long-term after)
+**분석 차원**:
 
-**2. Class-based (클래스 기반)** - factual 질문용
-- 인물 중심 정보 (Person)
-- 사건 중심 정보 (Event)
-- 제도·기구 중심 정보 (Institution)
+1. **시간축**: 원인(이전), 직후 결과, 장기 영향
+2. **클래스**: 인물 중심, 사건 중심, 제도 중심
+3. **범위**: 개인적, 제도적, 국가적, 국제적 영향
+4. **깊이**: 기본 정보, 내용 비교, 성패 분석
 
-**3. Scope-based (범위 기반)** - deep_analysis 질문용
-- 인적 영향 (individual)
-- 제도적 영향 (institutional)
-- 국가적 영향 (national)
-- 국제적 영향 (international)
+**핵심 특징**:
 
-**4. Depth-based (깊이 기반)** - comparative 질문용
-- 기본 정보 비교 (basic)
-- 내용·방법 비교 (relational)
-- 성공/실패 원인 비교 (causal)
+- 같은 차원에서만 선택할 필요 없음
+- 질문마다 최적의 2-4개 방향을 자유롭게 조합
+- 예: "시간축(원인)" + "클래스(인물)" + "범위(국제)" 조합 가능
+
+**LLM 프롬프트 구조**:
+
+```python
+prompt = f"""다음 질문을 분석하여, 사용자가 선택할 수 있는 2-4가지 답변 방향을 제시하세요.
+
+질문: "{query}"
+키워드: {', '.join(keywords)}
+
+**사용 가능한 분석 차원:**
+1. **시간축**: 원인(이전), 직후 결과, 장기 영향
+2. **클래스**: 인물 중심, 사건 중심, 제도 중심
+3. **범위**: 개인적, 제도적, 국가적, 국제적 영향
+4. **깊이**: 기본 정보, 내용 비교, 성패 분석
+
+**중요**: 질문에 가장 적합한 2-4가지 방향을 **자유롭게 조합**하세요.
+
+**출력 형식 (JSON)**:
+{{
+  "directions": [
+    {{
+      "direction_id": "고유ID (영문_조합, 예: time_cause, class_person)",
+      "title": "방향 제목 (15자 이내)",
+      "description": "구체적 설명 (20-40자)",
+      "property_groups": ["관련 프로퍼티 그룹 3-5개"]
+    }}
+  ]
+}}
+"""
+```
 
 #### 효과
 
-- ✅ **RAGAS nv_context_relevance 향상**: 불필요한 컨텍스트 제거
-- ✅ **RAGAS answer_relevancy 향상**: 사용자 의도에 맞는 답변 생성
-- ✅ **사용자 만족도 향상**: 원하는 정보만 얻음
-
-**참고**: 현재 Phase 1 (고정 매핑 방식) 구현 완료. 향후 Phase 2 (Hybrid), Phase 3 (자유 조합)으로 발전 가능.
+- ✅ **질문별 최적화**: 질문마다 다른 방향 제시 (하드코딩 없음)
+- ✅ **전략 혼합**: 시간/클래스/범위/깊이 차원을 자유롭게 조합
+- ✅ **검색 정확도 향상**: 선택된 property_groups가 SPARQL FILTER에 적용
+- ✅ **답변 품질 향상**: 선택된 방향이 Story Generator 프롬프트에 반영
+- ✅ **RAGAS 지표 향상**:
+  - nv_context_relevance: 불필요한 컨텍스트 제거
+  - answer_relevancy: 사용자 의도에 맞는 답변 생성
 
 ---
 
@@ -441,6 +459,7 @@ for keyword in all_keywords:  # 확장된 키워드 + 원본 키워드
 ```
 
 **장점**:
+
 - ✅ 속도: 네트워크 통신 없음 (~0ms)
 - ✅ 캐싱: 파일 I/O 최소화 (연속 질문 시 ~0.5초 절약)
 
@@ -478,6 +497,7 @@ for result in results:
 **목적**: 키워드와 관련된 엔티티를 우선 선택하기 위해 연결된 노드를 분석하여 관련성 점수 계산
 
 **점수 구성**:
+
 1. 기본 점수: 정확 매칭 1.0, 부분 매칭 0.7, pgvector 0.0~1.0
 2. 엔티티 이름 매칭: 키워드가 엔티티 이름에 포함되면 +0.5/keyword
 3. 연결 노드 매칭: 연결된 노드의 label에 키워드 포함 시 +0.1/connection (최대 +0.3)
@@ -536,6 +556,7 @@ matched_entities = matched_entities[:30]
 ```
 
 **효과**:
+
 - ✅ 관련성 우선: 질문과 가장 관련 있는 엔티티부터 처리
 - ✅ 성능 최적화: 30개로 제한하여 후속 처리 속도 향상
 - ✅ 노이즈 감소: 낮은 점수의 무관한 엔티티 제거
@@ -544,7 +565,7 @@ matched_entities = matched_entities[:30]
 
 ### Stage 3: Semantic Expander
 
-**역할**: Entity Extractor에서 추출된 엔티티(30개)를 4가지 방법으로 의미론적 확장
+**역할**: Entity Extractor에서 추출된 엔티티(30개)를 3가지 방법으로 의미론적 확장 (temporal, causal_chain, pgvector)
 
 #### 확장 방법
 
@@ -561,69 +582,124 @@ SELECT DISTINCT ?entity ?label ?year WHERE {
 } LIMIT 20
 ```
 
-**2. 카테고리 확장 (Category Expansion)**
+**2. 인과 체인 확장 (Causal Chain Expansion)**
 
-같은 타입(Person, Event, Institution 등)의 엔티티들을 검색:
-
-```sparql
-SELECT DISTINCT ?entity ?label WHERE {
-    ?entity rdf:type ?type .
-    ?entity rdfs:label ?label .
-    FILTER(?type = hist:Event)
-} LIMIT 20
-```
-
-**3. 인과 체인 확장 (Causal Chain Expansion)**
-
-인과관계로 연결된 엔티티들을 검색:
+인과관계(leadsTo, ledTo, causes)로 연결된 엔티티들을 1-3 hop까지 검색:
 
 ```sparql
-SELECT DISTINCT ?related ?label WHERE {
+SELECT DISTINCT ?related ?label ?type WHERE {
     {
-        <hist:Event_base> hist:leadsTo ?related .
+        # 나가는 인과관계: entity → ... → related (1-3 hop)
+        <hist:Event_base> (hist:leadsTo|hist:ledTo|hist:causes){1,3} ?related .
         ?related rdfs:label ?label .
+        ?related rdf:type ?type .
     }
     UNION
     {
-        <hist:Event_base> hist:causedBy ?related .
+        # 들어오는 인과관계: related → ... → entity (1-3 hop)
+        ?related (hist:leadsTo|hist:ledTo|hist:causes){1,3} <hist:Event_base> .
         ?related rdfs:label ?label .
+        ?related rdf:type ?type .
     }
-} LIMIT 20
+} LIMIT 30
 ```
 
-**4. 벡터 유사도 확장 (Vector Similarity Expansion)**
+**구현 특징**:
 
-pgvector를 사용하여 의미적으로 유사한 엔티티 검색:
+- ✅ **다중 hop 지원**: SPARQL Property Path를 사용하여 1-3 hop 체인 탐색
+- ✅ **정확한 hop_count 계산**: 각 결과에 대해 최단 경로 hop 수를 별도로 계산
+- ✅ **점수 감쇠 적용**: `decay_factor = 0.9 ** (hop_count - 1)`로 거리에 따른 관련성 감소
+- ✅ **양방향 탐색**: 원인(들어오는 관계)과 결과(나가는 관계) 모두 검색
+
+**3. 벡터 유사도 확장 (Vector Similarity Expansion)**
+
+pgvector를 사용하여 의미적으로 유사한 엔티티 검색 (2단계):
 
 ```python
-# 기존 엔티티들의 이름을 쿼리로 사용
-query_text = " ".join([e["name"] for e in entities[:10]])
-results = pgvector_service.search(query=query_text, top_k=20, threshold=0.65)
+# 1단계: 원본 질문으로 검색
+results1 = pgvector_service.search(query=original_query, top_k=15, threshold=0.5)
+
+# 2단계: 추출된 엔티티 이름으로 재검색 (확장 강화)
+for entity in extracted_entities[:5]:
+    entity_name = entity["name"]
+    results2 = pgvector_service.search(query=entity_name, top_k=5, threshold=0.5)
 ```
+
+**특징**:
+
+- 원본 질문으로 최초 검색 → 질문 맥락 반영
+- 추출된 엔티티 이름으로 재검색 → 관련 엔티티 추가 발견
+- 중복 제거 자동 처리
 
 #### 가중치 적용
 
-각 확장 방법별로 relevance_score 계산:
+각 확장 방법별로 SPARQL 결과 메타데이터를 활용하여 관련성 점수를 세밀하게 계산:
 
 ```python
-# 1. Causal Chain (인과관계 체인)
-relevance_score = 1.0 + sparql_bonus * FIXED_SCORE_CAUSAL_CHAIN
+def calculate_relevance_score(similarity, expansion_method, **kwargs):
+    """
+    확장 방법별 관련성 점수 계산
 
-# 2. Temporal (시간적 확장)
-relevance_score = 1.0 + sparql_bonus * FIXED_SCORE_TEMPORAL
+    Args:
+        similarity: 벡터 유사도 (0-1) 또는 None
+        expansion_method: 확장 방법 ("causal_chain", "temporal", "pgvector")
+        **kwargs: SPARQL 결과 메타데이터
+            - year_distance: 연도 거리 (temporal용)
+            - hop_count: hop 수 (causal_chain용)
 
-# 3. Category (카테고리 기반)
-relevance_score = 1.0 + sparql_bonus * FIXED_SCORE_CATEGORY
+    Returns:
+        관련성 점수 (0-1 범위)
+    """
+    weight = FIXED_SCORES.get(expansion_method, 1.0)
 
-# 4. Pgvector (하이브리드)
-relevance_score = 0.65 * 0.6 + similarity * 0.4
+    # 1. Temporal (시간적 확장): 연도 거리로 근접도 계산
+    if expansion_method == "temporal":
+        year_distance = kwargs.get("year_distance", 10)
+        # 연도 거리가 가까울수록 높은 점수
+        # 0년: 1.0, 10년: 0.5, 20년 이상: 0.0
+        proximity_factor = max(0.0, 1.0 - (year_distance / 20.0))
+        return weight * proximity_factor
+
+    # 2. Causal Chain (인과관계 체인): hop 수로 감쇠 계산
+    elif expansion_method == "causal_chain":
+        hop_count = kwargs.get("hop_count", 1)
+        # hop이 적을수록 높은 점수
+        # 1-hop: 1.0, 2-hop: 0.9, 3-hop: 0.81
+        decay_factor = 0.9 ** (hop_count - 1)
+        return weight * decay_factor
+
+    # 3. Pgvector (벡터 유사도): 벡터 유사도 사용
+    elif expansion_method == "pgvector":
+        if similarity is not None and USE_VECTOR_SIMILARITY_SCORE:
+            return similarity * weight
+        return weight
+
+    return weight
 ```
 
+**점수 계산 예시**:
+
+| 확장 방법        | 메타데이터       | 계산식              | 결과 점수 | 비고             |
+| ---------------- | ---------------- | ------------------- | --------- | ---------------- |
+| **Temporal**     | year_distance=2  | 1.0 × (1.0 - 2/20)  | **0.90**  | 2년 차이         |
+| **Temporal**     | year_distance=15 | 1.0 × (1.0 - 15/20) | **0.25**  | 15년 차이        |
+| **Causal Chain** | hop_count=1      | 1.0 × 0.9^0         | **1.00**  | 직접 연결        |
+| **Causal Chain** | hop_count=2      | 1.0 × 0.9^1         | **0.90**  | 2-hop            |
+| **Causal Chain** | hop_count=3      | 1.0 × 0.9^2         | **0.81**  | 3-hop            |
+| **Pgvector**     | similarity=0.88  | 0.88 × 1.0          | **0.88**  | 원본 질문 검색   |
+| **Pgvector**     | similarity=0.75  | 0.75 × 1.0          | **0.75**  | 엔티티 이름 검색 |
+
 **현재 가중치** (베이스라인 측정용):
+
 - `FIXED_SCORE_CAUSAL_CHAIN = 1.0`
 - `FIXED_SCORE_TEMPORAL = 1.0`
-- `FIXED_SCORE_CATEGORY = 1.0`
-- pgvector 하이브리드: `0.65 * 0.6 + similarity * 0.4`
+- `FIXED_SCORE_PGVECTOR = 1.0`
+
+**효과**:
+
+- ✅ **정밀한 점수 계산**: SPARQL 결과의 메타데이터를 활용하여 관련성을 더 정확하게 반영
+- ✅ **거리 기반 감쇠**: 시간적 거리, hop 거리에 따라 점수가 자연스럽게 감소
+- ✅ **의미적 확장 강화**: Pgvector 2단계 검색으로 관련 엔티티 추가 발견
 
 #### 결과
 
@@ -631,20 +707,29 @@ relevance_score = 0.65 * 0.6 + similarity * 0.4
 입력: 30개 엔티티
   ↓
 확장 결과:
-  - Causal Chain: 15개
-  - Temporal: 20개
-  - Category: 20개
-  - Pgvector: 20개
+  - Temporal: ~20개 (시간적 맥락, ±10년)
+  - Causal Chain: ~30개 (인과관계, 1-3 hop)
+  - Pgvector: ~25개 (원본 질문 15개 + 엔티티 이름 10개)
   ↓
 중복 제거 후: ~75개 엔티티
   ↓
 Stage 4 (Parallel Knowledge Retrieval)로 전달
 ```
 
+**개선 사항**:
+
+- ✅ **Category 확장 제거**: Type 기반 확장은 의미적 연관성이 낮아 노이즈 발생 → 제거
+- ✅ **Causal Chain 3-hop 확장**: 1-hop → 3-hop으로 확장하여 인과관계 체인 추적 강화
+- ✅ **정확한 hop_count 계산**: 최단 경로 기반 점수 감쇠 적용 (0.9^(hop-1))
+- ✅ **Pgvector 2단계 검색**: 원본 질문 + 엔티티 이름 검색으로 관련 엔티티 발견율 향상
+- ✅ **성능 최적화**: 불필요한 SPARQL 쿼리 제거로 처리 속도 개선
+
 **효과**:
+
 - ✅ 검색 범위 확대: 직접 매칭되지 않은 관련 엔티티 발견
 - ✅ 맥락 이해: 시간적·의미적으로 연결된 정보 포함
-- ✅ 정확도 향상: 인과관계 체인으로 원인-결과 추적 가능
+- ✅ 인과관계 추적 강화: 3-hop까지 확장하여 원인-결과 체인 완전 추적
+- ✅ 정확도 향상: hop 거리 기반 점수 감쇠로 관련성 정밀 측정
 
 ---
 
@@ -747,7 +832,7 @@ SELECT DISTINCT ?type ?typeLabel WHERE {
 
 - ✅ 병렬 실행: 5개 쿼리가 동시에 실행되어 시간 단축
 - ✅ 다양한 관점: 서로 다른 측면의 지식 수집
-- ✅ 프로퍼티 FILTER: Stage 1에서 선택한 프로퍼티 그룹으로 검색 범위 축소
+- ✅ 프로퍼티 FILTER: Stage 1.5에서 선택한 프로퍼티 그룹으로 검색 범위 축소
 - ✅ 양방향 BFS: 직접 연결뿐 아니라 간접 연결까지 탐색
 
 ---
@@ -852,6 +937,7 @@ top_evidences = all_paths[:15]
 ```
 
 **효과**:
+
 - ✅ 신뢰도 높은 근거 우선: final_weight로 정렬
 - ✅ 수렴 노드 강조: 여러 엔티티가 공통으로 가리키는 핵심 정보 부각
 - ✅ 다양한 관점: 5개 Thread에서 고르게 선택
@@ -860,7 +946,7 @@ top_evidences = all_paths[:15]
 
 ### Stage 6: Story Generator
 
-**역할**: 상위 15개 근거를 바탕으로 최종 스토리 형식 답변 생성
+**역할**: 상위 15개 근거를 바탕으로 사용자가 선택한 방향을 반영하여 최종 스토리 형식 답변 생성
 
 #### 입력 데이터
 
@@ -868,10 +954,22 @@ top_evidences = all_paths[:15]
 - ✅ 질문 유형 (causal, factual, deep_analysis, comparative)
 - ✅ 추출된 엔티티 목록
 - ✅ 상위 15개 근거 (경로 + 점수)
+- ✅ **사용자가 선택한 답변 방향** (Stage 1.5에서 저장됨)
 
 #### 프롬프트 구조
 
 ```python
+# 사용자가 선택한 방향 정보 가져오기
+user_selected_direction = state.get("user_selected_direction")
+expansion_directions = state.get("expansion_directions", [])
+
+selected_direction_detail = None
+if user_selected_direction and expansion_directions:
+    for direction in expansion_directions:
+        if direction["direction_id"] == user_selected_direction:
+            selected_direction_detail = direction
+            break
+
 prompt = f"""
 당신은 조선시대 역사 전문가입니다. 다음 질문에 대해 제공된 근거를 바탕으로 답변을 작성하세요.
 
@@ -883,6 +981,20 @@ prompt = f"""
 
 근거 (신뢰도 순):
 {evidences}
+"""
+
+# 사용자가 선택한 구체적 방향 추가
+if selected_direction_detail:
+    prompt += f"""
+
+## 사용자가 선택한 답변 방향
+**{selected_direction_detail['title']}**
+{selected_direction_detail['description']}
+
+→ 초기 질문에 답하되, 위에서 선택한 방향을 중심으로 답변을 구성하세요.
+"""
+
+prompt += """
 
 답변 작성 규칙:
 1. 반드시 "-입니다" 체를 사용하세요
@@ -890,6 +1002,7 @@ prompt = f"""
 3. 추출된 엔티티를 반드시 언급하세요
 4. 되묻거나 추가 질문하지 마세요
 5. 역사적 사실만 서술하고 추측하지 마세요
+6. 사용자가 선택한 방향에 집중하여 답변하세요
 
 답변:
 """
@@ -898,28 +1011,31 @@ prompt = f"""
 #### 출력 예시
 
 ```
-질문: "명성황후 시해사건으로 발발된 사건들은?"
+질문: "임진왜란이 조선에 미친 영향은?"
+사용자 선택: 1️⃣ 직후 영향
 
 답변:
-명성황후 시해사건(을미사변, 1895년)은 여러 중요한 사건들을 촉발했습니다.
+임진왜란(1592-1598)은 전쟁 직후 조선 사회 전반에 막대한 영향을 미쳤습니다.
 
-가장 직접적인 결과로는 아관파천(1896년)이 있습니다. 고종이 신변의 위협을
-느껴 러시아 공사관으로 피신한 사건으로, 조선의 외교 정책이 친러 노선으로
-급격히 전환되는 계기가 되었습니다.
+가장 즉각적인 변화는 인구 감소와 경제적 피해였습니다. 전쟁으로 인해 약 100만 명
+이상의 인구가 감소했으며, 농지의 약 2/3가 황폐화되었습니다. 이로 인해 전쟁 직후
+조선의 재정은 극도로 악화되었습니다.
 
-이후 을사조약(1905년)과 한일병합(1910년)으로 이어지는 일련의 사건들도
-을미사변과 무관하지 않습니다. 일본의 조선 내정 간섭이 심화되면서 조선의
-국권이 점차 침탈당하게 되었습니다.
+사회 구조 측면에서는 양반 중심의 신분제가 동요하기 시작했습니다. 전쟁 중
+공을 세운 노비들이 해방되거나 양민으로 신분 상승하는 경우가 늘어났으며,
+이는 조선 후기 신분제 해체의 시발점이 되었습니다.
 
-또한 의병 활동이 전국적으로 확산되는 계기가 되었으며, 특히 을미의병
-(1895-1896)이 대표적입니다. 유인석, 이소응 등의 유생들이 중심이 되어
-반일 운동을 전개했습니다.
+정치적으로는 왕권이 크게 약화되었습니다. 선조의 피난과 무능한 대응으로 인해
+왕실에 대한 민중의 신뢰가 급격히 하락했으며, 이후 인조반정(1623) 등 정치적
+불안정이 지속되는 원인이 되었습니다.
 ```
 
 **효과**:
+
 - ✅ 자연스러운 스토리: "-입니다" 체로 친근한 답변
 - ✅ 근거 기반: 제공된 15개 근거 내용 반영
 - ✅ 엔티티 언급: 추출된 엔티티를 자연스럽게 포함
+- ✅ **방향 반영**: 사용자가 선택한 방향에 집중한 답변 생성
 - ✅ 되묻기 없음: 명확한 답변 제공
 
 ---
@@ -949,7 +1065,7 @@ classDiagram
         +involvesPerson Person
         +occursAt Place
         +leadsTo Event
-        +causedBy Event
+        +caused Event
     }
 
     class Institution {
@@ -986,7 +1102,7 @@ classDiagram
 
     Person "N" --> "N" Event : participatesIn
     Person "N" --> "1" Person : servedUnder
-    Event "N" --> "N" Event : leadsTo/causedBy
+    Event "N" --> "N" Event : leadsTo/ledTo/causes/caused
     Event "N" --> "1" Place : occursAt
     Institution "1" --> "N" Person : establishedBy
     Document "1" --> "N" Person : hasAuthor
@@ -996,27 +1112,27 @@ classDiagram
 
 ### 주요 통계
 
-| 항목 | 수량 |
-|------|------|
-| **TTL 파일 크기** | 15MB (정규화됨) |
-| **총 트리플 수** | ~50,000개 |
-| **엔티티 수** | ~8,000개 |
-| **프로퍼티 수** | 4,056개 |
-| **프로퍼티 그룹 수** | 32개 |
-| **클래스 수** | 15개 (Person, Event, Institution, Place, Document, Battle 등) |
+| 항목                 | 수량                                                          |
+| -------------------- | ------------------------------------------------------------- |
+| **TTL 파일 크기**    | 15MB (정규화됨)                                               |
+| **총 트리플 수**     | ~50,000개                                                     |
+| **엔티티 수**        | ~8,000개                                                      |
+| **프로퍼티 수**      | 4,056개                                                       |
+| **프로퍼티 그룹 수** | 32개                                                          |
+| **클래스 수**        | 15개 (Person, Event, Institution, Place, Document, Battle 등) |
 
 ### 프로퍼티 그룹 예시
 
-| 그룹 | 프로퍼티 수 | 예시 질문 |
-|------|------------|----------|
-| 건설 | 28개 | "궁궐을 지은 왕" |
-| 설립 | 60개 | "세종이 만든 정책" |
-| 임명 | 84개 | "세종이 임명한 인물" |
-| 사망 | 42개 | "을미사변에서 죽은 사람" |
-| 처벌 | 22개 | "유배당한 인물" |
-| 전쟁 | 23개 | "임진왜란에 참여한 인물" |
-| 인과관계 | 18개 | "명성황후 시해의 원인" |
-| 외교 | 35개 | "조선의 대일 외교" |
+| 그룹     | 프로퍼티 수 | 예시 질문                |
+| -------- | ----------- | ------------------------ |
+| 건설     | 28개        | "궁궐을 지은 왕"         |
+| 설립     | 60개        | "세종이 만든 정책"       |
+| 임명     | 84개        | "세종이 임명한 인물"     |
+| 사망     | 42개        | "을미사변에서 죽은 사람" |
+| 처벌     | 22개        | "유배당한 인물"          |
+| 전쟁     | 23개        | "임진왜란에 참여한 인물" |
+| 인과관계 | 18개        | "명성황후 시해의 원인"   |
+| 외교     | 35개        | "조선의 대일 외교"       |
 
 ---
 
@@ -1106,7 +1222,7 @@ backend/langgraph_fuseki/
 │   ├── history_check_node.py        # Stage 0: 역사 질문 필터링
 │   ├── classify_node.py             # Stage 1: 질문 분류 & 키워드 확장
 │   ├── user_intent_clarification_node.py  # Stage 1.5: 사용자 의도 확인
-│   ├── intent_clarification_templates.py  # 확장 방향 템플릿
+│   ├── intent_clarification_templates.py  # LLM 기반 동적 방향 생성
 │   ├── entity_expander_node.py      # Stage 2: 엔티티 추출 (43KB)
 │   ├── generate_node.py             # Stage 6: 스토리 생성 (30KB)
 │   │
@@ -1135,26 +1251,27 @@ backend/langgraph_fuseki/
     ├── README.md                    # 전체 워크플로우 (이 문서)
     ├── SETUP.md                     # 설치 & 설정
     ├── ONTOLOGY_SCHEMA.md           # 스키마 상세
-    ├── QUERY_CLASSIFICATION_GUIDE.md  # 분류 가이드
     ├── scoring_methodology.md       # 점수 계산 방법론
-    └── conversational_intent_clarification.md  # 대화형 의도 확인 문서
+    ├── ontology_rag_evaluation.md    # 평가 프레임워크
+    ├── conversational_intent_clarification.md  # 대화형 의도 확인
+    └── langgraph_router.md          # 라우터 관련
 ```
 
 ### 핵심 파일
 
-| 파일 | 크기 | 역할 |
-|------|------|------|
-| `entity_expander_node.py` | 43KB | Stage 2: TTL 캐싱 + pgvector fallback + SPARQL 스코어링 |
-| `semantic_expander_node.py` | 31KB | Stage 3: 4가지 확장 (시간적/카테고리/인과/벡터) |
-| `parallel_knowledge_retrieval_node.py` | ~25KB | Stage 4: 5-Thread 병렬 SPARQL 검색 |
-| `path_evidence_aggregator_node.py` | ~20KB | Stage 5: 경로 추출 및 근거 점수 계산 |
-| `generate_node.py` | 30KB | Stage 6: 스토리 생성 + 프롬프트 엔지니어링 |
-| `user_intent_clarification_node.py` | ~5KB | Stage 1.5: 사용자 의도 확인 (입력 대기) |
-| `intent_clarification_templates.py` | ~10KB | 확장 방향 템플릿 (4가지 전략) |
-| `korean_history_normalized.ttl` | 15MB | 운영 데이터 (정규화됨) |
-| `property_groups.json` | ~10KB | 32개 프로퍼티 그룹 정의 |
-| `graph.py` | ~150줄 | LangGraph 워크플로우 정의 |
-| `state.py` | ~120줄 | GraphState TypedDict (Stage 1.5 필드 포함) |
+| 파일                                   | 크기   | 역할                                                        |
+| -------------------------------------- | ------ | ----------------------------------------------------------- |
+| `entity_expander_node.py`              | 43KB   | Stage 2: TTL 캐싱 + pgvector fallback + SPARQL 스코어링     |
+| `semantic_expander_node.py`            | 31KB   | Stage 3: 3가지 확장 (시간적/인과/벡터)                      |
+| `parallel_knowledge_retrieval_node.py` | ~25KB  | Stage 4: 5-Thread 병렬 SPARQL 검색                          |
+| `path_evidence_aggregator_node.py`     | ~20KB  | Stage 5: 경로 추출 및 근거 점수 계산                        |
+| `generate_node.py`                     | 30KB   | Stage 6: 사용자 방향 반영 스토리 생성 + 프롬프트 엔지니어링 |
+| `user_intent_clarification_node.py`    | ~5KB   | Stage 1.5: 사용자 의도 확인 (입력 대기)                     |
+| `intent_clarification_templates.py`    | ~10KB  | LLM 기반 동적 방향 생성 (자유 조합)                         |
+| `korean_history_normalized.ttl`        | 15MB   | 운영 데이터 (정규화됨)                                      |
+| `property_groups.json`                 | ~10KB  | 32개 프로퍼티 그룹 정의                                     |
+| `graph.py`                             | ~150줄 | LangGraph 워크플로우 정의                                   |
+| `state.py`                             | ~120줄 | GraphState TypedDict (Stage 1.5 필드 포함)                  |
 
 ---
 
@@ -1172,7 +1289,7 @@ pip install -r requirements.txt
 
 # 환경변수 설정
 cp .env.example .env
-# .env 파일에서 OPENAI_API_KEY, FUSEKI_URL 등 설정
+# .env 파일에서 OPENAI_API_KEY, OPENAI_MODEL, FUSEKI_URL 등 설정
 ```
 
 ### 2. Apache Fuseki 실행
@@ -1193,23 +1310,31 @@ python backend/langgraph_fuseki/ontology/scripts/load_ttl_to_fuseki.py
 python backend/langgraph_fuseki/main.py
 
 # 질문 입력
-질문을 입력하세요: 명성황후 시해사건으로 발발된 사건들은?
+질문을 입력하세요: 임진왜란이 조선에 미친 영향은?
 
-# Stage 1.5에서 확장 방향 선택 (필요 시)
+# Stage 1.5에서 확장 방향 선택 (자동 생성)
 ==================================================
-"명성황후 시해사건으로 발발된 사건들은?"는
-여러 시간 관점에서 답변할 수 있어요.
+"임진왜란이 조선에 미친 영향은?"는
+여러 관점에서 답변할 수 있어요.
 
-어떤 시기의 정보가 더 궁금하신가요?
+어떤 방향의 정보가 더 궁금하신가요?
 
-1️⃣ 원인 및 배경 (사건 이전)
-2️⃣ 직후 발생한 사건 (몇 개월~1년)
-3️⃣ 장기적 영향 (수년~수십년 후)
+1️⃣ 직후 영향
+   전쟁 직후의 사회 구조와 경제 변화
+
+2️⃣ 장기 영향
+   제도·문화의 지속적 변화와 인식의 전환
+
+3️⃣ 조선 내부 영향
+   인구, 재정, 제도, 외교의 변화와 재편
+
+4️⃣ 주요 인물 영향
+   이순신, 선조 등 인물의 영향과 리더십
 ==================================================
 
-선택 (번호 입력): 2
+선택 (번호 입력): 1
 
-# 최종 답변 출력
+# 최종 답변 출력 (선택한 방향에 집중)
 ```
 
 ### 4. CLI 명령어
@@ -1229,28 +1354,40 @@ python backend/langgraph_fuseki/ontology/scripts/count_ttl_stats.py
 
 ## 기술 스택
 
-| 카테고리 | 기술 | 버전 | 용도 |
-|---------|------|------|------|
-| **워크플로우** | LangGraph | ^0.0.40 | 7단계 파이프라인 정의 |
-| **LLM** | OpenAI GPT-4o | gpt-4o / gpt-4o-mini | 질문 분석, 키워드 확장, 스토리 생성 |
-| **지식 그래프** | Apache Fuseki | 4.x.x | SPARQL Endpoint (RDF 트리플 저장) |
-| **온톨로지** | RDF/OWL | - | 조선시대 역사 지식 그래프 (15MB) |
-| **벡터 검색** | pgvector | - | 엔티티 유사도 검색 (PostgreSQL 확장) |
-| **형태소 분석** | kiwipiepy | ^0.16.0 | 키워드 추출 (무료, 빠름) |
-| **병렬 처리** | ThreadPoolExecutor | Python 내장 | LLM 병렬 호출, SPARQL 병렬 검색 |
-| **평가** | RAGAS | ^0.1.0 | nv_context_relevance, answer_relevancy, faithfulness |
+| 카테고리        | 기술               | 버전        | 용도                                                 |
+| --------------- | ------------------ | ----------- | ---------------------------------------------------- |
+| **워크플로우**  | LangGraph          | ^0.0.40     | 7단계 파이프라인 정의                                |
+| **LLM**         | OpenAI GPT         | 환경변수    | 질문 분석, 키워드 확장, 방향 생성, 스토리 생성       |
+| **지식 그래프** | Apache Fuseki      | 4.x.x       | SPARQL Endpoint (RDF 트리플 저장)                    |
+| **온톨로지**    | RDF/OWL            | -           | 조선시대 역사 지식 그래프 (15MB)                     |
+| **벡터 검색**   | pgvector           | -           | 엔티티 유사도 검색 (PostgreSQL 확장)                 |
+| **형태소 분석** | kiwipiepy          | ^0.16.0     | 키워드 추출 (무료, 빠름)                             |
+| **병렬 처리**   | ThreadPoolExecutor | Python 내장 | LLM 병렬 호출, SPARQL 병렬 검색                      |
+| **평가**        | RAGAS              | ^0.1.0      | nv_context_relevance, answer_relevancy, faithfulness |
 
 ---
 
 ## 참고 문서
 
-- [SETUP.md](SETUP.md): 설치 및 설정 가이드
-- [ONTOLOGY_SCHEMA.md](ONTOLOGY_SCHEMA.md): 온톨로지 스키마 상세
-- [QUERY_CLASSIFICATION_GUIDE.md](QUERY_CLASSIFICATION_GUIDE.md): 질문 분류 가이드
-- [scoring_methodology.md](scoring_methodology.md): 점수 계산 방법론 (3단계 가중치 시스템)
-- [conversational_intent_clarification.md](conversational_intent_clarification.md): 대화형 의도 확인 시스템 (Phase 1-3 로드맵)
+### 설치 및 설정
+
+- [SETUP.md](SETUP.md): 설치 및 설정 가이드 (TTL 파일 업로드, 환경 설정)
+
+### 스키마 및 구조
+
+- [ONTOLOGY_SCHEMA.md](ONTOLOGY_SCHEMA.md): 온톨로지 스키마 상세 (클래스, 프로퍼티 정의)
+
+### 점수 계산 및 평가
+
+- [scoring_methodology.md](scoring_methodology.md): 점수 계산 방법론 (3단계 가중치 시스템, 실제 코드 로직)
+- [ontology_rag_evaluation.md](ontology_rag_evaluation.md): 평가 프레임워크 (이론적 평가 방법론, RAGAS 대안)
+
+### 기능 설명
+
+- [conversational_intent_clarification.md](conversational_intent_clarification.md): 대화형 의도 확인 시스템 (Stage 1.5)
+- [langgraph_router.md](langgraph_router.md): 라우터 관련 (모드 전환, 메모리 관리)
 
 ---
 
-**마지막 업데이트**: 2025-12-23
-**버전**: Stage 1.5 (User Intent Clarification) 포함, Phase 1 (고정 매핑) 완료
+**마지막 업데이트**: 2025-12-24
+**버전**: LLM 기반 자유 조합 방식 (Stage 1.5 동적 방향 생성 + Stage 6 방향 반영)

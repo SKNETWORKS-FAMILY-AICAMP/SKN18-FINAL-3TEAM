@@ -52,7 +52,7 @@
    📊 출력: query_entities (각 엔티티에 base_score 포함)
 
 [Stage 3/6] Semantic Expansion ⭐ 1차 점수 계산
-   ├─ 4가지 확장 방법 (causal_chain, temporal, category, pgvector)
+   ├─ 3가지 확장 방법 (causal_chain, temporal, pgvector)
    ├─ 각 방법별 relevance_score 계산
    ├─ sparql_connected_bonus 추가
    └─ semantic_weight 적용 (FIXED_SCORE_*)
@@ -82,10 +82,9 @@
 
 **목적**: 의미론적 확장 방법의 중요도 반영
 
-**4가지 방법**:
-- `causal_chain`: 인과관계 체인 (예: leadsTo, causedBy)
+**3가지 방법**:
+- `causal_chain`: 인과관계 체인 (예: leadsTo, ledTo, causes, caused)
 - `temporal`: 시간적 맥락 (±10년 범위)
-- `category`: 카테고리 분류 (동일 주제/유형)
 - `pgvector`: 벡터 유사도 (임베딩 검색)
 
 **설정 위치**: `config.py` → `FIXED_SCORE_*`
@@ -148,7 +147,7 @@ semantic_weight 적용
 
 #### 1. Causal Chain (인과관계 체인)
 
-**SPARQL 쿼리**: `leadsTo`, `causedBy`, `triggeredBy` 관계 추적
+**SPARQL 쿼리**: `leadsTo`, `ledTo`, `causes`, `caused` 관계 추적
 
 **점수 계산**:
 ```
@@ -159,7 +158,7 @@ relevance_score = 1.0 (기본값)
 
 **예시**:
 - 질문: "세조 즉위의 원인은?"
-- 확장: "계유정난" (causedBy 관계)
+- 확장: "계유정난" (caused 관계)
 - 점수: 1.0 + 0.2 (SPARQL 연결) × 1.0 = **1.2**
 
 ---
@@ -182,25 +181,7 @@ relevance_score = 1.0 (기본값)
 
 ---
 
-#### 3. Category (카테고리)
-
-**SPARQL 쿼리**: `hasCategory` 속성으로 동일 유형 검색
-
-**점수 계산**:
-```
-relevance_score = 1.0 (기본값)
-+ SPARQL 연결 분석 보너스 (최대 +0.3)
-× FIXED_SCORE_CATEGORY (현재 1.0)
-```
-
-**예시**:
-- 질문: "강화도 조약의 배경은?" (카테고리: 조약)
-- 확장: "병자수호조약" (동일 카테고리)
-- 점수: 1.0 × 1.0 = **1.0**
-
----
-
-#### 4. Pgvector (벡터 유사도)
+#### 3. Pgvector (벡터 유사도)
 
 **pgvector 쿼리**: 코사인 거리 기반 유사 엔티티 검색
 
@@ -416,7 +397,6 @@ final_weight = 1.0 × 1.8 × 1.0 × 1.0 = 1.8
 # Semantic Expansion Weights
 FIXED_SCORE_CAUSAL_CHAIN = 1.0
 FIXED_SCORE_TEMPORAL = 1.0
-FIXED_SCORE_CATEGORY = 1.0
 FIXED_SCORE_PGVECTOR = 1.0
 
 # Thread Type Weights
@@ -471,7 +451,7 @@ QUERY_ENTITY_MATCH_BOOST_NORMALIZED = 1.0
 **실험 1: Semantic Expansion Weights**
 ```
 causal_chain: [1.0, 1.2, 1.4, 1.6]
-temporal, category, pgvector: 1.0 (고정)
+temporal, pgvector: 1.0 (고정)
 
 → 4가지 조합 테스트
 ```

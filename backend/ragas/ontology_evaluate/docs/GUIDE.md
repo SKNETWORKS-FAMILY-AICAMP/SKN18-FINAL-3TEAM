@@ -22,7 +22,7 @@
 ┌─────────────────────────────────────────────────────────────┐
 │  평가 프레임워크 (ontology_evaluate/)                          │
 │  ├─ Evaluators: state_output을 받아서 평가                    │
-│  ├─ LLM Judge: GPT-4로 Intent/Triple 평가                    │
+│  ├─ LLM Judge: GPT-5-nano로 Intent/Triple 평가                    │
 │  └─ Result Analyzer: 실험 결과 분석                           │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -33,8 +33,8 @@
 # experiments/run_baseline.py
 
 # 1. LangGraph 초기화 (기존 코드 그대로)
-from langgraph_fuseki.graph import create_graph
-graph = create_graph()
+from langgraph_fuseki.graph import create_graph_flow
+graph = create_graph_flow()
 
 # 2. 테스트 질문으로 실행
 initial_state = {
@@ -42,7 +42,8 @@ initial_state = {
     "test_config": {  # Ablation 설정 주입
         "semantic_expander": {
             "temporal": True,
-            "category": False,  # Category 확장만 비활성화
+            "causal_chain": True,
+            "pgvector": True,
             ...
         }
     }
@@ -82,10 +83,15 @@ def semantic_expander_node(state: GraphState) -> GraphState:
         temporal_entities = expand_temporal(extracted_entities)
         extracted_entities.extend(temporal_entities)
 
-    # Category 확장
-    if semantic_config.get("category", True):
-        category_entities = expand_category(extracted_entities)
-        extracted_entities.extend(category_entities)
+    # Causal Chain 확장
+    if semantic_config.get("causal_chain", True):
+        causal_entities = expand_by_causal_chain(extracted_entities)
+        extracted_entities.extend(causal_entities)
+
+    # Pgvector 확장
+    if semantic_config.get("pgvector", True):
+        pgvector_entities = expand_by_pgvector(extracted_entities)
+        extracted_entities.extend(pgvector_entities)
 
     # ... (나머지 확장 방법)
 
@@ -104,6 +110,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
 **작업 내용**: 각 노드가 `test_config`를 인식하도록 최소한의 코드 추가
 
 **수정 파일**:
+
 - `nodes/kg/semantic_expander_node.py`
 - `nodes/kg/path_evidence_aggregator_node.py`
 - (필요시) `state.py`에 `test_config` 필드 추가
@@ -117,6 +124,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
 **작업 내용**: TTL 파일에서 온톨로지 스키마(classes, properties) 추출
 
 **파일 생성**:
+
 ```python
 # ontology_evaluate/utils/schema_loader.py
 
@@ -148,6 +156,7 @@ def load_ontology_schema(ttl_path: str) -> dict:
 **작업 내용**: Mock 함수를 실제 LangGraph 연동으로 교체
 
 **수정 위치**:
+
 ```python
 # experiments/run_baseline.py
 
@@ -156,9 +165,9 @@ def mock_graph_invoke(state):
     return {...}
 
 # After (실제 연동)
-from langgraph_fuseki.graph import create_graph
+from langgraph_fuseki.graph import create_graph_flow
 
-graph = create_graph()
+graph = create_graph_flow()
 
 def real_graph_invoke(state):
     return graph.invoke(state)
@@ -171,6 +180,7 @@ def real_graph_invoke(state):
 ### Step 4: 첫 Ablation 실험 실행 ✅ 핵심
 
 **실행 명령**:
+
 ```bash
 cd backend/ragas/ontology_evaluate
 
@@ -185,6 +195,7 @@ cat data/results/semantic_expander_ablation.json
 ```
 
 **예상 결과**:
+
 ```json
 [
   {
@@ -207,6 +218,7 @@ cat data/results/semantic_expander_ablation.json
 ### Step 5: 결과 분석 및 인사이트 도출 📊
 
 **실행 명령**:
+
 ```bash
 python -c "
 from utils.result_analyzer import ResultAnalyzer
@@ -216,6 +228,7 @@ analyzer.generate_report('data/results/analysis_report.txt')
 ```
 
 **분석 내용**:
+
 1. Baseline 대비 각 확장 방법의 기여도
 2. 어떤 확장 방법이 Intent Preservation에 기여하는가?
 3. Thread별 Evidence Diversity 비교
@@ -244,7 +257,21 @@ python experiments/run_grid_search.py \
 
 **작업 내용**: Query type에 따라 메트릭에 다른 가중치를 적용하는 평가 실행
 
-**실행 명령**:
+#### Intent-Aware 평가 개요
+
+Intent-Aware Evaluation은 query_type(factual, causal, comparative, deep_analysis)에 따라 평가 메트릭에 다른 가중치를 적용하는 평가 시스템입니다.
+
+**핵심 아이디어**:
+
+- Factual 쿼리: 단순 사실 확인 → 수렴 노드 중요도 낮음
+- Causal 쿼리: 인과관계 추론 → 수렴 노드 중요도 높음
+- Comparative 쿼리: 2개 엔티티 비교 → 수렴 노드 중요도 매우 높음
+- Deep Analysis 쿼리: 심층 분석 → Intent 보존과 관계 일관성 중요
+
+#### 실행 방법
+
+**커맨드라인 실행 (가장 간단)**:
+
 ```bash
 cd backend/ragas/ontology_evaluate
 
@@ -258,10 +285,61 @@ python experiments/run_baseline.py \
     --group semantic_expander \
     --queries data/test_queries.json \
     --no-intent-aware
+
+# 디버깅용 (쿼리 10개만)
+python experiments/run_baseline.py \
+    --group semantic_expander \
+    --queries data/test_queries.json \
+    --limit 10
+```
+
+**Python 코드에서 직접 사용**:
+
+```python
+from ragas.ontology_evaluate.evaluators.intent_aware_evaluator import IntentAwareEvaluator
+
+# 1. Evaluator 생성
+evaluator = IntentAwareEvaluator()
+
+# 2. 각 evaluator의 원점수 준비
+raw_metrics = {
+    "tbox_consistency": 0.90,
+    "intent_preservation": 0.85,
+    "relation_coherence": 0.88,
+    "triple_validity": 0.82,
+    "evidence_diversity": 0.75,
+    "convergence_utilization": 0.80
+}
+
+# 3. Intent-aware 평가 실행
+result = evaluator.evaluate(
+    query_type="causal",  # factual, causal, comparative, deep_analysis
+    raw_metrics=raw_metrics
+)
+
+# 4. 결과 확인
+print(f"Query Type: {result['query_type']}")
+print(f"Final Score: {result['final_score']:.3f}")
+print(f"Weights: {result['weights']}")
+print(f"Weighted Metrics: {result['weighted_metrics']}")
 ```
 
 **출력 예시**:
+
 ```
+======================================================================
+Baseline Ablation Study 실행
+======================================================================
+실험 그룹: semantic_expander
+질문 파일: data/test_queries.json
+결과 저장: data/results
+Intent-aware 평가: 활성화
+======================================================================
+테스트 질문 개수: 40
+Query Type 분포: {'factual': 10, 'causal': 10, 'comparative': 10, 'deep_analysis': 10}
+
+...
+
 ======================================================================
 Intent-Aware 평가 요약
 ======================================================================
@@ -272,12 +350,72 @@ Intent-Aware 평가 요약
 ======================================================================
 ```
 
-**예상 결과**:
-- Comparative 쿼리가 가장 높은 점수 (수렴 노드 중요도 높음)
-- Factual 쿼리가 가장 낮은 점수 (수렴 노드 중요도 낮음)
-- Causal/Deep Analysis 쿼리는 중간 점수
+#### Query Type별 가중치 분석
 
-**상세 가이드**: [INTENT_AWARE_USAGE.md](./INTENT_AWARE_USAGE.md)
+**Factual (단순 사실 확인)**:
+
+- Schema 준수와 Intent 보존이 가장 중요
+- 수렴 노드는 거의 불필요 (가중치 0.075)
+- 단순 1-hop 조회에 최적화
+
+**Causal (인과관계 추론)**:
+
+- 수렴 노드가 가장 중요 (가중치 0.234)
+- 관계 일관성도 중요 (인과 체인 연결)
+- 증거 다양성 중요 (다각적 인과 분석)
+
+**Comparative (비교 분석)**:
+
+- 수렴 노드가 가장 중요 (가중치 0.253)
+- 증거 다양성도 매우 중요 (양쪽 엔티티의 증거 필요)
+- 2개 엔티티 비교에 최적화
+
+**Deep Analysis (심층 분석)**:
+
+- Intent 보존이 가장 중요 (복합 분석)
+- 관계 일관성도 매우 중요
+- 균형잡힌 가중치 분포
+
+#### 결과 해석 가이드
+
+**Final Score 해석**:
+
+- **0.9 ~ 1.0**: 매우 우수 - 해당 query_type에 최적화된 성능
+- **0.8 ~ 0.9**: 우수 - 대부분의 메트릭이 높은 점수
+- **0.7 ~ 0.8**: 양호 - 일부 메트릭 개선 필요
+- **0.6 ~ 0.7**: 보통 - 여러 메트릭 개선 필요
+- **< 0.6**: 미흡 - 전반적인 개선 필요
+
+**Query Type별 기대 점수 범위**:
+
+| Query Type    | 기대 점수 범위 | 이유                                 |
+| ------------- | -------------- | ------------------------------------ |
+| Factual       | 0.70 ~ 0.85    | 단순 조회는 높은 점수 쉽게 달성 가능 |
+| Causal        | 0.75 ~ 0.90    | 인과 체인 구축 시 높은 점수          |
+| Comparative   | 0.80 ~ 0.95    | 수렴 노드 발견 시 매우 높은 점수     |
+| Deep Analysis | 0.75 ~ 0.90    | 복합 분석 성공 시 높은 점수          |
+
+#### FAQ
+
+**Q1: Intent-aware 평가를 비활성화하려면?**
+
+```bash
+python experiments/run_baseline.py --no-intent-aware
+```
+
+**Q2: 새로운 query_type을 추가하려면?**
+`intent_aware_evaluator.py`의 `INTENT_WEIGHT_PRESETS`에 추가
+
+**Q3: 가중치를 동적으로 조정하려면?**
+커스텀 가중치 사용 (자세한 내용은 [WEIGHT_CALCULATION_GUIDE.md](./WEIGHT_CALCULATION_GUIDE.md) 참고)
+
+**Q4: Raw metrics와 Intent-aware 점수가 크게 차이나는 이유?**
+Intent-aware 평가는 query_type에 따라 가중치를 다르게 적용합니다:
+
+- Factual: 수렴 노드 낮은 가중치 → raw 평균보다 낮을 수 있음
+- Comparative: 수렴 노드 높은 가중치 → raw 평균보다 높을 수 있음
+
+이는 정상적인 동작이며, query_type에 적합한 평가를 위한 것입니다.
 
 **예상 작업량**: 30분 (Step 4 완료 후)
 
@@ -310,6 +448,7 @@ ontology_evaluate/
 **주요 클래스**:
 
 #### `AblationConfig`
+
 ```python
 @dataclass
 class AblationConfig:
@@ -319,12 +458,12 @@ class AblationConfig:
 ```
 
 **예시**:
+
 ```python
 # Temporal 확장만 활성화
 config = AblationConfig(
     semantic_expander={
         "temporal": True,
-        "category": False,
         "causal_chain": False,
         "pgvector": False
     },
@@ -335,19 +474,22 @@ config = AblationConfig(
 #### `AblationExperimentGenerator`
 
 **메서드**:
-- `generate_semantic_expander_experiments()`: 6개 Semantic Expander 실험 생성
+
+- `generate_semantic_expander_experiments()`: 5개 Semantic Expander 실험 생성
+
   - Baseline (모두 비활성화)
-  - Temporal Only
-  - Category Only
-  - Causal Chain Only
-  - Pgvector Only
+  - Temporal Only (±10년 시간적 확장)
+  - Causal Chain Only (1-3 hop 인과관계 체인)
+  - Pgvector Only (벡터 유사도)
   - Full (모두 활성화)
 
 - `generate_thread_experiments()`: 6개 Thread 실험 생성
+
   - Baseline (1개만)
   - Leave-One-Out (각 Thread 하나씩 제거)
 
 **사용 예시**:
+
 ```python
 experiments = AblationExperimentGenerator.generate_semantic_expander_experiments()
 # → [AblationConfig(...), AblationConfig(...), ...] 6개 설정 반환
@@ -358,11 +500,13 @@ experiments = AblationExperimentGenerator.generate_semantic_expander_experiments
 **역할**: 실험 실행 및 결과 저장
 
 **메서드**:
+
 - `run_single_experiment()`: 1개 질문 × 1개 설정 실행
 - `run_experiment_group()`: 여러 질문 × 여러 설정 실행
 - `run_all_experiments()`: 모든 실험 실행
 
 **사용 예시**:
+
 ```python
 runner = AblationRunner(output_dir="data/results")
 
@@ -384,6 +528,7 @@ runner.run_experiment_group(
 **주요 클래스**:
 
 #### `TestQuery`
+
 ```python
 @dataclass
 class TestQuery:
@@ -397,22 +542,46 @@ class TestQuery:
 #### `PersonaQueryBuilder`
 
 **메서드**:
+
 - `build_factual_queries()`: 10개 사실 확인 질문
 - `build_causal_queries()`: 10개 인과관계 질문 (수렴 노드 중요)
 - `build_comparative_queries()`: 10개 비교 질문 (수렴 노드 매우 중요)
 - `build_deep_analysis_queries()`: 10개 심층 분석 질문
 
 **생성 규칙**:
+
 - **Factual**: 단순 정보 조회 (예: "세종대왕이 훈민정음을 창제한 시기는?")
 - **Causal**: 원인/결과 분석 (예: "임진왜란이 발생한 원인은?")
 - **Comparative**: 2개 엔티티 비교 (예: "임진왜란과 병자호란의 공통점은?")
 - **Deep Analysis**: 심층 분석 (예: "세종대왕의 업적이 조선 사회에 미친 영향은?")
 
 **사용 예시**:
+
 ```python
 PersonaQueryBuilder.save_to_json("data/test_queries.json")
 # → 40개 질문이 담긴 JSON 파일 생성
 ```
+
+#### 테스트 쿼리 검증 결과
+
+**검증 완료**: 40개 쿼리 모두 Intent-aware 평가에 적합
+
+**Query Type별 분포**:
+
+- Factual: 10개 (단순 사실 확인, 수렴 노드 불필요)
+- Causal: 10개 (인과관계 추론, 수렴 노드 중요)
+- Comparative: 10개 (2개 엔티티 비교, 수렴 노드 매우 중요)
+- Deep Analysis: 10개 (심층 분석, Intent 보존 중요)
+
+**검증 포인트**:
+
+- ✅ Query Type별 분포 균형 (각 10개씩)
+- ✅ Intent 키워드 명확성 (각 타입별 특성 반영)
+- ✅ 수렴 노드 중요도 분포 적절 (query_type별 차별화)
+- ✅ 엔티티 다양성 (인물, 사건, 장소, 개념)
+- ✅ 2-Entity 비교 충분 (Comparative 쿼리 10개 모두 2개 이상 엔티티 비교)
+
+**전체 평가: ⭐⭐⭐⭐⭐ (5/5)** - Intent-Aware 평가에 매우 적합
 
 ---
 
@@ -425,6 +594,7 @@ PersonaQueryBuilder.save_to_json("data/test_queries.json")
 **주요 클래스**:
 
 ##### `IntentWeightConfig`
+
 ```python
 @dataclass
 class IntentWeightConfig:
@@ -439,9 +609,11 @@ class IntentWeightConfig:
 ##### `IntentAwareEvaluator`
 
 **메서드**:
+
 - `evaluate(query_type, raw_metrics)`: Query type에 따라 가중치 적용 후 최종 점수 계산
 
 **가중치 프리셋**:
+
 ```python
 INTENT_WEIGHT_PRESETS = {
     "factual": IntentWeightConfig(
@@ -468,6 +640,7 @@ INTENT_WEIGHT_PRESETS = {
 ```
 
 **출력**:
+
 ```python
 {
     "query_type": "causal",
@@ -487,6 +660,7 @@ INTENT_WEIGHT_PRESETS = {
 ```
 
 **사용 예시**:
+
 ```python
 from ragas.ontology_evaluate.evaluators.intent_aware_evaluator import IntentAwareEvaluator
 
@@ -505,8 +679,6 @@ result = evaluator.evaluate("causal", raw_metrics)
 print(f"Final Score: {result['final_score']:.3f}")  # 0.847
 ```
 
-**상세 가이드**: [INTENT_AWARE_USAGE.md](./INTENT_AWARE_USAGE.md)
-
 ---
 
 #### `l1_schema_compliance.py`
@@ -516,10 +688,12 @@ print(f"Final Score: {result['final_score']:.3f}")  # 0.847
 **역할**: 온톨로지 스키마(TBox) 위반 검증
 
 **평가 대상**:
+
 - Stage 3 (Semantic Expander)에서 생성된 확장 경로
 - Stage 5 (Path Evidence Aggregator)에서 추출된 triple
 
 **검증 항목**:
+
 ```python
 # 예: (Person) -[participatesIn]-> (Event)
 # domain: Person, range: Event 일치해야 함
@@ -529,6 +703,7 @@ print(f"Final Score: {result['final_score']:.3f}")  # 0.847
 ```
 
 **출력**:
+
 ```python
 {
     "score": 0.95,  # 1.0 - (violations / total_triples)
@@ -558,12 +733,14 @@ print(f"Final Score: {result['final_score']:.3f}")  # 0.847
 **평가 대상**: Stage 3의 각 expansion hop
 
 **Intent 상태**:
+
 - **Preserve (1.0)**: 의도 유지
 - **Enrich (1.2)**: 의도 심화 (보너스)
 - **Drift (0.5)**: 의도 전환 (페널티)
 - **Hallucinated (0.0)**: 의도 무관 (실패)
 
 **예시**:
+
 ```python
 # 질문: "임진왜란의 원인은?"
 # Hop 1: "임진왜란" → "명나라 요청" (Enrich: 1.2)
@@ -572,6 +749,7 @@ print(f"Final Score: {result['final_score']:.3f}")  # 0.847
 ```
 
 **출력**:
+
 ```python
 {
     "score": 0.6,
@@ -597,6 +775,7 @@ print(f"Final Score: {result['final_score']:.3f}")  # 0.847
 **평가 대상**: Stage 4의 5개 Thread에서 사용된 relation
 
 **Valid Relations 예시**:
+
 ```python
 VALID_RELATIONS_BY_INTENT = {
     "원인": ["causedBy", "leadsTo", "influences"],
@@ -606,6 +785,7 @@ VALID_RELATIONS_BY_INTENT = {
 ```
 
 **예시**:
+
 ```python
 # 질문: "세종의 업적"
 # Thread 1: [built, established, founded] → 3/3 = 1.0 ✓
@@ -613,6 +793,7 @@ VALID_RELATIONS_BY_INTENT = {
 ```
 
 **출력**:
+
 ```python
 {
     "score": 0.6,  # coherent_relations / total_relations
@@ -640,11 +821,13 @@ VALID_RELATIONS_BY_INTENT = {
 **평가 대상**: Stage 5의 top 15 evidences
 
 **Triple 기여도**:
+
 - **기여함 (1.0)**: 질문에 직접 답함
 - **간접 기여 (0.5)**: 배경 정보 제공
 - **무관함 (0.0)**: 답변에 도움 안 됨
 
 **예시**:
+
 ```python
 # 질문: "세종대왕의 업적"
 # Triple 1: (세종대왕) -[built]-> (경복궁) → 기여함 (1.0) ✓
@@ -652,6 +835,7 @@ VALID_RELATIONS_BY_INTENT = {
 ```
 
 **출력**:
+
 ```python
 {
     "score": 0.67,  # (1.0 + 0.5 + 0.0) / 3
@@ -677,6 +861,7 @@ VALID_RELATIONS_BY_INTENT = {
 **평가 대상**: Stage 5의 evidences 분포
 
 **Shannon Entropy 계산**:
+
 ```python
 # Thread 분포: [7, 4, 2, 1, 1] (총 15개)
 # Entropy = -Σ(p * log2(p))
@@ -684,6 +869,7 @@ VALID_RELATIONS_BY_INTENT = {
 ```
 
 **문제 상황**:
+
 ```python
 # 불균형 예시:
 Thread 1 (outgoing_relations): 14개
@@ -697,6 +883,7 @@ Thread 1: 3개, Thread 2: 3개, Thread 3: 3개, Thread 4: 3개, Thread 5: 3개
 ```
 
 **출력**:
+
 ```python
 {
     "score": 0.85,
@@ -721,6 +908,7 @@ Thread 1: 3개, Thread 2: 3개, Thread 3: 3개, Thread 4: 3개, Thread 5: 3개
 **평가 대상**: Stage 5의 convergence_nodes, Stage 6의 final_answer
 
 **query_type별 가중치**:
+
 ```python
 IMPORTANCE_WEIGHTS = {
     "causal": 1.5,         # 인과관계 → 수렴 노드 매우 중요
@@ -731,6 +919,7 @@ IMPORTANCE_WEIGHTS = {
 ```
 
 **계산 방식**:
+
 ```python
 # 수렴 노드: ["명나라", "일본"]
 # 답변에 "명나라"만 언급됨
@@ -741,6 +930,7 @@ final_score = 0.5 * 1.5 = 0.75 (1.0 상한)
 ```
 
 **출력**:
+
 ```python
 {
     "score": 0.75,
@@ -764,6 +954,7 @@ final_score = 0.5 * 1.5 = 0.75 (1.0 상한)
 **메서드**:
 
 1. `evaluate_intent_preservation()`: Intent 상태 평가
+
 ```python
 llm_judge.evaluate_intent_preservation(
     query="임진왜란의 원인은?",
@@ -776,6 +967,7 @@ llm_judge.evaluate_intent_preservation(
 ```
 
 2. `evaluate_triple_contribution()`: Triple 기여도 평가
+
 ```python
 llm_judge.evaluate_triple_contribution(
     query="세종대왕의 업적은?",
@@ -800,6 +992,7 @@ llm_judge.evaluate_triple_contribution(
 **메서드**:
 
 1. `calculate_metric_averages()`: 실험별 평균 점수 계산
+
 ```python
 analyzer = ResultAnalyzer("data/results/semantic_expander_ablation.json")
 df = analyzer.calculate_metric_averages()
@@ -812,6 +1005,7 @@ df = analyzer.calculate_metric_averages()
 ```
 
 2. `compare_to_baseline()`: Baseline 대비 성능 비교
+
 ```python
 diff_df = analyzer.compare_to_baseline("semantic_expander_baseline")
 
@@ -822,6 +1016,7 @@ diff_df = analyzer.compare_to_baseline("semantic_expander_baseline")
 ```
 
 3. `generate_report()`: 분석 리포트 생성
+
 ```python
 analyzer.generate_report("data/results/report.txt")
 
@@ -854,6 +1049,7 @@ analyzer.generate_report("data/results/report.txt")
 3. `main()`: 실험 실행 메인 함수
 
 **사용 예시**:
+
 ```bash
 python experiments/run_baseline.py \
     --group semantic_expander \
@@ -862,6 +1058,7 @@ python experiments/run_baseline.py \
 ```
 
 **실행 흐름**:
+
 ```
 1. 테스트 질문 로드 (40개)
 2. LLM Judge 초기화 (GPT-4)
@@ -883,21 +1080,25 @@ python experiments/run_baseline.py \
 **주요 클래스**: `GridSearchRunner`
 
 **메서드**:
+
 - `generate_semantic_weight_grid()`: Semantic Expander 가중치 조합 생성 (4^4 = 256개)
 - `generate_thread_weight_grid()`: Thread 가중치 조합 생성 (4^5 = 1024개)
 - `run_semantic_weight_search()`: Semantic 가중치 탐색
 - `run_thread_weight_search()`: Thread 가중치 탐색
 
 **가중치 범위**:
+
 ```python
 SEMANTIC_WEIGHTS = {
     "temporal": [0.5, 1.0, 1.5, 2.0],
-    "category": [0.5, 1.0, 1.5, 2.0],
+    "causal_chain": [0.5, 1.0, 1.5, 2.0],
+    "pgvector": [0.5, 1.0, 1.5, 2.0],
     ...
 }
 ```
 
 **사용 예시**:
+
 ```bash
 python experiments/run_grid_search.py \
     --baseline-results data/results/semantic_expander_ablation.json \
@@ -914,17 +1115,17 @@ python experiments/run_grid_search.py \
 
 ### 코드 역할 요약
 
-| 파일 | 역할 | 입력 | 출력 |
-|------|------|------|------|
-| `baseline_ablation.py` | 실험 설정 생성 | 없음 | `AblationConfig` 리스트 |
-| `build_queries_persona.py` | 테스트 질문 생성 | 없음 | `test_queries.json` |
-| `evaluators/l1_*.py` | TBox 검증 | `GraphState` | 점수 (0~1) |
-| `evaluators/l2_*.py` | 경로 품질 평가 | `GraphState` | 점수 (0~1.2) |
-| `evaluators/l3_*.py` | 최종 지식 평가 | `GraphState` | 점수 (0~1) |
-| `utils/llm_judge.py` | LLM 평가 | 질문, 엔티티, Triple | 판단, 근거 |
-| `utils/result_analyzer.py` | 결과 분석 | JSON 결과 파일 | DataFrame, 리포트 |
-| `experiments/run_baseline.py` | 실험 실행 | 질문, 설정 | JSON 결과 파일 |
-| `experiments/run_grid_search.py` | 가중치 최적화 | Baseline 결과 | 최적 가중치 |
+| 파일                             | 역할             | 입력                 | 출력                    |
+| -------------------------------- | ---------------- | -------------------- | ----------------------- |
+| `baseline_ablation.py`           | 실험 설정 생성   | 없음                 | `AblationConfig` 리스트 |
+| `build_queries_persona.py`       | 테스트 질문 생성 | 없음                 | `test_queries.json`     |
+| `evaluators/l1_*.py`             | TBox 검증        | `GraphState`         | 점수 (0~1)              |
+| `evaluators/l2_*.py`             | 경로 품질 평가   | `GraphState`         | 점수 (0~1.2)            |
+| `evaluators/l3_*.py`             | 최종 지식 평가   | `GraphState`         | 점수 (0~1)              |
+| `utils/llm_judge.py`             | LLM 평가         | 질문, 엔티티, Triple | 판단, 근거              |
+| `utils/result_analyzer.py`       | 결과 분석        | JSON 결과 파일       | DataFrame, 리포트       |
+| `experiments/run_baseline.py`    | 실험 실행        | 질문, 설정           | JSON 결과 파일          |
+| `experiments/run_grid_search.py` | 가중치 최적화    | Baseline 결과        | 최적 가중치             |
 
 ### 데이터 흐름
 

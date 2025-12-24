@@ -95,7 +95,12 @@ def evaluate_state(
     intent_aware_result = None
     if use_intent_aware and query_type:
         intent_aware_evaluator = IntentAwareEvaluator()
-        intent_aware_result = intent_aware_evaluator.evaluate(query_type, raw_metrics)
+        user_selected_direction = state_output.get("user_selected_direction")
+        intent_aware_result = intent_aware_evaluator.evaluate(
+            query_type,
+            raw_metrics,
+            user_selected_direction
+        )
 
     return {
         "raw_metrics": raw_metrics,

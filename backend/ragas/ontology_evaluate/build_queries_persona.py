@@ -23,6 +23,7 @@ class TestQuery:
     expected_entities: List[str]  # 예상되는 핵심 엔티티
     difficulty: str  # easy, medium, hard
     description: str  # 질문 설명
+    preferred_direction: str = None  # 선호하는 답변 방향 (예: "time_cause", "class_person")
 
 
 class PersonaQueryBuilder:
@@ -395,7 +396,8 @@ class PersonaQueryBuilder:
                 "intent_keywords": q.intent_keywords,
                 "expected_entities": q.expected_entities,
                 "difficulty": q.difficulty,
-                "description": q.description
+                "description": q.description,
+                "preferred_direction": q.preferred_direction
             }
             for q in queries
         ]
