@@ -1,7 +1,7 @@
 """
 LLM-as-Judge 구현
 
-GPT-4를 Judge로 사용하여 평가
+GPT-5-nano를 Judge로 사용하여 평가
 """
 
 from typing import Tuple, Literal
@@ -16,13 +16,14 @@ TripleContribution = Literal["기여함", "간접 기여", "무관함"]
 class LLMJudge:
     """LLM-as-Judge 구현"""
 
-    def __init__(self, model: str = "gpt-4o", api_key: str = None):
+    def __init__(self, model: str = None, api_key: str = None):
         """
         Args:
-            model: 사용할 모델 ("gpt-4o", "gpt-4-turbo")
+            model: 사용할 모델 ("gpt-5-nano", 환경변수에서 로드)
             api_key: API 키 (None이면 환경변수에서 로드)
         """
-        self.model = model
+        if model is None:
+            model = os.getenv("OPENAI_MODEL")
 
         if api_key is None:
             api_key = os.getenv("OPENAI_API_KEY")

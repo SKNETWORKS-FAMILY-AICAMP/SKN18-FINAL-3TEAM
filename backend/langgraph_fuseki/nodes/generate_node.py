@@ -451,6 +451,16 @@ def story_generator_node(state: GraphState) -> GraphState:
     extracted_entities = state.get("extracted_entities", [])
     convergence_nodes = state.get("convergence_nodes", [])  # 수렴 노드
 
+    # 사용자가 선택한 의도 방향
+    user_selected_direction = state.get("user_selected_direction")
+    expansion_directions = state.get("expansion_directions", [])
+    selected_direction_detail = None
+    if user_selected_direction and expansion_directions:
+        for direction in expansion_directions:
+            if direction["direction_id"] == user_selected_direction:
+                selected_direction_detail = direction
+                break
+
     llm = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL"),
         temperature=0.7  # 스토리 생성은 창의성 필요
@@ -538,12 +548,20 @@ def story_generator_node(state: GraphState) -> GraphState:
     # 전체 근거 포맷팅 (중복 제거된 것)
     evidence_list_all, _ = format_evidence_for_prompt(deduplicated_evidences, query)
 
-    # 의도 정보 추가
+    # 의도 정보 추가 (초기 의도 + 사용자 선택 방향)
     intent_info = ""
     if query_intent:
         intent_info = f"\n## 질문의 핵심 의도\n{query_intent}"
         if relation_keywords:
             intent_info += f"\n관련 키워드: {', '.join(relation_keywords)}"
+
+    # 사용자가 선택한 구체적 방향 추가
+    if selected_direction_detail:
+        intent_info += f"\n\n## 사용자가 선택한 답변 방향\n"
+        intent_info += f"**{selected_direction_detail['title']}**\n"
+        intent_info += f"{selected_direction_detail['description']}\n"
+        intent_info += "\n→ 초기 질문에 답하되, 위에서 선택한 방향을 중심으로 답변을 구성하세요.\n"
+    elif query_intent:
         intent_info += "\n→ 근거에서 이 의도와 관련된 정보를 우선적으로 사용하세요.\n"
 
     # 수렴 노드 정보 추가

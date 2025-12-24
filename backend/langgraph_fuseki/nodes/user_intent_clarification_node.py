@@ -45,6 +45,32 @@ def user_intent_clarification_node(state: GraphState) -> GraphState:
             "needs_clarification": False
         }
 
+    # ========== test_config에서 자동 선택 확인 ==========
+    test_config = state.get("test_config")
+    if test_config and test_config.get("skip_clarification", False):
+        # 자동으로 첫 번째 옵션 선택 (평가/테스트 모드)
+        selected_direction = expansion_directions[0]
+        node_elapsed = time.time() - node_start
+
+        print(f"\n{'='*70}")
+        print(f"[Stage 1.5/6] 사용자 의도 확인 (자동 선택 - 테스트 모드)")
+        print(f"{'='*70}")
+        print(f"  ├─ 자동 선택: {selected_direction['title']}")
+        print(f"  ├─ Direction ID: {selected_direction['direction_id']}")
+        print(f"  └─ 완료 ({node_elapsed:.2f}초)")
+        print()
+
+        node_times = state.get("node_execution_times", {})
+        node_times["user_intent_clarification"] = node_elapsed
+
+        return {
+            **state,
+            "user_selected_direction": selected_direction["direction_id"],
+            "needs_clarification": False,
+            "executed_nodes": state.get("executed_nodes", []) + ["user_intent_clarification"],
+            "node_execution_times": node_times
+        }
+
     # ========== 사용자에게 질문 제시 ==========
     print(clarification_question)
 

@@ -25,8 +25,8 @@ from ragas.ontology_evaluate.evaluators import (
 from ragas.ontology_evaluate.evaluators.intent_aware_evaluator import IntentAwareEvaluator
 from ragas.ontology_evaluate.utils import LLMJudge
 
-# LangGraph import (실제 경로에 맞게 수정 필요)
-# from langgraph_fuseki.graph import create_graph
+# LangGraph import
+from langgraph_fuseki.graph import create_graph_flow
 
 
 def load_queries(queries_file: str):
@@ -191,23 +191,52 @@ def main():
     }
 
     # 4. LangGraph 초기화
-    # TODO: 실제 LangGraph 초기화 구현
-    # graph = create_graph()
+    print("\n[INFO] LangGraph 초기화 중...")
+    try:
+        graph = create_graph_flow()
+        print("[INFO] LangGraph 초기화 완료!")
+    except Exception as e:
+        print(f"[ERROR] LangGraph 초기화 실패: {e}")
+        print("[INFO] Mock 모드로 전환합니다.")
+        graph = None
 
-    def mock_graph_invoke(state):
-        """Mock LangGraph invoke (실제 구현 필요)"""
-        # TODO: 실제 graph.invoke() 호출 구현
-        # query_type을 state에서 가져오거나 기본값 사용
-        query_type = state.get("query_type", "factual")
-        return {
-            "query": state["query"],
-            "query_intent": "테스트 의도",
-            "query_type": query_type,
-            "extracted_entities": [],
-            "evidences": [],
-            "convergence_nodes": [],
-            "final_answer": "테스트 답변"
-        }
+    def real_graph_invoke(state):
+        """실제 LangGraph 실행"""
+        # test_config에 skip_clarification 추가 (평가 모드)
+        if "test_config" not in state:
+            state["test_config"] = {}
+        state["test_config"]["skip_clarification"] = True
+
+        if graph is None:
+            # Fallback: Mock 모드
+            query_type = state.get("query_type", "factual")
+            return {
+                "query": state["query"],
+                "query_intent": "테스트 의도",
+                "query_type": query_type,
+                "extracted_entities": [],
+                "evidences": [],
+                "convergence_nodes": [],
+                "final_answer": "테스트 답변 (Mock)"
+            }
+
+        # 실제 LangGraph 실행
+        try:
+            result = graph.invoke(state)
+            return result
+        except Exception as e:
+            print(f"[ERROR] LangGraph 실행 실패: {e}")
+            # Fallback: Mock 데이터 반환
+            query_type = state.get("query_type", "factual")
+            return {
+                "query": state["query"],
+                "query_intent": "에러 발생",
+                "query_type": query_type,
+                "extracted_entities": [],
+                "evidences": [],
+                "convergence_nodes": [],
+                "final_answer": f"에러 발생: {str(e)}"
+            }
 
     # 5. Ablation Runner 초기화
     runner = AblationRunner(output_dir=args.output)
@@ -228,7 +257,7 @@ def main():
             results = runner.run_experiment_group(
                 queries=queries,
                 configs=configs,
-                graph_invoke_func=mock_graph_invoke,
+                graph_invoke_func=real_graph_invoke,
                 group_name=group_name
             )
 
@@ -257,7 +286,7 @@ def main():
         results = runner.run_experiment_group(
             queries=queries,
             configs=configs,
-            graph_invoke_func=mock_graph_invoke,
+            graph_invoke_func=real_graph_invoke,
             group_name=args.group
         )
 
