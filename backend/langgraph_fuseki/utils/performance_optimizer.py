@@ -65,7 +65,7 @@ class OptimizedTTLLoader:
             return self._cache
         
         if not os.path.exists(self.ttl_path):
-            print(f"⚠️ TTL 파일이 없습니다: {self.ttl_path}")
+            print(f"[WARN] TTL 파일이 없습니다: {self.ttl_path}")
             return {"label_to_uri": {}, "uri_to_type": {}, "load_time": 0}
         
         # 파일을 청크로 분할하여 병렬 처리
@@ -198,7 +198,7 @@ class BatchSPARQLExecutor:
                     batch_result = future.result()
                     updated_entities.extend(batch_result)
                 except Exception as e:
-                    print(f"  ⚠️ 배치 처리 에러: {e}")
+                    print(f"[ERROR] 배치 처리 에러: {e}")
         
         return updated_entities
     
@@ -334,10 +334,10 @@ class LazyVectorService:
             if hasattr(self._service, 'search'):
                 return self._service.search(query=query, top_k=top_k, threshold=threshold)
             else:
-                print(f"  ⚠️ 벡터 서비스에 search 메서드가 없습니다")
+                print(f"[WARN] 벡터 서비스에 search 메서드가 없습니다")
                 return []
         except Exception as e:
-            print(f"  ⚠️ 벡터 검색 실패: {e}")
+            print(f"[ERROR] 벡터 검색 실패: {e}")
             return []
     
     @property
@@ -366,12 +366,12 @@ class LazyVectorService:
             # 실제 TitleVectorService 사용
             from backend.db_pipeline.postgres.services.title_vector_service import TitleVectorService
             self._service = TitleVectorService()
-            print("  ✓ 실제 벡터 서비스 초기화 완료")
+            print("[INFO] 실제 벡터 서비스 초기화 완료")
         except ImportError:
-            print("  ⚠️ TitleVectorService import 실패")
+            print("[WARN] TitleVectorService import 실패")
             self._service = None
         except Exception as e:
-            print(f"  ⚠️ 벡터 서비스 초기화 실패: {e}")
+            print(f"[ERROR] 벡터 서비스 초기화 실패: {e}")
             self._service = None
         finally:
             self._initialized = True

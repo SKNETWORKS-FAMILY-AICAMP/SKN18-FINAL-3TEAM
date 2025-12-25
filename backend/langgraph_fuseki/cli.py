@@ -61,11 +61,11 @@ def ttl_load(ttl_file, fuseki_url, dataset, fuseki_user, fuseki_password):
         load_main.invoke(ctx)
 
     except ImportError as e:
-        click.echo(f"❌ 모듈 import 실패: {e}", err=True)
+        click.echo(f"[ERROR] 모듈 import 실패: {e}", err=True)
         click.echo("   먼저 'uv pip install -e .'를 실행하여 패키지를 설치하세요.", err=True)
         raise click.Abort()
     except Exception as e:
-        click.echo(f"❌ 오류 발생: {e}", err=True)
+        click.echo(f"[ERROR] 오류 발생: {e}", err=True)
         raise click.Abort()
 
 
@@ -81,7 +81,7 @@ def main(verbose):
         ontology main
         ontology main --verbose
     """
-    click.echo("🚀 HistoK LangGraph Fuseki 시작 중...")
+    click.echo("[INFO] HistoK LangGraph Fuseki 시작 중...")
 
     try:
         # Python 모듈로 실행
@@ -91,14 +91,14 @@ def main(verbose):
         langgraph_main()
 
     except ImportError as e:
-        click.echo(f"❌ 모듈 import 실패: {e}", err=True)
+        click.echo(f"[ERROR] 모듈 import 실패: {e}", err=True)
         click.echo("   먼저 'uv pip install -e .'를 실행하여 패키지를 설치하세요.", err=True)
         raise click.Abort()
     except KeyboardInterrupt:
-        click.echo("\n\n👋 프로그램을 종료합니다.")
+        click.echo("\n\n[INFO] 프로그램을 종료합니다.")
         sys.exit(0)
     except Exception as e:
-        click.echo(f"❌ 오류 발생: {e}", err=True)
+        click.echo(f"[ERROR] 오류 발생: {e}", err=True)
         raise click.Abort()
 
 
@@ -109,7 +109,7 @@ def status():
 
     Fuseki 서버 연결 상태와 데이터셋 통계를 표시합니다.
     """
-    click.echo("📊 Fuseki 서버 상태 확인 중...")
+    click.echo("[INFO] Fuseki 서버 상태 확인 중...")
 
     try:
         import requests
@@ -129,7 +129,7 @@ def status():
         response = requests.get(f"{base_url}/$/ping", timeout=5)
 
         if response.status_code == 200:
-            click.echo(f"✅ Fuseki 서버 연결: {base_url}")
+            click.echo(f"[INFO] Fuseki 서버 연결: {base_url}")
 
             # 데이터셋 통계 (SPARQL COUNT 쿼리)
             query = "SELECT (COUNT(*) as ?count) WHERE { ?s ?p ?o }"
@@ -148,14 +148,14 @@ def status():
                 click.echo(f"   데이터셋: {dataset}")
                 click.echo(f"   총 트리플 수: {count}")
             else:
-                click.echo(f"   ⚠️  데이터셋 '{dataset}' 통계 조회 실패")
+                click.echo(f"   [WARN] 데이터셋 '{dataset}' 통계 조회 실패")
         else:
-            click.echo(f"❌ Fuseki 서버 연결 실패: {base_url}", err=True)
+            click.echo(f"[ERROR] Fuseki 서버 연결 실패: {base_url}", err=True)
 
     except ImportError:
-        click.echo("❌ requests 라이브러리가 필요합니다: pip install requests", err=True)
+        click.echo("[ERROR] requests 라이브러리가 필요합니다: pip install requests", err=True)
     except Exception as e:
-        click.echo(f"❌ 오류 발생: {e}", err=True)
+        click.echo(f"[ERROR] 오류 발생: {e}", err=True)
         click.echo("   Fuseki 서버가 실행 중인지 확인하세요.", err=True)
 
 

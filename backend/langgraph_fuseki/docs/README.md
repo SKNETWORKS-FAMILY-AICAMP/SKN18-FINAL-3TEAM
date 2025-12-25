@@ -118,10 +118,10 @@ graph TB
 
 ## 7단계 파이프라인
 
-### 전체 플로우
+### 전체 플로우 (UX 최적화: 점진적 로딩)
 
 ```mermaid
-graph TD
+graph TB
     Start([사용자 질문]) --> HistCheck{Stage 0<br/>역사 관련 질문?}
 
     HistCheck -->|No| Exit([조기 종료])
@@ -136,16 +136,27 @@ graph TD
     Merge --> DirectionGen[LLM 방향 생성]
     DirectionGen --> IntentCheck{의도 확인<br/>필요?}
 
-    IntentCheck -->|Yes| Clarification[Stage 1.5<br/>User Intent Clarification]
+    IntentCheck -->|Yes| ParallelPhase[병렬 처리 시작]
     IntentCheck -->|No| Extractor
 
-    Clarification --> UserSelect[사용자 선택]
-    UserSelect --> DirectionApply[선택된 방향 적용]
-    DirectionApply --> Extractor[Stage 2<br/>Entity Extractor]
+    subgraph "Phase 2: 사용자 응답 대기 + 백그라운드 처리 (병렬)"
+        ParallelPhase --> Clarification[Stage 1.5<br/>사용자 선택 대기]
+        ParallelPhase --> BG1[Background 1:<br/>TTL 데이터 로드]
+        ParallelPhase --> BG2[Background 2:<br/>기본 엔티티 매칭]
+        ParallelPhase --> BG3[Background 3:<br/>Pgvector 검색]
 
-    Extractor --> TTL[TTL 정확 매칭]
-    TTL --> PGVector[pgvector 검색]
-    PGVector --> Scoring[SPARQL 스코어링]
+        Clarification --> UserSelect[사용자 선택 완료]
+        BG1 --> Integration[백그라운드<br/>결과 통합]
+        BG2 --> Integration
+        BG3 --> Integration
+
+        UserSelect --> Integration
+    end
+
+    Integration --> DirectionApply[선택된 방향 적용]
+    DirectionApply --> Extractor[Stage 2<br/>Entity Extractor<br/>완성]
+
+    Extractor --> Scoring[SPARQL 스코어링<br/>선택된 방향 적용]
     Scoring --> Top30[상위 30개 선택]
 
     Top30 --> Expander[Stage 3<br/>Semantic Expander]
@@ -182,11 +193,25 @@ graph TD
     style Start fill:#e1f5ff,stroke:#01579b,stroke-width:3px
     style HistCheck fill:#fff3e0,stroke:#e65100,stroke-width:3px
     style Clarification fill:#fff9c4,stroke:#f57f17,stroke-width:3px
+    style BG1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style BG2 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style BG3 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Integration fill:#ffecb3,stroke:#ff6f00,stroke-width:3px
     style Parallel fill:#ffe0b2,stroke:#e65100,stroke-width:2px
     style Generator fill:#b2dfdb,stroke:#00695c,stroke-width:2px
     style Answer fill:#c5e1a5,stroke:#33691e,stroke-width:3px
     style Exit fill:#ffcdd2,stroke:#b71c1c,stroke-width:2px
 ```
+
+**핵심 개선사항 (3단계 파이프라인)**:
+- ✅ **Phase 1: 초고속 재질문** (0.2초) - Stage 1을 분할하여 재질문에 필요한 최소 데이터만 먼저 생성
+- ✅ **Phase 2: 백그라운드 병렬 처리** - 사용자 선택 중 Stage 1-B(상세 분석) + Entity 준비(TTL 로드, 매칭, 벡터 검색) 동시 실행
+- ✅ **Phase 3: 유연한 결과 통합** - 사용자 선택 속도에 따라 유연하게 대응 (빠른 선택 시 대기, 느린 선택 시 즉시 통합)
+- ✅ **시간 단축**: 재질문 진입 2.5초 → 0.2초 (92% 단축!), 사용자 체감 시간 23.5초 → 11.2초 (52% 단축!)
+
+**상세 분석**:
+- [UX_OPTIMIZATION_ANALYSIS.md](UX_OPTIMIZATION_ANALYSIS.md) - 3단계 파이프라인 전략
+- [STAGE1_OPTIMIZATION.md](STAGE1_OPTIMIZATION.md) - Stage 1 분할 전략
 
 ### 단계별 요약
 

@@ -8,13 +8,16 @@ HistoK LangGraph Fuseki - 데이터 기반 LangGraph
 - 하이브리드 엔티티 추출 (TTL + pgvector)
 - 데이터 기반 5개 Thread (event_context, actor_network, timeline, similar_events, background)
 - 이야기 모드 지원 (선택적)
+- 성능 최적화 지원 (비동기 파이프라인)
 
 실행 방법:
     python -m backend.langgraph_fuseki.main
+    python -m backend.langgraph_fuseki.main --optimized  # 최적화 버전
 """
 
 # 환경변수 설정은 config.py에서 자동 로드됨
 from backend.langgraph_fuseki.config import PACKAGE_DIR
+import os
 
 from langgraph.graph import StateGraph, END
 from backend.langgraph_fuseki.state import GraphState
@@ -30,9 +33,12 @@ from backend.langgraph_fuseki.nodes.kg.path_evidence_aggregator_node import path
 from backend.langgraph_fuseki.nodes.generate_node import story_generator_node
 
 
-def create_graph_flow():
+def create_graph_flow(use_optimized: bool = None):
     """
     데이터 기반 창작 모드 랭그래프 (개선된 버전)
+    
+    Args:
+        use_optimized: True면 최적화된 파이프라인 사용, None이면 환경변수 확인
 
     Flow:
     0. History Check → 역사 관련 여부 체크 (LLM 1회) ⭐NEW
@@ -60,6 +66,28 @@ def create_graph_flow():
        └─ 상위 15개 근거 선택 (기존 5개에서 확장)
     6. Story Generator → 풍부한 스토리 생성
     """
+    
+    # 최적화 사용 여부 결정
+    if use_optimized is None:
+        use_optimized = os.getenv("USE_OPTIMIZED_PIPELINE", "false").lower() == "true"
+    
+    if use_optimized:
+        print("[INFO] 최적화된 파이프라인 사용")
+        try:
+            # 비동기 그래프 우선 시도
+            from backend.langgraph_fuseki.graph_async import create_async_graph_flow
+            return create_async_graph_flow()
+        except ImportError:
+            try:
+                # 기존 최적화 그래프 시도
+                from backend.langgraph_fuseki.graph_optimized import create_optimized_graph_flow
+                return create_optimized_graph_flow()
+            except ImportError:
+                print("[WARN] 최적화 모듈 없음, 기본 그래프 사용")
+                use_optimized = False
+    
+    if not use_optimized:
+        print("[INFO] 기본 순차 그래프 사용")
 
     workflow = StateGraph(GraphState)
 
@@ -123,5 +151,8 @@ def create_graph_flow():
     return workflow.compile()
 
 
-# 그래프 인스턴스 생성
-graph = create_graph_flow()
+# 그래프 인스턴스 생성 (기본값)
+graph = create_graph_flow(use_optimized=False)
+
+# 최적화된 그래프 인스턴스
+optimized_graph = create_graph_flow(use_optimized=True)

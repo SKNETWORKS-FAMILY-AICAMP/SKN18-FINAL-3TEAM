@@ -94,10 +94,10 @@ def history_check_node(state: GraphState) -> GraphState:
         print(f"\n{'='*70}")
         print(f"[Stage 0/6] 역사 관련 여부 체크 (History Check)")
         print(f"{'='*70}")
-        print(f"  └─ 결과: {'✅ 역사 질문' if is_historical else '❌ 비역사 질문 (조기 종료)'}")
+        print(f"  └─ 결과: {'[INFO] 역사 질문' if is_historical else '[WARN] 비역사 질문 (조기 종료)'}")
 
     except Exception as e:
-        print(f"⚠️ 역사 관련 여부 판단 실패: {e}")
+        print(f"[ERROR] 역사 관련 여부 판단 실패: {e}")
         # 오류 시 안전하게 True로 처리 (정상 플로우 진행)
         is_historical = True
 

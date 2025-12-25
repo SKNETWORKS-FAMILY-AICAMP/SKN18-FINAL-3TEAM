@@ -102,7 +102,7 @@ python -m backend.ragas.ontology_evaluate
 # 방법 1: 직접 모듈 실행
 python -m backend.ragas.ontology_evaluate.experiments.run_baseline --group semantic_expander
 
-# 방법 2: 패키지 실행 (동일한 결과)  
+# 방법 2: 패키지 실행 (동일한 결과)
 python -m backend.ragas.ontology_evaluate.experiments --group semantic_expander
 
 # 다른 실험 그룹들

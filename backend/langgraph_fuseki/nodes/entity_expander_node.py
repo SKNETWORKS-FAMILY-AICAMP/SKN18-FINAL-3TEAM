@@ -18,6 +18,10 @@ import os
 import sys
 import re
 import json
+import time
+import threading
+import queue
+import requests
 import requests
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
@@ -28,11 +32,11 @@ try:
     from kiwipiepy import Kiwi
     _kiwi = Kiwi()
     USE_KIWI = True
-    print("✅ kiwipiepy 형태소 분석기 로드 완료")
+    print("[INFO] kiwipiepy 형태소 분석기 로드 완료")
 except ImportError:
     _kiwi = None
     USE_KIWI = False
-    print("⚠️ kiwipiepy 미설치 - 규칙 기반 조사 제거 사용")
+    print("[WARN] kiwipiepy 미설치 - 규칙 기반 조사 제거 사용")
 
 # config.py에서 환경변수 자동 로드
 from backend.langgraph_fuseki.config import TTL_PATH, USE_PGVECTOR
@@ -52,16 +56,16 @@ def get_title_vector_service():
             if config and config.lazy_load_vectors:
                 from backend.langgraph_fuseki.utils.performance_optimizer import LazyVectorService
                 _title_vector_service = LazyVectorService(config)
-                print("✅ 최적화된 벡터 서비스 초기화")
+                print("  ├─ [INFO] 최적화된 벡터 서비스 초기화")
             else:
                 # 기존 방식
                 from backend.db_pipeline.postgres.services.title_vector_service import TitleVectorService
                 _title_vector_service = TitleVectorService()
-                print("✅ 제목 임베딩 pgvector 서비스 초기화 완료")
+                print("  ├─ [INFO] 제목 임베딩 pgvector 서비스 초기화 완료")
         except ImportError:
-            print("⚠️ 제목 임베딩 pgvector 서비스 import 실패 - TTL 매칭만 사용")
+            print("  ├─ [WARN] 제목 임베딩 pgvector 서비스 import 실패 - TTL 매칭만 사용")
         except Exception as e:
-            print(f"⚠️ 제목 임베딩 pgvector 초기화 실패: {e}")
+            print(f"  ├─ [WARN] 제목 임베딩 pgvector 초기화 실패: {e}")
     return _title_vector_service
 
 
@@ -87,8 +91,12 @@ def get_performance_config():
                 enable_ttl_cache=True,
                 lazy_load_vectors=True
             )
-        except ImportError:
-            # 성능 최적화 모듈이 없으면 기본 설정
+            print("  ├─ [INFO] 성능 최적화 설정 로드 완료")
+        except ImportError as e:
+            print(f"  ├─ [WARN] 성능 최적화 모듈 import 실패: {e}")
+            _performance_config = None
+        except Exception as e:
+            print(f"  ├─ [WARN] 성능 최적화 설정 실패: {e}")
             _performance_config = None
     return _performance_config
 
@@ -111,10 +119,10 @@ def load_ttl_entities() -> dict:
         try:
             from backend.langgraph_fuseki.utils.performance_optimizer import OptimizedTTLLoader
             _optimized_ttl_loader = OptimizedTTLLoader(TTL_PATH, config)
-            print("  ✓ 최적화된 TTL 로더 사용")
+            print("  │   ✓ 최적화된 TTL 로더 사용")
             return _optimized_ttl_loader.load_entities_parallel()
         except ImportError:
-            print("  ⚠️ 성능 최적화 모듈 없음, 기본 로더 사용")
+            print("  ├─ [INFO] 성능 최적화 모듈 없음, 기본 로더 사용")
     
     if _optimized_ttl_loader:
         return _optimized_ttl_loader.load_entities_parallel()
@@ -130,7 +138,7 @@ def load_ttl_entities() -> dict:
     uri_to_type = {}
     
     if not os.path.exists(TTL_PATH):
-        print(f"⚠️ TTL 파일이 없습니다: {TTL_PATH}")
+        print(f"  ├─ [WARN] TTL 파일이 없습니다: {TTL_PATH}")
         return {"label_to_uri": {}, "uri_to_type": {}}
     
     try:
@@ -167,7 +175,7 @@ def load_ttl_entities() -> dict:
         print(f"📂 TTL 엔티티 로드 완료: {len(label_to_uri)}개 라벨, {len(uri_to_type)}개 타입 ({load_time:.2f}초)")
         
     except Exception as e:
-        print(f"⚠️ TTL 파일 로드 실패: {e}")
+        print(f"  ├─ [ERROR] TTL 파일 로드 실패: {e}")
     
     # 캐시 저장
     result = {"label_to_uri": label_to_uri, "uri_to_type": uri_to_type}
@@ -316,13 +324,13 @@ def match_entities_with_ttl(entities: list, ttl_data: dict) -> list:
     return matched_entities
 
 
-# ⚠️ DEPRECATED: kiwipiepy 형태소 분석기 사용으로 더 이상 필요 없음
+# [DEPRECATED] kiwipiepy 형태소 분석기 사용으로 더 이상 필요 없음
 # kiwipiepy가 없을 때만 fallback으로 사용 (현재는 사용 안 함)
 def remove_particles(word: str) -> str:
     """
     [DEPRECATED] 한국어 조사/어미 제거 (하드코딩 규칙)
     
-    ⚠️ kiwipiepy 형태소 분석기를 사용하므로 이 함수는 더 이상 사용되지 않습니다.
+    [DEPRECATED] kiwipiepy 형태소 분석기를 사용하므로 이 함수는 더 이상 사용되지 않습니다.
     kiwipiepy가 없을 때만 fallback으로 사용됩니다.
     """
     # 간단한 fallback (kiwipiepy 없을 때만)
@@ -367,7 +375,7 @@ def extract_nouns_with_kiwi(query: str) -> list:
         
         return nouns
     except Exception as e:
-        print(f"⚠️ kiwipiepy 분석 실패: {e}")
+        print(f"[ERROR] kiwipiepy 분석 실패: {e}")
         return []
 
 
@@ -432,7 +440,7 @@ def extract_keywords_from_query(query: str, for_vector_search: bool = False) -> 
     # ========================================
     # Fallback: kiwipiepy 없을 때만 (최소한의 처리)
     # ========================================
-    print("⚠️ kiwipiepy 미설치 - 기본 키워드 추출 사용 (정확도 낮음)")
+    print("[WARN] kiwipiepy 미설치 - 기본 키워드 추출 사용 (정확도 낮음)")
     
     # 한글 단어 추출 (2글자 이상)
     raw_words = re.findall(r'[가-힣]{2,}', query)
@@ -568,7 +576,7 @@ def extract_historical_keywords_with_llm(query: str, include_query_type: bool = 
             return keywords
         
     except Exception as e:
-        print(f"⚠️ LLM 키워드 추출 실패: {e}")
+        print(f"[ERROR] LLM 키워드 추출 실패: {e}")
         # 실패 시 기본 키워드 추출 사용
         if include_query_type:
             return {"keywords": extract_keywords_from_query(query), "query_type": "causal"}
@@ -689,15 +697,15 @@ JSON 형식으로 출력하세요:
                         expanded_keywords.remove(general_noun)
                     expanded_keywords.extend(filtered_instances)
         
-        print(f"   🔄 키워드 확장: {general_nouns} → {sum(len(v) for v in expanded_dict.values())}개 인스턴스")
+        print(f"[DEBUG] 키워드 확장: {general_nouns} → {sum(len(v) for v in expanded_dict.values())}개 인스턴스")
         return expanded_keywords
         
     except Exception as e:
-        print(f"⚠️ 키워드 확장 실패: {e}")
+        print(f"[ERROR] 키워드 확장 실패: {e}")
         return keywords  # 실패 시 원본 반환
 
 
-# ⚠️ DEPRECATED: Fuseki 검색 제거됨 (TTL 매칭만 사용)
+# [DEPRECATED] Fuseki 검색 제거됨 (TTL 매칭만 사용)
 # def search_fuseki_with_keywords(keywords: list) -> list:
 #     """
 #     [DEPRECATED] Fuseki 검색 기능 제거됨
@@ -729,7 +737,7 @@ def search_entities_with_pgvector(keywords: list, ttl_data: dict, top_k: int = 5
         # TitleVectorService 연결 확인 (lazy connection)
         if not title_vector_service.conn:
             if not title_vector_service.connect():
-                print("⚠️ 제목 임베딩 pgvector 연결 실패")
+                print("[WARN] 제목 임베딩 pgvector 연결 실패")
                 return []
 
         # 키워드로 벡터 검색
@@ -775,7 +783,7 @@ def search_entities_with_pgvector(keywords: list, ttl_data: dict, top_k: int = 5
         entities.sort(key=lambda x: x.get("pgvector_score", 0), reverse=True)
 
     except Exception as e:
-        print(f"⚠️ 제목 임베딩 pgvector 검색 실패: {e}")
+        print(f"[ERROR] 제목 임베딩 pgvector 검색 실패: {e}")
 
     return entities
 
@@ -825,18 +833,42 @@ def entity_expander_node(state: GraphState) -> GraphState:
     # 2. 키워드 추출 (kiwipiepy) - classify_node에서 이미 추출됨, 재사용 가능
     query_keywords = extract_keywords_from_query(query, for_vector_search=False)
 
-    # 3. 키워드 확장 (classify_node에서 이미 확장된 키워드 사용)
+    # 3. 키워드 확장 처리 (비동기 방식)
+    # 사용자 선택 방향에 따라 키워드 확장 전략 결정
     expanded_keywords_from_classify = state.get("expanded_keywords", [])
     expanded_keywords_dict = state.get("expanded_keywords_dict", {})
 
     if expanded_keywords_from_classify:
-        # classify_node에서 이미 확장됨 (README 플로우 준수)
+        # classify_node에서 이미 확장됨 (즉시 사용)
+        print(f"  ├─ 기존 확장 키워드 사용: {len(expanded_keywords_from_classify)}개")
         expanded_keywords = expanded_keywords_from_classify
+        use_background_expansion = False
     else:
-        # fallback: 직접 확장 (classify_node가 실패한 경우)
-        expanded_keywords = expand_keywords_with_llm(query_keywords, query, state=state)
+        # 백그라운드 키워드 확장 시작 (비동기)
+        print(f"  ├─ 백그라운드 키워드 확장 시작...")
+        use_background_expansion = True
+        
+        # 일단 기본 키워드로 시작 (즉시 처리)
+        expanded_keywords = query_keywords.copy()
+        
+        # 백그라운드에서 LLM 키워드 확장 (별도 스레드)
+        import threading
+        import queue
+        
+        expansion_queue = queue.Queue()
+        
+        def background_keyword_expansion():
+            try:
+                llm_expanded = expand_keywords_with_llm(query_keywords, query, state=state)
+                expansion_queue.put(("success", llm_expanded))
+            except Exception as e:
+                expansion_queue.put(("error", str(e)))
+        
+        expansion_thread = threading.Thread(target=background_keyword_expansion)
+        expansion_thread.daemon = True
+        expansion_thread.start()
 
-    # 원본 키워드와 확장된 키워드 병합
+    # 원본 키워드와 확장된 키워드 병합 (현재 사용 가능한 것만)
     all_keywords = list(set(query_keywords + expanded_keywords))
 
     # query_type은 query_classifier_node에서 이미 설정됨
@@ -978,7 +1010,7 @@ def entity_expander_node(state: GraphState) -> GraphState:
                     
                     # 간소화된 로그 (연결이 있을 때만)
                     if connection_count > 0:
-                        print(f"    ✓ {entity.get('name', 'Unknown')}: {connection_count}개 연결 (매칭: {len(matched_connections)})")
+                        print(f"  │   ✓ {entity.get('name', 'Unknown')}: {connection_count}개 연결 (매칭: {len(matched_connections)})")
                     
                 else:
                     print(f"    [ERROR] SPARQL 쿼리 실패: HTTP {response.status_code}")
@@ -1055,8 +1087,64 @@ def entity_expander_node(state: GraphState) -> GraphState:
 
     print(f"  │  └─ TTL 매칭: {ttl_matched}개")
 
+    # 백그라운드 키워드 확장 결과 확인 및 통합
+    if use_background_expansion:
+        try:
+            # 비블로킹으로 확장 결과 확인 (최대 2초 대기)
+            import time
+            wait_start = time.time()
+            expansion_result = None
+            
+            while time.time() - wait_start < 2.0:  # 최대 2초 대기
+                try:
+                    expansion_result = expansion_queue.get_nowait()
+                    break
+                except queue.Empty:
+                    time.sleep(0.1)
+            
+            if expansion_result:
+                status, result = expansion_result
+                if status == "success" and result:
+                    # 확장된 키워드로 추가 TTL 매칭
+                    print(f"  ├─ 백그라운드 확장 완료: {len(result)}개 키워드")
+                    
+                    additional_keywords = [kw for kw in result if kw not in all_keywords]
+                    if additional_keywords:
+                        print(f"  │  ├─ 추가 키워드로 TTL 매칭: {len(additional_keywords)}개")
+                        
+                        additional_matched = 0
+                        for keyword in additional_keywords:
+                            # 정확한 라벨 매칭
+                            if keyword in ttl_data["label_to_uri"]:
+                                uri = ttl_data["label_to_uri"][keyword]
+                                entity_type = ttl_data["uri_to_type"].get(uri, "Event")
+                                key = uri or keyword
+                                if key not in seen:
+                                    seen.add(key)
+                                    matched_entities.append({
+                                        "type": entity_type,
+                                        "name": keyword,
+                                        "uri": uri,
+                                        "matched": True,
+                                        "match_method": "exact_expanded"
+                                    })
+                                    additional_matched += 1
+                        
+                        print(f"  │  └─ 추가 매칭: {additional_matched}개")
+                        all_keywords.extend(additional_keywords)
+                else:
+                    print(f"  │  └─ 백그라운드 확장 실패: {result}")
+            else:
+                print(f"  │  └─ 백그라운드 확장 진행 중 (2초 타임아웃)")
+                
+        except Exception as e:
+            print(f"  │  └─ 백그라운드 확장 오류: {e}")
+    
+    # 최종 TTL 매칭 개수 업데이트
+    ttl_matched = len([e for e in matched_entities if e.get("match_method", "").startswith("exact")])
+
     # --- pgvector 제목 임베딩 유사도 검색 (규칙 기반 키워드 사용) ---
-    # ⚡ 리팩토링: LLM 대신 규칙 기반 키워드로 벡터 검색
+    # [REFACTOR] 리팩토링: LLM 대신 규칙 기반 키워드로 벡터 검색
     # - "조선시대/조선" 제외 (모든 데이터가 조선시대라서)
     # - 조사/동사 제거된 명확한 단어만 사용
     pgvector_added = 0
@@ -1183,7 +1271,7 @@ def entity_expander_node(state: GraphState) -> GraphState:
             print(f"      → LLM 추가: {len(llm_entities)}개")
             
         except Exception as e:
-            print(f"      ⚠️ LLM 추출 실패: {e}")
+            print(f"[ERROR] LLM 추출 실패: {e}")
     
     # ========================================
     # 엔티티 점수 계산 및 정렬

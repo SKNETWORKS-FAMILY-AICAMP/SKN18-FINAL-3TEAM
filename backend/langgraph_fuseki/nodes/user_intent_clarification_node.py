@@ -86,17 +86,17 @@ def user_intent_clarification_node(state: GraphState) -> GraphState:
                 selected_direction = expansion_directions[choice_idx]
                 break
             else:
-                print(f"❌ 1~{len(expansion_directions)} 사이의 번호를 입력해주세요.")
+                print(f"[ERROR] 1~{len(expansion_directions)} 사이의 번호를 입력해주세요.")
 
         except ValueError:
-            print("❌ 숫자를 입력해주세요.")
+            print("[ERROR] 숫자를 입력해주세요.")
         except KeyboardInterrupt:
-            print("\n\n❌ 사용자가 입력을 중단했습니다. 기본값(1번)으로 진행합니다.")
+            print("\n\n[WARN] 사용자가 입력을 중단했습니다. 기본값(1번)으로 진행합니다.")
             selected_direction = expansion_directions[0]
             break
         except EOFError:
             # 파이프/리다이렉션 등으로 stdin이 닫힌 경우
-            print("\n❌ 입력을 받을 수 없습니다. 기본값(1번)으로 진행합니다.")
+            print("\n[WARN] 입력을 받을 수 없습니다. 기본값(1번)으로 진행합니다.")
             selected_direction = expansion_directions[0]
             break
 

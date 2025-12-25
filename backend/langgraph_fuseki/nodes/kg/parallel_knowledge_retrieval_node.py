@@ -61,7 +61,7 @@ THREAD_WEIGHTS = {
 }
 
 # 데이터 기반 Thread 설정 (SPARQL 템플릿)
-# ⚡ 라벨 기반 검색: URI 대신 라벨로 검색하여 데이터 불일치 문제 해결
+# [OPTIMIZATION] 라벨 기반 검색: URI 대신 라벨로 검색하여 데이터 불일치 문제 해결
 DATA_THREADS = {
     "outgoing_relations": {
         "description": "엔티티에서 나가는 모든 관계 (엔티티 → ?)",

@@ -27,7 +27,7 @@ def main():
     generator = LLMTTLGenerator(str(csv_path), str(output_dir))
 
     print("=" * 60)
-    print("🚀 전체 CSV 데이터 → TTL 변환 시작")
+    print("[INFO] 전체 CSV 데이터 → TTL 변환 시작")
     print("=" * 60)
     print(f"📂 입력: {csv_path}")
     print(f"📂 출력: {output_dir}/korean_history_instances.ttl")

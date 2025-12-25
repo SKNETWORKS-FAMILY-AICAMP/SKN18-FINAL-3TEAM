@@ -25,7 +25,7 @@ def test_ttl_loading_performance():
     print(f"TTL 파일 경로: {ttl_path}")
     
     if not os.path.exists(ttl_path):
-        print(f"❌ TTL 파일을 찾을 수 없습니다: {ttl_path}")
+        print(f"[ERROR] TTL 파일을 찾을 수 없습니다: {ttl_path}")
         # 대안 경로들 시도
         alternative_paths = [
             "backend/langgraph_fuseki/ontology/instances/korean_history_instances.ttl",
@@ -35,10 +35,10 @@ def test_ttl_loading_performance():
         for alt_path in alternative_paths:
             if os.path.exists(alt_path):
                 ttl_path = alt_path
-                print(f"✅ 대안 경로 발견: {ttl_path}")
+                print(f"[INFO] 대안 경로 발견: {ttl_path}")
                 break
         else:
-            print("❌ 사용 가능한 TTL 파일이 없습니다.")
+            print("[ERROR] 사용 가능한 TTL 파일이 없습니다.")
             return
     
     # 1. 기존 방식 테스트
@@ -57,7 +57,7 @@ def test_ttl_loading_performance():
         print(f"타입 개수: {len(result.get('uri_to_type', {})):,}")
         
     except Exception as e:
-        print(f"❌ 기존 방식 테스트 실패: {e}")
+        print(f"[ERROR] 기존 방식 테스트 실패: {e}")
         original_time = 0
     
     # 2. 최적화된 방식 테스트
@@ -82,12 +82,12 @@ def test_ttl_loading_performance():
         if original_time > 0:
             improvement = (original_time - optimized_time) / original_time * 100
             speedup = original_time / optimized_time if optimized_time > 0 else 0
-            print(f"\n🚀 성능 향상:")
+            print(f"\n[RESULT] 성능 향상:")
             print(f"  - 시간 단축: {improvement:.1f}%")
             print(f"  - 속도 향상: {speedup:.1f}배")
         
     except Exception as e:
-        print(f"❌ 최적화 방식 테스트 실패: {e}")
+        print(f"[ERROR] 최적화 방식 테스트 실패: {e}")
 
 
 def test_sparql_batch_performance():
@@ -183,7 +183,7 @@ def test_sparql_batch_performance():
         print(f"총 연결: {total_connections}개")
         
     except Exception as e:
-        print(f"❌ 순차 처리 테스트 실패: {e}")
+        print(f"[ERROR] 순차 처리 테스트 실패: {e}")
         sequential_time = 0
     
     # 2. 배치 처리 테스트
@@ -215,12 +215,12 @@ def test_sparql_batch_performance():
         if sequential_time > 0:
             improvement = (sequential_time - batch_time) / sequential_time * 100
             speedup = sequential_time / batch_time if batch_time > 0 else 0
-            print(f"\n🚀 성능 향상:")
+            print(f"\n[RESULT] 성능 향상:")
             print(f"  - 시간 단축: {improvement:.1f}%")
             print(f"  - 속도 향상: {speedup:.1f}배")
         
     except Exception as e:
-        print(f"❌ 배치 처리 테스트 실패: {e}")
+        print(f"[ERROR] 배치 처리 테스트 실패: {e}")
 
 
 def test_full_entity_expander_performance():
@@ -280,14 +280,14 @@ def test_full_entity_expander_performance():
             print(f"  {i}. {name}: {score:.2f}점 (연결: {connections}개)")
         
     except Exception as e:
-        print(f"❌ 전체 테스트 실패: {e}")
+        print(f"[ERROR] 전체 테스트 실패: {e}")
         import traceback
         traceback.print_exc()
 
 
 def main():
     """성능 테스트 실행"""
-    print("🚀 LangGraph Entity Expander 성능 테스트")
+    print("[INFO] LangGraph Entity Expander 성능 테스트")
     
     # 1. TTL 로딩 성능
     test_ttl_loading_performance()
@@ -308,12 +308,12 @@ def main():
         pipeline_test = create_pipeline_performance_test()
         pipeline_test()
     except Exception as e:
-        print(f"❌ 파이프라인 테스트 실패: {e}")
+        print(f"[ERROR] 파이프라인 테스트 실패: {e}")
     
     print("\n" + "=" * 70)
-    print("✅ 성능 테스트 완료!")
+    print("[INFO] 성능 테스트 완료!")
     print("=" * 70)
-    print("\n📊 성능 향상 요약:")
+    print("\n[RESULT] 성능 향상 요약:")
     print("  - TTL 로딩: 25-29% 향상 (1.3-1.4배)")
     print("  - SPARQL 배치: 57% 향상 (2.3배)")
     print("  - 파이프라인: 31% 향상 (1.5배)")
