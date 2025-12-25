@@ -1,20 +1,39 @@
 """
-Query Classifier Node
+Query Classifier Node (Stage 1)
 
-전제 조건: 0단계에서 역사 관련 질문으로 확인된 경우에만 실행
+질문 분류 및 사용자 의도 확인을 위한 노드
 
-사용자 질문을 분석하여:
-1. 질문 유형 분류 (causal/deep_analysis)
-2. 관련 프로퍼티 그룹 선택 (TTL 기반)
-3. 핵심 의도(관계) 파악
+## 주요 기능
 
-프로퍼티 그룹: property_groups.json에서 로드
+1. **Stage 1-A: 빠른 재질문 준비** (0.2초 목표)
+   - 규칙 기반 query_type 분류
+   - 키워드 추출 (kiwipiepy)
+   - LLM 기반 확장 방향 생성
+   - 템플릿 기반 재질문 텍스트 생성
+   → 즉시 사용자에게 재질문 표시
+
+2. **Stage 1-B: 백그라운드 상세 분석** (사용자 선택 중 실행)
+   - LLM 정밀 query_type 분류
+   - LLM 키워드 확장
+   - 프로퍼티 그룹 선택
+
+## 노드 구조
+
+- `query_classifier_node()`: 메인 진입점 (Stage 1-A 호출)
+- `query_classifier_stage1a_node()`: 빠른 재질문 준비
+- `query_classifier_stage1b_background()`: 백그라운드 상세 분석
+
+## 프로퍼티 그룹
+
+property_groups.json에서 로드하여 LLM에 제공
 """
 
 import os
 import sys
 import json
 import re
+import time
+import threading
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from langchain_openai import ChatOpenAI
@@ -168,7 +187,19 @@ def translate_english_query_to_korean(query: str, llm: ChatOpenAI) -> str:
 
 
 def extract_keywords_with_kiwi(query: str) -> list:
-    """kiwipiepy로 키워드 추출"""
+    """
+    kiwipiepy를 사용하여 질문에서 핵심 키워드 추출
+
+    Args:
+        query: 사용자 질문
+
+    Returns:
+        키워드 리스트 (명사만 추출, 1글자 이상)
+        
+    Note:
+        - kiwipiepy가 없으면 정규식으로 한글 단어 추출 (fallback)
+        - 일반명사(NNG)와 고유명사(NNP)만 추출
+    """
     if not USE_KIWI or _kiwi is None:
         # fallback: 정규식으로 한글 단어 추출
         return re.findall(r'[가-힣]{2,}', query)
@@ -186,57 +217,44 @@ def extract_keywords_with_kiwi(query: str) -> list:
 
 def query_classifier_node(state: GraphState) -> GraphState:
     """
-    질문 분류 및 키워드 확장 노드 (LLM 기반 상세 분석)
-    
-    플로우:
-    1. LLM으로 질문 분석 및 키워드 확장 (필수)
-    2. 프로퍼티 그룹 선택
-    3. 확장 방향 생성
-    4. 사용자 의도 확인 질문 생성
-    
-    사용자 재질문 전에 모든 분석을 완료하여 의미 있는 선택지 제공
-    """
-    
-    print("\n" + "=" * 70)
-    print("[Stage 1/6] 질문 분류 및 키워드 확장 (Query Classifier)")
-    print("=" * 70)
-    
-    query = state["query"]
-    
-    # 성능 최적화: 간단한 질문은 빠른 분류 시도
-    if len(query) < 20 and any(pattern in query for pattern in ["언제", "누구", "어디"]):
-        quick_result = try_quick_classification(query)
-        if quick_result:
-            print("[INFO] 간단한 질문 - 빠른 분류 사용")
-            state.update(quick_result)
-            
-            # 확장 방향 생성 (간단한 버전)
-            classification_strategy, expansion_directions = generate_simple_expansion_directions(
-                query, quick_result["query_type"]
-            )
-            
-            # 의도 확인 질문 생성
-            clarification_question = generate_clarification_question(
-                strategy=classification_strategy,
-                directions=expansion_directions,
-                query=query
-            )
-            
-            state["classification_strategy"] = classification_strategy
-            state["expansion_directions"] = expansion_directions
-            state["clarification_question"] = clarification_question
-            state["needs_clarification"] = True  # 사용자 선택 필요
-            
-            return state
-    
-    # 복잡한 질문: LLM 기반 상세 분석 (기본값)
-    print("[INFO] LLM 기반 상세 분석 시작")
-    return original_query_classifier_node(state)
+    질문 분류 및 사용자 의도 확인 노드 (Stage 1)
 
+    ## 처리 흐름
+
+    1. **Stage 1-0: 공통 단계** (~0.1초)
+       - 규칙 기반 query_type 분류
+       - 키워드 추출 (kiwipiepy)
+       → 이후 병렬 분화
+
+    2. **Stage 1-A: LLM 방향 생성** (병렬, ~1-2초)
+       - LLM 기반 확장 방향 생성
+       - 템플릿 기반 재질문 텍스트 생성
+       - Stage 1-B 백그라운드 시작
+       → 즉시 사용자에게 재질문 표시
+
+    3. **Stage 1-B: 키워드 확장** (병렬, 백그라운드)
+       - LLM 정밀 query_type 분류
+       - LLM 키워드 확장
+       - 프로퍼티 그룹 선택
+       → 사용자 선택 완료 후 결과 통합
+    """
+
+    # Stage 1-0: 공통 단계 (규칙 분류 + 키워드 추출)
+    state = query_classifier_stage1_common_node(state)
+    
+    # Stage 1-A: LLM 방향 생성 + Stage 1-B 백그라운드 시작
+    return query_classifier_stage1a_node(state)
+
+
+# ============================================================
+# DEPRECATED: 사용하지 않는 함수들 (레거시 코드)
+# ============================================================
 
 def try_quick_classification(query: str) -> dict:
     """
-    빠른 규칙 기반 분류 시도
+    [DEPRECATED] 빠른 규칙 기반 분류 시도
+    
+    현재 사용되지 않음. Stage 1-A에서 더 효율적인 방식 사용.
     
     Returns:
         분류 결과 딕셔너리 또는 None (실패 시)
@@ -282,7 +300,11 @@ def try_quick_classification(query: str) -> dict:
 
 
 def extract_keywords_from_query_simple(query: str) -> list:
-    """간단한 키워드 추출 (형태소 분석기 사용)"""
+    """
+    [DEPRECATED] 간단한 키워드 추출 (형태소 분석기 사용)
+    
+    현재 사용되지 않음. `extract_keywords_with_kiwi()` 사용.
+    """
     if USE_KIWI and _kiwi:
         # 형태소 분석
         tokens = _kiwi.analyze(query)
@@ -300,7 +322,11 @@ def extract_keywords_from_query_simple(query: str) -> list:
 
 
 def select_property_groups_by_type(query_type: str, keywords: list) -> list:
-    """쿼리 타입별 프로퍼티 그룹 선택"""
+    """
+    [DEPRECATED] 쿼리 타입별 프로퍼티 그룹 선택
+    
+    현재 사용되지 않음. Stage 1-B에서 LLM이 프로퍼티 그룹 선택.
+    """
     
     # 기본 그룹 매핑
     type_groups = {
@@ -326,7 +352,11 @@ def select_property_groups_by_type(query_type: str, keywords: list) -> list:
 
 
 def generate_simple_expansion_directions(query: str, query_type: str) -> tuple:
-    """간단한 확장 방향 생성 (LLM 없이)"""
+    """
+    [DEPRECATED] 간단한 확장 방향 생성 (LLM 없이)
+    
+    현재 사용되지 않음. Stage 1-A에서 LLM 기반 방향 생성 사용.
+    """
     
     strategy_map = {
         "factual": "time-based",
@@ -396,17 +426,20 @@ def generate_simple_expansion_directions(query: str, query_type: str) -> tuple:
     return classification_strategy, directions
 
 
-# 기존 함수를 백업
+# ============================================================
+# DEPRECATED: 백업 함수 (레거시 코드)
+# ============================================================
+
 def original_query_classifier_node(state: GraphState) -> GraphState:
     """
-    질문 분석 통합 노드 (README 플로우 준수)
-
-    순서:
+    [DEPRECATED] 질문 분석 통합 노드 (레거시 버전)
+    
+    현재 사용되지 않음. `query_classifier_node()`가 Stage 1-A/B 구조로 개선됨.
+    
+    기존 플로우:
     1. 의도 파악 (사용자 질문만 사용)
-    2. kiwipiepy로 키워드 추출: ["궁궐", "건축", "왕"]
-    3. LLM 1회 호출 (추출된 키워드 사용):
-       - 프로퍼티 그룹 선택 (의도 기반)
-       - 키워드 확장: {"궁궐": ["경복궁", "창덕궁"], "왕": ["태조", "세종"]}
+    2. kiwipiepy로 키워드 추출
+    3. LLM 1회 호출로 프로퍼티 그룹 선택 및 키워드 확장
     """
 
     import time
@@ -774,10 +807,20 @@ def original_query_classifier_node(state: GraphState) -> GraphState:
 
 def classify_query_type_by_rules(query: str) -> str:
     """
-    규칙 기반 query_type 분류 (Stage 1-A용, 0.01초)
+    규칙 기반 query_type 분류 (Stage 1-A용, ~0.01초)
 
-    LLM 없이 키워드 패턴으로 빠르게 분류
-    정확도는 낮지만 재질문 표시용으로 충분
+    LLM 없이 키워드 패턴으로 빠르게 분류합니다.
+    정확도는 낮지만 재질문 표시용으로 충분합니다.
+
+    ## 분류 우선순위
+
+    1. **factual**: "언제", "시기", "연도", "누구", "무엇", "어디" 등
+    2. **comparative**: "비교", "차이", "같은점", "다른점" 등
+    3. **deep_analysis**: "진짜", "숨은", "이면", "배경", "동기" 등
+    4. **causal**: "왜", "이유", "원인", "결과", "영향" 등 (기본값)
+
+    Args:
+        query: 사용자 질문
 
     Returns:
         "causal" | "factual" | "deep_analysis" | "comparative"
@@ -821,9 +864,10 @@ def classify_query_type_by_rules(query: str) -> str:
 
 def generate_fixed_expansion_directions(query_type: str, keywords: list) -> tuple:
     """
-    고정 매핑으로 확장 방향 생성 (Stage 1-A용, 0.1초)
-
-    LLM 없이 query_type과 키워드로 확장 방향 생성
+    [DEPRECATED] 고정 매핑으로 확장 방향 생성
+    
+    현재 사용되지 않음. Stage 1-A에서 LLM 기반 방향 생성 사용.
+    (`generate_llm_based_directions()`)
 
     Returns:
         (classification_strategy: str, expansion_directions: list)
@@ -916,30 +960,24 @@ def generate_fixed_expansion_directions(query_type: str, keywords: list) -> tupl
     return classification_strategy, directions
 
 
-def query_classifier_stage1a_node(state: GraphState) -> GraphState:
+def query_classifier_stage1_common_node(state: GraphState) -> GraphState:
     """
-    Stage 1-A: 재질문에 필요한 최소 데이터만 생성 (0.2초)
-
-    LLM 호출 없이 규칙 기반으로 빠르게 처리:
-    1. 규칙 기반 query_type 분류 (~0.01초)
-    2. 키워드 추출 (kiwipiepy, ~0.05초)
-    3. 고정 매핑 확장 방향 생성 (~0.1초)
-    4. 질문 텍스트 생성 (~0.04초)
-
-    총 0.2초 내 완료 → 즉시 사용자 재질문 표시
+    Stage 1-0: 공통 단계 (규칙 분류 + 키워드 추출)
+    
+    이후 Stage 1-A와 Stage 1-B로 병렬 분화
     """
     import time
     node_start = time.time()
 
     print("\n" + "=" * 70)
-    print("[Stage 1-A] 초고속 재질문 준비 (0.2초 목표)")
+    print("[Stage 1-0] 공통 단계 (규칙 분류 + 키워드 추출)")
     print("=" * 70)
 
     query = state.get("query", "")
 
     # 1. 규칙 기반 query_type 분류
     query_type_initial = classify_query_type_by_rules(query)
-    print(f"  ├─ [1/4] 규칙 기반 분류: {query_type_initial}")
+    print(f"  ├─ [1/2] 규칙 기반 분류: {query_type_initial}")
 
     # 2. 키워드 추출 (kiwipiepy)
     basic_keywords = extract_keywords_with_kiwi(query)
@@ -950,22 +988,87 @@ def query_classifier_stage1a_node(state: GraphState) -> GraphState:
         '조선', '조선시대', '조선왕조', '한국', '우리나라'
     }
     basic_keywords = [kw for kw in basic_keywords if kw not in stopwords]
-    print(f"  ├─ [2/4] 키워드 추출: {basic_keywords[:5]}")
+    print(f"  └─ [2/2] 키워드 추출: {basic_keywords[:5]}")
 
-    # 3. 고정 매핑 방향 생성
-    classification_strategy, expansion_directions = generate_fixed_expansion_directions(
-        query_type=query_type_initial,
-        keywords=basic_keywords[:5]
+    node_elapsed = time.time() - node_start
+
+    # 노드 실행 시간 기록
+    node_times = state.get("node_execution_times", {})
+    node_times["query_classifier_stage1_common"] = node_elapsed
+
+    print(f"\n[Stage 1-0] 완료 ({node_elapsed:.2f}초) - 병렬 분화 시작")
+    print("=" * 70)
+
+    return {
+        **state,
+        "query_type_initial": query_type_initial,
+        "basic_keywords": basic_keywords[:10],
+        "node_execution_times": node_times,
+        "executed_nodes": state.get("executed_nodes", []) + ["query_classifier_stage1_common"]
+    }
+
+
+def query_classifier_stage1a_node(state: GraphState) -> GraphState:
+    """
+    Stage 1-A: LLM 방향 생성 + 재질문 텍스트
+    
+    Stage 1-B를 백그라운드로 시작하고, Stage 1-A 작업을 수행
+    """
+    import time
+    node_start = time.time()
+
+    query = state.get("query", "")
+    query_type_initial = state.get("query_type_initial", "")
+    basic_keywords = state.get("basic_keywords", [])
+
+    print("\n" + "=" * 70)
+    print("[Stage 1-A] LLM 방향 생성")
+    print("=" * 70)
+
+    # ========== Stage 1-B 백그라운드 시작 ==========
+    stage1b_result = {}
+    stage1b_thread = None
+
+    def run_stage1b_background():
+        """백그라운드 스레드에서 Stage 1-B 실행"""
+        nonlocal stage1b_result
+        try:
+            stage1b_state = {
+                **state,
+                "query": query,
+                "basic_keywords": basic_keywords,
+                "query_type_initial": query_type_initial
+            }
+            stage1b_result = query_classifier_stage1b_background(stage1b_state)
+        except Exception as e:
+            print(f"  ├─ [WARN] Stage 1-B 백그라운드 실행 실패: {e}")
+            stage1b_result = {"status": "error", "error": str(e)}
+
+    # 백그라운드 스레드 시작
+    stage1b_thread = threading.Thread(target=run_stage1b_background, daemon=True)
+    stage1b_thread.start()
+    print(f"  ├─ [BACKGROUND] Stage 1-B 백그라운드 분석 시작 (키워드: {basic_keywords[:3]})")
+
+    # ========== Stage 1-A: LLM 방향 생성 (Stage 1-B와 병렬) ==========
+    from backend.langgraph_fuseki.nodes.intent_clarification_templates import generate_llm_based_directions
+    direction_start = time.time()
+    expansion_directions = generate_llm_based_directions(
+        query=query,
+        keywords=basic_keywords[:5],
+        query_type=query_type_initial
     )
-    print(f"  ├─ [3/4] 확장 방향: {len(expansion_directions)}개 생성")
+    classification_strategy = "mixed"
+    direction_elapsed = time.time() - direction_start
+    print(f"  ├─ 확장 방향: {len(expansion_directions)}개 생성 (LLM: {direction_elapsed:.2f}초)")
 
-    # 4. 질문 텍스트 생성
+    # 재질문 텍스트 생성 (템플릿 기반)
     clarification_question = generate_clarification_question(
         strategy=classification_strategy,
         directions=expansion_directions,
-        query=query
+        query=query,
+        use_llm=False
     )
-    print(f"  └─ [4/4] 재질문 준비 완료")
+    print(f"  └─ 재질문 준비 완료")
 
     node_elapsed = time.time() - node_start
 
@@ -978,33 +1081,43 @@ def query_classifier_stage1a_node(state: GraphState) -> GraphState:
 
     return {
         **state,
-        "query_type_initial": query_type_initial,  # 초기 분류 (백그라운드에서 정밀 분석)
         "classification_strategy": classification_strategy,
         "expansion_directions": expansion_directions,
         "clarification_question": clarification_question,
         "needs_clarification": True,
-        "basic_keywords": basic_keywords[:10],  # 백그라운드 작업에 사용
         "node_execution_times": node_times,
-        "executed_nodes": state.get("executed_nodes", []) + ["query_classifier_stage1a"]
+        "executed_nodes": state.get("executed_nodes", []) + ["query_classifier_stage1a"],
+        # Stage 1-B 백그라운드 스레드 정보
+        "stage1b_thread": stage1b_thread,
+        "stage1b_result": stage1b_result
     }
 
 
 def query_classifier_stage1b_background(state: GraphState) -> dict:
     """
-    Stage 1-B: 백그라운드 상세 분석 (LLM 2회 병렬)
+    Stage 1-B: 백그라운드 상세 분석 (사용자 선택 중 병렬 실행)
 
-    사용자 선택 중 백그라운드에서 실행:
-    1. LLM으로 정밀 query_type 분류
-    2. LLM으로 키워드 확장
+    사용자가 재질문에 답하는 동안 백그라운드에서 실행:
+    1. LLM 정밀 query_type 분류
+       - Stage 1-A의 규칙 기반 분류를 LLM으로 정밀화
+    2. LLM 키워드 확장
+       - 기본 키워드를 관련 엔티티로 확장
     3. 프로퍼티 그룹 선택
+       - 질문 의도에 맞는 property_groups 선택
+
+    LLM 2회 병렬 호출로 시간 단축
 
     Returns:
-        백그라운드 결과 딕셔너리
+        dict: 백그라운드 분석 결과
+        {
+            "query_type": "causal",
+            "query_intent": "...",
+            "expanded_keywords_dict": {...},
+            "selected_property_groups": [...]
+        }
     """
     import time
     start_time = time.time()
-
-    print("  ├─ [BACKGROUND] Stage 1-B 상세 분석 시작...")
 
     query = state.get("query", "")
     basic_keywords = state.get("basic_keywords", [])

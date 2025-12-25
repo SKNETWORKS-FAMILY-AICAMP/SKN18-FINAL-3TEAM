@@ -5,36 +5,13 @@
 LLM이 질문을 분석하여 동적으로 적절한 방향 설명을 생성합니다.
 """
 
-from typing import Dict, List, Literal, Any
+from typing import Dict, List, Any
 import os
 import json
 from langchain_openai import ChatOpenAI
 
 
-# ========== 전략 매핑 ==========
-
-STRATEGY_MAPPING: Dict[str, str] = {
-    "causal": "time-based",
-    "factual": "class-based",
-    "deep_analysis": "scope-based",
-    "comparative": "depth-based"
-}
-
-
-def select_strategy(query_type: Literal["causal", "factual", "deep_analysis", "comparative"]) -> str:
-    """
-    질문 유형에 따라 분류 전략 선택
-
-    Args:
-        query_type: 질문 유형
-
-    Returns:
-        분류 전략
-    """
-    return STRATEGY_MAPPING.get(query_type, "time-based")
-
-
-# ========== LLM 기반 방향 생성 (자유 조합 방식) ==========
+# ========== LLM 기반 방향 생성 ==========
 
 def generate_llm_based_directions(
     query: str,
@@ -196,13 +173,13 @@ def generate_expansion_directions(
 
 # ========== 사용자 질문 텍스트 생성 ==========
 
-def generate_clarification_question(
+def generate_clarification_question_template(
     strategy: str,
     directions: List[Dict[str, Any]],
     query: str
 ) -> str:
     """
-    사용자에게 보여줄 의도 확인 질문 텍스트 생성
+    템플릿 기반 재질문 생성 (Fallback)
 
     Args:
         strategy: 선택된 전략 (혼합 시 "mixed")
@@ -223,3 +200,25 @@ def generate_clarification_question(
     question_text += f'{"="*70}\n'
 
     return question_text
+
+
+def generate_clarification_question(
+    strategy: str,
+    directions: List[Dict[str, Any]],
+    query: str,
+    use_llm: bool = False
+) -> str:
+    """
+    사용자에게 보여줄 의도 확인 질문 텍스트 생성 (템플릿 기반)
+
+    Args:
+        strategy: 선택된 전략 (혼합 시 "mixed")
+        directions: 방향 리스트
+        query: 원본 질문
+        use_llm: LLM 사용 여부 (기본값: False, 템플릿 사용)
+
+    Returns:
+        사용자 친화적 질문 텍스트
+    """
+    # 템플릿 기반으로 원복 (기본 동작)
+    return generate_clarification_question_template(strategy, directions, query)

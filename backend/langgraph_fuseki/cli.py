@@ -12,7 +12,15 @@ HistoK Ontology CLI
 import click
 import subprocess
 import sys
+import os
 from pathlib import Path
+
+# 프로젝트 루트를 Python path에 추가
+# CLI가 어디서 실행되든 프로젝트 루트를 찾아서 추가
+_current_file = Path(__file__).resolve()
+_project_root = _current_file.parent.parent.parent.parent  # backend/langgraph_fuseki/cli.py -> 프로젝트 루트
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
 
 
 @click.group()
