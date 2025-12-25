@@ -27,7 +27,8 @@ class LLMJudge:
 
         if api_key is None:
             api_key = os.getenv("OPENAI_API_KEY")
-
+            
+        self.model = model  # self.model에 저장 (evaluate 메서드에서 사용)
         self.client = OpenAI(api_key=api_key)
 
     def evaluate_intent_preservation(

@@ -77,6 +77,20 @@ python build_queries_persona.py
 - comparative: 10개
 - deep_analysis: 10개
 
+**질문 구조** (property_groups.json 기반):
+
+```json
+{
+  "query": "세종대왕이 훈민정음을 창제한 시기는 언제인가?",
+  "query_type": "factual",
+  "intent_keywords": ["연도", "시기", "설립"], // property_groups 그룹명
+  "expected_entities": ["세종", "훈민정음"],
+  "expected_property_groups": ["연도", "시기", "설립"],
+  "difficulty": "easy",
+  "description": "단순 사실 확인 - 시간 정보"
+}
+```
+
 ### 2. Baseline Ablation Study 실행
 
 ```bash
@@ -148,6 +162,11 @@ python experiments/run_grid_search.py --baseline-results data/results/all_ablati
 | L1               | TBox Consistency           | `evaluators/l1_schema_compliance.py`   | 자동                   |
 | L2               | Intent Preservation        | `evaluators/l2_path_quality.py`        | LLM Judge              |
 | L2               | Relation Coherence         | `evaluators/l2_path_quality.py`        | 자동                   |
+| L2               | Property Group Selection   | `evaluators/l2_path_quality.py`        | 자동 (Jaccard Index)   |
+| L3               | Terminal Triple Validity   | `evaluators/l3_terminal_knowledge.py`  | LLM Judge              |
+| L3               | Evidence Diversity         | `evaluators/l3_terminal_knowledge.py`  | 자동 (Shannon Entropy) |
+| L3               | Convergence Utilization    | `evaluators/l3_terminal_knowledge.py`  | 반자동 (query_type별)  |
+| **Intent-Aware** | **Query Type별 가중 평가** | `evaluators/intent_aware_evaluator.py` | **자동 (가중치 적용)** |
 | L3               | Terminal Triple Validity   | `evaluators/l3_terminal_knowledge.py`  | LLM Judge              |
 | L3               | Evidence Diversity         | `evaluators/l3_terminal_knowledge.py`  | 자동 (Shannon Entropy) |
 | L3               | Convergence Utilization    | `evaluators/l3_terminal_knowledge.py`  | 반자동 (query_type별)  |
@@ -164,6 +183,9 @@ python experiments/run_grid_search.py --baseline-results data/results/all_ablati
 
 - **Intent Preservation**: 각 hop에서 질문 의도 유지 여부 (Preserve: 1.0, Enrich: 1.2, Drift: 0.5, Hallucinated: 0.0)
 - **Relation Coherence**: relation이 질문 의도와 의미적으로 일관되는지 평가
+- **Property Group Selection**: LangGraph가 선택한 property groups와 예상 그룹의 일치도 평가
+  - 점수: Jaccard Index = `교집합 / 합집합`
+  - 예: 선택된 ["연도", "설립"], 예상된 ["연도", "시기", "설립"] → 점수: 2/3 = 0.67
 
 #### L3: Terminal Knowledge Contribution
 

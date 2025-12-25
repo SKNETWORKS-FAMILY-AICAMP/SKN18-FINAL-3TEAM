@@ -534,9 +534,24 @@ runner.run_experiment_group(
 class TestQuery:
     query: str                      # 질문
     query_type: str                 # factual, causal, comparative, deep_analysis
-    intent_keywords: List[str]      # 의도 키워드 (예: ["원인", "배경"])
+    intent_keywords: List[str]      # property_groups 그룹명 (예: ["인과관계", "설립"])
     expected_entities: List[str]    # 예상 엔티티 (예: ["임진왜란"])
+    expected_property_groups: List[str]  # 예상 property groups
     difficulty: str                 # easy, medium, hard
+```
+
+**property_groups.json 기반 구조**:
+
+```json
+{
+  "query": "세종대왕이 훈민정음을 창제한 시기는 언제인가?",
+  "query_type": "factual",
+  "intent_keywords": ["연도", "시기", "설립"], // property_groups 그룹명
+  "expected_entities": ["세종", "훈민정음"],
+  "expected_property_groups": ["연도", "시기", "설립"], // 평가용
+  "difficulty": "easy",
+  "description": "단순 사실 확인 - 시간 정보"
+}
 ```
 
 #### `PersonaQueryBuilder`
@@ -561,6 +576,27 @@ class TestQuery:
 PersonaQueryBuilder.save_to_json("data/test_queries.json")
 # → 40개 질문이 담긴 JSON 파일 생성
 ```
+
+#### **Property Groups 매핑 가이드**
+
+**32개 사용 가능한 그룹**:
+
+- "속성", "문서", "연결관계", "연도", "소속", "인과관계", "장소", "참여", "부분", "포함", "직위", "기간중", "시기", "재위", "법률", "시행", "지휘", "변경", "역할", "조사", "위치", "세금", "협력", "저술", "시대", "반대", "설립", "날짜", "복원", "승진", "외교", "교육"
+
+**Query Type별 매핑 전략**:
+
+| Query Type        | 주요 그룹                    | 예시                                                                            |
+| ----------------- | ---------------------------- | ------------------------------------------------------------------------------- |
+| **Factual**       | 연도, 시기, 장소, 직위, 재위 | "세종대왕이 훈민정음을 창제한 시기는?" → ["연도", "시기", "설립"]               |
+| **Causal**        | 인과관계 + 도메인 그룹       | "임진왜란이 발생한 원인은?" → ["인과관계"]                                      |
+| **Comparative**   | 연결관계 + 비교 대상 그룹    | "임진왜란과 병자호란의 공통점은?" → ["연결관계", "지휘"]                        |
+| **Deep Analysis** | 복합 그룹 조합               | "세종대왕의 업적이 조선 사회에 미친 영향은?" → ["속성", "인과관계", "연결관계"] |
+
+**매핑 원칙**:
+
+1. **핵심 그룹 우선**: 각 query_type의 특성을 반영하는 핵심 그룹 선택
+2. **도메인 그룹 추가**: 질문 내용에 맞는 도메인별 그룹 추가
+3. **2-3개 그룹 권장**: 너무 많으면 평가가 모호해짐
 
 #### 테스트 쿼리 검증 결과
 
@@ -587,13 +623,43 @@ PersonaQueryBuilder.save_to_json("data/test_queries.json")
 
 ### 3️⃣ `evaluators/` - 평가 메트릭 구현
 
-#### `intent_aware_evaluator.py` ✅ NEW
+#### `intent_aware_evaluator.py`
 
 **역할**: Query type에 따라 메트릭에 다른 가중치를 적용하는 평가자
 
-**주요 클래스**:
+#### `PropertyGroupSelectionEvaluator`
 
-##### `IntentWeightConfig`
+**역할**: LangGraph가 선택한 property groups와 예상 그룹의 일치도 평가
+
+**사용 예시**:
+
+```python
+from ragas.ontology_evaluate.evaluators import PropertyGroupSelectionEvaluator
+
+evaluator = PropertyGroupSelectionEvaluator()
+
+# LangGraph 실행 결과
+state_output = {
+    "selected_property_groups": ["연도", "설립", "참여"]
+}
+
+# 예상 그룹 (test_queries.json에서)
+expected_groups = ["연도", "시기", "설립"]
+
+result = evaluator.evaluate(state_output, expected_groups)
+print(f"Property Group Selection Score: {result['score']:.3f}")  # 0.667
+print(f"Matched: {result['matched_groups']}")     # ["연도", "설립"]
+print(f"Missing: {result['missing_groups']}")     # ["시기"]
+print(f"Extra: {result['extra_groups']}")         # ["참여"]
+```
+
+**점수 계산**: Jaccard Index = `교집합 / 합집합`
+
+- 교집합: ["연도", "설립"] = 2개
+- 합집합: ["연도", "시기", "설립", "참여"] = 4개
+- 점수: 2/4 = 0.5
+
+#### `IntentWeightConfig`
 
 ```python
 @dataclass

@@ -14,6 +14,70 @@ import math
 TripleContribution = Literal["기여함", "간접 기여", "무관함"]
 
 
+def extract_triple_from_evidence(evidence: Dict[str, Any]) -> tuple:
+    """
+    Evidence에서 Triple (subject, predicate, object) 추출
+    
+    Args:
+        evidence: Evidence 객체 (type, raw_data 포함)
+    
+    Returns:
+        (subject, predicate, object) 또는 (None, None, None) if 추출 불가
+    """
+    thread_type = evidence.get("type", "")
+    raw_data = evidence.get("raw_data", {})
+    
+    # raw_data가 path 객체인 경우 (path_evidence_aggregator_node에서 생성)
+    if isinstance(raw_data, dict):
+        # Thread type별로 다른 필드명 사용
+        if thread_type in ["outgoing_relations", "incoming_relations"]:
+            subject = raw_data.get("subject", "")
+            predicate = raw_data.get("predicate", "")
+            obj = raw_data.get("object", "")
+            return (subject, predicate, obj)
+        
+        elif thread_type == "entity_properties":
+            subject = raw_data.get("entity", "")
+            predicate = raw_data.get("predicate", "")
+            obj = raw_data.get("value", "")
+            return (subject, predicate, obj)
+        
+        elif thread_type == "connected_entities":
+            subject = raw_data.get("entity1", "")
+            predicate = raw_data.get("predicate", "")
+            obj = raw_data.get("entity2", "")
+            return (subject, predicate, obj)
+        
+        # type_and_summary는 triple이 아니므로 스킵
+        elif thread_type == "type_and_summary":
+            return (None, None, None)
+        
+        # SPARQL binding 형식도 지원 (fallback)
+        else:
+            # SPARQL binding 형식: {"entityLabel": {"value": "..."}}
+            entity_label = raw_data.get("entityLabel", {})
+            if isinstance(entity_label, dict):
+                subject = entity_label.get("value", "")
+            else:
+                subject = raw_data.get("entity_label", "")
+            
+            predicate_obj = raw_data.get("predicate", {})
+            if isinstance(predicate_obj, dict):
+                predicate = predicate_obj.get("value", "").split("#")[-1] if predicate_obj.get("value") else ""
+            else:
+                predicate = raw_data.get("predicate", "")
+            
+            obj_label = raw_data.get("objectLabel", {})
+            if isinstance(obj_label, dict):
+                obj = obj_label.get("value", "")
+            else:
+                obj = raw_data.get("value_label", "") or raw_data.get("object", "")
+            
+            return (subject, predicate, obj)
+    
+    return (None, None, None)
+
+
 @dataclass
 class TripleEvaluation:
     """Triple 평가 결과"""
@@ -55,11 +119,7 @@ class TerminalTripleValidityEvaluator:
         triple_evaluations = []
 
         for evidence in evidences:
-            raw_data = evidence.get("raw_data", {})
-
-            subject = raw_data.get("entity_label", "")
-            predicate = raw_data.get("predicate", "")
-            obj = raw_data.get("value_label", "")
+            subject, predicate, obj = extract_triple_from_evidence(evidence)
 
             if not subject or not predicate or not obj:
                 continue

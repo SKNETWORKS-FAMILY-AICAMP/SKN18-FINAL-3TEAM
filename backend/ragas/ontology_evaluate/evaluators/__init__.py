@@ -7,7 +7,7 @@ L3: Terminal Knowledge Contribution
 """
 
 from .l1_schema_compliance import TBoxConsistencyEvaluator
-from .l2_path_quality import IntentPreservationEvaluator, RelationCoherenceEvaluator
+from .l2_path_quality import IntentPreservationEvaluator, RelationCoherenceEvaluator, PropertyGroupSelectionEvaluator
 from .l3_terminal_knowledge import (
     TerminalTripleValidityEvaluator,
     EvidenceDiversityEvaluator,
@@ -17,7 +17,8 @@ from .l3_terminal_knowledge import (
 __all__ = [
     "TBoxConsistencyEvaluator",
     "IntentPreservationEvaluator",
-    "RelationCoherenceEvaluator",
+    "RelationCoherenceEvaluator", 
+    "PropertyGroupSelectionEvaluator",
     "TerminalTripleValidityEvaluator",
     "EvidenceDiversityEvaluator",
     "ConvergenceUtilizationEvaluator"

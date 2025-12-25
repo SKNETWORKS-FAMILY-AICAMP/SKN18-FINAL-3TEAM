@@ -99,7 +99,7 @@ TBox_Consistency = 1.0 - (violations_count / total_triples)
 
 **목적**: 각 hop에서 질문 의도가 유지/강화/이탈되는지 추적
 
-**평가 대상**: Stage 3 (Semantic Expander의 4가지 확장 방법)
+**평가 대상**: Stage 3 (Semantic Expander의 3가지 확장 방법: Temporal, Causal Chain, Pgvector)
 
 **Intent 상태 분류**:
 | 상태 | 점수 | 의미 |
@@ -417,11 +417,12 @@ def convergence_node_utilization_score(convergence_nodes, final_answer, query_ty
 
 ### 8.1 Phase 1: Baseline 설정 (필수)
 - [ ] Semantic Expander 없이 직접 검색만 (baseline)
-- [ ] Semantic Expander 4가지 방법 개별 평가
+- [ ] Semantic Expander 3가지 방법 개별 평가 (Temporal, Causal Chain 1-3 hop, Pgvector)
 - [ ] Thread별 기여도 측정 (각 Thread 제거 실험)
 
 ### 8.2 Phase 2: 가중치 튜닝
 - [ ] `FIXED_SCORE_*` 값 실험 (temporal, causal_chain, pgvector)
+- [ ] Causal Chain hop별 가중치 최적화 (1-hop vs 2-hop vs 3-hop 기여도)
 - [ ] `THREAD_WEIGHT_*` 값 실험 (5개 Thread별 가중치)
 - [ ] `QUERY_ENTITY_MATCH_BOOST_*` 값 실험
 

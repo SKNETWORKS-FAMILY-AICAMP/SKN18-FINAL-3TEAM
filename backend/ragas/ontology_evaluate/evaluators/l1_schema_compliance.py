@@ -80,22 +80,42 @@ class TBoxConsistencyEvaluator:
         evidences = state_output.get("evidences", [])
         for evidence in evidences:
             raw_data = evidence.get("raw_data", {})
+            thread_type = evidence.get("type", "")
 
-            # outgoing_relations 경로 검증
-            if evidence.get("type") == "outgoing_relations":
-                subject = raw_data.get("entity_label", "")
-                predicate = raw_data.get("predicate", "")
-                obj = raw_data.get("value_label", "")
-                subject_type = raw_data.get("entity_type", "")
-                obj_type = raw_data.get("value_type", "")
+            # Triple 추출 (thread type별로 다른 필드명 처리)
+            subject, predicate, obj = self._extract_triple_from_evidence(evidence)
+            
+            if not subject or not predicate or not obj:
+                continue
 
-                if subject and predicate and obj:
-                    total_triples += 1
-                    violation = self._check_triple_consistency(
-                        subject, subject_type, predicate, obj, obj_type
-                    )
-                    if violation:
-                        violations.append(violation)
+            # Type 정보 추출 (가능한 경우)
+            subject_type = ""
+            obj_type = ""
+            
+            # raw_data에서 type 정보 추출 시도
+            if isinstance(raw_data, dict):
+                # path 객체에서 type 정보가 있는 경우
+                subject_type = raw_data.get("subject_type", "") or raw_data.get("entity_type", "")
+                obj_type = raw_data.get("object_type", "") or raw_data.get("value_type", "")
+                
+                # SPARQL binding 형식인 경우
+                if not subject_type:
+                    entity_type = raw_data.get("entityType", {})
+                    if isinstance(entity_type, dict):
+                        subject_type = entity_type.get("value", "").split("#")[-1] if entity_type.get("value") else ""
+                
+                if not obj_type:
+                    object_type = raw_data.get("objectType", {})
+                    if isinstance(object_type, dict):
+                        obj_type = object_type.get("value", "").split("#")[-1] if object_type.get("value") else ""
+
+            if subject and predicate and obj:
+                total_triples += 1
+                violation = self._check_triple_consistency(
+                    subject, subject_type, predicate, obj, obj_type
+                )
+                if violation:
+                    violations.append(violation)
 
         # 점수 계산
         violation_count = len(violations)
@@ -148,6 +168,67 @@ class TBoxConsistencyEvaluator:
             )
 
         return None
+
+    def _extract_triple_from_evidence(self, evidence: Dict[str, Any]) -> tuple:
+        """
+        Evidence에서 Triple (subject, predicate, object) 추출
+        
+        Args:
+            evidence: Evidence 객체 (type, raw_data 포함)
+        
+        Returns:
+            (subject, predicate, object) 또는 (None, None, None) if 추출 불가
+        """
+        thread_type = evidence.get("type", "")
+        raw_data = evidence.get("raw_data", {})
+        
+        if isinstance(raw_data, dict):
+            # Thread type별로 다른 필드명 사용
+            if thread_type in ["outgoing_relations", "incoming_relations"]:
+                subject = raw_data.get("subject", "")
+                predicate = raw_data.get("predicate", "")
+                obj = raw_data.get("object", "")
+                return (subject, predicate, obj)
+            
+            elif thread_type == "entity_properties":
+                subject = raw_data.get("entity", "")
+                predicate = raw_data.get("predicate", "")
+                obj = raw_data.get("value", "")
+                return (subject, predicate, obj)
+            
+            elif thread_type == "connected_entities":
+                subject = raw_data.get("entity1", "")
+                predicate = raw_data.get("predicate", "")
+                obj = raw_data.get("entity2", "")
+                return (subject, predicate, obj)
+            
+            # type_and_summary는 triple이 아니므로 스킵
+            elif thread_type == "type_and_summary":
+                return (None, None, None)
+            
+            # SPARQL binding 형식도 지원 (fallback)
+            else:
+                entity_label = raw_data.get("entityLabel", {})
+                if isinstance(entity_label, dict):
+                    subject = entity_label.get("value", "")
+                else:
+                    subject = raw_data.get("entity_label", "")
+                
+                predicate_obj = raw_data.get("predicate", {})
+                if isinstance(predicate_obj, dict):
+                    predicate = predicate_obj.get("value", "").split("#")[-1] if predicate_obj.get("value") else ""
+                else:
+                    predicate = raw_data.get("predicate", "")
+                
+                obj_label = raw_data.get("objectLabel", {})
+                if isinstance(obj_label, dict):
+                    obj = obj_label.get("value", "")
+                else:
+                    obj = raw_data.get("value_label", "") or raw_data.get("object", "")
+                
+                return (subject, predicate, obj)
+        
+        return (None, None, None)
 
     def _check_triple_consistency(
         self,

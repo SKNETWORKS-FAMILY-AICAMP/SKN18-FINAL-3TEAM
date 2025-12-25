@@ -18,12 +18,13 @@ from ragas.ontology_evaluate.evaluators import (
     TBoxConsistencyEvaluator,
     IntentPreservationEvaluator,
     RelationCoherenceEvaluator,
+    PropertyGroupSelectionEvaluator,
     TerminalTripleValidityEvaluator,
     EvidenceDiversityEvaluator,
     ConvergenceUtilizationEvaluator
 )
 from ragas.ontology_evaluate.evaluators.intent_aware_evaluator import IntentAwareEvaluator
-from ragas.ontology_evaluate.utils import LLMJudge
+from ragas.ontology_evaluate.utils import LLMJudge, load_ontology_schema
 
 # LangGraph import
 from langgraph_fuseki.graph import create_graph_flow
@@ -43,6 +44,7 @@ def evaluate_state(
     llm_judge: LLMJudge,
     ontology_schema: dict,
     query_type: str = None,
+    expected_property_groups: List[str] = None,
     use_intent_aware: bool = True
 ) -> dict:
     """GraphState에 대해 모든 평가 메트릭 실행
@@ -52,6 +54,7 @@ def evaluate_state(
         llm_judge: LLM Judge 인스턴스
         ontology_schema: 온톨로지 스키마
         query_type: 쿼리 타입 (factual, causal, comparative, deep_analysis)
+        expected_property_groups: 예상되는 property group 목록
         use_intent_aware: Intent-aware 평가 사용 여부
 
     Returns:
@@ -68,6 +71,12 @@ def evaluate_state(
     # L2: Relation Coherence
     relation_evaluator = RelationCoherenceEvaluator()
     relation_result = relation_evaluator.evaluate(state_output)
+
+    # L2: Property Group Selection (NEW)
+    property_group_result = None
+    if expected_property_groups:
+        property_group_evaluator = PropertyGroupSelectionEvaluator()
+        property_group_result = property_group_evaluator.evaluate(state_output, expected_property_groups)
 
     # L3: Terminal Triple Validity
     triple_evaluator = TerminalTripleValidityEvaluator(llm_judge)
@@ -90,6 +99,10 @@ def evaluate_state(
         "evidence_diversity": diversity_result["score"],
         "convergence_utilization": convergence_result["score"]
     }
+    
+    # Property Group Selection 점수 추가 (있는 경우)
+    if property_group_result:
+        raw_metrics["property_group_selection"] = property_group_result["score"]
 
     # Intent-aware 평가
     intent_aware_result = None
@@ -181,19 +194,12 @@ def main():
             query_type_counts[qtype] = query_type_counts.get(qtype, 0) + 1
         print(f"Query Type 분포: {query_type_counts}")
 
-    # 2. LLM Judge 초기화
-    llm_judge = LLMJudge(model="gpt-4o")
+    # 2. LLM Judge 초기화 (환경변수 OPENAI_MODEL 사용)
+    llm_judge = LLMJudge()
 
-    # 3. 온톨로지 스키마 로드 (실제 스키마 파일에서 로드 필요)
-    # TODO: 실제 온톨로지 스키마 로드 구현
-    ontology_schema = {
-        "classes": ["Person", "Event", "Place", "Organization"],
-        "properties": {
-            "participatesIn": {"domain": "Person", "range": "Event"},
-            "built": {"domain": "Person", "range": "Place"},
-            "causedBy": {"domain": "Event", "range": "Event"},
-        }
-    }
+    # 3. 온톨로지 스키마 로드 (korean_history.owl에서 자동 로드)
+    print("\n[INFO] 온톨로지 스키마 로드 중...")
+    ontology_schema = load_ontology_schema()
 
     # 4. LangGraph 초기화
     print("\n[INFO] LangGraph 초기화 중...")
