@@ -58,6 +58,10 @@ except ImportError:
 # 프로퍼티 그룹 로드 (1회)
 _PROPERTY_GROUPS = None
 
+# Stage 1-B 백그라운드 결과 저장 (전역 딕셔너리)
+# Thread 객체는 직렬화 불가하므로 task_id로 결과를 찾음
+_STAGE1B_RESULTS = {}
+
 def load_property_groups() -> dict:
     """프로퍼티 그룹 로드 (캐싱)"""
     global _PROPERTY_GROUPS
@@ -1026,12 +1030,16 @@ def query_classifier_stage1a_node(state: GraphState) -> GraphState:
     print("=" * 70)
 
     # ========== Stage 1-B 백그라운드 시작 ==========
-    stage1b_result = {}
-    stage1b_thread = None
+    # 전역 딕셔너리를 사용하여 노드 간 결과 공유
+    # Thread 객체는 직렬화 불가하므로 task_id로 결과를 찾음
+    import uuid
+    stage1b_task_id = str(uuid.uuid4())
+    
+    # 전역 딕셔너리에 초기 상태 저장
+    _STAGE1B_RESULTS[stage1b_task_id] = {"status": "running", "result": None}
 
     def run_stage1b_background():
         """백그라운드 스레드에서 Stage 1-B 실행"""
-        nonlocal stage1b_result
         try:
             stage1b_state = {
                 **state,
@@ -1039,10 +1047,13 @@ def query_classifier_stage1a_node(state: GraphState) -> GraphState:
                 "basic_keywords": basic_keywords,
                 "query_type_initial": query_type_initial
             }
-            stage1b_result = query_classifier_stage1b_background(stage1b_state)
+            result = query_classifier_stage1b_background(stage1b_state)
+            _STAGE1B_RESULTS[stage1b_task_id]["status"] = "completed"
+            _STAGE1B_RESULTS[stage1b_task_id]["result"] = result
         except Exception as e:
             print(f"  ├─ [WARN] Stage 1-B 백그라운드 실행 실패: {e}")
-            stage1b_result = {"status": "error", "error": str(e)}
+            _STAGE1B_RESULTS[stage1b_task_id]["status"] = "error"
+            _STAGE1B_RESULTS[stage1b_task_id]["result"] = {"status": "error", "error": str(e)}
 
     # 백그라운드 스레드 시작
     stage1b_thread = threading.Thread(target=run_stage1b_background, daemon=True)
@@ -1087,9 +1098,9 @@ def query_classifier_stage1a_node(state: GraphState) -> GraphState:
         "needs_clarification": True,
         "node_execution_times": node_times,
         "executed_nodes": state.get("executed_nodes", []) + ["query_classifier_stage1a"],
-        # Stage 1-B 백그라운드 스레드 정보
-        "stage1b_thread": stage1b_thread,
-        "stage1b_result": stage1b_result
+        # Stage 1-B 백그라운드 정보 (Thread 객체는 직렬화 불가하므로 task_id만 저장)
+        "stage1b_started": True,  # Stage 1-B가 시작되었음을 표시
+        "stage1b_task_id": stage1b_task_id  # 전역 딕셔너리에서 결과를 찾기 위한 ID
     }
 
 
@@ -1231,8 +1242,16 @@ def query_classifier_stage1b_background(state: GraphState) -> dict:
         future1 = executor.submit(analyze_intent_and_properties)
         future2 = executor.submit(expand_keywords)
 
+        # 각 작업 완료 시점 추적
+        task1_start = time.time()
         response1, result1 = future1.result()
+        task1_elapsed = time.time() - task1_start
+        print(f"  ├─ [BACKGROUND] Stage 1-B 작업1 완료: 의도분석 (query_type={result1.get('query_type', 'causal')}, {task1_elapsed:.2f}초)")
+
+        task2_start = time.time()
         response2, result2 = future2.result()
+        task2_elapsed = time.time() - task2_start
+        print(f"  ├─ [BACKGROUND] Stage 1-B 작업2 완료: 키워드확장 ({len(result2.get('expanded_keywords', {}))}개 그룹, {task2_elapsed:.2f}초)")
 
         # 결과 추출
         query_type = result1.get("query_type", "causal")
@@ -1260,7 +1279,7 @@ def query_classifier_stage1b_background(state: GraphState) -> dict:
                     expanded_keywords.extend(filtered_instances)
 
         elapsed = time.time() - start_time
-        print(f"  ├─ [BACKGROUND] Stage 1-B 완료: query_type={query_type} ({elapsed:.2f}초)")
+        print(f"  └─ [BACKGROUND] Stage 1-B 전체 완료: query_type={query_type} (총 {elapsed:.2f}초)")
 
         return {
             "status": "success",

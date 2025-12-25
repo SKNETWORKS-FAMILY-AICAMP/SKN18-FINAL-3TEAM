@@ -114,11 +114,47 @@ def user_intent_clarification_node(state: GraphState) -> GraphState:
 
     # ========== Stage 1-B 백그라운드 실행 확인 ==========
     # Stage 1-A에서 이미 시작되었는지 확인
-    stage1b_thread = state.get("stage1b_thread")
-    stage1b_result = state.get("stage1b_result", {})
+    # 주의: Thread 객체는 LangGraph state에서 직렬화되지 않으므로 플래그로 확인
+    stage1b_started = state.get("stage1b_started", False)
+    stage1b_task_id = state.get("stage1b_task_id")
+    stage1b_result = {}
+    stage1b_thread = None
 
-    if stage1b_thread is None:
-        raise RuntimeError("Stage 1-B 백그라운드 스레드가 시작되지 않았습니다. Stage 1-A 노드가 제대로 실행되었는지 확인하세요.")
+    if not stage1b_started:
+        # Stage 1-A에서 시작되지 않았다면 여기서 시작 (하위 호환성)
+        import uuid
+        stage1b_task_id = str(uuid.uuid4())
+        
+        # 전역 딕셔너리 초기화
+        from backend.langgraph_fuseki.nodes.classify_node import _STAGE1B_RESULTS
+        
+        _STAGE1B_RESULTS[stage1b_task_id] = {"status": "running", "result": None}
+        
+        def run_stage1b_background():
+            """백그라운드 스레드에서 Stage 1-B 실행"""
+            try:
+                result = query_classifier_stage1b_background(state)
+                _STAGE1B_RESULTS[stage1b_task_id]["status"] = "completed"
+                _STAGE1B_RESULTS[stage1b_task_id]["result"] = result
+            except Exception as e:
+                print(f"[WARN] Stage 1-B 백그라운드 실행 실패: {e}")
+                _STAGE1B_RESULTS[stage1b_task_id]["status"] = "error"
+                _STAGE1B_RESULTS[stage1b_task_id]["result"] = {"status": "error", "error": str(e)}
+
+        stage1b_thread = threading.Thread(target=run_stage1b_background, daemon=True)
+        stage1b_thread.start()
+        print("[INFO] Stage 1-B 백그라운드 분석 시작 (하위 호환성)")
+    else:
+        # Stage 1-A에서 이미 시작됨 (백그라운드에서 실행 중)
+        print("[INFO] Stage 1-B 백그라운드 분석 진행 중 (Stage 1-A에서 시작됨)")
+        # 전역 딕셔너리에서 현재 상태 확인
+        from backend.langgraph_fuseki.nodes.classify_node import _STAGE1B_RESULTS
+        if stage1b_task_id and stage1b_task_id in _STAGE1B_RESULTS:
+            task_info = _STAGE1B_RESULTS[stage1b_task_id]
+            if task_info.get("status") == "completed":
+                stage1b_result = task_info.get("result", {})
+            elif task_info.get("status") == "error":
+                stage1b_result = task_info.get("result", {"status": "error"})
 
     # ========== 사용자에게 질문 제시 ==========
     print(clarification_question)
@@ -150,13 +186,61 @@ def user_intent_clarification_node(state: GraphState) -> GraphState:
             break
 
     # ========== Stage 1-B 백그라운드 결과 대기 ==========
-    if stage1b_thread and stage1b_thread.is_alive():
+    # Stage 1-A에서 시작된 경우: 전역 딕셔너리에서 결과 확인
+    # 여기서 시작한 경우: 스레드가 실행 중
+    if stage1b_thread is not None and stage1b_thread.is_alive():
         print("\n[INFO] Stage 1-B 백그라운드 분석 완료 대기 중...")
         stage1b_thread.join(timeout=60.0)  # 최대 60초 대기
 
         if stage1b_thread.is_alive():
             print("[WARN] Stage 1-B 백그라운드 분석 시간 초과 (60초), 결과 무시")
             stage1b_result = {"status": "timeout"}
+        else:
+            # 스레드가 완료되었으면 전역 딕셔너리에서 결과 가져오기
+            from backend.langgraph_fuseki.nodes.classify_node import _STAGE1B_RESULTS
+            if stage1b_task_id and stage1b_task_id in _STAGE1B_RESULTS:
+                task_info = _STAGE1B_RESULTS[stage1b_task_id]
+                if task_info.get("status") == "completed":
+                    stage1b_result = task_info.get("result", {})
+                elif task_info.get("status") == "error":
+                    stage1b_result = task_info.get("result", {"status": "error"})
+    elif stage1b_started and stage1b_task_id:
+        # Stage 1-A에서 시작된 경우: 전역 딕셔너리에서 결과 확인 및 대기
+        from backend.langgraph_fuseki.nodes.classify_node import _STAGE1B_RESULTS
+        
+        if stage1b_task_id in _STAGE1B_RESULTS:
+            task_info = _STAGE1B_RESULTS[stage1b_task_id]
+            current_status = task_info.get("status", "running")
+            
+            # 결과가 아직 없으면 대기
+            if current_status == "running":
+                print("\n[INFO] Stage 1-B 백그라운드 분석 완료 대기 중...")
+                wait_start = time.time()
+                max_wait = 60.0  # 최대 60초 대기
+                
+                while time.time() - wait_start < max_wait:
+                    # 전역 딕셔너리에서 상태 확인
+                    if stage1b_task_id in _STAGE1B_RESULTS:
+                        task_info = _STAGE1B_RESULTS[stage1b_task_id]
+                        current_status = task_info.get("status", "running")
+                        if current_status == "completed":
+                            stage1b_result = task_info.get("result", {})
+                            break
+                        elif current_status == "error":
+                            stage1b_result = task_info.get("result", {"status": "error"})
+                            break
+                    time.sleep(0.5)  # 0.5초마다 확인
+                
+                # 타임아웃 확인
+                if time.time() - wait_start >= max_wait:
+                    print("[WARN] Stage 1-B 백그라운드 분석 시간 초과 (60초), 결과 무시")
+                    stage1b_result = {"status": "timeout"}
+            elif current_status == "completed":
+                # 이미 완료된 경우
+                stage1b_result = task_info.get("result", {})
+            elif current_status == "error":
+                # 이미 에러가 발생한 경우
+                stage1b_result = task_info.get("result", {"status": "error"})
 
     # ========== 선택 결과 출력 ==========
     node_elapsed = time.time() - node_start

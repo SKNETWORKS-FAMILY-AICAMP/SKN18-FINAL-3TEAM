@@ -116,6 +116,237 @@ graph TB
 
 ---
 
+## LangGraph 전체 구조
+
+### 노드 구조 및 실행 흐름
+
+```mermaid
+graph TB
+    Start([사용자 질문]) --> Stage0[Stage 0: History Check<br/>역사 관련 여부 체크]
+
+    Stage0 -->|비역사| Exit([조기 종료])
+    Stage0 -->|역사| Stage1_0[Stage 1-0: 공통 단계<br/>규칙 분류 + 키워드 추출]
+
+    Stage1_0 --> Stage1_A[Stage 1-A: LLM 방향 생성<br/>재질문 텍스트 생성]
+    Stage1_0 -->|백그라운드 스레드| Stage1_B[Stage 1-B: 키워드 확장<br/>LLM 정밀 분류 + 프로퍼티 그룹]
+
+    Stage1_A --> Stage1_5[Stage 1.5: User Intent Clarification<br/>사용자 선택 대기]
+    Stage1_B -.결과 통합.-> Stage1_5
+
+    Stage1_5 --> Stage2[Stage 2: Entity Extractor<br/>TTL + pgvector 하이브리드]
+    Stage2 --> Stage3[Stage 3: Semantic Expander<br/>시간적/인과/벡터 확장]
+    Stage3 --> Stage4[Stage 4: Parallel Knowledge Retrieval<br/>5개 Thread 병렬 SPARQL]
+
+    Stage4 --> T1[Thread 1: outgoing_relations]
+    Stage4 --> T2[Thread 2: incoming_relations]
+    Stage4 --> T3[Thread 3: entity_properties]
+    Stage4 --> T4[Thread 4: connected_entities]
+    Stage4 --> T5[Thread 5: type_and_summary]
+
+    T1 --> Stage5[Stage 5: Path Evidence Aggregator<br/>근거 통합 + 수렴 노드 감지]
+    T2 --> Stage5
+    T3 --> Stage5
+    T4 --> Stage5
+    T5 --> Stage5
+
+    Stage5 --> Stage6[Stage 6: Story Generator<br/>최종 스토리 생성]
+    Stage6 --> Answer([최종 답변])
+
+    style Stage0 fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    style Stage1_0 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Stage1_A fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Stage1_B fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,stroke-dasharray: 5 5
+    style Stage1_5 fill:#fff9c4,stroke:#f57f17,stroke-width:3px
+    style Stage4 fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style Stage6 fill:#b2dfdb,stroke:#00695c,stroke-width:2px
+```
+
+### 병렬 처리 및 비동기 처리
+
+#### 1. Stage 1 내부 병렬 처리
+
+**Stage 1-A와 Stage 1-B 병렬 실행** (Python Threading):
+
+```python
+# Stage 1-A 노드 내부
+def query_classifier_stage1a_node(state: GraphState):
+    # Stage 1-B 백그라운드 스레드 시작
+    stage1b_thread = threading.Thread(
+        target=run_stage1b_background,
+        daemon=True
+    )
+    stage1b_thread.start()
+
+    # Stage 1-A 작업 (메인 스레드)
+    expansion_directions = generate_llm_based_directions(...)
+    clarification_question = generate_clarification_question(...)
+
+    return state  # Stage 1-B는 백그라운드에서 계속 실행
+```
+
+**Stage 1-B 내부 LLM 병렬 호출** (ThreadPoolExecutor):
+
+```python
+# Stage 1-B 함수 내부
+def query_classifier_stage1b_background(state: GraphState):
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        # Thread 1: 의도 분석 + 프로퍼티 그룹 선택
+        future1 = executor.submit(analyze_intent_and_properties)
+
+        # Thread 2: 키워드 확장
+        future2 = executor.submit(expand_keywords)
+
+        # 결과 대기
+        result1 = future1.result()
+        result2 = future2.result()
+```
+
+**병렬 처리 위치**:
+
+- ✅ **Stage 1-A (메인 스레드)**: LLM 방향 생성
+- ✅ **Stage 1-B (백그라운드 스레드)**: LLM 정밀 분류 + 키워드 확장
+  - 내부에서 LLM 2회 병렬 호출 (ThreadPoolExecutor)
+
+#### 2. Stage 2 내부 병렬 처리
+
+**TTL 병렬 로딩** (ThreadPoolExecutor):
+
+```python
+# OptimizedTTLLoader 내부
+def load_entities_parallel(self):
+    # 파일을 청크로 분할
+    chunks = split_file_into_chunks(content, num_workers=4)
+
+    # 병렬 파싱
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(self._parse_chunk, chunk) for chunk in chunks]
+        results = [future.result() for future in as_completed(futures)]
+
+    # 결과 병합
+    return merge_results(results)
+```
+
+**백그라운드 키워드 확장** (Python Threading):
+
+```python
+# entity_expander_node 내부
+def entity_expander_node(state: GraphState):
+    # 백그라운드에서 LLM 키워드 확장 (필요 시)
+    if not expanded_keywords_from_classify:
+        expansion_thread = threading.Thread(
+            target=background_keyword_expansion,
+            daemon=True
+        )
+        expansion_thread.start()
+        # 메인 스레드는 TTL 매칭 진행
+```
+
+**SPARQL 배치 처리** (ThreadPoolExecutor):
+
+```python
+# BatchSPARQLExecutor 내부
+def process_entities_batch(self, entities, keywords):
+    # 엔티티를 배치로 분할
+    batches = split_into_batches(entities, batch_size=10)
+
+    # 각 배치를 병렬 처리
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {
+            executor.submit(self._process_batch, batch, keywords): batch
+            for batch in batches
+        }
+        results = [future.result() for future in as_completed(futures)]
+
+    return merge_batch_results(results)
+```
+
+**병렬 처리 위치**:
+
+- ✅ **TTL 로딩**: ThreadPoolExecutor로 파일 청크 병렬 파싱 (최적화 모듈 사용 시)
+- ✅ **백그라운드 키워드 확장**: threading.Thread로 LLM 키워드 확장 (필요 시)
+- ✅ **SPARQL 배치 처리**: ThreadPoolExecutor로 엔티티별 SPARQL 쿼리 병렬 실행 (엔티티가 많을 때)
+
+#### 3. Stage 4 병렬 지식 검색
+
+**5개 Thread 병렬 SPARQL 쿼리 실행** (ThreadPoolExecutor):
+
+```python
+# Stage 4 노드 내부
+def parallel_knowledge_retrieval_node(state: GraphState):
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {
+            executor.submit(execute_unified_thread, "outgoing_relations"): "outgoing_relations",
+            executor.submit(execute_unified_thread, "incoming_relations"): "incoming_relations",
+            executor.submit(execute_unified_thread, "entity_properties"): "entity_properties",
+            executor.submit(execute_unified_thread, "connected_entities"): "connected_entities",
+            executor.submit(execute_unified_thread, "type_and_summary"): "type_and_summary"
+        }
+
+        # 결과 수집
+        for future in as_completed(futures):
+            thread_type = futures[future]
+            result = future.result(timeout=45)
+            results[thread_type] = result
+```
+
+**병렬 처리 위치**:
+
+- ✅ **5개 SPARQL 쿼리**: ThreadPoolExecutor로 동시 실행
+- ✅ **각 Thread**: 독립적인 SPARQL 쿼리 생성 및 실행
+
+#### 4. 비동기 그래프 (선택적)
+
+#### 3. 비동기 그래프 (선택적)
+
+**graph_async.py**: 최적화된 비동기 파이프라인
+
+```python
+# 환경변수로 활성화
+USE_OPTIMIZED_PIPELINE=true
+
+# 또는 코드에서
+graph = create_graph_flow(use_optimized=True)
+```
+
+**비동기 처리 특징**:
+
+- ✅ **Phase 1**: 빠른 재질문 준비 (0.2초 목표)
+- ✅ **Phase 2**: 백그라운드 병렬 처리
+  - Stage 1-B 상세 분석
+  - Entity 준비 (TTL 로드 + 기본 매칭)
+  - Vector 검색
+- ✅ **Phase 3**: 유연한 결과 통합
+
+### 노드 등록 및 플로우
+
+```python
+# graph.py
+workflow = StateGraph(GraphState)
+
+# 노드 등록
+workflow.add_node("history_check", history_check_node)  # Stage 0
+workflow.add_node("query_classifier", query_classifier_node)  # Stage 1
+workflow.add_node("user_intent_clarification", user_intent_clarification_node)  # Stage 1.5
+workflow.add_node("entity_expander", entity_expander_node)  # Stage 2
+workflow.add_node("semantic_expander", semantic_expander_node)  # Stage 3
+workflow.add_node("parallel_knowledge_retrieval", parallel_knowledge_retrieval_node)  # Stage 4
+workflow.add_node("path_evidence_aggregator", path_evidence_aggregator_node)  # Stage 5
+workflow.add_node("story_generator", story_generator_node)  # Stage 6
+
+# 플로우 정의
+workflow.set_entry_point("history_check")
+workflow.add_conditional_edges("history_check", route_after_history_check, {...})
+workflow.add_edge("query_classifier", "user_intent_clarification")
+workflow.add_edge("user_intent_clarification", "entity_expander")
+workflow.add_edge("entity_expander", "semantic_expander")
+workflow.add_edge("semantic_expander", "parallel_knowledge_retrieval")
+workflow.add_edge("parallel_knowledge_retrieval", "path_evidence_aggregator")
+workflow.add_edge("path_evidence_aggregator", "story_generator")
+workflow.add_edge("story_generator", END)
+```
+
+---
+
 ## 7단계 파이프라인
 
 ### 전체 플로우 (UX 최적화: 점진적 로딩)
@@ -125,38 +356,29 @@ graph TB
     Start([사용자 질문]) --> HistCheck{Stage 0<br/>역사 관련 질문?}
 
     HistCheck -->|No| Exit([조기 종료])
-    HistCheck -->|Yes| Classifier[Stage 1<br/>Query Classifier]
+    HistCheck -->|Yes| Stage1_0[Stage 1-0: 공통 단계<br/>규칙 분류 + 키워드 추출]
 
-    Classifier --> Thread1[Thread 1: 의도분석]
-    Classifier --> Thread2[Thread 2: 키워드확장]
+    Stage1_0 --> Stage1_A[Stage 1-A: LLM 방향 생성<br/>메인 스레드]
+    Stage1_0 -->|백그라운드 스레드| Stage1_B[Stage 1-B: 의도 분석 + 키워드 확장<br/>백그라운드]
 
-    Thread1 --> Merge{결과 병합}
-    Thread2 --> Merge
+    Stage1_B --> Stage1_B_Thread1[Thread 1: 의도 분석<br/>+ 프로퍼티 그룹]
+    Stage1_B --> Stage1_B_Thread2[Thread 2: 키워드 확장]
 
-    Merge --> DirectionGen[LLM 방향 생성]
-    DirectionGen --> IntentCheck{의도 확인<br/>필요?}
+    Stage1_B_Thread1 --> Stage1_B_Merge[Stage 1-B 결과]
+    Stage1_B_Thread2 --> Stage1_B_Merge
 
-    IntentCheck -->|Yes| ParallelPhase[병렬 처리 시작]
-    IntentCheck -->|No| Extractor
+    Stage1_A --> Stage1_5[Stage 1.5: User Intent Clarification<br/>사용자 선택 대기]
+    Stage1_B_Merge -.결과 통합.-> Stage1_5
 
-    subgraph "Phase 2: 사용자 응답 대기 + 백그라운드 처리 (병렬)"
-        ParallelPhase --> Clarification[Stage 1.5<br/>사용자 선택 대기]
-        ParallelPhase --> BG1[Background 1:<br/>TTL 데이터 로드]
-        ParallelPhase --> BG2[Background 2:<br/>기본 엔티티 매칭]
-        ParallelPhase --> BG3[Background 3:<br/>Pgvector 검색]
+    Stage1_5 --> Stage2[Stage 2: Entity Extractor<br/>TTL 병렬 로딩 + SPARQL 배치]
 
-        Clarification --> UserSelect[사용자 선택 완료]
-        BG1 --> Integration[백그라운드<br/>결과 통합]
-        BG2 --> Integration
-        BG3 --> Integration
+    Stage2 --> TTL_Thread[TTL 병렬 파싱<br/>ThreadPoolExecutor]
+    Stage2 --> Keyword_Thread[백그라운드 키워드 확장<br/>Threading]
+    Stage2 --> SPARQL_Batch[SPARQL 배치 처리<br/>ThreadPoolExecutor]
 
-        UserSelect --> Integration
-    end
-
-    Integration --> DirectionApply[선택된 방향 적용]
-    DirectionApply --> Extractor[Stage 2<br/>Entity Extractor<br/>완성]
-
-    Extractor --> Scoring[SPARQL 스코어링<br/>선택된 방향 적용]
+    TTL_Thread --> Scoring[SPARQL 스코어링<br/>선택된 방향 적용]
+    Keyword_Thread --> Scoring
+    SPARQL_Batch --> Scoring
     Scoring --> Top30[상위 30개 선택]
 
     Top30 --> Expander[Stage 3<br/>Semantic Expander]
@@ -192,11 +414,12 @@ graph TB
 
     style Start fill:#e1f5ff,stroke:#01579b,stroke-width:3px
     style HistCheck fill:#fff3e0,stroke:#e65100,stroke-width:3px
-    style Clarification fill:#fff9c4,stroke:#f57f17,stroke-width:3px
-    style BG1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style BG2 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style BG3 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style Integration fill:#ffecb3,stroke:#ff6f00,stroke-width:3px
+    style Stage1_0 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Stage1_A fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Stage1_B fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,stroke-dasharray: 5 5
+    style Stage1_B_Thread1 fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px,stroke-dasharray: 3 3
+    style Stage1_B_Thread2 fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px,stroke-dasharray: 3 3
+    style Stage1_5 fill:#fff9c4,stroke:#f57f17,stroke-width:3px
     style Parallel fill:#ffe0b2,stroke:#e65100,stroke-width:2px
     style Generator fill:#b2dfdb,stroke:#00695c,stroke-width:2px
     style Answer fill:#c5e1a5,stroke:#33691e,stroke-width:3px
@@ -204,30 +427,46 @@ graph TB
 ```
 
 **핵심 개선사항 (3단계 파이프라인)**:
+
 - ✅ **Phase 1: 초고속 재질문** (0.2초) - Stage 1을 분할하여 재질문에 필요한 최소 데이터만 먼저 생성
 - ✅ **Phase 2: 백그라운드 병렬 처리** - 사용자 선택 중 Stage 1-B(상세 분석) + Entity 준비(TTL 로드, 매칭, 벡터 검색) 동시 실행
 - ✅ **Phase 3: 유연한 결과 통합** - 사용자 선택 속도에 따라 유연하게 대응 (빠른 선택 시 대기, 느린 선택 시 즉시 통합)
 - ✅ **시간 단축**: 재질문 진입 2.5초 → 0.2초 (92% 단축!), 사용자 체감 시간 23.5초 → 11.2초 (52% 단축!)
 
 **상세 분석**:
+
 - [UX_OPTIMIZATION_ANALYSIS.md](UX_OPTIMIZATION_ANALYSIS.md) - 3단계 파이프라인 전략
 - [STAGE1_OPTIMIZATION.md](STAGE1_OPTIMIZATION.md) - Stage 1 분할 전략
 
 ### 단계별 요약
 
-| 단계          | 이름                         | LLM         | 사용자 입력 | SPARQL | 주요 작업                                                              |
-| ------------- | ---------------------------- | ----------- | ----------- | ------ | ---------------------------------------------------------------------- |
-| **Stage 0**   | History Check                | ✅ 1회      | ❌          | ❌     | 조선시대 역사 질문 필터링 (비역사 질문 조기 종료)                      |
-| **Stage 1**   | Query Classifier             | ✅ 2회 병렬 | ❌          | ❌     | 질문 분석, 키워드 확장, 프로퍼티 그룹 선택                             |
-| **Stage 1.5** | User Intent Clarification    | ✅ 1회      | ✅ 필요시   | ❌     | LLM이 질문 분석하여 2-4개 방향 제시, 사용자 선택                       |
-| **Stage 2**   | Entity Extractor             | ❌          | ❌          | ✅ N회 | TTL 매칭 + pgvector 검색 + SPARQL 스코어링 → 상위 30개 선택            |
-| **Stage 3**   | Semantic Expander            | ❌          | ❌          | ✅ 3회 | 시간적/인과/벡터 기반 엔티티 확장 (30개 → ~75개)                       |
-| **Stage 4**   | Parallel Knowledge Retrieval | ❌          | ❌          | ✅ 5회 | 5개 관점 병렬 검색 + 양방향 BFS (최대 3-hop) + 프로퍼티 FILTER         |
-| **Stage 5**   | Path Evidence Aggregator     | ❌          | ❌          | ❌     | 경로 추출 + 근거 통합 + 수렴 노드 감지 (1.1배 부스트) → 상위 15개 선택 |
-| **Stage 6**   | Story Generator              | ✅ 1회      | ❌          | ❌     | 선택된 방향을 반영하여 최종 스토리 생성 (-입니다 체)                   |
+| 단계          | 이름                         | 노드 타입 | 병렬 처리   | LLM         | 사용자 입력 | SPARQL | 주요 작업                                                                  |
+| ------------- | ---------------------------- | --------- | ----------- | ----------- | ----------- | ------ | -------------------------------------------------------------------------- |
+| **Stage 0**   | History Check                | 노드      | ❌          | ✅ 1회      | ❌          | ❌     | 조선시대 역사 질문 필터링 (비역사 질문 조기 종료)                          |
+| **Stage 1-0** | 공통 단계                    | 함수      | ❌          | ❌          | ❌          | ❌     | 규칙 기반 분류 + 키워드 추출 (kiwi)                                        |
+| **Stage 1-A** | LLM 방향 생성                | 노드      | ✅ 스레드   | ✅ 1회      | ❌          | ❌     | LLM 확장 방향 생성 + 재질문 텍스트 (Stage 1-B와 병렬)                      |
+| **Stage 1-B** | 키워드 확장                  | 함수      | ✅ 내부     | ✅ 2회 병렬 | ❌          | ❌     | LLM 정밀 분류 + 키워드 확장 + 프로퍼티 그룹 선택 (백그라운드 스레드)       |
+| **Stage 1.5** | User Intent Clarification    | 노드      | ❌          | ❌          | ✅ 필요시   | ❌     | 사용자 선택 대기 + Stage 1-B 결과 통합                                     |
+| **Stage 2**   | Entity Extractor             | 노드      | ✅ 내부     | ❌          | ❌          | ✅ N회 | TTL 병렬 로딩 + 백그라운드 키워드 확장 + SPARQL 배치 처리 → 상위 30개 선택 |
+| **Stage 3**   | Semantic Expander            | 노드      | ❌          | ❌          | ❌          | ✅ 3회 | 시간적/인과/벡터 기반 엔티티 확장 (30개 → ~75개)                           |
+| **Stage 4**   | Parallel Knowledge Retrieval | 노드      | ✅ 5 Thread | ❌          | ❌          | ✅ 5회 | 5개 관점 병렬 검색 + 양방향 BFS (최대 3-hop) + 프로퍼티 FILTER             |
+| **Stage 5**   | Path Evidence Aggregator     | 노드      | ❌          | ❌          | ❌          | ❌     | 경로 추출 + 근거 통합 + 수렴 노드 감지 (1.1배 부스트) → 상위 15개 선택     |
+| **Stage 6**   | Story Generator              | 노드      | ❌          | ✅ 1회      | ❌          | ❌     | 선택된 방향을 반영하여 최종 스토리 생성 (-입니다 체)                       |
 
-**총 LLM 호출**: 5회 (역사 체크 1회 + Query Classifier 2회 병렬 + 방향 생성 1회 + Story Generator 1회)
-**총 SPARQL 호출**: 9 + N회 (Semantic Expander 4회 + 병렬 검색 5회 + 엔티티 스코어링 N회)
+**병렬 처리 요약**:
+
+- ✅ **Stage 1-A와 Stage 1-B**: Python Threading으로 병렬 실행
+  - Stage 1-A: 메인 스레드에서 LLM 방향 생성
+  - Stage 1-B: 백그라운드 스레드에서 LLM 정밀 분류 + 키워드 확장
+- ✅ **Stage 1-B 내부**: ThreadPoolExecutor로 LLM 2회 병렬 호출
+- ✅ **Stage 2 내부**:
+  - TTL 로딩: ThreadPoolExecutor로 파일 청크 병렬 파싱 (OptimizedTTLLoader)
+  - 백그라운드 키워드 확장: threading.Thread로 LLM 키워드 확장 (필요 시)
+  - SPARQL 배치 처리: ThreadPoolExecutor로 엔티티별 SPARQL 쿼리 병렬 실행 (BatchSPARQLExecutor)
+- ✅ **Stage 4**: ThreadPoolExecutor로 5개 SPARQL 쿼리 병렬 실행
+
+**총 LLM 호출**: 5회 (역사 체크 1회 + Stage 1-A 방향 생성 1회 + Stage 1-B 2회 병렬 + Story Generator 1회)
+**총 SPARQL 호출**: 8 + N회 (Semantic Expander 3회 + 병렬 검색 5회 + 엔티티 스코어링 N회)
 
 ---
 
@@ -253,38 +492,80 @@ LLM 호출 1회만 사용 (비용 절감)
 
 ### Stage 1: Query Classifier
 
-**역할**: ThreadPoolExecutor로 LLM 2개를 병렬 실행하여 질문 분석
+**역할**: 질문 분류 및 사용자 의도 확인을 위한 3단계 구조
 
-#### 1-1. kiwipiepy 키워드 추출 (전처리)
+#### Stage 1-0: 공통 단계
 
-형태소 분석기로 질문에서 명사 추출:
+**역할**: 규칙 기반 분류 + 키워드 추출 (kiwipiepy)
 
 ```python
+# 1. 규칙 기반 query_type 분류
+query_type_initial = classify_query_type_by_rules(query)
+# 결과: "causal", "factual", "comparative", "deep_analysis"
+
+# 2. 키워드 추출 (kiwipiepy)
 from kiwipiepy import Kiwi
 kiwi = Kiwi()
-
-# 질문 예시: "궁궐을 건축한 왕들은 누가 있는지?"
-tokens = kiwi.tokenize(query)
-keywords = [t.form for t in tokens if t.tag in ('NNG', 'NNP') and len(t.form) >= 1]
+basic_keywords = extract_keywords_with_kiwi(query)
+# 예시: "궁궐을 건축한 왕들은 누가 있는지?"
 # 결과: ['궁궐', '건축', '왕']
 ```
 
-#### 1-2. 병렬 실행 구조
+**처리 시간**: ~0.1초 (빠른 전처리)
+
+#### Stage 1-A: LLM 방향 생성 (메인 스레드)
+
+**역할**: LLM 기반 확장 방향 생성 + 재질문 텍스트 생성
 
 ```python
-from concurrent.futures import ThreadPoolExecutor
+# LLM 확장 방향 생성
+expansion_directions = generate_llm_based_directions(
+    query=query,
+    keywords=basic_keywords[:5],
+    query_type=query_type_initial
+)
+# 결과: 2-4개의 확장 방향 리스트
 
-with ThreadPoolExecutor(max_workers=2) as executor:
-    # Thread 1: 의도 분석 + 프로퍼티 그룹 선택
-    future1 = executor.submit(analyze_intent_and_properties)
-
-    # Thread 2: 키워드 확장
-    future2 = executor.submit(expand_keywords)
-
-    # 결과 대기 (병렬 실행으로 약 40-50% 시간 단축)
-    result1 = future1.result()  # query_type, intent, property_groups
-    result2 = future2.result()  # expanded_keywords
+# 재질문 텍스트 생성 (템플릿 기반)
+clarification_question = generate_clarification_question(
+    strategy="mixed",
+    directions=expansion_directions,
+    query=query,
+    use_llm=False  # 템플릿 기반
+)
 ```
+
+**처리 시간**: ~1-2초 (LLM 호출 1회)
+
+#### Stage 1-B: 키워드 확장 (백그라운드 스레드)
+
+**역할**: LLM 정밀 분류 + 키워드 확장 + 프로퍼티 그룹 선택
+
+**병렬 처리**: Stage 1-A와 동시에 실행 (Python Threading)
+
+```python
+# Stage 1-A 노드 내부에서 백그라운드 스레드 시작
+stage1b_thread = threading.Thread(
+    target=run_stage1b_background,
+    daemon=True
+)
+stage1b_thread.start()
+
+# Stage 1-B 내부: LLM 2회 병렬 호출
+def query_classifier_stage1b_background(state: GraphState):
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        # Thread 1: 의도 분석 + 프로퍼티 그룹 선택
+        future1 = executor.submit(analyze_intent_and_properties)
+
+        # Thread 2: 키워드 확장
+        future2 = executor.submit(expand_keywords)
+
+        # 결과 대기 (병렬 실행으로 약 40-50% 시간 단축)
+        result1 = future1.result()  # query_type, intent, property_groups
+        result2 = future2.result()  # expanded_keywords
+```
+
+**처리 시간**: ~2-3초 (LLM 호출 2회 병렬, 백그라운드 실행)
 
 #### Thread 1: 의도 분석 + 프로퍼티 그룹 선택
 
