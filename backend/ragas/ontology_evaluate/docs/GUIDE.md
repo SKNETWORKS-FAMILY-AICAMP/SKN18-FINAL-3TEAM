@@ -110,7 +110,6 @@ def semantic_expander_node(state: GraphState) -> GraphState:
 **작업 내용**: 각 노드가 `test_config`를 인식하도록 최소한의 코드 추가
 
 **수정 파일**:
-
 - `nodes/kg/semantic_expander_node.py`
 - `nodes/kg/path_evidence_aggregator_node.py`
 - (필요시) `state.py`에 `test_config` 필드 추가
@@ -126,7 +125,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
 **파일 생성**:
 
 ```python
-# ontology_evaluate/utils/schema_loader.py
+# backend/ragas/ontology_evaluate/utils/schema_loader.py
 
 def load_ontology_schema(ttl_path: str) -> dict:
     """TTL 파일에서 스키마 로드
@@ -151,47 +150,23 @@ def load_ontology_schema(ttl_path: str) -> dict:
 
 ---
 
-### Step 3: run_baseline.py 완성 ✅ 필수
-
-**작업 내용**: Mock 함수를 실제 LangGraph 연동으로 교체
-
-**수정 위치**:
-
-```python
-# experiments/run_baseline.py
-
-# Before (Mock)
-def mock_graph_invoke(state):
-    return {...}
-
-# After (실제 연동)
-from langgraph_fuseki.graph import create_graph_flow
-
-graph = create_graph_flow()
-
-def real_graph_invoke(state):
-    return graph.invoke(state)
-```
-
-**예상 작업량**: 30분
-
----
-
-### Step 4: 첫 Ablation 실험 실행 ✅ 핵심
+### Step 3: 첫 Ablation 실험 실행 ✅ 핵심
 
 **실행 명령**:
 
 ```bash
-cd backend/ragas/ontology_evaluate
-
-# 5개 질문으로 테스트 (디버깅)
-python experiments/run_baseline.py \
+# 방법 1: 직접 모듈 실행
+python -m backend.ragas.ontology_evaluate.experiments.run_baseline \
     --group semantic_expander \
-    --queries data/test_queries.json \
+    --limit 5
+
+# 방법 2: 패키지 실행
+python -m backend.ragas.ontology_evaluate.experiments \
+    --group semantic_expander \
     --limit 5
 
 # 결과 확인
-cat data/results/semantic_expander_ablation.json
+cat backend/ragas/ontology_evaluate/data/results/semantic_expander_ablation.json
 ```
 
 **예상 결과**:
@@ -276,20 +251,17 @@ Intent-Aware Evaluation은 query_type(factual, causal, comparative, deep_analysi
 cd backend/ragas/ontology_evaluate
 
 # Intent-aware 평가 활성화 (기본값)
-python experiments/run_baseline.py \
-    --group semantic_expander \
-    --queries data/test_queries.json
+python -m backend.ragas.ontology_evaluate.experiments.run_baseline \
+    --group semantic_expander
 
 # Intent-aware 평가 비활성화 (비교용)
-python experiments/run_baseline.py \
+python -m backend.ragas.ontology_evaluate.experiments.run_baseline \
     --group semantic_expander \
-    --queries data/test_queries.json \
     --no-intent-aware
 
 # 디버깅용 (쿼리 10개만)
-python experiments/run_baseline.py \
+python -m backend.ragas.ontology_evaluate.experiments.run_baseline \
     --group semantic_expander \
-    --queries data/test_queries.json \
     --limit 10
 ```
 
@@ -400,7 +372,7 @@ Intent-Aware 평가 요약
 **Q1: Intent-aware 평가를 비활성화하려면?**
 
 ```bash
-python experiments/run_baseline.py --no-intent-aware
+python -m backend.ragas.ontology_evaluate.experiments.run_baseline --no-intent-aware
 ```
 
 **Q2: 새로운 query_type을 추가하려면?**
@@ -1117,9 +1089,8 @@ analyzer.generate_report("data/results/report.txt")
 **사용 예시**:
 
 ```bash
-python experiments/run_baseline.py \
+python -m backend.ragas.ontology_evaluate.experiments.run_baseline \
     --group semantic_expander \
-    --queries data/test_queries.json \
     --limit 5
 ```
 

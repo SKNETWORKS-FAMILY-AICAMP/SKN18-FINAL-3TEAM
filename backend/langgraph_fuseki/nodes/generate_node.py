@@ -11,15 +11,14 @@ Story Generator Node
 import os
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
 # 상위 디렉토리를 경로에 추가
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# .env 파일 로드 (프로젝트 루트에서)
-env_path = Path(__file__).parent.parent.parent.parent / ".env"
-load_dotenv(env_path, override=True)
+# config.py를 import하면 자동으로 환경변수가 로드됨
+# (config.py에서 load_dotenv가 실행됨)
+from backend.langgraph_fuseki.config import PROJECT_ROOT
 
 from backend.langgraph_fuseki.state import GraphState
 

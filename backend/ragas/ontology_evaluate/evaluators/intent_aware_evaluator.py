@@ -21,6 +21,7 @@ class IntentWeightConfig:
     # L2: Path Quality
     intent_preservation_weight: float
     relation_coherence_weight: float
+    property_group_selection_weight: float  # NEW
 
     # L3: Terminal Knowledge
     triple_validity_weight: float
@@ -33,6 +34,7 @@ class IntentWeightConfig:
             self.tbox_consistency_weight +
             self.intent_preservation_weight +
             self.relation_coherence_weight +
+            self.property_group_selection_weight +
             self.triple_validity_weight +
             self.evidence_diversity_weight +
             self.convergence_utilization_weight
@@ -42,6 +44,7 @@ class IntentWeightConfig:
             "tbox_consistency": self.tbox_consistency_weight / total,
             "intent_preservation": self.intent_preservation_weight / total,
             "relation_coherence": self.relation_coherence_weight / total,
+            "property_group_selection": self.property_group_selection_weight / total,
             "triple_validity": self.triple_validity_weight / total,
             "evidence_diversity": self.evidence_diversity_weight / total,
             "convergence_utilization": self.convergence_utilization_weight / total
@@ -56,11 +59,13 @@ INTENT_WEIGHT_PRESETS = {
     "factual": IntentWeightConfig(
         # Factual 쿼리: 단순 사실 확인
         # - Schema 준수가 가장 중요 (TBox 일치)
+        # - Property Group 선택이 중요 (정확한 그룹 선택)
         # - 수렴 노드는 상대적으로 덜 중요
         # - Intent 보존과 Triple 유효성이 중요
         tbox_consistency_weight=1.5,      # ↑ Schema 준수
         intent_preservation_weight=1.3,   # ↑ Intent 보존
         relation_coherence_weight=1.0,    # = 관계 일관성
+        property_group_selection_weight=1.4,  # ↑ Property Group 선택
         triple_validity_weight=1.2,       # ↑ Triple 유효성
         evidence_diversity_weight=0.8,    # ↓ 증거 다양성
         convergence_utilization_weight=0.5  # ↓↓ 수렴 노드 (가장 낮음)
@@ -70,10 +75,12 @@ INTENT_WEIGHT_PRESETS = {
         # Causal 쿼리: 인과관계 추론
         # - 수렴 노드가 매우 중요 (인과 체인 연결)
         # - 관계 일관성과 Intent 보존이 중요
+        # - Property Group 선택도 중요 (인과관계 그룹)
         # - 증거 다양성도 중요 (다각적 인과 분석)
         tbox_consistency_weight=1.0,      # = Schema 준수
         intent_preservation_weight=1.4,   # ↑ Intent 보존
         relation_coherence_weight=1.3,    # ↑ 관계 일관성 (인과 체인)
+        property_group_selection_weight=1.2,  # ↑ Property Group 선택
         triple_validity_weight=1.2,       # ↑ Triple 유효성
         evidence_diversity_weight=1.2,    # ↑ 증거 다양성
         convergence_utilization_weight=1.5  # ↑↑ 수렴 노드 (매우 중요)
@@ -83,10 +90,12 @@ INTENT_WEIGHT_PRESETS = {
         # Comparative 쿼리: 비교 분석
         # - 수렴 노드가 가장 중요 (2개 엔티티 비교점 발견)
         # - 증거 다양성이 매우 중요 (양쪽 증거 필요)
+        # - Property Group 선택이 중요 (연결관계 그룹)
         # - 관계 일관성과 Intent 보존도 중요
         tbox_consistency_weight=1.0,      # = Schema 준수
         intent_preservation_weight=1.3,   # ↑ Intent 보존
         relation_coherence_weight=1.2,    # ↑ 관계 일관성
+        property_group_selection_weight=1.3,  # ↑ Property Group 선택
         triple_validity_weight=1.2,       # ↑ Triple 유효성
         evidence_diversity_weight=1.4,    # ↑↑ 증거 다양성 (양쪽 증거)
         convergence_utilization_weight=1.6  # ↑↑↑ 수렴 노드 (가장 중요)
@@ -96,13 +105,15 @@ INTENT_WEIGHT_PRESETS = {
         # Deep Analysis 쿼리: 심층 분석
         # - 수렴 노드가 중요 (복합적 분석)
         # - Intent 보존과 관계 일관성이 매우 중요
+        # - Property Group 선택이 중요 (복합 그룹)
         # - 증거 다양성과 Triple 유효성도 중요
         tbox_consistency_weight=1.0,      # = Schema 준수
         intent_preservation_weight=1.5,   # ↑↑ Intent 보존 (가장 중요)
-        relation_coherence_weight=1.4,    # ↑↑ 관계 일관성
+        relation_coherence_weight=1.4,    # ↑↑ 관계 일관성 (매우 중요)
+        property_group_selection_weight=1.2,  # ↑ Property Group 선택
         triple_validity_weight=1.3,       # ↑ Triple 유효성
         evidence_diversity_weight=1.3,    # ↑ 증거 다양성
-        convergence_utilization_weight=1.3  # ↑ 수렴 노드
+        convergence_utilization_weight=1.3  # ↑ 수렴 노드 (중요)
     )
 }
 

@@ -42,22 +42,32 @@ def title(batch_size, verbose):
     click.echo("📦 제목 임베딩 로드 시작...")
     click.echo(f"   배치 크기: {batch_size}")
 
+    # 절대 경로로 스크립트 찾기
     script_path = Path(__file__).parent / "ETL" / "load_title_embeddings.py"
+    
+    # 프로젝트 루트에서 상대 경로로도 시도
+    if not script_path.exists():
+        project_root = Path(__file__).parent.parent.parent.parent
+        script_path = project_root / "backend" / "db_pipeline" / "postgres" / "ETL" / "load_title_embeddings.py"
 
     if not script_path.exists():
         click.echo(f"❌ 오류: 스크립트를 찾을 수 없습니다: {script_path}", err=True)
+        click.echo("다음 경로들을 확인했습니다:")
+        click.echo(f"  - {Path(__file__).parent / 'ETL' / 'load_title_embeddings.py'}")
+        click.echo(f"  - {script_path}")
         raise click.Abort()
 
     try:
-        # 모듈로 실행하여 패키지 컨텍스트 보장
+        # 직접 파이썬 스크립트 실행
         python_executable = sys.executable
-        # 모듈 경로: backend.db_pipeline.postgres.ETL.load_title_embeddings
-        module_path = "backend.db_pipeline.postgres.ETL.load_title_embeddings"
-        cmd = [python_executable, "-m", module_path]
+        cmd = [python_executable, str(script_path)]
+        
         if verbose:
             cmd.append("--verbose")
 
-        # 항상 실시간 출력
+        click.echo(f"실행 명령: {' '.join(cmd)}")
+
+        # 실시간 출력으로 실행
         result = subprocess.run(
             cmd,
             check=True,
@@ -102,22 +112,32 @@ def contents(batch_size, verbose):
     click.echo("📦 문서 내용 임베딩 로드 시작...")
     click.echo(f"   배치 크기: {batch_size}")
 
+    # 절대 경로로 스크립트 찾기
     script_path = Path(__file__).parent / "ETL" / "load_to_pgvector.py"
+    
+    # 프로젝트 루트에서 상대 경로로도 시도
+    if not script_path.exists():
+        project_root = Path(__file__).parent.parent.parent.parent
+        script_path = project_root / "backend" / "db_pipeline" / "postgres" / "ETL" / "load_to_pgvector.py"
 
     if not script_path.exists():
         click.echo(f"❌ 오류: 스크립트를 찾을 수 없습니다: {script_path}", err=True)
+        click.echo("다음 경로들을 확인했습니다:")
+        click.echo(f"  - {Path(__file__).parent / 'ETL' / 'load_to_pgvector.py'}")
+        click.echo(f"  - {script_path}")
         raise click.Abort()
 
     try:
-        # 모듈로 실행하여 패키지 컨텍스트 보장
+        # 직접 파이썬 스크립트 실행
         python_executable = sys.executable
-        # 모듈 경로: backend.db_pipeline.postgres.ETL.load_to_pgvector
-        module_path = "backend.db_pipeline.postgres.ETL.load_to_pgvector"
-        cmd = [python_executable, "-m", module_path]
+        cmd = [python_executable, str(script_path)]
+        
         if verbose:
             cmd.append("--verbose")
 
-        # 항상 실시간 출력
+        click.echo(f"실행 명령: {' '.join(cmd)}")
+
+        # 실시간 출력으로 실행
         result = subprocess.run(
             cmd,
             check=True,

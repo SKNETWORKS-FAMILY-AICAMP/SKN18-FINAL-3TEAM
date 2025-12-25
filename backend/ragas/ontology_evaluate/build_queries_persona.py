@@ -420,4 +420,9 @@ class PersonaQueryBuilder:
 
 if __name__ == "__main__":
     # 질문 생성 및 저장
-    PersonaQueryBuilder.save_to_json("data/test_queries.json")
+    import os
+    from pathlib import Path
+    
+    # 프로젝트 루트에서 실행되는 것을 가정
+    output_path = "backend/ragas/ontology_evaluate/data/test_queries.json"
+    PersonaQueryBuilder.save_to_json(output_path)

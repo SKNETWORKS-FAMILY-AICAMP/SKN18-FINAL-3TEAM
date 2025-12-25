@@ -43,21 +43,14 @@ from backend.langgraph_fuseki.ontology_schema import get_schema_summary
 _title_vector_service = None
 
 def get_title_vector_service():
-    """제목 임베딩 pgvector 서비스 lazy loading (최적화된 버전)"""
+    """제목 임베딩 pgvector 서비스 lazy loading"""
     global _title_vector_service
     if _title_vector_service is None and USE_PGVECTOR:
         try:
-            # 성능 최적화된 지연 로딩 서비스 시도
-            config = get_performance_config()
-            if config and config.lazy_load_vectors:
-                from backend.langgraph_fuseki.utils.performance_optimizer import LazyVectorService
-                _title_vector_service = LazyVectorService(config)
-                print("✅ 최적화된 벡터 서비스 초기화")
-            else:
-                # 기존 방식
-                from backend.db_pipeline.postgres.services.title_vector_service import TitleVectorService
-                _title_vector_service = TitleVectorService()
-                print("✅ 제목 임베딩 pgvector 서비스 초기화 완료")
+            # load_title_embeddings.py와 동일한 import 방식 사용
+            from backend.db_pipeline.postgres.services.title_vector_service import TitleVectorService
+            _title_vector_service = TitleVectorService()
+            print("✅ 제목 임베딩 pgvector 서비스 초기화 완료")
         except ImportError:
             print("⚠️ 제목 임베딩 pgvector 서비스 import 실패 - TTL 매칭만 사용")
         except Exception as e:
@@ -70,32 +63,9 @@ _ttl_cache = None
 _ttl_cache_mtime = None
 
 
-# 최적화된 TTL 로더 및 성능 설정
-_optimized_ttl_loader = None
-_performance_config = None
-
-def get_performance_config():
-    """성능 설정 가져오기"""
-    global _performance_config
-    if _performance_config is None:
-        try:
-            from backend.langgraph_fuseki.utils.performance_optimizer import PerformanceConfig
-            _performance_config = PerformanceConfig(
-                max_workers=4,
-                sparql_batch_size=10,
-                sparql_timeout=3,
-                enable_ttl_cache=True,
-                lazy_load_vectors=True
-            )
-        except ImportError:
-            # 성능 최적화 모듈이 없으면 기본 설정
-            _performance_config = None
-    return _performance_config
-
-
 def load_ttl_entities() -> dict:
     """
-    TTL 파일에서 모든 엔티티와 label 로드 (최적화된 버전)
+    TTL 파일에서 모든 엔티티와 label 로드 (캐싱 적용)
     
     Returns:
         {
@@ -103,23 +73,8 @@ def load_ttl_entities() -> dict:
             "uri_to_type": {"hist:Event_심기원역모사건": "Event", ...}
         }
     """
-    global _ttl_cache, _ttl_cache_mtime, _optimized_ttl_loader
+    global _ttl_cache, _ttl_cache_mtime
     
-    # 성능 최적화 모듈 사용 시도
-    config = get_performance_config()
-    if config and _optimized_ttl_loader is None:
-        try:
-            from backend.langgraph_fuseki.utils.performance_optimizer import OptimizedTTLLoader
-            _optimized_ttl_loader = OptimizedTTLLoader(TTL_PATH, config)
-            print("  ✓ 최적화된 TTL 로더 사용")
-            return _optimized_ttl_loader.load_entities_parallel()
-        except ImportError:
-            print("  ⚠️ 성능 최적화 모듈 없음, 기본 로더 사용")
-    
-    if _optimized_ttl_loader:
-        return _optimized_ttl_loader.load_entities_parallel()
-    
-    # 기본 TTL 로더 (기존 코드)
     # 캐시 유효성 검사 (파일 수정 시간 비교)
     if os.path.exists(TTL_PATH):
         current_mtime = os.path.getmtime(TTL_PATH)
@@ -134,7 +89,6 @@ def load_ttl_entities() -> dict:
         return {"label_to_uri": {}, "uri_to_type": {}}
     
     try:
-        start_time = time.time()
         with open(TTL_PATH, 'r', encoding='utf-8') as f:
             content = f.read()
         
@@ -163,8 +117,7 @@ def load_ttl_entities() -> dict:
                 if base_label:
                     label_to_uri[base_label] = uri
         
-        load_time = time.time() - start_time
-        print(f"📂 TTL 엔티티 로드 완료: {len(label_to_uri)}개 라벨, {len(uri_to_type)}개 타입 ({load_time:.2f}초)")
+        print(f"📂 TTL 엔티티 로드 완료: {len(label_to_uri)}개 라벨, {len(uri_to_type)}개 타입")
         
     except Exception as e:
         print(f"⚠️ TTL 파일 로드 실패: {e}")
@@ -846,41 +799,6 @@ def entity_expander_node(state: GraphState) -> GraphState:
     seen = set()
 
     # 키워드 기반 엔티티 점수 계산을 위한 함수
-    def calculate_entity_base_score(entity, keywords, ttl_data):
-        """
-        엔티티와 키워드의 기본 연관성 점수 계산 (SPARQL 제외)
-        
-        Args:
-            entity: 엔티티 딕셔너리 (name, uri, type 포함)
-            keywords: 키워드 리스트
-            ttl_data: TTL 데이터 (uri_to_type 포함)
-        
-        Returns:
-            계산된 점수 (float)
-        """
-        # 1. 기본 점수 (엔티티 타입별 가중치)
-        entity_type = entity.get("type", "Unknown")
-        type_weights = {
-            "Person": 1.0,
-            "Event": 0.9,
-            "Place": 0.8,
-            "Institution": 0.7,
-            "Document": 0.6,
-            "Policy": 0.5,
-            "Object": 0.4
-        }
-        base_score = type_weights.get(entity_type, 0.3)
-
-        # 2. 이름 매칭 점수 (부분 일치)
-        name = entity.get("name", "").lower()
-        name_match_score = sum(0.5 for kw in keywords if kw.lower() in name)
-
-        # SPARQL 연결 점수는 별도 처리
-        total_score = base_score + name_match_score
-        entity["relevance_score"] = total_score
-        return total_score
-
-    # 키워드 기반 엔티티 점수 계산을 위한 함수
     def calculate_entity_score_with_connections(entity, keywords, ttl_data):
         """
         엔티티와 키워드의 연관성 점수 계산
@@ -940,12 +858,11 @@ def entity_expander_node(state: GraphState) -> GraphState:
 
             try:
                 fuseki_url = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
-                
                 response = requests.post(
                     f"{fuseki_url}/sparql",
                     data={"query": sparql_query},
                     headers={"Accept": "application/sparql-results+json"},
-                    timeout=5  # 5초 타임아웃 (증가)
+                    timeout=2  # 2초 타임아웃 (성능 최적화)
                 )
 
                 if response.status_code == 200:
@@ -975,20 +892,10 @@ def entity_expander_node(state: GraphState) -> GraphState:
                     entity["sparql_connections"] = connection_count
                     entity["matched_connections"] = len(matched_connections)
                     entity["has_keyword_in_connections"] = has_keyword_match  # 우선순위 정렬용 플래그
-                    
-                    # 간소화된 로그 (연결이 있을 때만)
-                    if connection_count > 0:
-                        print(f"    ✓ {entity.get('name', 'Unknown')}: {connection_count}개 연결 (매칭: {len(matched_connections)})")
-                    
-                else:
-                    print(f"    [ERROR] SPARQL 쿼리 실패: HTTP {response.status_code}")
 
-            except requests.exceptions.Timeout:
-                print(f"    [ERROR] SPARQL 타임아웃: {entity.get('name')} ({uri})")
-            except requests.exceptions.ConnectionError:
-                print(f"    [ERROR] SPARQL 연결 실패: Fuseki 서버 확인 필요 ({fuseki_url})")
             except Exception as e:
-                print(f"    [ERROR] SPARQL 예외: {entity.get('name')} - {str(e)}")
+                # SPARQL 실패 시 조용히 무시 (점수만 0으로 유지)
+                pass
 
         # 디버깅 정보 저장
         entity["sparql_executed"] = sparql_executed
@@ -1053,7 +960,7 @@ def entity_expander_node(state: GraphState) -> GraphState:
                         if partial_count >= 3:  # 키워드당 최대 3개 부분 매칭 (성능 최적화)
                             break
 
-    print(f"  │  └─ TTL 매칭: {ttl_matched}개")
+    print(f"   │ └─ TTL 매칭: {ttl_matched}개")
 
     # --- pgvector 제목 임베딩 유사도 검색 (규칙 기반 키워드 사용) ---
     # ⚡ 리팩토링: LLM 대신 규칙 기반 키워드로 벡터 검색
@@ -1082,7 +989,7 @@ def entity_expander_node(state: GraphState) -> GraphState:
                 matched_entities.append(e)
                 pgvector_added += 1
 
-        print(f"  │  └─ pgvector 추가: {pgvector_added}개")
+        print(f"   │ └─ pgvector 추가: {pgvector_added}개")
     
     # ========================================
     # 3단계: LLM 엔티티 추출 (결과가 부족할 때만)
@@ -1190,42 +1097,13 @@ def entity_expander_node(state: GraphState) -> GraphState:
     # ========================================
     print(f"  ├─ SPARQL 기반 스코어링 중...")
 
-    # 모든 엔티티에 대해 점수 계산 (배치 처리 시도)
+    # 모든 엔티티에 대해 점수 계산
     sparql_count = 0
     total_connections = 0
     total_matched_connections = 0
 
-    # 성능 최적화: SPARQL 배치 처리 시도
-    config = get_performance_config()
-    if config and len(matched_entities) > config.sparql_batch_size:
-        try:
-            from backend.langgraph_fuseki.utils.performance_optimizer import BatchSPARQLExecutor
-            fuseki_url = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
-            executor = BatchSPARQLExecutor(fuseki_url, config)
-            
-            print(f"  │  ├─ SPARQL 배치 처리 시작 ({len(matched_entities)}개 엔티티)")
-            
-            # 기본 점수 계산 (SPARQL 제외)
-            for entity in matched_entities:
-                calculate_entity_base_score(entity, all_keywords, ttl_data)
-            
-            # SPARQL 연결 배치 처리
-            matched_entities = executor.process_entities_batch(matched_entities, all_keywords)
-            
-            print(f"  │  └─ SPARQL 배치 처리 완료")
-            
-        except ImportError:
-            print(f"  │  ├─ 성능 최적화 모듈 없음, 순차 처리")
-            # 기존 방식으로 폴백
-            for entity in matched_entities:
-                calculate_entity_score_with_connections(entity, all_keywords, ttl_data)
-    else:
-        # 엔티티가 적거나 최적화 설정이 없으면 기존 방식
-        for entity in matched_entities:
-            calculate_entity_score_with_connections(entity, all_keywords, ttl_data)
-
-    # SPARQL 통계 계산
     for entity in matched_entities:
+        calculate_entity_score_with_connections(entity, all_keywords, ttl_data)
         if entity.get("sparql_executed"):
             sparql_count += 1
             total_connections += entity.get("sparql_connections", 0)

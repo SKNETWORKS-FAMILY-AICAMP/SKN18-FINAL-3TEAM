@@ -780,7 +780,10 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
             connected = ", ".join(node_info["connected_entities"][:3])
             props_count = len(node_info.get("properties", {}))
             rels_count = len(node_info.get("relations", []))
-            print(f"  │  {i}. {node_label} (연결: {connected}, 속성: {props_count}개, 관계: {rels_count}개)")
+            print(f"│ │  {i}. {node_label}")
+            print(f"│ │     ├─ 연결 엔티티: {connected}")
+            print(f"│ │     ├─ 속성: {props_count}개")
+            print(f"│ │     └─ 관계: {rels_count}개")
 
     # 3. 모든 Thread의 경로를 하나로 병합
     all_evidences = []

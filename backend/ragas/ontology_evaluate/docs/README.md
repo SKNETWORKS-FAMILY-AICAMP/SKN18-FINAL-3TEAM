@@ -63,14 +63,19 @@ Phase 1에서 필요성이 검증된 요소들의 가중치 최적화
 
 ## 사용법
 
+## 사용법
+
 ### 1. 테스트 질문 생성
 
 ```bash
-cd backend/ragas/ontology_evaluate
-python build_queries_persona.py
+# 방법 1: 직접 모듈 실행
+python -m backend.ragas.ontology_evaluate.build_queries_persona
+
+# 방법 2: 패키지 실행 (동일한 결과)
+python -m backend.ragas.ontology_evaluate
 ```
 
-생성된 질문: `data/test_queries.json` (40개)
+생성된 질문: `backend/ragas/ontology_evaluate/data/test_queries.json` (40개)
 
 - factual: 10개
 - causal: 10개
@@ -94,20 +99,19 @@ python build_queries_persona.py
 ### 2. Baseline Ablation Study 실행
 
 ```bash
-# Semantic Expander 실험 (Intent-aware 평가 활성화, 기본값)
-python experiments/run_baseline.py --group semantic_expander --queries data/test_queries.json
+# 방법 1: 직접 모듈 실행
+python -m backend.ragas.ontology_evaluate.experiments.run_baseline --group semantic_expander
 
-# Thread 실험
-python experiments/run_baseline.py --group thread --queries data/test_queries.json
+# 방법 2: 패키지 실행 (동일한 결과)  
+python -m backend.ragas.ontology_evaluate.experiments --group semantic_expander
 
-# 모든 실험
-python experiments/run_baseline.py --group all --queries data/test_queries.json
+# 다른 실험 그룹들
+python -m backend.ragas.ontology_evaluate.experiments.run_baseline --group thread
+python -m backend.ragas.ontology_evaluate.experiments.run_baseline --group all
 
-# Intent-aware 평가 비활성화 (Raw 메트릭만 사용)
-python experiments/run_baseline.py --group semantic_expander --queries data/test_queries.json --no-intent-aware
-
-# 디버깅용 (5개 질문만)
-python experiments/run_baseline.py --group semantic_expander --queries data/test_queries.json --limit 5
+# 옵션들
+python -m backend.ragas.ontology_evaluate.experiments.run_baseline --group semantic_expander --no-intent-aware  # Intent-aware 평가 비활성화
+python -m backend.ragas.ontology_evaluate.experiments.run_baseline --group semantic_expander --limit 5  # 디버깅용 (5개 질문만)
 ```
 
 **출력 예시** (Intent-aware 평가 활성화 시):
@@ -139,20 +143,24 @@ Intent-Aware 평가 요약
 ### 3. 결과 분석
 
 ```bash
-python -c "from utils.result_analyzer import ResultAnalyzer; analyzer = ResultAnalyzer('data/results/semantic_expander_ablation.json'); analyzer.generate_report()"
+python -c "
+from backend.ragas.ontology_evaluate.utils.result_analyzer import ResultAnalyzer
+analyzer = ResultAnalyzer('backend/ragas/ontology_evaluate/data/results/semantic_expander_ablation.json')
+analyzer.generate_report()
+"
 ```
 
 ### 4. Grid Search (Phase 2)
 
 ```bash
 # Semantic Expander 가중치 최적화
-python experiments/run_grid_search.py --baseline-results data/results/semantic_expander_ablation.json --search-type semantic
+python -m backend.ragas.ontology_evaluate.experiments.run_grid_search --baseline-results backend/ragas/ontology_evaluate/data/results/semantic_expander_ablation.json --search-type semantic
 
 # Thread 가중치 최적화
-python experiments/run_grid_search.py --baseline-results data/results/thread_ablation.json --search-type thread
+python -m backend.ragas.ontology_evaluate.experiments.run_grid_search --baseline-results backend/ragas/ontology_evaluate/data/results/thread_ablation.json --search-type thread
 
 # 모든 가중치 최적화
-python experiments/run_grid_search.py --baseline-results data/results/all_ablation.json --search-type all
+python -m backend.ragas.ontology_evaluate.experiments.run_grid_search --baseline-results backend/ragas/ontology_evaluate/data/results/all_ablation.json --search-type all
 ```
 
 ## 평가 메트릭
@@ -163,10 +171,6 @@ python experiments/run_grid_search.py --baseline-results data/results/all_ablati
 | L2               | Intent Preservation        | `evaluators/l2_path_quality.py`        | LLM Judge              |
 | L2               | Relation Coherence         | `evaluators/l2_path_quality.py`        | 자동                   |
 | L2               | Property Group Selection   | `evaluators/l2_path_quality.py`        | 자동 (Jaccard Index)   |
-| L3               | Terminal Triple Validity   | `evaluators/l3_terminal_knowledge.py`  | LLM Judge              |
-| L3               | Evidence Diversity         | `evaluators/l3_terminal_knowledge.py`  | 자동 (Shannon Entropy) |
-| L3               | Convergence Utilization    | `evaluators/l3_terminal_knowledge.py`  | 반자동 (query_type별)  |
-| **Intent-Aware** | **Query Type별 가중 평가** | `evaluators/intent_aware_evaluator.py` | **자동 (가중치 적용)** |
 | L3               | Terminal Triple Validity   | `evaluators/l3_terminal_knowledge.py`  | LLM Judge              |
 | L3               | Evidence Diversity         | `evaluators/l3_terminal_knowledge.py`  | 자동 (Shannon Entropy) |
 | L3               | Convergence Utilization    | `evaluators/l3_terminal_knowledge.py`  | 반자동 (query_type별)  |

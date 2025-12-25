@@ -206,6 +206,32 @@ class AblationRunner:
     def __init__(self, output_dir: str = "data/results"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 로그 디렉토리 생성
+        self.log_dir = Path("backend/ragas/ontology_evaluate/log")
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+
+    def clean_state_output(self, state_output: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        state_output에서 불필요한 대용량 데이터 제거
+        
+        제거 대상:
+        - ontology_schema: 온톨로지 스키마 (매번 동일)
+        - ttl_data: TTL 데이터 (매번 동일)
+        """
+        if not isinstance(state_output, dict):
+            return state_output
+        
+        cleaned = state_output.copy()
+        
+        # 제거할 키 목록
+        keys_to_remove = ["ontology_schema", "ttl_data", "raw_ttl_content", "full_schema", "metadata_cache"]
+        
+        for key in keys_to_remove:
+            if key in cleaned:
+                del cleaned[key]
+        
+        return cleaned
 
     def run_single_experiment(
         self,
@@ -262,7 +288,7 @@ class AblationRunner:
             "description": config.description,
             "query": query,
             "config": config.to_state_config(),
-            "state_output": state_output,
+            "state_output": self.clean_state_output(state_output),  # 불필요한 데이터 제거
             "execution_time": execution_time,
             "success": success,
             "error": error,
@@ -294,6 +320,19 @@ class AblationRunner:
         Returns:
             실험 결과 리스트
         """
+        import logging
+        import datetime
+        
+        # 로그 설정
+        log_file = self.log_dir / f"{group_name}_experiment.log"
+        logging.basicConfig(
+            filename=log_file,
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            filemode='w'
+        )
+        logger = logging.getLogger()
+        
         results = []
 
         total_experiments = len(queries) * len(configs)
@@ -301,20 +340,40 @@ class AblationRunner:
         print(f"실험 그룹: {group_name}")
         print(f"총 {total_experiments}개 실험 (질문 {len(queries)}개 × 설정 {len(configs)}개)")
         print(f"{'='*70}")
+        
+        logger.info(f"실험 그룹 시작: {group_name}")
+        logger.info(f"총 {total_experiments}개 실험 (질문 {len(queries)}개 × 설정 {len(configs)}개)")
 
         for i, query in enumerate(queries, 1):
             for j, config in enumerate(configs, 1):
                 print(f"\n진행률: [{i}/{len(queries)}] 질문, [{j}/{len(configs)}] 설정")
+                logger.info(f"진행률: [{i}/{len(queries)}] 질문, [{j}/{len(configs)}] 설정")
 
                 result = self.run_single_experiment(query, config, graph_invoke_func)
                 results.append(result)
+                
+                # 매 5개 실험마다 임시 저장
+                if len(results) % 5 == 0:
+                    temp_file = self.output_dir / f"{group_name}_temp.json"
+                    with open(temp_file, "w", encoding="utf-8") as f:
+                        json.dump(results, f, ensure_ascii=False, indent=2)
+                    print(f"  ├─ 임시 저장: {temp_file} ({len(results)}개 실험)")
+                    logger.info(f"임시 저장: {temp_file} ({len(results)}개 실험)")
 
-        # 결과 저장
+        # 최종 결과 저장
         output_file = self.output_dir / f"{group_name}_ablation.json"
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
 
-        print(f"\n결과 저장: {output_file}")
+        print(f"\n  └─ 결과 저장: {output_file}")
+        logger.info(f"최종 결과 저장: {output_file}")
+        
+        # 임시 파일 삭제
+        temp_file = self.output_dir / f"{group_name}_temp.json"
+        if temp_file.exists():
+            temp_file.unlink()
+            logger.info(f"임시 파일 삭제: {temp_file}")
+        
         return results
 
     def run_all_experiments(

@@ -25,7 +25,8 @@ from backend.langgraph_fuseki.config import (
 )
 
 
-SAVE_INFERENCE_TRIPLES = os.getenv("SAVE_INFERENCE_TRIPLES", "true").lower() == "true"
+# 추론 결과 저장 비활성화 (평가 모드에서는 불필요)
+SAVE_INFERENCE_TRIPLES = False
 
 # 질문 유형별 Thread 가중치 (config에서 가져온 값 사용)
 THREAD_WEIGHTS = {
@@ -883,6 +884,8 @@ def execute_fuseki_direct(thread_type: str, sparql: str, debug: bool = False) ->
         }
         
     except requests.exceptions.ConnectionError:
+        print(f"    ├─ SPARQL 연결 실패: {endpoint}")
+        print(f"    └─ Fuseki 서버가 실행 중인지 확인하세요")
         return {
             "status": "error", 
             "bindings": [], 
@@ -890,8 +893,10 @@ def execute_fuseki_direct(thread_type: str, sparql: str, debug: bool = False) ->
             "thread_type": thread_type
         }
     except requests.exceptions.Timeout:
+        print(f"    ├─ SPARQL 타임아웃: {endpoint}")
         return {"status": "timeout", "bindings": [], "thread_type": thread_type}
     except Exception as e:
+        print(f"    ├─ SPARQL 오류: {str(e)}")
         return {"status": "error", "bindings": [], "error": str(e), "thread_type": thread_type}
 
 

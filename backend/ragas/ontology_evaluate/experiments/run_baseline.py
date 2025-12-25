@@ -2,19 +2,16 @@
 Baseline Ablation Study 실행
 
 Usage:
-    python experiments/run_baseline.py --group semantic_expander --queries data/test_queries.json
+    python -m backend.ragas.ontology_evaluate.experiments.run_baseline --group semantic_expander
 """
 
-import sys
 import argparse
 import json
 from pathlib import Path
+from typing import List
 
-# 상위 디렉토리를 sys.path에 추가
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-
-from ragas.ontology_evaluate.baseline_ablation import AblationRunner, AblationExperimentGenerator
-from ragas.ontology_evaluate.evaluators import (
+from backend.ragas.ontology_evaluate.baseline_ablation import AblationRunner, AblationExperimentGenerator
+from backend.ragas.ontology_evaluate.evaluators import (
     TBoxConsistencyEvaluator,
     IntentPreservationEvaluator,
     RelationCoherenceEvaluator,
@@ -23,19 +20,20 @@ from ragas.ontology_evaluate.evaluators import (
     EvidenceDiversityEvaluator,
     ConvergenceUtilizationEvaluator
 )
-from ragas.ontology_evaluate.evaluators.intent_aware_evaluator import IntentAwareEvaluator
-from ragas.ontology_evaluate.utils import LLMJudge, load_ontology_schema
+from backend.ragas.ontology_evaluate.evaluators.intent_aware_evaluator import IntentAwareEvaluator
+from backend.ragas.ontology_evaluate.utils.llm_judge import LLMJudge
 
 # LangGraph import
-from langgraph_fuseki.graph import create_graph_flow
+from backend.langgraph_fuseki.graph import create_graph_flow
 
 
 def load_queries(queries_file: str):
     """테스트 질문 로드"""
-    with open(queries_file, "r", encoding="utf-8") as f:
+    queries_path = Path(queries_file)
+    
+    with open(queries_path, "r", encoding="utf-8") as f:
         queries_data = json.load(f)
 
-    # 전체 query 데이터 반환 (query_type 정보 포함)
     return queries_data
 
 
@@ -141,13 +139,13 @@ def main():
     parser.add_argument(
         "--queries",
         type=str,
-        default="data/test_queries.json",
+        default="backend/ragas/ontology_evaluate/data/test_queries.json",
         help="테스트 질문 JSON 파일 경로"
     )
     parser.add_argument(
         "--output",
         type=str,
-        default="data/results",
+        default="backend/ragas/ontology_evaluate/data/results",
         help="결과 저장 디렉토리"
     )
     parser.add_argument(
@@ -194,12 +192,19 @@ def main():
             query_type_counts[qtype] = query_type_counts.get(qtype, 0) + 1
         print(f"Query Type 분포: {query_type_counts}")
 
-    # 2. LLM Judge 초기화 (환경변수 OPENAI_MODEL 사용)
-    llm_judge = LLMJudge()
+    # 2. LLM Judge 초기화
+    llm_judge = LLMJudge(model="gpt-4o")
 
-    # 3. 온톨로지 스키마 로드 (korean_history.owl에서 자동 로드)
-    print("\n[INFO] 온톨로지 스키마 로드 중...")
-    ontology_schema = load_ontology_schema()
+    # 3. 온톨로지 스키마 로드 (실제 스키마 파일에서 로드 필요)
+    # TODO: 실제 온톨로지 스키마 로드 구현
+    ontology_schema = {
+        "classes": ["Person", "Event", "Place", "Organization"],
+        "properties": {
+            "participatesIn": {"domain": "Person", "range": "Event"},
+            "built": {"domain": "Person", "range": "Place"},
+            "causedBy": {"domain": "Event", "range": "Event"},
+        }
+    }
 
     # 4. LangGraph 초기화
     print("\n[INFO] LangGraph 초기화 중...")
@@ -278,12 +283,16 @@ def main():
                     state_output = result["state_output"]
                     # 해당 쿼리의 query_type 가져오기
                     query_idx = idx % len(queries_data)
-                    query_type = queries_data[query_idx].get("query_type", "factual")
+                    query_data = queries_data[query_idx]
+                    query_type = query_data.get("query_type", "factual")
+                    expected_property_groups = query_data.get("expected_property_groups", [])
+                    
                     result["metrics"] = evaluate_state(
                         state_output,
                         llm_judge,
                         ontology_schema,
                         query_type=query_type,
+                        expected_property_groups=expected_property_groups,
                         use_intent_aware=args.intent_aware
                     )
     else:
@@ -307,17 +316,22 @@ def main():
                 state_output = result["state_output"]
                 # 해당 쿼리의 query_type 가져오기
                 query_idx = idx % len(queries_data)
-                query_type = queries_data[query_idx].get("query_type", "factual")
+                query_data = queries_data[query_idx]
+                query_type = query_data.get("query_type", "factual")
+                expected_property_groups = query_data.get("expected_property_groups", [])
+                
                 result["metrics"] = evaluate_state(
                     state_output,
                     llm_judge,
                     ontology_schema,
                     query_type=query_type,
+                    expected_property_groups=expected_property_groups,
                     use_intent_aware=args.intent_aware
                 )
 
         # 결과 재저장 (메트릭 포함)
         output_file = Path(args.output) / f"{args.group}_ablation.json"
+        output_file.parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
 

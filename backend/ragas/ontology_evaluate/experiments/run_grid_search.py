@@ -4,18 +4,14 @@ Grid Search: 가중치 최적화 실험
 Phase 1 (Baseline Ablation) 결과를 바탕으로 가중치 최적화
 
 Usage:
-    python experiments/run_grid_search.py --baseline-results data/results/semantic_expander_ablation.json
+    python -m backend.ragas.ontology_evaluate.experiments.run_grid_search --baseline-results backend/ragas/ontology_evaluate/data/results/semantic_expander_ablation.json
 """
 
-import sys
 import argparse
 import json
 from pathlib import Path
 from typing import Dict, List, Any
 from itertools import product
-
-# 상위 디렉토리를 sys.path에 추가
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 
 class GridSearchConfig:
