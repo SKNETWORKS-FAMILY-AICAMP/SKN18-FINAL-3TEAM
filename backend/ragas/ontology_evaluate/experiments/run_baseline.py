@@ -27,6 +27,96 @@ from backend.ragas.ontology_evaluate.utils.llm_judge import LLMJudge
 from backend.langgraph_fuseki.graph import create_graph_flow
 
 
+def _save_experiment_results(results: list, output_dir: str, group_name: str, queries_data: list):
+    """실험 결과를 2개 파일로 저장: Full + Summary
+
+    Args:
+        results: 실험 결과 리스트
+        output_dir: 출력 디렉토리
+        group_name: 실험 그룹명
+        queries_data: 원본 질문 데이터
+    """
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # 1. Full 결과 저장 (기존 방식, 모든 state 포함)
+    full_file = output_path / f"{group_name}_ablation_full.json"
+    with open(full_file, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+    print(f"  → Full 결과: {full_file}")
+
+    # 2. Summary 결과 생성 (점수, 수치만)
+    summary_results = []
+    for idx, result in enumerate(results):
+        query_idx = idx % len(queries_data)
+        query_data = queries_data[query_idx]
+
+        summary_item = {
+            "experiment_name": result.get("experiment_name", ""),
+            "description": result.get("description", ""),
+            "query": result.get("query", ""),
+            "query_type": query_data.get("query_type", "unknown"),
+            "success": result.get("success", False),
+            "execution_time": result.get("execution_time", 0.0),
+            "config": result.get("config", {}),
+        }
+
+        if result.get("success") and result.get("state_output"):
+            state = result["state_output"]
+
+            # 답변 추가
+            summary_item["final_answer"] = state.get("final_answer", "")
+
+            # 엔티티 개수
+            extracted_entities = state.get("extracted_entities", [])
+            expanded_entities = state.get("expanded_entities", [])
+            summary_item["num_extracted_entities"] = len(extracted_entities)
+            summary_item["num_expanded_entities"] = len(expanded_entities)
+
+            # Evidence 개수
+            evidences = state.get("evidences", [])
+            summary_item["num_evidences"] = len(evidences)
+
+            # Convergence nodes 개수
+            convergence_nodes = state.get("convergence_nodes", [])
+            summary_item["num_convergence_nodes"] = len(convergence_nodes)
+
+            # 메트릭 점수
+            if result.get("metrics"):
+                metrics = result["metrics"]
+
+                # Raw metrics
+                summary_item["raw_metrics"] = metrics.get("raw_metrics", {})
+
+                # Intent-aware final score
+                if metrics.get("intent_aware"):
+                    ia = metrics["intent_aware"]
+                    summary_item["intent_aware_score"] = ia.get("final_score", 0.0)
+                    summary_item["weighted_metrics"] = ia.get("weighted_metrics", {})
+                else:
+                    # Fallback: raw metrics 평균
+                    raw_scores = list(metrics.get("raw_metrics", {}).values())
+                    summary_item["intent_aware_score"] = sum(raw_scores) / len(raw_scores) if raw_scores else 0.0
+        else:
+            # 실패한 경우
+            summary_item["error"] = result.get("error", "Unknown error")
+            summary_item["final_answer"] = ""
+            summary_item["num_extracted_entities"] = 0
+            summary_item["num_expanded_entities"] = 0
+            summary_item["num_evidences"] = 0
+            summary_item["num_convergence_nodes"] = 0
+            summary_item["raw_metrics"] = {}
+            summary_item["intent_aware_score"] = 0.0
+
+        summary_results.append(summary_item)
+
+    # Summary 파일 저장
+    summary_file = output_path / f"{group_name}_ablation_summary.json"
+    with open(summary_file, "w", encoding="utf-8") as f:
+        json.dump(summary_results, f, ensure_ascii=False, indent=2)
+    print(f"  → Summary: {summary_file}")
+
+
 def load_queries(queries_file: str):
     """테스트 질문 로드"""
     queries_path = Path(queries_file)
@@ -193,7 +283,7 @@ def main():
         print(f"Query Type 분포: {query_type_counts}")
 
     # 2. LLM Judge 초기화
-    llm_judge = LLMJudge(model="gpt-4o")
+    llm_judge = LLMJudge(model="gpt-5-mini")
 
     # 3. 온톨로지 스키마 로드 (실제 스키마 파일에서 로드 필요)
     # TODO: 실제 온톨로지 스키마 로드 구현
@@ -319,7 +409,7 @@ def main():
                 query_data = queries_data[query_idx]
                 query_type = query_data.get("query_type", "factual")
                 expected_property_groups = query_data.get("expected_property_groups", [])
-                
+
                 result["metrics"] = evaluate_state(
                     state_output,
                     llm_judge,
@@ -329,13 +419,10 @@ def main():
                     use_intent_aware=args.intent_aware
                 )
 
-        # 결과 재저장 (메트릭 포함)
-        output_file = Path(args.output) / f"{args.group}_ablation.json"
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(results, f, ensure_ascii=False, indent=2)
+        # 2개 파일 저장: Full + Summary
+        _save_experiment_results(results, args.output, args.group, queries_data)
 
-        print(f"\n✅ 평가 완료: {output_file}")
+        print(f"\n✅ 평가 완료!")
 
         # Intent-aware 평가 요약 출력
         if args.intent_aware:

@@ -340,7 +340,7 @@ def get_group_with_llm(property_batch: list) -> dict:
     """
     # API 키 확인
     api_key = os.getenv("OPENAI_API_KEY")
-    model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    model_name = os.getenv("OPENAI_MODEL", "gpt-5-nano")
 
     if not api_key:
         print("  WARNING: OPENAI_API_KEY 없음, 키워드 기반으로 대체")

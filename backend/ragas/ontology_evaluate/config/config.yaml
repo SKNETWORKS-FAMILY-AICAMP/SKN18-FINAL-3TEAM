@@ -1,0 +1,238 @@
+# Ontology Evaluate 시스템 설정
+# 가중치 최적화 실험 결과를 반영하여 업데이트
+
+# =============================================================================
+# Semantic Expander 설정
+# =============================================================================
+semantic_expander:
+  # 전역 기본 가중치 (모든 query_type에 적용되는 fallback)
+  default_weights:
+    temporal_weight: 0.33
+    causal_weight: 0.33
+    vector_weight: 0.34
+
+  # Query Type별 최적화된 가중치
+  # 실험을 통해 각 질문 유형에 최적화된 가중치 값 적용
+  query_type_weights:
+    # Factual 질문: 시간적 확장이 중요 (언제, 누가, 무엇)
+    factual:
+      temporal_weight: 0.5 # 시간적 확장 강화
+      causal_weight: 0.2
+      vector_weight: 0.3
+      description: "사실 확인 질문 - 시간적 확장 중시"
+
+    # Causal 질문: 인과관계 확장이 중요 (왜, 어떻게)
+    causal:
+      temporal_weight: 0.2
+      causal_weight: 0.6 # 인과관계 확장 강화
+      vector_weight: 0.2
+      description: "인과관계 질문 - 인과 체인 중시"
+
+    # Comparative 질문: 벡터 유사도 중요 (비교, 차이)
+    comparative:
+      temporal_weight: 0.3
+      causal_weight: 0.3
+      vector_weight: 0.4 # 벡터 검색 강화
+      description: "비교 질문 - 벡터 유사도 중시"
+
+    # Deep Analysis 질문: 균형잡힌 확장
+    deep_analysis:
+      temporal_weight: 0.25
+      causal_weight: 0.45
+      vector_weight: 0.3
+      description: "심층 분석 - 인과관계 약간 강화"
+
+  # 컴포넌트 활성화 여부
+  enabled: true
+
+# =============================================================================
+# Entity Extractor 설정
+# =============================================================================
+entity_extractor:
+  # 엔티티 매칭 임계값
+  similarity_threshold: 0.75 # 최적화 실험 결과 반영
+
+  # 최대 추출 엔티티 개수
+  max_entities: 30
+
+  # Query Type별 임계값 (선택적)
+  query_type_thresholds:
+    factual: 0.8 # 사실 확인: 높은 정확도 요구
+    causal: 0.7 # 인과관계: 다양한 엔티티 필요
+    comparative: 0.75 # 비교: 중간 수준
+    deep_analysis: 0.7
+
+  enabled: true
+
+# =============================================================================
+# Property Extractor 설정
+# =============================================================================
+property_extractor:
+  # 프로퍼티 추출 신뢰도 임계값
+  confidence_threshold: 0.8
+
+  # 최대 프로퍼티 개수
+  max_properties: 5
+
+  enabled: true
+
+# =============================================================================
+# Aggregator Threads 설정
+# =============================================================================
+aggregator_threads:
+  # 전역 기본 Thread 가중치
+  default_weights:
+    outgoing_relations: 1.0
+    incoming_relations: 1.0
+    entity_properties: 1.0
+    connected_entities: 1.0
+    type_and_summary: 1.0
+
+  # Query Type별 Thread 가중치 (최적화 실험 결과 반영)
+  query_type_weights:
+    factual:
+      outgoing_relations: 1.0
+      incoming_relations: 0.8
+      entity_properties: 1.2 # 사실 확인: 속성 중시
+      connected_entities: 0.8
+      type_and_summary: 1.0
+      description: "사실 확인 - 엔티티 속성 강조"
+
+    causal:
+      outgoing_relations: 1.5 # 인과관계: outgoing 중시
+      incoming_relations: 1.2
+      entity_properties: 0.8
+      connected_entities: 1.0
+      type_and_summary: 1.0
+      description: "인과관계 - 관계 흐름 강조"
+
+    comparative:
+      outgoing_relations: 1.0
+      incoming_relations: 1.0
+      entity_properties: 1.0
+      connected_entities: 1.2 # 비교: 연결된 엔티티 중시
+      type_and_summary: 1.0
+      description: "비교 분석 - 연결 엔티티 강조"
+
+    deep_analysis:
+      outgoing_relations: 1.2
+      incoming_relations: 1.2
+      entity_properties: 1.0
+      connected_entities: 1.0
+      type_and_summary: 1.1
+      description: "심층 분석 - 관계망 균형"
+
+  # Thread 활성화 여부
+  active_threads:
+    outgoing_relations: true
+    incoming_relations: true
+    entity_properties: true
+    connected_entities: true
+    type_and_summary: true
+
+# =============================================================================
+# Entity Boost 설정
+# =============================================================================
+entity_boost:
+  # Boost 모드 (null, "exact_match", "partial_match")
+  mode: null
+
+  # 전역 기본 Boost 배율
+  default_multipliers:
+    exact_match: 2.0
+    partial_match: 1.5
+
+  # Query Type별 Boost 배율 (최적화 실험 결과 반영)
+  query_type_multipliers:
+    factual:
+      exact_match: 2.5 # 사실 확인: 정확한 매칭 강조
+      partial_match: 1.3
+      description: "사실 확인 - 정확한 매칭 우선"
+
+    causal:
+      exact_match: 2.0
+      partial_match: 1.5
+      description: "인과관계 - 균형"
+
+    comparative:
+      exact_match: 2.0
+      partial_match: 1.8 # 비교: 부분 매칭도 중요
+      description: "비교 분석 - 부분 매칭 활용"
+
+    deep_analysis:
+      exact_match: 2.2
+      partial_match: 1.6
+      description: "심층 분석 - 균형"
+
+# =============================================================================
+# LLM 설정
+# =============================================================================
+llm:
+  # 평가용 LLM 모델
+  evaluator_model: "gpt-5-mini"
+
+  # 온톨로지 시스템 LLM 모델
+  system_model: "gpt-5-nano"
+
+  # Temperature
+  temperature: 0.7
+
+  # Max tokens
+  max_tokens: 2000
+
+# =============================================================================
+# 평가 설정
+# =============================================================================
+evaluation:
+  # Intent-aware 평가 활성화
+  use_intent_aware: true
+
+  # 메트릭 가중치 (Intent-aware 평가용)
+  metric_weights:
+    factual:
+      tbox_consistency: 0.15
+      intent_preservation: 0.20
+      relation_coherence: 0.15
+      triple_validity: 0.25
+      evidence_diversity: 0.10
+      convergence_utilization: 0.15
+
+    causal:
+      tbox_consistency: 0.15
+      intent_preservation: 0.25
+      relation_coherence: 0.20
+      triple_validity: 0.20
+      evidence_diversity: 0.10
+      convergence_utilization: 0.10
+
+    comparative:
+      tbox_consistency: 0.15
+      intent_preservation: 0.20
+      relation_coherence: 0.15
+      triple_validity: 0.20
+      evidence_diversity: 0.15
+      convergence_utilization: 0.15
+
+    deep_analysis:
+      tbox_consistency: 0.15
+      intent_preservation: 0.20
+      relation_coherence: 0.15
+      triple_validity: 0.20
+      evidence_diversity: 0.15
+      convergence_utilization: 0.15
+
+# =============================================================================
+# 실험 설정
+# =============================================================================
+experiment:
+  # 결과 저장 경로
+  results_dir: "backend/ragas/ontology_evaluate/data/results"
+
+  # 질문 데이터셋 경로
+  queries_file: "backend/ragas/ontology_evaluate/data/test_queries.json"
+
+  # 디버깅 모드
+  debug: false
+
+  # 로그 레벨
+  log_level: "INFO"

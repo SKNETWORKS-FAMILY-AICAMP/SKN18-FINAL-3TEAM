@@ -217,7 +217,9 @@ def query_classifier_node(state: GraphState) -> GraphState:
             
             # 의도 확인 질문 생성
             clarification_question = generate_clarification_question(
-                query, expansion_directions, quick_result["query_type"]
+                strategy=classification_strategy,
+                directions=expansion_directions,
+                query=query
             )
             
             state["classification_strategy"] = classification_strategy

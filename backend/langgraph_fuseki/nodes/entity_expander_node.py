@@ -1346,7 +1346,7 @@ def entity_expander_node(state: GraphState) -> GraphState:
 
     # 추출된 엔티티 상세 목록 (상위 10개)
     if matched_entities:
-        print(f"\n  │   [추출된 엔티티 상세]")
+        print(f"  │\n  │   [추출된 엔티티 상세]")
         for i, entity in enumerate(matched_entities[:10], 1):
             name = entity.get("name", "")
             entity_type = entity.get("type", "Unknown")

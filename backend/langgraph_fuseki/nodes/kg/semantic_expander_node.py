@@ -421,7 +421,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                 f"{FUSEKI_URL}/sparql",
                 data={"query": sparql},
                 headers={"Accept": "application/sparql-results+json"},
-                timeout=5
+                timeout=20
             )
 
             if response.status_code == 200:
@@ -799,7 +799,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
 
     # 상위 5개 샘플 출력
     if len(all_expanded) > len(extracted_entities):
-        print(f"\n      [확장된 엔티티 샘플 (상위 5개)]")
+        print(f"  │\n  │   [확장된 엔티티 샘플 (상위 5개)]")
         new_entities = [e for e in all_expanded if e.get("expansion_method")]
         for i, entity in enumerate(new_entities[:5], 1):
             name = entity.get("name", "")

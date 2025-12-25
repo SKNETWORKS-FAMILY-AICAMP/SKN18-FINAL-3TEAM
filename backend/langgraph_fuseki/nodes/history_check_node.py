@@ -30,7 +30,7 @@ def history_check_node(state: GraphState) -> GraphState:
 
     # LLM 초기화
     llm = ChatOpenAI(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        model=os.getenv("OPENAI_MODEL", "gpt-5-nano"),
         temperature=0
     )
 

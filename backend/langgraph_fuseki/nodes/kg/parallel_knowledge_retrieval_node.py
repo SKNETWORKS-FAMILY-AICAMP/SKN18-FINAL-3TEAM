@@ -477,7 +477,7 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
         print(f"      └─ URI가 있는 엔티티가 2개 미만 ({len(entities_with_uri)}개)")
         return []
 
-    print(f"      ├─ 엔티티 쌍 탐색: {len(entities_with_uri)}개 엔티티 중 최대 {max_pairs}개 쌍")
+    print(f"    │ ├─ 엔티티 쌍 탐색: {len(entities_with_uri)}개 엔티티 중 최대 {max_pairs}개 쌍")
 
     # 모든 쌍 시도 (최대 max_pairs)
     pairs_tried = 0
@@ -505,7 +505,7 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
             
             if paths:
                 paths_found += len(paths)
-                print(f"      │  ├─ [{name_a} ↔ {name_b}]: {len(paths)}개 경로 발견")
+                print(f"    │ │  ├─ [{name_a} ↔ {name_b}]: {len(paths)}개 경로 발견")
 
             # 경로를 Fuseki binding 형식으로 변환
             for path_info in paths:

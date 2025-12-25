@@ -118,7 +118,7 @@ class OptimizedTTLLoader:
             self._cache = result
             self._cache_mtime = os.path.getmtime(self.ttl_path)
         
-        print(f"  ✓ TTL 병렬 로딩: {len(label_to_uri)}개 라벨, {len(uri_to_type)}개 타입 ({load_time:.2f}초)")
+        print(f"  │   ✓ TTL 병렬 로딩: {len(label_to_uri)}개 라벨, {len(uri_to_type)}개 타입 ({load_time:.2f}초)")
         
         return result
     
@@ -366,7 +366,7 @@ class LazyVectorService:
             # 실제 TitleVectorService 사용
             from backend.db_pipeline.postgres.services.title_vector_service import TitleVectorService
             self._service = TitleVectorService()
-            print("[INFO] 실제 벡터 서비스 초기화 완료")
+            print("  ├─ [INFO] 실제 벡터 서비스 초기화 완료")
         except ImportError:
             print("[WARN] TitleVectorService import 실패")
             self._service = None

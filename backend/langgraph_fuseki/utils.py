@@ -21,5 +21,5 @@ def get_openai_model() -> str:
         별도로 load_dotenv를 호출할 필요가 없습니다.
     """
     # config.py가 이미 .env를 로드했으므로 직접 읽기만 하면 됨
-    return os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    return os.getenv("OPENAI_MODEL", "gpt-5-nano")
 

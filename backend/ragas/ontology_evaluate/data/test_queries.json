@@ -4,143 +4,20 @@
     "query_type": "factual",
     "intent_keywords": [
       "연도",
-      "시기", 
+      "시기",
       "설립"
     ],
     "expected_entities": [
       "세종",
       "훈민정음"
     ],
-    "expected_property_groups": ["연도", "시기", "설립"],
-    "difficulty": "easy",
-    "description": "단순 사실 확인 - 시간 정보"
-  },
-  {
-    "query": "이순신이 참전한 전투는 무엇이 있는가?",
-    "query_type": "factual",
-    "intent_keywords": [
-      "참여",
-      "지휘"
-    ],
-    "expected_entities": [
-      "이순신"
-    ],
-    "expected_property_groups": ["참여", "지휘"],
-    "difficulty": "easy",
-    "description": "단순 사실 확인 - 관계 정보"
-  },
-  {
-    "query": "경복궁은 누가 건설했는가?",
-    "query_type": "factual",
-    "intent_keywords": [
-      "설립",
-      "연결관계"
-    ],
-    "expected_entities": [
-      "경복궁"
-    ],
-    "expected_property_groups": ["설립", "연결관계"],
-    "difficulty": "easy",
-    "description": "단순 사실 확인 - 주체 정보"
-  },
-  {
-    "query": "광해군의 재위 기간은?",
-    "query_type": "factual",
-    "intent_keywords": [
-      "재위",
-      "기간중"
-    ],
-    "expected_entities": [
-      "광해군"
-    ],
-    "expected_property_groups": ["재위", "기간중"],
-    "difficulty": "easy",
-    "description": "단순 사실 확인 - 기간 정보"
-  },
-  {
-    "query": "정약용이 저술한 책의 제목은?",
-    "query_type": "factual",
-    "intent_keywords": [
-      "저술",
-      "문서"
-    ],
-    "expected_entities": [
-      "정약용"
-    ],
-    "expected_property_groups": ["저술", "문서"],
-    "difficulty": "medium",
-    "description": "사실 확인 - 다중 답변 가능"
-  },
-  {
-    "query": "임진왜란은 몇 년도에 발생했는가?",
-    "query_type": "factual",
-    "intent_keywords": [
+    "expected_property_groups": [
       "연도",
-      "시기"
-    ],
-    "expected_entities": [
-      "임진왜란"
-    ],
-    "expected_property_groups": ["연도", "시기"],
-    "difficulty": "easy",
-    "description": "단순 사실 확인 - 연도 정보"
-  },
-  {
-    "query": "명성황후는 어디에서 시해되었는가?",
-    "query_type": "factual",
-    "intent_keywords": [
-      "장소",
-      "위치"
-    ],
-    "expected_entities": [
-      "명성황후"
-    ],
-    "expected_property_groups": ["장소", "위치"],
-    "difficulty": "easy",
-    "description": "단순 사실 확인 - 장소 정보"
-  },
-  {
-    "query": "병자호란 당시 조선의 왕은 누구인가?",
-    "query_type": "factual",
-    "intent_keywords": [
-      "재위",
-      "기간중",
-      "직위"
-    ],
-    "expected_entities": [
-      "병자호란"
-    ],
-    "expected_property_groups": ["재위", "기간중", "직위"],
-    "difficulty": "easy",
-    "description": "사실 확인 - 시간적 맥락"
-  },
-  {
-    "query": "불국사는 어느 시대에 건립되었는가?",
-    "query_type": "factual",
-    "intent_keywords": [
-      "시대",
+      "시기",
       "설립"
     ],
-    "expected_entities": [
-      "불국사"
-    ],
-    "expected_property_groups": ["시대", "설립"],
-    "difficulty": "medium",
-    "description": "사실 확인 - 시대 정보"
-  },
-  {
-    "query": "을사조약은 언제 체결되었는가?",
-    "query_type": "factual",
-    "intent_keywords": [
-      "연도",
-      "외교"
-    ],
-    "expected_entities": [
-      "을사조약"
-    ],
-    "expected_property_groups": ["연도", "외교"],
     "difficulty": "easy",
-    "description": "단순 사실 확인 - 조약 시기"
+    "description": "단순 사실 확인 - 시간 정보"
   },
   {
     "query": "임진왜란이 발생한 원인은 무엇인가?",
@@ -151,140 +28,11 @@
     "expected_entities": [
       "임진왜란"
     ],
-    "expected_property_groups": ["인과관계"],
-    "difficulty": "medium",
-    "description": "인과관계 - 전쟁의 원인"
-  },
-  {
-    "query": "세종대왕이 훈민정음을 창제한 이유는?",
-    "query_type": "causal",
-    "intent_keywords": [
-      "인과관계",
-      "설립"
-    ],
-    "expected_entities": [
-      "세종",
-      "훈민정음"
-    ],
-    "expected_property_groups": ["인과관계", "설립"],
-    "difficulty": "medium",
-    "description": "인과관계 - 정책의 동기"
-  },
-  {
-    "query": "인조반정이 일어나게 된 배경은 무엇인가?",
-    "query_type": "causal",
-    "intent_keywords": [
-      "인과관계",
-      "반대"
-    ],
-    "expected_entities": [
-      "인조반정"
-    ],
-    "expected_property_groups": ["인과관계", "반대"],
-    "difficulty": "medium",
-    "description": "인과관계 - 정변의 배경"
-  },
-  {
-    "query": "고려가 몽골에 항복한 이유는?",
-    "query_type": "causal",
-    "intent_keywords": [
-      "인과관계",
-      "외교"
-    ],
-    "expected_entities": [
-      "고려",
-      "몽골"
-    ],
-    "expected_property_groups": ["인과관계", "외교"],
-    "difficulty": "hard",
-    "description": "인과관계 - 2개 엔티티 관계 (수렴 노드 중요)"
-  },
-  {
-    "query": "병자호란의 결과로 조선에 어떤 영향을 끼쳤는가?",
-    "query_type": "causal",
-    "intent_keywords": [
+    "expected_property_groups": [
       "인과관계"
     ],
-    "expected_entities": [
-      "병자호란",
-      "조선"
-    ],
-    "expected_property_groups": ["인과관계"],
-    "difficulty": "hard",
-    "description": "인과관계 - 전쟁의 결과 (수렴 노드 중요)"
-  },
-  {
-    "query": "정조가 수원 화성을 건설한 목적은?",
-    "query_type": "causal",
-    "intent_keywords": [
-      "인과관계",
-      "설립"
-    ],
-    "expected_entities": [
-      "정조",
-      "화성"
-    ],
-    "expected_property_groups": ["인과관계", "설립"],
     "difficulty": "medium",
-    "description": "인과관계 - 건설의 목적"
-  },
-  {
-    "query": "갑신정변이 실패한 원인은 무엇인가?",
-    "query_type": "causal",
-    "intent_keywords": [
-      "인과관계",
-      "반대"
-    ],
-    "expected_entities": [
-      "갑신정변"
-    ],
-    "expected_property_groups": ["인과관계", "반대"],
-    "difficulty": "medium",
-    "description": "인과관계 - 실패 원인"
-  },
-  {
-    "query": "신라가 삼국을 통일할 수 있었던 이유는?",
-    "query_type": "causal",
-    "intent_keywords": [
-      "인과관계",
-      "지휘"
-    ],
-    "expected_entities": [
-      "신라",
-      "삼국통일"
-    ],
-    "expected_property_groups": ["인과관계", "지휘"],
-    "difficulty": "hard",
-    "description": "인과관계 - 통일의 요인"
-  },
-  {
-    "query": "동학농민운동이 확산된 배경은?",
-    "query_type": "causal",
-    "intent_keywords": [
-      "인과관계",
-      "변경"
-    ],
-    "expected_entities": [
-      "동학농민운동"
-    ],
-    "expected_property_groups": ["인과관계", "변경"],
-    "difficulty": "medium",
-    "description": "인과관계 - 운동의 확산 배경"
-  },
-  {
-    "query": "조선시대 당쟁이 격화된 원인은 무엇인가?",
-    "query_type": "causal",
-    "intent_keywords": [
-      "인과관계",
-      "반대"
-    ],
-    "expected_entities": [
-      "조선",
-      "당쟁"
-    ],
-    "expected_property_groups": ["인과관계", "반대"],
-    "difficulty": "hard",
-    "description": "인과관계 - 정치 갈등의 원인"
+    "description": "인과관계 - 전쟁의 원인"
   },
   {
     "query": "임진왜란과 병자호란의 공통점은 무엇인가?",
@@ -297,145 +45,12 @@
       "임진왜란",
       "병자호란"
     ],
-    "expected_property_groups": ["연결관계", "지휘"],
+    "expected_property_groups": [
+      "연결관계",
+      "지휘"
+    ],
     "difficulty": "hard",
     "description": "비교 질문 - 2개 전쟁 공통점 (수렴 노드 매우 중요)"
-  },
-  {
-    "query": "세종대왕과 정조의 업적을 비교하면?",
-    "query_type": "comparative",
-    "intent_keywords": [
-      "연결관계",
-      "속성"
-    ],
-    "expected_entities": [
-      "세종",
-      "정조"
-    ],
-    "expected_property_groups": ["연결관계", "속성"],
-    "difficulty": "hard",
-    "description": "비교 질문 - 2명의 왕 업적 (수렴 노드 중요)"
-  },
-  {
-    "query": "갑오개혁과 갑신정변의 차이점은?",
-    "query_type": "comparative",
-    "intent_keywords": [
-      "연결관계",
-      "변경"
-    ],
-    "expected_entities": [
-      "갑오개혁",
-      "갑신정변"
-    ],
-    "expected_property_groups": ["연결관계", "변경"],
-    "difficulty": "hard",
-    "description": "비교 질문 - 2개 개혁 차이점 (수렴 노드 중요)"
-  },
-  {
-    "query": "신라와 고구려의 건국 과정의 유사점은?",
-    "query_type": "comparative",
-    "intent_keywords": [
-      "연결관계",
-      "설립"
-    ],
-    "expected_entities": [
-      "신라",
-      "고구려"
-    ],
-    "expected_property_groups": ["연결관계", "설립"],
-    "difficulty": "hard",
-    "description": "비교 질문 - 건국 과정 비교 (수렴 노드 중요)"
-  },
-  {
-    "query": "이순신과 원균의 전략 차이는?",
-    "query_type": "comparative",
-    "intent_keywords": [
-      "연결관계",
-      "지휘"
-    ],
-    "expected_entities": [
-      "이순신",
-      "원균"
-    ],
-    "expected_property_groups": ["연결관계", "지휘"],
-    "difficulty": "hard",
-    "description": "비교 질문 - 장군 전략 비교 (수렴 노드 중요)"
-  },
-  {
-    "query": "이순신과 권율의 전략 차이는?",
-    "query_type": "comparative",
-    "intent_keywords": [
-      "연결관계",
-      "지휘"
-    ],
-    "expected_entities": [
-      "이순신",
-      "권율"
-    ],
-    "expected_property_groups": ["연결관계", "지휘"],
-    "difficulty": "hard",
-    "description": "비교 질문 - 장군 전략 비교 (수렴 노드 중요)"
-  },
-  {
-    "query": "조선 전기와 후기의 정치 체제 차이는?",
-    "query_type": "comparative",
-    "intent_keywords": [
-      "연결관계",
-      "시대",
-      "직위"
-    ],
-    "expected_entities": [
-      "조선"
-    ],
-    "expected_property_groups": ["연결관계", "시대", "직위"],
-    "difficulty": "hard",
-    "description": "비교 질문 - 시대별 정치 체제"
-  },
-  {
-    "query": "백제와 신라의 불교 수용 방식 차이는?",
-    "query_type": "comparative",
-    "intent_keywords": [
-      "연결관계",
-      "교육"
-    ],
-    "expected_entities": [
-      "백제",
-      "신라",
-      "불교"
-    ],
-    "expected_property_groups": ["연결관계", "교육"],
-    "difficulty": "hard",
-    "description": "비교 질문 - 종교 수용 비교"
-  },
-  {
-    "query": "경복궁과 창덕궁의 건축 양식 차이는?",
-    "query_type": "comparative",
-    "intent_keywords": [
-      "연결관계",
-      "속성"
-    ],
-    "expected_entities": [
-      "경복궁",
-      "창덕궁"
-    ],
-    "expected_property_groups": ["연결관계", "속성"],
-    "difficulty": "medium",
-    "description": "비교 질문 - 건축물 비교"
-  },
-  {
-    "query": "고종과 순종의 통치 방식 공통점은?",
-    "query_type": "comparative",
-    "intent_keywords": [
-      "연결관계",
-      "재위"
-    ],
-    "expected_entities": [
-      "고종",
-      "순종"
-    ],
-    "expected_property_groups": ["연결관계", "재위"],
-    "difficulty": "hard",
-    "description": "비교 질문 - 왕의 통치 방식 (수렴 노드 중요)"
   },
   {
     "query": "세종대왕의 업적이 조선 사회에 미친 영향을 분석하라",
@@ -449,9 +64,66 @@
       "세종",
       "조선"
     ],
-    "expected_property_groups": ["속성", "인과관계", "연결관계"],
+    "expected_property_groups": [
+      "속성",
+      "인과관계",
+      "연결관계"
+    ],
     "difficulty": "hard",
     "description": "심층 분석 - 업적의 사회적 영향"
+  },
+  {
+    "query": "이순신이 참전한 전투는 무엇이 있는가?",
+    "query_type": "factual",
+    "intent_keywords": [
+      "참여",
+      "지휘"
+    ],
+    "expected_entities": [
+      "이순신"
+    ],
+    "expected_property_groups": [
+      "참여",
+      "지휘"
+    ],
+    "difficulty": "easy",
+    "description": "단순 사실 확인 - 관계 정보"
+  },
+  {
+    "query": "세종대왕이 훈민정음을 창제한 이유는?",
+    "query_type": "causal",
+    "intent_keywords": [
+      "인과관계",
+      "설립"
+    ],
+    "expected_entities": [
+      "세종",
+      "훈민정음"
+    ],
+    "expected_property_groups": [
+      "인과관계",
+      "설립"
+    ],
+    "difficulty": "medium",
+    "description": "인과관계 - 정책의 동기"
+  },
+  {
+    "query": "세종대왕과 정조의 업적을 비교하면?",
+    "query_type": "comparative",
+    "intent_keywords": [
+      "연결관계",
+      "속성"
+    ],
+    "expected_entities": [
+      "세종",
+      "정조"
+    ],
+    "expected_property_groups": [
+      "연결관계",
+      "속성"
+    ],
+    "difficulty": "hard",
+    "description": "비교 질문 - 2명의 왕 업적 (수렴 노드 중요)"
   },
   {
     "query": "임진왜란이 조선 사회 전반에 끼친 장기적 영향은?",
@@ -464,9 +136,64 @@
       "임진왜란",
       "조선"
     ],
-    "expected_property_groups": ["인과관계", "시기"],
+    "expected_property_groups": [
+      "인과관계",
+      "시기"
+    ],
     "difficulty": "hard",
     "description": "심층 분석 - 전쟁의 장기 영향 (수렴 노드 중요)"
+  },
+  {
+    "query": "경복궁은 누가 건설했는가?",
+    "query_type": "factual",
+    "intent_keywords": [
+      "설립",
+      "연결관계"
+    ],
+    "expected_entities": [
+      "경복궁"
+    ],
+    "expected_property_groups": [
+      "설립",
+      "연결관계"
+    ],
+    "difficulty": "easy",
+    "description": "단순 사실 확인 - 주체 정보"
+  },
+  {
+    "query": "인조반정이 일어나게 된 배경은 무엇인가?",
+    "query_type": "causal",
+    "intent_keywords": [
+      "인과관계",
+      "반대"
+    ],
+    "expected_entities": [
+      "인조반정"
+    ],
+    "expected_property_groups": [
+      "인과관계",
+      "반대"
+    ],
+    "difficulty": "medium",
+    "description": "인과관계 - 정변의 배경"
+  },
+  {
+    "query": "갑오개혁과 갑신정변의 차이점은?",
+    "query_type": "comparative",
+    "intent_keywords": [
+      "연결관계",
+      "변경"
+    ],
+    "expected_entities": [
+      "갑오개혁",
+      "갑신정변"
+    ],
+    "expected_property_groups": [
+      "연결관계",
+      "변경"
+    ],
+    "difficulty": "hard",
+    "description": "비교 질문 - 2개 개혁 차이점 (수렴 노드 중요)"
   },
   {
     "query": "조선시대 당쟁의 전개 과정과 그 영향을 설명하라",
@@ -480,24 +207,137 @@
       "조선",
       "당쟁"
     ],
-    "expected_property_groups": ["시기", "인과관계", "반대"],
+    "expected_property_groups": [
+      "시기",
+      "인과관계",
+      "반대"
+    ],
     "difficulty": "hard",
     "description": "심층 분석 - 정치 갈등의 전개"
   },
   {
-    "query": "고려의 대몽항쟁이 고려 사회에 미친 영향은?",
+    "query": "광해군의 재위 기간은?",
+    "query_type": "factual",
+    "intent_keywords": [
+      "재위",
+      "기간중"
+    ],
+    "expected_entities": [
+      "광해군"
+    ],
+    "expected_property_groups": [
+      "재위",
+      "기간중"
+    ],
+    "difficulty": "easy",
+    "description": "단순 사실 확인 - 기간 정보"
+  },
+  {
+    "query": "정묘호란이 발생한 이유는?",
+    "query_type": "causal",
+    "intent_keywords": [
+      "인과관계",
+      "외교"
+    ],
+    "expected_entities": [
+      "정묘호란",
+      "조선"
+    ],
+    "expected_property_groups": [
+      "인과관계",
+      "외교"
+    ],
+    "difficulty": "medium",
+    "description": "인과관계 - 전쟁 발생 원인"
+  },
+  {
+    "query": "영조와 정조의 정치 개혁 방식 차이는?",
+    "query_type": "comparative",
+    "intent_keywords": [
+      "연결관계",
+      "변경"
+    ],
+    "expected_entities": [
+      "영조",
+      "정조"
+    ],
+    "expected_property_groups": [
+      "연결관계",
+      "변경"
+    ],
+    "difficulty": "hard",
+    "description": "비교 질문 - 왕의 개혁 정책 비교 (수렴 노드 중요)"
+  },
+  {
+    "query": "사화가 조선 정치에 미친 영향은?",
     "query_type": "deep_analysis",
     "intent_keywords": [
       "인과관계",
-      "반대"
+      "반대",
+      "법률"
     ],
     "expected_entities": [
-      "고려",
-      "몽골"
+      "사화",
+      "조선"
     ],
-    "expected_property_groups": ["인과관계", "반대"],
+    "expected_property_groups": [
+      "인과관계",
+      "반대",
+      "법률"
+    ],
     "difficulty": "hard",
-    "description": "심층 분석 - 항쟁의 사회적 영향 (수렴 노드 중요)"
+    "description": "심층 분석 - 정치 사건의 사회적 영향 (수렴 노드 중요)"
+  },
+  {
+    "query": "정약용이 저술한 책의 제목은?",
+    "query_type": "factual",
+    "intent_keywords": [
+      "저술",
+      "문서"
+    ],
+    "expected_entities": [
+      "정약용"
+    ],
+    "expected_property_groups": [
+      "저술",
+      "문서"
+    ],
+    "difficulty": "medium",
+    "description": "사실 확인 - 다중 답변 가능"
+  },
+  {
+    "query": "병자호란의 결과로 조선에 어떤 영향을 끼쳤는가?",
+    "query_type": "causal",
+    "intent_keywords": [
+      "인과관계"
+    ],
+    "expected_entities": [
+      "병자호란",
+      "조선"
+    ],
+    "expected_property_groups": [
+      "인과관계"
+    ],
+    "difficulty": "hard",
+    "description": "인과관계 - 전쟁의 결과 (수렴 노드 중요)"
+  },
+  {
+    "query": "이순신과 원균의 전략 차이는?",
+    "query_type": "comparative",
+    "intent_keywords": [
+      "연결관계",
+      "지휘"
+    ],
+    "expected_entities": [
+      "이순신",
+      "원균"
+    ],
+    "expected_property_groups": [
+      "연결관계",
+      "지휘"
+    ],
+    "difficulty": "hard",
+    "description": "비교 질문 - 장군 전략 비교 (수렴 노드 중요)"
   },
   {
     "query": "정약용의 개혁 사상이 조선 후기 사회에 미친 영향은?",
@@ -510,25 +350,139 @@
       "정약용",
       "조선"
     ],
-    "expected_property_groups": ["교육", "인과관계"],
+    "expected_property_groups": [
+      "교육",
+      "인과관계"
+    ],
     "difficulty": "hard",
     "description": "심층 분석 - 사상가의 사회적 영향 (수렴 노드 중요)"
   },
   {
-    "query": "신라의 삼국통일 과정에서 나타난 외교 전략을 분석하라",
-    "query_type": "deep_analysis",
+    "query": "임진왜란은 몇 년도에 발생했는가?",
+    "query_type": "factual",
     "intent_keywords": [
-      "시기",
-      "외교",
+      "연도",
+      "시기"
+    ],
+    "expected_entities": [
+      "임진왜란"
+    ],
+    "expected_property_groups": [
+      "연도",
+      "시기"
+    ],
+    "difficulty": "easy",
+    "description": "단순 사실 확인 - 연도 정보"
+  },
+  {
+    "query": "정조가 수원 화성을 건설한 목적은?",
+    "query_type": "causal",
+    "intent_keywords": [
+      "인과관계",
+      "설립"
+    ],
+    "expected_entities": [
+      "정조",
+      "화성"
+    ],
+    "expected_property_groups": [
+      "인과관계",
+      "설립"
+    ],
+    "difficulty": "medium",
+    "description": "인과관계 - 건설의 목적"
+  },
+  {
+    "query": "이순신과 권율의 전략 차이는?",
+    "query_type": "comparative",
+    "intent_keywords": [
+      "연결관계",
       "지휘"
     ],
     "expected_entities": [
-      "신라",
-      "삼국통일"
+      "이순신",
+      "권율"
     ],
-    "expected_property_groups": ["시기", "외교", "지휘"],
+    "expected_property_groups": [
+      "연결관계",
+      "지휘"
+    ],
     "difficulty": "hard",
-    "description": "심층 분석 - 외교 전략 분석"
+    "description": "비교 질문 - 장군 전략 비교 (수렴 노드 중요)"
+  },
+  {
+    "query": "훈구파와 사림파의 갈등 과정을 분석하라",
+    "query_type": "deep_analysis",
+    "intent_keywords": [
+      "시기",
+      "반대",
+      "직위"
+    ],
+    "expected_entities": [
+      "훈구파",
+      "사림파",
+      "조선"
+    ],
+    "expected_property_groups": [
+      "시기",
+      "반대",
+      "직위"
+    ],
+    "difficulty": "hard",
+    "description": "심층 분석 - 정치 세력 갈등"
+  },
+  {
+    "query": "명성황후는 어디에서 시해되었는가?",
+    "query_type": "factual",
+    "intent_keywords": [
+      "장소",
+      "위치"
+    ],
+    "expected_entities": [
+      "명성황후"
+    ],
+    "expected_property_groups": [
+      "장소",
+      "위치"
+    ],
+    "difficulty": "easy",
+    "description": "단순 사실 확인 - 장소 정보"
+  },
+  {
+    "query": "갑신정변이 실패한 원인은 무엇인가?",
+    "query_type": "causal",
+    "intent_keywords": [
+      "인과관계",
+      "반대"
+    ],
+    "expected_entities": [
+      "갑신정변"
+    ],
+    "expected_property_groups": [
+      "인과관계",
+      "반대"
+    ],
+    "difficulty": "medium",
+    "description": "인과관계 - 실패 원인"
+  },
+  {
+    "query": "조선 전기와 후기의 정치 체제 차이는?",
+    "query_type": "comparative",
+    "intent_keywords": [
+      "연결관계",
+      "시대",
+      "직위"
+    ],
+    "expected_entities": [
+      "조선"
+    ],
+    "expected_property_groups": [
+      "연결관계",
+      "시대",
+      "직위"
+    ],
+    "difficulty": "hard",
+    "description": "비교 질문 - 시대별 정치 체제"
   },
   {
     "query": "조선 건국의 정당성 확립 과정을 설명하라",
@@ -541,9 +495,68 @@
     "expected_entities": [
       "조선"
     ],
-    "expected_property_groups": ["시기", "설립", "법률"],
+    "expected_property_groups": [
+      "시기",
+      "설립",
+      "법률"
+    ],
     "difficulty": "hard",
     "description": "심층 분석 - 왕조 건국 과정"
+  },
+  {
+    "query": "병자호란 당시 조선의 왕은 누구인가?",
+    "query_type": "factual",
+    "intent_keywords": [
+      "재위",
+      "기간중",
+      "직위"
+    ],
+    "expected_entities": [
+      "병자호란"
+    ],
+    "expected_property_groups": [
+      "재위",
+      "기간중",
+      "직위"
+    ],
+    "difficulty": "easy",
+    "description": "사실 확인 - 시간적 맥락"
+  },
+  {
+    "query": "사림파가 집권하게 된 이유는?",
+    "query_type": "causal",
+    "intent_keywords": [
+      "인과관계",
+      "직위"
+    ],
+    "expected_entities": [
+      "사림",
+      "조선"
+    ],
+    "expected_property_groups": [
+      "인과관계",
+      "직위"
+    ],
+    "difficulty": "medium",
+    "description": "인과관계 - 정치 세력 변화"
+  },
+  {
+    "query": "사육신과 생육신의 행동 방식 차이는?",
+    "query_type": "comparative",
+    "intent_keywords": [
+      "연결관계",
+      "반대"
+    ],
+    "expected_entities": [
+      "사육신",
+      "생육신"
+    ],
+    "expected_property_groups": [
+      "연결관계",
+      "반대"
+    ],
+    "difficulty": "hard",
+    "description": "비교 질문 - 저항 방식 비교 (수렴 노드 중요)"
   },
   {
     "query": "대한제국의 성립 배경과 한계를 분석하라",
@@ -556,9 +569,65 @@
     "expected_entities": [
       "대한제국"
     ],
-    "expected_property_groups": ["인과관계", "설립", "변경"],
+    "expected_property_groups": [
+      "인과관계",
+      "설립",
+      "변경"
+    ],
     "difficulty": "hard",
     "description": "심층 분석 - 정치 체제 변화"
+  },
+  {
+    "query": "창덕궁은 언제 건립되었는가?",
+    "query_type": "factual",
+    "intent_keywords": [
+      "연도",
+      "설립"
+    ],
+    "expected_entities": [
+      "창덕궁"
+    ],
+    "expected_property_groups": [
+      "연도",
+      "설립"
+    ],
+    "difficulty": "easy",
+    "description": "사실 확인 - 건축물 건립 시기"
+  },
+  {
+    "query": "동학농민운동이 확산된 배경은?",
+    "query_type": "causal",
+    "intent_keywords": [
+      "인과관계",
+      "변경"
+    ],
+    "expected_entities": [
+      "동학농민운동"
+    ],
+    "expected_property_groups": [
+      "인과관계",
+      "변경"
+    ],
+    "difficulty": "medium",
+    "description": "인과관계 - 운동의 확산 배경"
+  },
+  {
+    "query": "경복궁과 창덕궁의 건축 양식 차이는?",
+    "query_type": "comparative",
+    "intent_keywords": [
+      "연결관계",
+      "속성"
+    ],
+    "expected_entities": [
+      "경복궁",
+      "창덕궁"
+    ],
+    "expected_property_groups": [
+      "연결관계",
+      "속성"
+    ],
+    "difficulty": "medium",
+    "description": "비교 질문 - 건축물 비교"
   },
   {
     "query": "이순신의 전략적 사고가 해전에 미친 영향을 분석하라",
@@ -570,9 +639,65 @@
     "expected_entities": [
       "이순신"
     ],
-    "expected_property_groups": ["지휘", "인과관계"],
+    "expected_property_groups": [
+      "지휘",
+      "인과관계"
+    ],
     "difficulty": "hard",
     "description": "심층 분석 - 인물의 전략적 영향"
+  },
+  {
+    "query": "을사조약은 언제 체결되었는가?",
+    "query_type": "factual",
+    "intent_keywords": [
+      "연도",
+      "외교"
+    ],
+    "expected_entities": [
+      "을사조약"
+    ],
+    "expected_property_groups": [
+      "연도",
+      "외교"
+    ],
+    "difficulty": "easy",
+    "description": "단순 사실 확인 - 조약 시기"
+  },
+  {
+    "query": "조선시대 당쟁이 격화된 원인은 무엇인가?",
+    "query_type": "causal",
+    "intent_keywords": [
+      "인과관계",
+      "반대"
+    ],
+    "expected_entities": [
+      "조선",
+      "당쟁"
+    ],
+    "expected_property_groups": [
+      "인과관계",
+      "반대"
+    ],
+    "difficulty": "hard",
+    "description": "인과관계 - 정치 갈등의 원인"
+  },
+  {
+    "query": "고종과 순종의 통치 방식 공통점은?",
+    "query_type": "comparative",
+    "intent_keywords": [
+      "연결관계",
+      "재위"
+    ],
+    "expected_entities": [
+      "고종",
+      "순종"
+    ],
+    "expected_property_groups": [
+      "연결관계",
+      "재위"
+    ],
+    "difficulty": "hard",
+    "description": "비교 질문 - 왕의 통치 방식 (수렴 노드 중요)"
   },
   {
     "query": "동학농민운동의 발생 원인과 조선 사회 변화의 관계는?",
@@ -586,7 +711,11 @@
       "동학농민운동",
       "조선"
     ],
-    "expected_property_groups": ["인과관계", "변경", "연결관계"],
+    "expected_property_groups": [
+      "인과관계",
+      "변경",
+      "연결관계"
+    ],
     "difficulty": "hard",
     "description": "심층 분석 - 운동의 사회적 영향 (수렴 노드 중요)"
   }
