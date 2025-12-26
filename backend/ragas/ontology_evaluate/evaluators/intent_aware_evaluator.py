@@ -52,68 +52,71 @@ class IntentWeightConfig:
 
 
 # =====================================================
-# Intent별 가중치 프리셋
+# Intent별 가중치 프리셋 (Quick Win 실험 결과 기반)
+# =====================================================
+# 실험 근거: 300개 케이스, aggressive_intent 가중치 (2024-12-26)
+# - intent_preservation: 5.0 (핵심 메트릭)
+# - evidence/convergence/property: 0.5 (상대적으로 낮춤)
+# - tbox/relation/triple: 1.0 (기본 유지)
+#
+# 자세한 내용: backend/ragas/ontology_evaluate/data/quick_win/ALL_WEIGHT_EXPERIMENT_RESULTS.md
 # =====================================================
 
 INTENT_WEIGHT_PRESETS = {
     "factual": IntentWeightConfig(
         # Factual 쿼리: 단순 사실 확인
-        # - Schema 준수가 가장 중요 (TBox 일치)
-        # - Property Group 선택이 중요 (정확한 그룹 선택)
-        # - 수렴 노드는 상대적으로 덜 중요
-        # - Intent 보존과 Triple 유효성이 중요
-        tbox_consistency_weight=1.5,      # ↑ Schema 준수
-        intent_preservation_weight=1.3,   # ↑ Intent 보존
+        # - Intent 보존이 가장 중요 (Quick Win: 5.0)
+        # - Schema 준수와 Triple 유효성 기본 유지 (1.0)
+        # - Property Group, 증거, 수렴 노드는 상대적으로 낮춤 (0.5)
+        tbox_consistency_weight=1.0,      # = Schema 준수
+        intent_preservation_weight=5.0,   # ★ Quick Win: 핵심 메트릭
         relation_coherence_weight=1.0,    # = 관계 일관성
-        property_group_selection_weight=1.4,  # ↑ Property Group 선택
-        triple_validity_weight=1.2,       # ↑ Triple 유효성
-        evidence_diversity_weight=0.8,    # ↓ 증거 다양성
-        convergence_utilization_weight=0.5  # ↓↓ 수렴 노드 (가장 낮음)
+        property_group_selection_weight=0.5,  # ↓ Property Group 선택
+        triple_validity_weight=1.0,       # = Triple 유효성
+        evidence_diversity_weight=0.5,    # ↓ 증거 다양성
+        convergence_utilization_weight=0.5  # ↓ 수렴 노드
     ),
 
     "causal": IntentWeightConfig(
         # Causal 쿼리: 인과관계 추론
-        # - 수렴 노드가 매우 중요 (인과 체인 연결)
-        # - 관계 일관성과 Intent 보존이 중요
-        # - Property Group 선택도 중요 (인과관계 그룹)
-        # - 증거 다양성도 중요 (다각적 인과 분석)
+        # - Intent 보존이 가장 중요 (Quick Win: 5.0)
+        # - 관계 일관성과 Triple 유효성 기본 유지 (1.0)
+        # - Property Group, 증거, 수렴 노드는 상대적으로 낮춤 (0.5)
         tbox_consistency_weight=1.0,      # = Schema 준수
-        intent_preservation_weight=1.4,   # ↑ Intent 보존
-        relation_coherence_weight=1.3,    # ↑ 관계 일관성 (인과 체인)
-        property_group_selection_weight=1.2,  # ↑ Property Group 선택
-        triple_validity_weight=1.2,       # ↑ Triple 유효성
-        evidence_diversity_weight=1.2,    # ↑ 증거 다양성
-        convergence_utilization_weight=1.5  # ↑↑ 수렴 노드 (매우 중요)
+        intent_preservation_weight=5.0,   # ★ Quick Win: 핵심 메트릭
+        relation_coherence_weight=1.0,    # = 관계 일관성
+        property_group_selection_weight=0.5,  # ↓ Property Group 선택
+        triple_validity_weight=1.0,       # = Triple 유효성
+        evidence_diversity_weight=0.5,    # ↓ 증거 다양성
+        convergence_utilization_weight=0.5  # ↓ 수렴 노드
     ),
 
     "comparative": IntentWeightConfig(
         # Comparative 쿼리: 비교 분석
-        # - 수렴 노드가 가장 중요 (2개 엔티티 비교점 발견)
-        # - 증거 다양성이 매우 중요 (양쪽 증거 필요)
-        # - Property Group 선택이 중요 (연결관계 그룹)
-        # - 관계 일관성과 Intent 보존도 중요
+        # - Intent 보존이 가장 중요 (Quick Win: 5.0)
+        # - Schema 준수와 Triple 유효성 기본 유지 (1.0)
+        # - Property Group, 증거, 수렴 노드는 상대적으로 낮춤 (0.5)
         tbox_consistency_weight=1.0,      # = Schema 준수
-        intent_preservation_weight=1.3,   # ↑ Intent 보존
-        relation_coherence_weight=1.2,    # ↑ 관계 일관성
-        property_group_selection_weight=1.3,  # ↑ Property Group 선택
-        triple_validity_weight=1.2,       # ↑ Triple 유효성
-        evidence_diversity_weight=1.4,    # ↑↑ 증거 다양성 (양쪽 증거)
-        convergence_utilization_weight=1.6  # ↑↑↑ 수렴 노드 (가장 중요)
+        intent_preservation_weight=5.0,   # ★ Quick Win: 핵심 메트릭
+        relation_coherence_weight=1.0,    # = 관계 일관성
+        property_group_selection_weight=0.5,  # ↓ Property Group 선택
+        triple_validity_weight=1.0,       # = Triple 유효성
+        evidence_diversity_weight=0.5,    # ↓ 증거 다양성
+        convergence_utilization_weight=0.5  # ↓ 수렴 노드
     ),
 
     "deep_analysis": IntentWeightConfig(
         # Deep Analysis 쿼리: 심층 분석
-        # - 수렴 노드가 중요 (복합적 분석)
-        # - Intent 보존과 관계 일관성이 매우 중요
-        # - Property Group 선택이 중요 (복합 그룹)
-        # - 증거 다양성과 Triple 유효성도 중요
+        # - Intent 보존이 가장 중요 (Quick Win: 5.0)
+        # - Schema 준수와 Triple 유효성 기본 유지 (1.0)
+        # - Property Group, 증거, 수렴 노드는 상대적으로 낮춤 (0.5)
         tbox_consistency_weight=1.0,      # = Schema 준수
-        intent_preservation_weight=1.5,   # ↑↑ Intent 보존 (가장 중요)
-        relation_coherence_weight=1.4,    # ↑↑ 관계 일관성 (매우 중요)
-        property_group_selection_weight=1.2,  # ↑ Property Group 선택
-        triple_validity_weight=1.3,       # ↑ Triple 유효성
-        evidence_diversity_weight=1.3,    # ↑ 증거 다양성
-        convergence_utilization_weight=1.3  # ↑ 수렴 노드 (중요)
+        intent_preservation_weight=5.0,   # ★ Quick Win: 핵심 메트릭
+        relation_coherence_weight=1.0,    # = 관계 일관성
+        property_group_selection_weight=0.5,  # ↓ Property Group 선택
+        triple_validity_weight=1.0,       # = Triple 유효성
+        evidence_diversity_weight=0.5,    # ↓ 증거 다양성
+        convergence_utilization_weight=0.5  # ↓ 수렴 노드
     )
 }
 
