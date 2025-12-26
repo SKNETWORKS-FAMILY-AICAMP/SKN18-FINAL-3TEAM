@@ -9,7 +9,10 @@ HistoK LangGraph Fuseki - 인터랙티브 실행 스크립트
 
 # 환경변수 및 LangSmith 설정은 config.py에서 자동 로드됨
 from backend.langgraph_fuseki.config import PACKAGE_DIR
-from backend.langgraph_fuseki.graph import graph
+from backend.langgraph_fuseki.graph import create_graph_flow
+
+# 그래프 인스턴스 생성 (main.py에서만 실행)
+graph = create_graph_flow(use_optimized=False)
 
 
 def print_header():

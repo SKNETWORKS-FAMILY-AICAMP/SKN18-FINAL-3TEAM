@@ -19,6 +19,27 @@ from datetime import timedelta
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(override=True, dotenv_path=BASE_DIR.parent.parent / ".env")
 
+# Docker 환경에서 Fuseki URL 설정
+# Docker Compose에서 같은 네트워크의 서비스는 서비스 이름으로 접근 가능
+# 로컬 실행 시: http://localhost:3030/korean-history
+# Docker 실행 시: http://fuseki:3030/korean-history
+if not os.getenv("FUSEKI_URL"):
+    # Docker 컨테이너 내부에서 실행 중인지 확인
+    # /proc/self/cgroup 파일이 있고 docker가 포함되어 있으면 Docker 환경
+    is_docker = False
+    try:
+        with open("/proc/self/cgroup", "r") as f:
+            if "docker" in f.read():
+                is_docker = True
+    except (FileNotFoundError, IOError):
+        pass
+    
+    # 환경 변수로도 확인 (docker-compose.yml에서 설정 가능)
+    if os.getenv("DOCKER_ENV") == "true" or is_docker:
+        os.environ["FUSEKI_URL"] = "http://fuseki:3030/korean-history"
+    else:
+        os.environ["FUSEKI_URL"] = "http://localhost:3030/korean-history"
+
 
 def env_required(key: str) -> str:
     """Read required environment variable or raise to avoid leaking defaults."""

@@ -6,6 +6,7 @@ export { default as HeartIcon } from './HeartIcon';
 export { default as CloseIcon } from './CloseIcon';
 export { default as GlobeIcon } from './GlobeIcon';
 export { default as SendIcon } from './SendIcon';
+export { default as StopIcon } from './StopIcon';
 export { default as ArrowLeftIcon } from './ArrowLeftIcon';
 export { default as PlusIcon } from './PlusIcon';
 export { default as CameraIcon } from './CameraIcon';
