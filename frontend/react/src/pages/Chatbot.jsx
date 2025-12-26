@@ -53,6 +53,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
             type: "clarification",
             question: metadata.question,
             options: metadata.options,
+            isActive: false, // 과거 기록은 비활성화
           };
         } catch (e) {
           console.error("[hydrateMessages] ❌ Failed to parse clarification metadata:", e);
@@ -231,6 +232,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
             type: "clarification",
             question: response.clarification_question,
             options: response.expansion_directions,
+            isActive: true, // 현재 진행 중인 재질문은 활성화
           },
         ]);
         setIsSubmitting(false);
@@ -316,8 +318,15 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
   };
 
   const handleClarificationChoice = async (directionId, optionTitle) => {
-    // 사용자 선택을 메시지에 추가
-    setMessages((prev) => [...prev, { type: "user", text: optionTitle }]);
+    // 재질문 카드를 비활성화하고 사용자 선택을 메시지에 추가
+    setMessages((prev) => {
+      const updated = prev.map((msg) =>
+        msg.type === "clarification" && msg.isActive
+          ? { ...msg, isActive: false }
+          : msg
+      );
+      return [...updated, { type: "user", text: optionTitle }];
+    });
 
     setIsSubmitting(true);
 
@@ -851,59 +860,63 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                                 msOverflowStyle: "auto", // IE/Edge 스크롤바
                               }}
                             >
-                              {msg.options?.map((option, idx) => (
-                                <button
-                                  key={option.id}
-                                  onClick={() =>
-                                    handleClarificationChoice(
-                                      option.direction_id,
-                                      option.title
-                                    )
-                                  }
-                                  disabled={isSubmitting}
-                                  style={{
-                                    minWidth: "220px",
-                                    maxWidth: "280px",
-                                    padding: "16px",
-                                    backgroundColor: COLORS.white,
-                                    border: `2px solid ${COLORS.border}`,
-                                    borderRadius: "16px",
-                                    cursor: isSubmitting
-                                      ? "not-allowed"
-                                      : "pointer",
-                                    textAlign: "left",
-                                    transition: "all 0.2s",
-                                    opacity: isSubmitting ? 0.6 : 1,
-                                    flexShrink: 0,
-                                    // 마지막 카드에 추가 여백 (스크롤 끝까지 보이도록)
-                                    marginRight:
-                                      idx === msg.options.length - 1
-                                        ? "24px"
-                                        : "0px",
-                                  }}
-                                  onMouseEnter={(e) => {
-                                    if (!isSubmitting) {
-                                      e.currentTarget.style.borderColor =
-                                        COLORS.primary;
-                                      e.currentTarget.style.backgroundColor =
-                                        COLORS.tertiary;
-                                      e.currentTarget.style.transform =
-                                        "translateY(-2px)";
-                                      e.currentTarget.style.boxShadow =
-                                        "0 4px 12px rgba(0,0,0,0.1)";
-                                    }
-                                  }}
-                                  onMouseLeave={(e) => {
-                                    if (!isSubmitting) {
-                                      e.currentTarget.style.borderColor =
-                                        COLORS.border;
-                                      e.currentTarget.style.backgroundColor =
-                                        COLORS.white;
-                                      e.currentTarget.style.transform =
-                                        "translateY(0)";
-                                      e.currentTarget.style.boxShadow = "none";
-                                    }
-                                  }}
+                              {msg.options?.map((option, idx) => {
+                                const isDisabled = !msg.isActive || isSubmitting;
+                                return (
+                                  <button
+                                    key={option.id}
+                                    onClick={() => {
+                                      if (msg.isActive && !isSubmitting) {
+                                        handleClarificationChoice(
+                                          option.direction_id,
+                                          option.title
+                                        );
+                                      }
+                                    }}
+                                    disabled={isDisabled}
+                                    style={{
+                                      minWidth: "220px",
+                                      maxWidth: "280px",
+                                      padding: "16px",
+                                      backgroundColor: COLORS.white,
+                                      border: `2px solid ${COLORS.border}`,
+                                      borderRadius: "16px",
+                                      cursor: isDisabled
+                                        ? "not-allowed"
+                                        : "pointer",
+                                      textAlign: "left",
+                                      transition: "all 0.2s",
+                                      opacity: 1,
+                                      flexShrink: 0,
+                                      // 마지막 카드에 추가 여백 (스크롤 끝까지 보이도록)
+                                      marginRight:
+                                        idx === msg.options.length - 1
+                                          ? "24px"
+                                          : "0px",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (!isDisabled) {
+                                        e.currentTarget.style.borderColor =
+                                          COLORS.primary;
+                                        e.currentTarget.style.backgroundColor =
+                                          COLORS.tertiary;
+                                        e.currentTarget.style.transform =
+                                          "translateY(-2px)";
+                                        e.currentTarget.style.boxShadow =
+                                          "0 4px 12px rgba(0,0,0,0.1)";
+                                      }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      if (!isDisabled) {
+                                        e.currentTarget.style.borderColor =
+                                          COLORS.border;
+                                        e.currentTarget.style.backgroundColor =
+                                          COLORS.white;
+                                        e.currentTarget.style.transform =
+                                          "translateY(0)";
+                                        e.currentTarget.style.boxShadow = "none";
+                                      }
+                                    }}
                                 >
                                   <div
                                     style={{
@@ -954,7 +967,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                                     {option.description}
                                   </div>
                                 </button>
-                              ))}
+                              );
+                              })}
                             </div>
                           </div>
                         </>
