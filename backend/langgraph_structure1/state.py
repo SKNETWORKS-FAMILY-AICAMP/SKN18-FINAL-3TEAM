@@ -25,6 +25,7 @@ class GraphState(TypedDict):
     # Neo4j 검색 결과
     cypher: NotRequired[str]
     neo4j_results: NotRequired[List[Dict[str, Any]]]
+    neo4j_candidates: NotRequired[List[Dict[str, Any]]]
 
     # 최종 답변 및 후처리
     final_answer: NotRequired[str]
