@@ -151,12 +151,18 @@ def status():
             )
 
             if response.status_code == 200:
-                result = response.json()
-                count = result['results']['bindings'][0]['count']['value']
-                click.echo(f"   데이터셋: {dataset}")
-                click.echo(f"   총 트리플 수: {count}")
+                try:
+                    result = response.json()
+                    count = result['results']['bindings'][0]['count']['value']
+                    click.echo(f"   데이터셋: {dataset}")
+                    click.echo(f"   총 트리플 수: {count}")
+                except (KeyError, IndexError, ValueError) as e:
+                    click.echo(f"   [WARN] 데이터셋 '{dataset}' 통계 조회 실패: 응답 파싱 오류")
+                    click.echo(f"   응답 내용: {response.text[:200]}")
             else:
                 click.echo(f"   [WARN] 데이터셋 '{dataset}' 통계 조회 실패")
+                click.echo(f"   HTTP 상태 코드: {response.status_code}")
+                click.echo(f"   응답 내용: {response.text[:200]}")
         else:
             click.echo(f"[ERROR] Fuseki 서버 연결 실패: {base_url}", err=True)
 

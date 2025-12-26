@@ -9,6 +9,7 @@ Parallel Knowledge Retrieval Node
 
 import os
 import time
+import threading
 import requests
 import concurrent.futures
 from datetime import datetime
@@ -837,12 +838,19 @@ def execute_inference_api(thread_type: str, sparql: str, hypothetical: list = No
     return execute_fuseki_direct(thread_type, sparql)
 
 
+# Fuseki 요청 간 지연을 위한 락 (동시성 제어)
+_fuseki_request_lock = threading.Semaphore(5)  # 최대 3개 동시 요청 허용
+_last_request_time = {}
+_request_time_lock = threading.Lock()
+
 def execute_fuseki_direct(thread_type: str, sparql: str, debug: bool = False) -> dict:
     """
     Fuseki에 직접 SPARQL 쿼리 (경량 모드)
     
     Java Reasoner 없이 이미 Fuseki에 저장된 데이터에서 쿼리.
     추론은 제한되지만 메모리 부족 환경에서 유용.
+    
+    동시성 제어: Semaphore로 최대 3개 동시 요청만 허용하여 잠금 방지
     """
     
     endpoint = f"{FUSEKI_URL}/sparql"
@@ -852,52 +860,63 @@ def execute_fuseki_direct(thread_type: str, sparql: str, debug: bool = False) ->
         print(f"\n[DEBUG] {thread_type} SPARQL:")
         print(sparql[:500])
     
-    try:
-        response = requests.post(
-            endpoint,
-            data={"query": sparql},
-            headers={"Accept": "application/sparql-results+json"},
-            timeout=30
-        )
+    # 동시성 제어: Semaphore로 최대 3개 동시 요청만 허용
+    with _fuseki_request_lock:
+        # 요청 간 최소 간격 유지 (50ms) - 잠금 방지
+        with _request_time_lock:
+            current_time = time.time()
+            if thread_type in _last_request_time:
+                elapsed = current_time - _last_request_time[thread_type]
+                if elapsed < 0.05:  # 50ms
+                    time.sleep(0.05 - elapsed)
+            _last_request_time[thread_type] = time.time()
         
-        # 에러 응답 상세 로그
-        if response.status_code != 200:
-            error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
-            if debug:
-                print(f"[DEBUG] {thread_type} 에러: {error_msg}")
+        try:
+            response = requests.post(
+                endpoint,
+                data={"query": sparql},
+                headers={"Accept": "application/sparql-results+json"},
+                timeout=30
+            )
+            
+            # 에러 응답 상세 로그
+            if response.status_code != 200:
+                error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
+                if debug:
+                    print(f"[DEBUG] {thread_type} 에러: {error_msg}")
+                return {
+                    "status": "error",
+                    "bindings": [],
+                    "error": error_msg,
+                    "thread_type": thread_type
+                }
+            
+            result = response.json()
+            bindings = result.get("results", {}).get("bindings", [])
+            
             return {
-                "status": "error",
-                "bindings": [],
-                "error": error_msg,
+                "status": "success",
+                "bindings": bindings,
+                "fuseki_endpoint": endpoint,
+                "thread_type": thread_type,
+                "mode": "light"
+            }
+            
+        except requests.exceptions.ConnectionError:
+            print(f"    ├─ SPARQL 연결 실패: {endpoint}")
+            print(f"    └─ Fuseki 서버가 실행 중인지 확인하세요")
+            return {
+                "status": "error", 
+                "bindings": [], 
+                "error": f"Fuseki 서버 연결 실패 ({endpoint}). Docker 컨테이너가 실행 중인지 확인하세요.",
                 "thread_type": thread_type
             }
-        
-        result = response.json()
-        bindings = result.get("results", {}).get("bindings", [])
-        
-        return {
-            "status": "success",
-            "bindings": bindings,
-            "fuseki_endpoint": endpoint,
-            "thread_type": thread_type,
-            "mode": "light"
-        }
-        
-    except requests.exceptions.ConnectionError:
-        print(f"    ├─ SPARQL 연결 실패: {endpoint}")
-        print(f"    └─ Fuseki 서버가 실행 중인지 확인하세요")
-        return {
-            "status": "error", 
-            "bindings": [], 
-            "error": f"Fuseki 서버 연결 실패 ({endpoint}). Docker 컨테이너가 실행 중인지 확인하세요.",
-            "thread_type": thread_type
-        }
-    except requests.exceptions.Timeout:
-        print(f"    ├─ SPARQL 타임아웃: {endpoint}")
-        return {"status": "timeout", "bindings": [], "thread_type": thread_type}
-    except Exception as e:
-        print(f"    ├─ SPARQL 오류: {str(e)}")
-        return {"status": "error", "bindings": [], "error": str(e), "thread_type": thread_type}
+        except requests.exceptions.Timeout:
+            print(f"    ├─ SPARQL 타임아웃: {endpoint}")
+            return {"status": "timeout", "bindings": [], "thread_type": thread_type}
+        except Exception as e:
+            print(f"    ├─ SPARQL 오류: {str(e)}")
+            return {"status": "error", "bindings": [], "error": str(e), "thread_type": thread_type}
 
 
 def save_inference_results_as_ttl(
