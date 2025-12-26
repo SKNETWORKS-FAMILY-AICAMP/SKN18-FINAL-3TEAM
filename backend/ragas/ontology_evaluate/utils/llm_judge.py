@@ -86,8 +86,7 @@ class LLMJudge:
 
         response = self.client.chat.completions.create(
             model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1
+            messages=[{"role": "user", "content": prompt}]
         )
 
         result = response.choices[0].message.content.strip()
@@ -148,8 +147,7 @@ Triple:
 
         response = self.client.chat.completions.create(
             model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1
+            messages=[{"role": "user", "content": prompt}]
         )
 
         result = response.choices[0].message.content.strip()
