@@ -1,0 +1,100 @@
+[
+  {
+    "query": "한양 천도는 몇 년도에 이루어졌는가?",
+    "query_type": "factual",
+    "intent_keywords": [
+      "연도",
+      "시기",
+      "장소"
+    ],
+    "expected_entities": [
+      "한양",
+      "조선"
+    ],
+    "expected_property_groups": [
+      "연도",
+      "시기",
+      "장소"
+    ],
+    "difficulty": "easy",
+    "description": "단순 사실 확인 - 천도 연도"
+  },
+  {
+    "query": "세조가 왕위를 찬탈한 원인은?",
+    "query_type": "causal",
+    "intent_keywords": [
+      "인과관계",
+      "재위"
+    ],
+    "expected_entities": [
+      "세조",
+      "단종"
+    ],
+    "expected_property_groups": [
+      "인과관계",
+      "재위"
+    ],
+    "difficulty": "medium",
+    "description": "인과관계 - 왕위 찬탈 원인"
+  },
+  {
+    "query": "태종과 세종의 왕권 강화 방식의 차이는?",
+    "query_type": "comparative",
+    "intent_keywords": [
+      "연결관계",
+      "재위",
+      "변경"
+    ],
+    "expected_entities": [
+      "태종",
+      "세종"
+    ],
+    "expected_property_groups": [
+      "연결관계",
+      "재위",
+      "변경"
+    ],
+    "difficulty": "hard",
+    "description": "비교 질문 - 왕권 강화 방식"
+  },
+  {
+    "query": "세도정치가 조선 후기 정치에 미친 영향을 분석하라",
+    "query_type": "deep_analysis",
+    "intent_keywords": [
+      "인과관계",
+      "직위",
+      "시기"
+    ],
+    "expected_entities": [
+      "세도정치",
+      "조선"
+    ],
+    "expected_property_groups": [
+      "인과관계",
+      "직위",
+      "시기"
+    ],
+    "difficulty": "hard",
+    "description": "심층 분석 - 정치 체제 영향"
+  },
+  {
+    "query": "태조 이성계의 재위 기간은?",
+    "query_type": "factual",
+    "intent_keywords": [
+      "재위",
+      "기간중",
+      "연도"
+    ],
+    "expected_entities": [
+      "태조",
+      "이성계"
+    ],
+    "expected_property_groups": [
+      "재위",
+      "기간중",
+      "연도"
+    ],
+    "difficulty": "easy",
+    "description": "단순 사실 확인 - 재위 기간"
+  }
+]

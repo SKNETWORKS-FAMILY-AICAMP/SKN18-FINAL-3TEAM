@@ -1,0 +1,101 @@
+[
+  {
+    "query": "실학사상이 조선 후기 사회 개혁에 미친 영향은?",
+    "query_type": "deep_analysis",
+    "intent_keywords": [
+      "인과관계",
+      "교육",
+      "변경"
+    ],
+    "expected_entities": [
+      "실학",
+      "조선"
+    ],
+    "expected_property_groups": [
+      "인과관계",
+      "교육",
+      "변경"
+    ],
+    "difficulty": "hard",
+    "description": "심층 분석 - 사상의 사회적 영향"
+  },
+  {
+    "query": "조선의 마지막 왕은 누구인가?",
+    "query_type": "factual",
+    "intent_keywords": [
+      "재위",
+      "직위",
+      "시기"
+    ],
+    "expected_entities": [
+      "조선"
+    ],
+    "expected_property_groups": [
+      "재위",
+      "직위",
+      "시기"
+    ],
+    "difficulty": "easy",
+    "description": "단순 사실 확인 - 마지막 왕"
+  },
+  {
+    "query": "탕평책이 추진된 배경은 무엇인가?",
+    "query_type": "causal",
+    "intent_keywords": [
+      "인과관계",
+      "시행",
+      "반대"
+    ],
+    "expected_entities": [
+      "탕평책",
+      "영조"
+    ],
+    "expected_property_groups": [
+      "인과관계",
+      "시행",
+      "반대"
+    ],
+    "difficulty": "medium",
+    "description": "인과관계 - 정책 추진 배경"
+  },
+  {
+    "query": "과전법과 직전법의 차이는 무엇인가?",
+    "query_type": "comparative",
+    "intent_keywords": [
+      "연결관계",
+      "법률",
+      "변경"
+    ],
+    "expected_entities": [
+      "과전법",
+      "직전법"
+    ],
+    "expected_property_groups": [
+      "연결관계",
+      "법률",
+      "변경"
+    ],
+    "difficulty": "hard",
+    "description": "비교 질문 - 토지 제도 비교"
+  },
+  {
+    "query": "조선의 과거제도가 사회 계층에 미친 영향을 분석하라",
+    "query_type": "deep_analysis",
+    "intent_keywords": [
+      "인과관계",
+      "직위",
+      "교육"
+    ],
+    "expected_entities": [
+      "과거제",
+      "조선"
+    ],
+    "expected_property_groups": [
+      "인과관계",
+      "직위",
+      "교육"
+    ],
+    "difficulty": "hard",
+    "description": "심층 분석 - 제도의 사회적 영향"
+  }
+]

@@ -26,7 +26,8 @@ from backend.ragas.ontology_evaluate.evaluators import (
     PropertyGroupSelectionEvaluator,
     TerminalTripleValidityEvaluator,
     EvidenceDiversityEvaluator,
-    ConvergenceUtilizationEvaluator
+    ConvergenceUtilizationEvaluator,
+    AnswerQualityEvaluator
 )
 from backend.ragas.ontology_evaluate.evaluators.intent_aware_evaluator import IntentAwareEvaluator
 from backend.ragas.ontology_evaluate.utils.llm_judge import LLMJudge
@@ -207,6 +208,9 @@ def _save_experiment_results(results: list, output_dir: str, group_name: str, qu
                     # Fallback: raw metrics 평균
                     raw_scores = list(metrics.get("raw_metrics", {}).values())
                     summary_item["intent_aware_score"] = sum(raw_scores) / len(raw_scores) if raw_scores else 0.0
+
+                # LLM Judge 품질 평가
+                summary_item["llm_judge_quality"] = metrics.get("llm_judge_quality")
         else:
             # 실패한 경우
             summary_item["error"] = result.get("error", "Unknown error")
@@ -241,6 +245,8 @@ def evaluate_state(
     state_output: dict,
     llm_judge: LLMJudge,
     ontology_schema: dict,
+    answer_quality_evaluator: AnswerQualityEvaluator,
+    query: str = None,
     query_type: str = None,
     expected_property_groups: List[str] = None,
     use_intent_aware: bool = True
@@ -301,6 +307,16 @@ def evaluate_state(
             user_selected_direction
         )
 
+    # LLM Judge 답변 품질 평가
+    llm_judge_quality = None
+    if query and answer_quality_evaluator:
+        final_answer = state_output.get("final_answer", "")
+        llm_judge_quality = answer_quality_evaluator.evaluate(
+            query=query,
+            query_type=query_type or "unknown",
+            answer=final_answer
+        )
+
     return {
         "raw_metrics": raw_metrics,
         "detailed_results": {
@@ -311,7 +327,8 @@ def evaluate_state(
             "evidence_diversity": diversity_result,
             "convergence_utilization": convergence_result
         },
-        "intent_aware": intent_aware_result
+        "intent_aware": intent_aware_result,
+        "llm_judge_quality": llm_judge_quality
     }
 
 
@@ -386,7 +403,11 @@ def main():
         print(f"Query Type 분포: {query_type_counts}")
 
     # 2. LLM Judge 초기화
-    llm_judge = LLMJudge(model="gpt-4o-mini")
+    llm_judge = LLMJudge(model="gpt-5-mini")
+
+    # 2-1. Answer Quality Evaluator 초기화
+    answer_quality_evaluator = AnswerQualityEvaluator()
+    print("LLM Judge Answer Quality Evaluator 초기화 완료")
 
     # 3. 온톨로지 스키마 로드
     ontology_schema = {
@@ -480,6 +501,7 @@ def main():
                     # 해당 쿼리의 query_type 가져오기
                     query_idx = idx % len(queries_data)
                     query_data = queries_data[query_idx]
+                    query = result.get("query", "")
                     query_type = query_data.get("query_type", "factual")
                     expected_property_groups = query_data.get("expected_property_groups", [])
 
@@ -487,6 +509,8 @@ def main():
                         state_output,
                         llm_judge,
                         ontology_schema,
+                        answer_quality_evaluator,
+                        query=query,
                         query_type=query_type,
                         expected_property_groups=expected_property_groups,
                         use_intent_aware=args.intent_aware
@@ -518,6 +542,7 @@ def main():
                 # 해당 쿼리의 query_type 가져오기
                 query_idx = idx % len(queries_data)
                 query_data = queries_data[query_idx]
+                query = result.get("query", "")
                 query_type = query_data.get("query_type", "factual")
                 expected_property_groups = query_data.get("expected_property_groups", [])
 
@@ -525,6 +550,8 @@ def main():
                     state_output,
                     llm_judge,
                     ontology_schema,
+                    answer_quality_evaluator,
+                    query=query,
                     query_type=query_type,
                     expected_property_groups=expected_property_groups,
                     use_intent_aware=args.intent_aware

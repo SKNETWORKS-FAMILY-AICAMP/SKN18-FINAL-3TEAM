@@ -287,7 +287,7 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
     total_bindings = sum(len(r.get("bindings", [])) for r in results.values())
 
     # Thread별 검색 결과 상세
-    print(f"\n      [Thread별 검색 결과]")
+    print(f"  │\n  │   [Thread별 검색 결과]")
     for thread_type, result in results.items():
         bindings = result.get("bindings", [])
         status = result.get("status", "unknown")
@@ -305,7 +305,7 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
         }
         thread_display = thread_name_map.get(thread_type, thread_type)
 
-        print(f"      {status_icon} {thread_display:15s}: {len(bindings):3d}개")
+        print(f"  │   {status_icon} {thread_display:15s}: {len(bindings):3d}개")
 
         # 상위 3개 결과 샘플 표시 (라벨만)
         if bindings and len(bindings) > 0:
@@ -334,7 +334,7 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
                 if label and len(label) > 0:
                     # 라벨 길이 제한
                     label_display = label[:40] + "..." if len(label) > 40 else label
-                    print(f"         {i}. {label_display}")
+                    print(f"  │      {i}. {label_display}")
 
     node_elapsed = time.time() - node_start
     print(f"  └─ 완료: {total_bindings}개 결과 ({node_elapsed:.2f}초)")

@@ -1,0 +1,104 @@
+[
+  {
+    "name": "recommended_default",
+    "description": "Isolation 최적 컴포넌트 조합 (causal + entity_properties + type_and_summary + normalized)",
+    "semantic_expander": {
+      "temporal": false,
+      "causal_chain": true,
+      "pgvector": false
+    },
+    "aggregator_threads": {
+      "outgoing_relations": false,
+      "incoming_relations": false,
+      "entity_properties": true,
+      "connected_entities": false,
+      "type_and_summary": true
+    },
+    "entity_boost_mode": "normalized"
+  },
+  {
+    "name": "causal_temporal_combo",
+    "description": "causal과 temporal 동시 활성화로 시너지 효과 확인",
+    "semantic_expander": {
+      "temporal": true,
+      "causal_chain": true,
+      "pgvector": false
+    },
+    "aggregator_threads": {
+      "outgoing_relations": false,
+      "incoming_relations": false,
+      "entity_properties": true,
+      "connected_entities": false,
+      "type_and_summary": true
+    },
+    "entity_boost_mode": "normalized"
+  },
+  {
+    "name": "minimal",
+    "description": "최소 컴포넌트로 성능 확인 (causal + type_and_summary만)",
+    "semantic_expander": {
+      "temporal": false,
+      "causal_chain": true,
+      "pgvector": false
+    },
+    "aggregator_threads": {
+      "outgoing_relations": false,
+      "incoming_relations": false,
+      "entity_properties": false,
+      "connected_entities": false,
+      "type_and_summary": true
+    },
+    "entity_boost_mode": "normalized"
+  },
+  {
+    "name": "with_outgoing",
+    "description": "기본 설정 + outgoing_relations 추가",
+    "semantic_expander": {
+      "temporal": false,
+      "causal_chain": true,
+      "pgvector": false
+    },
+    "aggregator_threads": {
+      "outgoing_relations": true,
+      "incoming_relations": false,
+      "entity_properties": true,
+      "connected_entities": false,
+      "type_and_summary": true
+    },
+    "entity_boost_mode": "normalized"
+  },
+  {
+    "name": "with_exact_boost",
+    "description": "normalized 대신 exact boost 모드 사용",
+    "semantic_expander": {
+      "temporal": false,
+      "causal_chain": true,
+      "pgvector": false
+    },
+    "aggregator_threads": {
+      "outgoing_relations": false,
+      "incoming_relations": false,
+      "entity_properties": true,
+      "connected_entities": false,
+      "type_and_summary": true
+    },
+    "entity_boost_mode": "exact"
+  },
+  {
+    "name": "ablation_baseline",
+    "description": "Ablation 실험의 baseline 설정 재현 (모든 컴포넌트 활성화)",
+    "semantic_expander": {
+      "temporal": false,
+      "causal_chain": false,
+      "pgvector": false
+    },
+    "aggregator_threads": {
+      "outgoing_relations": true,
+      "incoming_relations": true,
+      "entity_properties": true,
+      "connected_entities": true,
+      "type_and_summary": true
+    },
+    "entity_boost_mode": null
+  }
+]

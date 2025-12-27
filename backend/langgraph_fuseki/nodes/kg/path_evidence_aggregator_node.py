@@ -812,20 +812,20 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     sorted_evidences = sorted(all_evidences, key=lambda x: x["weight"], reverse=True)
 
     # 쓰레드별 검색 결과 출력
-    print(f"\n      [쓰레드별 검색 결과]")
+    print(f"  │\n  │   [쓰레드별 검색 결과]")
     for thread_type, paths in inference_paths.items():
         if paths:
-            print(f"        - {thread_type}: {len(paths)}개 경로")
+            print(f"  │     - {thread_type}: {len(paths)}개 경로")
             # 상위 3개만 미리보기
             for i, path in enumerate(paths[:3], 1):
                 desc = path.get("description", "")[:50]
                 weight = path.get("weight", 0)
-                print(f"          {i}. {desc} (가중치: {weight:.3f})")
+                print(f"  │       {i}. {desc} (가중치: {weight:.3f})")
             if len(paths) > 3:
-                print(f"          ... 외 {len(paths) - 3}개")
+                print(f"  │       ... 외 {len(paths) - 3}개")
 
     # 전체 근거 목록 출력 (정렬 후)
-    print(f"\n      [전체 근거 목록 (총 {len(sorted_evidences)}개, 가중치 순)]")
+    print(f"  │\n  │   [전체 근거 목록 (총 {len(sorted_evidences)}개, 가중치 순)]")
     for i, ev in enumerate(sorted_evidences[:25], 1):  # 상위 25개만 출력
         ev_type = ev.get("type", "unknown")
         description = ev.get("description", "")
@@ -844,17 +844,17 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
         type_display = type_map.get(ev_type, ev_type)
         desc_display = description[:60] + "..." if len(description) > 60 else description
         
-        print(f"        {i:2d}. [{type_display:12s}] {desc_display} (가중치: {weight:.4f})")
+        print(f"  │     {i:2d}. [{type_display:12s}] {desc_display} (가중치: {weight:.4f})")
     if len(sorted_evidences) > 25:
-        print(f"        ... 외 {len(sorted_evidences) - 25}개")
+        print(f"  │     ... 외 {len(sorted_evidences) - 25}개")
 
     # 5. 하이브리드 방식: 점수 기반 선별 → LLM 기반 최종 선택
     # 5-1. 점수 기반으로 상위 후보 선별 (30-50개)
     candidate_count = min(max(30, len(sorted_evidences) // 2), len(sorted_evidences))
     candidate_evidences = sorted_evidences[:candidate_count]
     
-    print(f"\n      [LLM 기반 근거 선택]")
-    print(f"        - 후보 근거: {len(candidate_evidences)}개 (점수 기반 선별)")
+    print(f"  │\n  │   [LLM 기반 근거 선택]")
+    print(f"  │     - 후보 근거: {len(candidate_evidences)}개 (점수 기반 선별)")
     
     # 5-2. LLM이 질문 의도에 맞는 상위 15개 선택
     query = state.get("query", "")
@@ -864,7 +864,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     if len(candidate_evidences) <= 15:
         # 후보가 15개 이하면 그대로 사용
         top_evidences = candidate_evidences
-        print(f"        - 최종 선택: {len(top_evidences)}개 (후보가 15개 이하)")
+        print(f"  │     - 최종 선택: {len(top_evidences)}개 (후보가 15개 이하)")
     else:
         # LLM으로 최종 선택
         top_evidences = select_top_evidences_with_llm(
@@ -875,7 +875,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
             state=state,
             top_k=15
         )
-        print(f"        - 최종 선택: {len(top_evidences)}개 (LLM 판단)")
+        print(f"  │     - 최종 선택: {len(top_evidences)}개 (LLM 판단)")
 
     # 6. 순위 부여
     for i, ev in enumerate(top_evidences, 1):
@@ -883,7 +883,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
 
     # 최종 선택된 근거 목록
     if top_evidences:
-        print(f"\n      [최종 근거 목록 (상위 {len(top_evidences)}개)]")
+        print(f"  │\n  │   [최종 근거 목록 (상위 {len(top_evidences)}개)]")
         for ev in top_evidences:
             rank = ev.get("rank", 0)
             ev_type = ev.get("type", "unknown")
@@ -905,7 +905,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
 
             desc_display = description[:60] + "..." if len(description) > 60 else description
 
-            print(f"      {rank}. [{type_display:12s}] {desc_display} (가중치: {weight:.2%})")
+            print(f"  │   {rank}. [{type_display:12s}] {desc_display} (가중치: {weight:.2%})")
 
     node_elapsed = time.time() - node_start
     print(f"  └─ 완료: {len(top_evidences)}개 근거 통합 ({node_elapsed:.2f}초)")

@@ -1,0 +1,664 @@
+{
+  "batch_num": 2,
+  "total_configs": 6,
+  "total_queries": 5,
+  "total_runs": 30,
+  "total_time": 5440.537495136261,
+  "start_time": "2025-12-27T13:53:04.782005",
+  "results": [
+    {
+      "config_name": "recommended_default",
+      "config": {
+        "name": "recommended_default",
+        "description": "Isolation 최적 컴포넌트 조합 (causal + entity_properties + type_and_summary + normalized)",
+        "semantic_expander": {
+          "temporal": false,
+          "causal_chain": true,
+          "pgvector": false
+        },
+        "aggregator_threads": {
+          "outgoing_relations": false,
+          "incoming_relations": false,
+          "entity_properties": true,
+          "connected_entities": false,
+          "type_and_summary": true
+        },
+        "entity_boost_mode": "normalized"
+      },
+      "total_queries": 5,
+      "success_count": 5,
+      "error_count": 0,
+      "mean_score": 0.7616775770266726,
+      "min_score": 0.575298766214389,
+      "max_score": 0.965757814225384,
+      "total_time": 1000.1119811534882,
+      "results": [
+        {
+          "query": "임오군란이 발생한 배경은?",
+          "query_type": "causal",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 0.5,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.25,
+            "evidence_diversity": 0.43067655807339306,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.575298766214389,
+          "elapsed_time": 125.90080690383911,
+          "status": "success"
+        },
+        {
+          "query": "무오사화와 갑자사화의 공통점은?",
+          "query_type": "comparative",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 0.7333333333333334,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.5,
+            "evidence_diversity": 0.0,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.7017543859649122,
+          "elapsed_time": 329.7131950855255,
+          "status": "success"
+        },
+        {
+          "query": "붕당정치의 발전과 변질 과정을 설명하라",
+          "query_type": "deep_analysis",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 1.2,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.5,
+            "evidence_diversity": 0.34939847028229715,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.965757814225384,
+          "elapsed_time": 110.06805920600891,
+          "status": "success"
+        },
+        {
+          "query": "경국대전을 편찬한 왕은 누구인가?",
+          "query_type": "factual",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 1.0,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.36666666666666664,
+            "evidence_diversity": 0.0,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.8280701754385964,
+          "elapsed_time": 225.2662751674652,
+          "status": "success"
+        },
+        {
+          "query": "대원군이 쇄국정책을 시행한 이유는?",
+          "query_type": "causal",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 0.7333333333333334,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.625,
+            "evidence_diversity": 0.42929478917821157,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.7375067432900814,
+          "elapsed_time": 209.16328406333923,
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "config_name": "causal_temporal_combo",
+      "config": {
+        "name": "causal_temporal_combo",
+        "description": "causal과 temporal 동시 활성화로 시너지 효과 확인",
+        "semantic_expander": {
+          "temporal": true,
+          "causal_chain": true,
+          "pgvector": false
+        },
+        "aggregator_threads": {
+          "outgoing_relations": false,
+          "incoming_relations": false,
+          "entity_properties": true,
+          "connected_entities": false,
+          "type_and_summary": true
+        },
+        "entity_boost_mode": "normalized"
+      },
+      "total_queries": 5,
+      "success_count": 5,
+      "error_count": 0,
+      "mean_score": 0.7924071078049731,
+      "min_score": 0.5717163212907103,
+      "max_score": 0.9684210526315788,
+      "total_time": 1028.7088589668274,
+      "results": [
+        {
+          "query": "임오군란이 발생한 배경은?",
+          "query_type": "causal",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 0.5,
+            "relation_coherence": 1.0,
+            "triple_validity": 1.0,
+            "evidence_diversity": 0.0,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.631578947368421,
+          "elapsed_time": 112.38159203529358,
+          "status": "success"
+        },
+        {
+          "query": "무오사화와 갑자사화의 공통점은?",
+          "query_type": "comparative",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 0.9666666666666667,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.5,
+            "evidence_diversity": 0.0,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.8245614035087719,
+          "elapsed_time": 311.9111647605896,
+          "status": "success"
+        },
+        {
+          "query": "붕당정치의 발전과 변질 과정을 설명하라",
+          "query_type": "deep_analysis",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 1.2,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.5,
+            "evidence_diversity": 0.34939847028229715,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.965757814225384,
+          "elapsed_time": 114.68902468681335,
+          "status": "success"
+        },
+        {
+          "query": "경국대전을 편찬한 왕은 누구인가?",
+          "query_type": "factual",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 0.5,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.2222222222222222,
+            "evidence_diversity": 0.4181656600790516,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.5717163212907103,
+          "elapsed_time": 209.12712407112122,
+          "status": "success"
+        },
+        {
+          "query": "대원군이 쇄국정책을 시행한 이유는?",
+          "query_type": "causal",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 1.2,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.7,
+            "evidence_diversity": 0.0,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.9684210526315788,
+          "elapsed_time": 280.5993866920471,
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "config_name": "minimal",
+      "config": {
+        "name": "minimal",
+        "description": "최소 컴포넌트로 성능 확인 (causal + type_and_summary만)",
+        "semantic_expander": {
+          "temporal": false,
+          "causal_chain": true,
+          "pgvector": false
+        },
+        "aggregator_threads": {
+          "outgoing_relations": false,
+          "incoming_relations": false,
+          "entity_properties": false,
+          "connected_entities": false,
+          "type_and_summary": true
+        },
+        "entity_boost_mode": "normalized"
+      },
+      "total_queries": 5,
+      "success_count": 5,
+      "error_count": 0,
+      "mean_score": 0.7578947368421052,
+      "min_score": 0.631578947368421,
+      "max_score": 1.0,
+      "total_time": 641.9384918212891,
+      "results": [
+        {
+          "query": "임오군란이 발생한 배경은?",
+          "query_type": "causal",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 0.5,
+            "relation_coherence": 1.0,
+            "triple_validity": 1.0,
+            "evidence_diversity": 0.0,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.631578947368421,
+          "elapsed_time": 137.29618787765503,
+          "status": "success"
+        },
+        {
+          "query": "무오사화와 갑자사화의 공통점은?",
+          "query_type": "comparative",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 0.5,
+            "relation_coherence": 1.0,
+            "triple_validity": 1.0,
+            "evidence_diversity": 0.0,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.631578947368421,
+          "elapsed_time": 138.11725401878357,
+          "status": "success"
+        },
+        {
+          "query": "붕당정치의 발전과 변질 과정을 설명하라",
+          "query_type": "deep_analysis",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 1.2,
+            "relation_coherence": 1.0,
+            "triple_validity": 1.0,
+            "evidence_diversity": 0.0,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 1.0,
+          "elapsed_time": 108.10740089416504,
+          "status": "success"
+        },
+        {
+          "query": "경국대전을 편찬한 왕은 누구인가?",
+          "query_type": "factual",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 1.0,
+            "relation_coherence": 1.0,
+            "triple_validity": 1.0,
+            "evidence_diversity": 0.0,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.894736842105263,
+          "elapsed_time": 126.32195496559143,
+          "status": "success"
+        },
+        {
+          "query": "대원군이 쇄국정책을 시행한 이유는?",
+          "query_type": "causal",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 0.5,
+            "relation_coherence": 1.0,
+            "triple_validity": 1.0,
+            "evidence_diversity": 0.0,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.631578947368421,
+          "elapsed_time": 132.09545397758484,
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "config_name": "with_outgoing",
+      "config": {
+        "name": "with_outgoing",
+        "description": "기본 설정 + outgoing_relations 추가",
+        "semantic_expander": {
+          "temporal": false,
+          "causal_chain": true,
+          "pgvector": false
+        },
+        "aggregator_threads": {
+          "outgoing_relations": true,
+          "incoming_relations": false,
+          "entity_properties": true,
+          "connected_entities": false,
+          "type_and_summary": true
+        },
+        "entity_boost_mode": "normalized"
+      },
+      "total_queries": 5,
+      "success_count": 5,
+      "error_count": 0,
+      "mean_score": 0.8850164824650744,
+      "min_score": 0.8255535218686033,
+      "max_score": 0.9521282254372846,
+      "total_time": 1050.9174010753632,
+      "results": [
+        {
+          "query": "임오군란이 발생한 배경은?",
+          "query_type": "causal",
+          "raw_metrics": {
+            "tbox_consistency": 0.6666666666666667,
+            "intent_preservation": 1.2,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.5,
+            "evidence_diversity": 0.6554587535412855,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.9467785308881378,
+          "elapsed_time": 120.95900011062622,
+          "status": "success"
+        },
+        {
+          "query": "무오사화와 갑자사화의 공통점은?",
+          "query_type": "comparative",
+          "raw_metrics": {
+            "tbox_consistency": 0.9333333333333333,
+            "intent_preservation": 0.9666666666666667,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.5,
+            "evidence_diversity": 0.15218358217012873,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.8255535218686033,
+          "elapsed_time": 313.59348320961,
+          "status": "success"
+        },
+        {
+          "query": "붕당정치의 발전과 변질 과정을 설명하라",
+          "query_type": "deep_analysis",
+          "raw_metrics": {
+            "tbox_consistency": 0.5,
+            "intent_preservation": 1.2,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.75,
+            "evidence_diversity": 0.5904362833084089,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.9521282254372846,
+          "elapsed_time": 147.60056614875793,
+          "status": "success"
+        },
+        {
+          "query": "경국대전을 편찬한 왕은 누구인가?",
+          "query_type": "factual",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 1.0,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.3333333333333333,
+            "evidence_diversity": 0.3603215550831918,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.8435256958815714,
+          "elapsed_time": 245.86736583709717,
+          "status": "success"
+        },
+        {
+          "query": "대원군이 쇄국정책을 시행한 이유는?",
+          "query_type": "causal",
+          "raw_metrics": {
+            "tbox_consistency": 0.8666666666666667,
+            "intent_preservation": 0.9666666666666667,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.7333333333333333,
+            "evidence_diversity": 0.4181656600790516,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.8570964382497747,
+          "elapsed_time": 222.89600729942322,
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "config_name": "with_exact_boost",
+      "config": {
+        "name": "with_exact_boost",
+        "description": "normalized 대신 exact boost 모드 사용",
+        "semantic_expander": {
+          "temporal": false,
+          "causal_chain": true,
+          "pgvector": false
+        },
+        "aggregator_threads": {
+          "outgoing_relations": false,
+          "incoming_relations": false,
+          "entity_properties": true,
+          "connected_entities": false,
+          "type_and_summary": true
+        },
+        "entity_boost_mode": "exact"
+      },
+      "total_queries": 5,
+      "success_count": 5,
+      "error_count": 0,
+      "mean_score": 0.8574684040053733,
+      "min_score": 0.7228070175438597,
+      "max_score": 0.9681836046896696,
+      "total_time": 955.593957901001,
+      "results": [
+        {
+          "query": "임오군란이 발생한 배경은?",
+          "query_type": "causal",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 1.2,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.25,
+            "evidence_diversity": 0.43067655807339306,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.943719818845968,
+          "elapsed_time": 99.84109807014465,
+          "status": "success"
+        },
+        {
+          "query": "무오사화와 갑자사화의 공통점은?",
+          "query_type": "comparative",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 0.9666666666666667,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.5666666666666667,
+            "evidence_diversity": 0.0,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.8315789473684211,
+          "elapsed_time": 273.8667802810669,
+          "status": "success"
+        },
+        {
+          "query": "붕당정치의 발전과 변질 과정을 설명하라",
+          "query_type": "deep_analysis",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 1.2,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.5,
+            "evidence_diversity": 0.3954884891037233,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.9681836046896696,
+          "elapsed_time": 127.63404107093811,
+          "status": "success"
+        },
+        {
+          "query": "경국대전을 편찬한 왕은 누구인가?",
+          "query_type": "factual",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 1.0,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.3,
+            "evidence_diversity": 0.0,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.8210526315789474,
+          "elapsed_time": 222.33738780021667,
+          "status": "success"
+        },
+        {
+          "query": "대원군이 쇄국정책을 시행한 이유는?",
+          "query_type": "causal",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 0.7333333333333334,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.7,
+            "evidence_diversity": 0.0,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.7228070175438597,
+          "elapsed_time": 231.91438508033752,
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "config_name": "ablation_baseline",
+      "config": {
+        "name": "ablation_baseline",
+        "description": "Ablation 실험의 baseline 설정 재현 (모든 컴포넌트 활성화)",
+        "semantic_expander": {
+          "temporal": false,
+          "causal_chain": false,
+          "pgvector": false
+        },
+        "aggregator_threads": {
+          "outgoing_relations": true,
+          "incoming_relations": true,
+          "entity_properties": true,
+          "connected_entities": true,
+          "type_and_summary": true
+        },
+        "entity_boost_mode": null
+      },
+      "total_queries": 5,
+      "success_count": 5,
+      "error_count": 0,
+      "mean_score": 0.8516668481977112,
+      "min_score": 0.8067225987774023,
+      "max_score": 0.8712786731146427,
+      "total_time": 763.2620182037354,
+      "results": [
+        {
+          "query": "임오군란이 발생한 배경은?",
+          "query_type": "causal",
+          "raw_metrics": {
+            "tbox_consistency": 0.25,
+            "intent_preservation": 1.0,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.5,
+            "evidence_diversity": 0.8277293767706428,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.8067225987774023,
+          "elapsed_time": 110.4352650642395,
+          "status": "success"
+        },
+        {
+          "query": "무오사화와 갑자사화의 공통점은?",
+          "query_type": "comparative",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 1.0,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.5625,
+            "evidence_diversity": 0.42929478917821157,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.8712786731146427,
+          "elapsed_time": 190.342276096344,
+          "status": "success"
+        },
+        {
+          "query": "붕당정치의 발전과 변질 과정을 설명하라",
+          "query_type": "deep_analysis",
+          "raw_metrics": {
+            "tbox_consistency": 0.5,
+            "intent_preservation": 1.0,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.75,
+            "evidence_diversity": 0.6460148371100897,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.8497902545847416,
+          "elapsed_time": 107.00150990486145,
+          "status": "success"
+        },
+        {
+          "query": "경국대전을 편찬한 왕은 누구인가?",
+          "query_type": "factual",
+          "raw_metrics": {
+            "tbox_consistency": 1.0,
+            "intent_preservation": 1.0,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.35714285714285715,
+            "evidence_diversity": 0.6273082983655498,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.860083895402698,
+          "elapsed_time": 156.47522974014282,
+          "status": "success"
+        },
+        {
+          "query": "대원군이 쇄국정책을 시행한 이유는?",
+          "query_type": "causal",
+          "raw_metrics": {
+            "tbox_consistency": 0.8461538461538461,
+            "intent_preservation": 1.0,
+            "relation_coherence": 1.0,
+            "triple_validity": 0.6153846153846154,
+            "evidence_diversity": 0.6156406399954366,
+            "convergence_utilization": 1.0,
+            "property_group_selection": 0.0
+          },
+          "final_score": 0.8704588191090715,
+          "elapsed_time": 199.0072591304779,
+          "status": "success"
+        }
+      ]
+    }
+  ]
+}

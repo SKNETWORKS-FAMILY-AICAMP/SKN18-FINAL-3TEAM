@@ -697,11 +697,11 @@ JSON 형식으로 출력하세요:
                         expanded_keywords.remove(general_noun)
                     expanded_keywords.extend(filtered_instances)
         
-        print(f"[DEBUG] 키워드 확장: {general_nouns} → {sum(len(v) for v in expanded_dict.values())}개 인스턴스")
+        print(f"  └─ [DEBUG] 키워드 확장: {general_nouns} → {sum(len(v) for v in expanded_dict.values())}개 인스턴스")
         return expanded_keywords
         
     except Exception as e:
-        print(f"[ERROR] 키워드 확장 실패: {e}")
+        print(f"  └─ [[ERROR] 키워드 확장 실패: {e}")
         return keywords  # 실패 시 원본 반환
 
 

@@ -13,13 +13,15 @@ from .l3_terminal_knowledge import (
     EvidenceDiversityEvaluator,
     ConvergenceUtilizationEvaluator
 )
+from .answer_quality_evaluator import AnswerQualityEvaluator
 
 __all__ = [
     "TBoxConsistencyEvaluator",
     "IntentPreservationEvaluator",
-    "RelationCoherenceEvaluator", 
+    "RelationCoherenceEvaluator",
     "PropertyGroupSelectionEvaluator",
     "TerminalTripleValidityEvaluator",
     "EvidenceDiversityEvaluator",
-    "ConvergenceUtilizationEvaluator"
+    "ConvergenceUtilizationEvaluator",
+    "AnswerQualityEvaluator"
 ]

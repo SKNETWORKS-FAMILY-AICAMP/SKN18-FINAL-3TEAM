@@ -1,0 +1,9 @@
+{
+  "experiment_name": "optimized_grid_search",
+  "created_at": "2025-12-27T16:14:52.775922",
+  "num_configs": 6,
+  "num_queries": 20,
+  "query_range": "41-60",
+  "total_experiments": 120,
+  "description": "Isolation 실험 기반 최적화된 설정 탐색"
+}
