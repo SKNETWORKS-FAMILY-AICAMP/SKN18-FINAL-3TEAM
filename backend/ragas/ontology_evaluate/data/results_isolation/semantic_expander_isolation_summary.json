@@ -1,0 +1,2822 @@
+[
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "세종대왕이 훈민정음을 창제한 시기는 언제인가?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 101.69875288009644,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "세종대왕이 훈민정음을 창제한 시점은 창제 작업이 1443년에 시작되어 1446년에 반포되었습니다.\n\n창제의 배경은 1440년대의 학문 발전과 백성을 가르치는 소통의 필요성에서 비롯되었습니다. 세종대왕은 집현전에 소속된 학자들과 함께 훈민정음 창제를 주도하였고, 성삼문은 창제 과정에 참여하였으며 신숙주와 최항, 정인지 등도 관련 활동에 관여한 것으로 전해집니다. 이 창제 정책은 백성을 가르치는 올바른 소리라는 뜻의 훈민정음 창제를 목표로 설정되었습니다.\n\n창제된 문자 체계의 핵심은 28자의 음운 표기에 맞춰 구성되었고, 1446년 반포될 때까지 훈민정음 서문과 정음 28자 해석이 함께 남아 있습니다. 창제는 세종대왕이 주도하고 집현전이 협력한 것으로 보이며, 1443년에는 실제 창제 작업이 시작되었고 1446년 반포로 확정되었습니다. 이 과정에서 정인지 등의 문헌 연구와 최항의 주관 하에 작성된 것으로 여겨집니다. \n\n한편 창제 이후의 정치적 상황과 역사적 흐름과 관련해 계유정난과 같은 사건들이 기록되어 있으며, 창덕궁 감역관 임명은 1453년에 이루어진 것으로 알려져 있습니다. 이러한 사건들은 훈민정음 창제의 정책적 맥락과 사회적 분위기를 형성하는 데 영향을 주었습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.7,
+      "evidence_diversity": 0.31091750708257115,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6163640793201353,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.07368421052631578,
+      "evidence_diversity": 0.016364079320135325,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "세종대왕이 훈민정음을 창제한 시기는 언제인가?",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 84.10762906074524,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "세종대왕이 훈민정음을 창제하기 시작한 해는 1443년이고, 1446년에 반포되었습니다.\n\n창제의 배경은 한자 중심 사회의 의사소통 한계에서 비롯되었습니다. 세종대왕은 집현전 학자들과 함께 문자 생활의 혁신을 추구하였고, 성삼문은 집현전 수찬으로 창제 과정에 참여하였습니다. 신숙주를 비롯한 학자들—정인지와 최항이 왕의 명을 받아 창제 정책을 주관하였고—훈민정음의 기본 체계가 마련되었습니다. 이 과정에서 정음 28자(훈민정음) 해석과 훈민정음 서문이 함께 남아 창제의 의도와 원리를 밝히고 있습니다.\n\n1443년 창제가 시작된 뒤 1446년 공식 반포되었습니다. 이 문자 체계의 핵심은 '백성을 가르치는 올바른 소리'라는 뜻으로, 문헌으로 남은 훈민정음 서문과 정음 28자(훈민정음) 해석에 잘 반영되어 있습니다. 세종대왕의 주도 아래 이루어진 이 창제 사건은 이후 문자 교육과 사회적 소통의 큰 혁신으로 평가되며, 세종의 업적은 훈민정음이라는 문자를 통해 널리 전해졌습니다. 또한 이 시기에는 공안 전면 개정과 과전법 개정 등 다른 정책 변화도 기록에 남아 있지만 창제와 직접적인 연계성은 낮습니다.",
+    "num_extracted_entities": 7,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.6875,
+      "evidence_diversity": 0.5541483697052956,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6278499141950156,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.07236842105263158,
+      "evidence_diversity": 0.029165703668699767,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "세종대왕이 훈민정음을 창제한 시기는 언제인가?",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 114.08512806892395,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "훈민정음은 1443년에 창제되었고, 1446년에 반포되었습니다.\n\n창제의 배경은 세종대왕이 집현전 학자들과 함께 백성을 가르치는 올바른 소리의 필요를 절감한 데서 시작됩니다. 1443년의 창제는 집현전을 중심으로 학문과 정치 체계를 정비하는 과정의 일환으로 이루어졌으며, 성삼문이 집현전 수찬으로 참여했고 최항이 직접 왕명을 받아 창제 업무를 주관한 것으로 본문에 언급됩니다. 세종은 훈민정음 창제 정책을 주도하였고 제민창 등 관원들과 협력하였습니다. 이 과정에서 정음 28자(훈민정음) 해석과 훈민정음 서문 같은 문헌이 마련되었으며, 이는 사회적 맥락의 민심과 민정, 이민의 흐름을 반영합니다.\n\n1446년 반포를 통해 공식적으로 세상에 알리게 되었고, ‘백성을 가르치는 올바른 소리’라는 뜻을 담아 널리 전파되었습니다. 이 창제와 반포의 기록은 세종실록에 남아 있으며, 훈민정음의 본문과 해례를 담은 자료로 오늘날까지도 전해집니다. 또한 이 과정은 유네스코 세계기록유산에 포함된 조선왕조실록과 함께 중요한 기록으로 남아 있습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.6,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.6111111111111112,
+      "evidence_diversity": 0.5482106005448051,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6721280433035277,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.3157894736842105,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.06432748538011696,
+      "evidence_diversity": 0.02885318950235816,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "임진왜란이 발생한 원인은 무엇인가?",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 150.42237210273743,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "임진왜란의 발생 원인은 일본의 침략 의도와 조선 외교 긴장이며, 일본은 조선을 침략해 동아시아에서의 지배권 확장을 노렸고, 조선은 명나라와의 관계를 둘러싼 외교적 긴장과 내부 상황으로 대응 여력이 약화되어 전쟁이 발발했습니다.\n\n1592년 선조 25년에 시작된 임진왜란은 일본의 침략 의도에 따른 공격으로 기록됩니다. 문헌에 따르면 일본은 동아시아의 패권 강화를 위해 조선을 침략했고, 이로써 한반도에 급속한 군사 작전이 전개되었습니다. 당시 조선은 명나라와의 동맹과 외교적 균형을 유지하려 했으나, 일본의 기습적 진격과 조선의 지리적·군사적 한계로 초동 방어가 크게 어려웠습니다. 전쟁은 정유재란으로 이어져 1597년에서 1598년까지 지속되었습니다.\n\n임진왜란 이후 조선은 군영 창설(임진왜란 이후 현종대까지)과 군총 증가(임진왜란 이후 현종대까지)를 통해 군사 체제를 재정비하였습니다. 또한 전후의 국내 불안 요인으로 회령 반란이 언급되며, 임진부와 이진은, 임진범릉사건 등의 사건은 임진왜란의 여파 속에서 벌어진 정치적 사건들로 기록됩니다. 정치적 긴장을 반영하는 기축옥사 역시 이 시기 내부 권력구조를 재편하는 원인이 되었던 것으로 보입니다. 이러한 흐름은 징비록 등 문헌에도 남아 있어 전후 정세의 변화를 이해하는 데 중요한 자료가 됩니다. 한편 오시복의 편지(1702)와 같은 후대의 기록은 전쟁 이후의 외교 관계와 내부 정책의 변화를 시사합니다. 임진왜란은 일본에서 시작된 전쟁으로 기록되며, 1592년부터 1598년 사이의 전개로 다수의 충돌과 외교적 교섭이 이어졌습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.3333333333333333,
+      "evidence_diversity": 0.3900152049033158,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5819306248194728,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.03508771929824561,
+      "evidence_diversity": 0.020527116047542936,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "임진왜란이 발생한 원인은 무엇인가?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 169.6190209388733,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "임진왜란의 발생 원인은 도요토미 히데요시의 확장 욕망과 조선의 외교 불안 때문입니다.\n\n1592년 Japanese expansion policy가 고조되면서 도요토미 히데요시의 확장 욕망이 구체화되었고, 일본은 한반도를 거점으로 명나라를 견제하려는 전략을 추진하였습니다. 이 확장 욕망은 실제로 임진왜란의 발발로 이어져 1592년에 일본이 조선을 침략하였습니다. 동시에 조선은 명나라의 책봉 명분 아래 외교적으로 취약한 위치에 있었고, 본문에서 언급된 명나라의 원병 파견 사례가 외교 불안을 더욱 키웠습니다. 일본은 군영 창설과 군총 증가를 통해 전력을 크게 강화하였고, 옥포 해전과 한산 진영 같은 해전이 전쟁의 흐름을 좌우하였습니다.\n\n또한 전쟁의 외교적 배경으로는 조선의 외교 불안이 지속되었으며, 회령 반란 같은 국내 혼란도 전황의 불확실성을 키웠습니다. 임진부, 이진은 등의 인물은 문헌에서 언급되지만 구체적 맥락은 확실치 않으며, 임진범릉사건 역시 기록에 남아 있으나 세부 내용은 불확실합니다. 정유재란은 임진왜란의 후반전으로 1597년 이후 일본의 재침으로 전쟁이 재점화되었으며, 본국송환은 외교적 맥락에서 전쟁의 확전 양상을 보여주는 요소로 언급됩니다. 이 모든 요소가 합쳐 도요토미의 확장 욕망과 조선의 외교 불안이 상호 작용하며 임진왜란이 발발하게 되었습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.3333333333333333,
+      "evidence_diversity": 0.15218358217012873,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5694131709914102,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.03508771929824561,
+      "evidence_diversity": 0.008009662219480459,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "임진왜란이 발생한 원인은 무엇인가?",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 146.59470391273499,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "임진왜란의 발생 원인은 일본의 대륙 확장 의도와 조선의 외교 갈등 때문입니다.\n\n먼저 일본의 대륙 확장 의도는 16세기 말 일본이 중국 대륙으로의 확장을 목표로 삼는 정책 방향에서 분명히 드러났으며, 이를 달성하기 위한 경로로 조선을 거쳐 명나라를 압박하는 전략이 작동했습니다. 이 의도는 1592년 일본의 조선 침략으로 구체화되어 임진왜란이 발발하게 되었습니다. 본문에서 다루는 임진왜란의 시작은 1592년에 일본이 조선을 침략한 사건으로 요약되며, 이 과정에서 임진하와 이진은 외교 교섭에 관여한 인물로 전해지고, 임진범릉사건과 회령 반란 같은 내부 사건들도 외교 갈등의 흐름 속에서 발생한 것으로 기록됩니다. 또한 이 시기의 기록은 선조 시기와 관련된 문헌들에 남아 있습니다.\n\n다음으로 조선의 외교 갈등과 내부 요인은 일본의 침략에 취약한 조건을 만들었습니다. 조선 내부의 외교 정책을 둘러싼 이진은 이진은 등과 같은 인물들이 서로 다른 외교 노선을 지지하며 갈등을 촉발했고, 임진하와 임진부도 이러한 논쟁에 관여한 인물들로 전해집니다. 이와 같은 내부 갈등은 임진범릉사건과 회령 반란 같은 사건들로 표면화되었고, 왕실의 권력 다툼과 행정机构의 불안정을 드러냈습니다. 이러한 내부 요인은 일본의 침략에 대한 조선의 대응력을 약화시켰고, 외교적으로도 취약한 동조를 만들었습니다. 이러한 사실은 선조실록과 승정원일기 등 주요 기록에 의해 확인됩니다.\n\n전쟁 발발 이후의 변화에 있어서는 임진왜란 이후의 군영 창설과 군총 증가가 국방 체제의 재정비를 촉발했고, 이는 현종대까지 이어지는 군사 제도의 강화로 연결됩니다. 또한 영창대군 같은 왕실 내 인물 간의 권력 다툼은 전쟁 직후의 정치적 불안정을 반영합니다. 이러한 교훈과 제도적 변화는 임진왜란의 직후 국방 및 외교 정책의 재편으로 이어졌습니다. 이 점은 현존하는 기록들뿐 아니라 선조실록, 현종실록 등의 문헌에도 반영되어 있습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.3,
+      "evidence_diversity": 0.5301454277694697,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5857971277773405,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.03157894736842105,
+      "evidence_diversity": 0.027902390935235246,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "임진왜란과 병자호란의 공통점은 무엇인가?",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 148.62673902511597,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "임진왜란과 병자호란의 공통점은 외적 침략으로 시작된 국난 전쟁이며, 내부적으로 전시 체제의 강화와 군사 조직의 확장, 그리고 전후의 중앙권력 재편과 외교 관계 재정립이 진행되었다는 점입니다.\n\n두 전쟁의 외적 동기를 보면, 임진왜란은 1592년 일본의 침략으로 시작되어 1598년까지 이어졌고 회령 반란은 임진왜란 기간 동안 일어난 반란으로 기록됩니다. 반면 정묘호란(1627)과 병자호란(1636)을 포함한 병자호란의 배경은 청(후금) 세력의 압력과 침략으로 형성되었습니다. 이처럼 두 전쟁 모두 외적 요인에 의해 촉발되었다는 점이 공통적입니다.\n\n국내 요인 면에서 두 전쟁은 전시 체제의 강화와 군사 조직의 확장을 촉진했습니다. 임진왜란의 경우 군영 창설과 군총 증가가 현종대까지 지속되었고 비변사의 기능이 확대되어 전시 최고 기관으로 활용되었습니다. 병자호란 시기에는 청의 개입으로 국인이라는 도구가 등장하고, 1636년 병자호란 당시 사신 파견 및 포로가 발생하는 한편 병자호란창의록과 같은 기록이 남아 역사를 남겼습니다. 또한 이진병은 이 시기 인물로 기록되어 있습니다. 따라서 두 전쟁은 외적 침략으로 촉발되었고, 전시 체제의 강화와 군사 조직의 확장, 외교 관계의 재정립이 공통적으로 수반되었습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 1.0,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.4,
+      "evidence_diversity": 0.0,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.831578947368421,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.5263157894736842,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.042105263157894736,
+      "evidence_diversity": 0.0,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "임진왜란과 병자호란의 공통점은 무엇인가?",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 155.88006901741028,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "임진왜란과 병자호란의 공통점은 조선이 외세의 침략에 직면했고 대외 관계의 불안정 속에서 국토와 주권이 위협받았으며 전쟁의 여파로 군제와 외교 질서가 대대적으로 재편되었다는 점입니다.\n\n임진왜란은 1592년 일본의 조선 침략으로 시작되었고 조선은 명나라의 지원 아래 원병을 파견받아 저항하였습니다. 이 과정에서 전시 체제가 강화되어 비변사의 기능이 확대되었고 전시를 위한 군영 창설과 군총 증가가 이루어졌습니다. 또한 회령 반란과 같은 지방 저항이 전쟁의 국내 혼란을 키웠습니다. 이 과정에서 명나라가 책봉 명분으로 조선에 원병을 보낸 사례도 기록되어 있습니다.\n\n정묘호란과 병자호란은 1627년과 1636-37년의 만주족 침략으로 촉발되었고, 조선은 결국 청과의 외교 질서를 재편하게 되었습니다. 병자호란 이후에는 청이 제작한 국인과 같은 외교적 상징이 등장했고 1636년 병자호란 당시 사신 파견 및 포로 문제가 발생했습니다. 이 변화와 관련된 내용은 병자호란창의록에 자세히 남아 있으며 이진병 같은 인물이 기록 속에 남아 있습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 1.0,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.4,
+      "evidence_diversity": 0.0,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.831578947368421,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.5263157894736842,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.042105263157894736,
+      "evidence_diversity": 0.0,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "임진왜란과 병자호란의 공통점은 무엇인가?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 145.93974900245667,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "임진왜란과 병자호란의 공통점은 둘 다 외세의 침략에 의해 촉발되었고, 조선의 내부 취약점을 이용한 침략으로 전쟁이 확산되었다는 점입니다.\n\n전쟁의 원인 면에서 보면 임진왜란은 1592년 일본의 조선 침략으로 시작되었고, 병자호란은 1636년 청의 남하로 촉발되었습니다. 양 전쟁 모두 외세의 팽창 욕구가 직접적인 발발 요인이었으며, 조선은 내부적으로 군제의 미비, 행정체계의 한계, 파벌 간 갈등 등으로 외세의 침략에 대응하는 데 취약했습니다. 이러한 취약점은 전쟁의 피해를 키우고 이후의 군영 창설(임진왜란 이후 ~ 현종대)과 군총 증가(임진왜란 이후 ~ 현종대) 같은 군사 제도 개혁의 필요성을 낳았습니다.\n\n임진왜란의 구체적 맥락으로는 1592년 발발, 옥포 해전과 한산 해전 등 해상전에서의 교전이 있었고, 회령 반란 등 내부 저항도 동시다발적으로 나타났습니다. 반면 정묘·병자호란의 흐름 속에서 병자호란은 1636년 병자호란 당시 사신 파견 및 포로가 이루어졌고, 병자호란창의록이 이를 기록합니다. 또한 병자호란 이후 청이 제작한 국인과 같은 외교적 관계 형성이 이루어졌으며, 이진병 등 인물이 관련 자료로 남아 있습니다. 이러한 맥락은 두 전쟁이 외세의 침략과 내부 취약점의 결합으로 발생했다는 점을 명확히 보여줍니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 1.0,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.34615384615384615,
+      "evidence_diversity": 0.2439823643980616,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.8387521082476712,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.5263157894736842,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.03643724696356275,
+      "evidence_diversity": 0.012841177073582188,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "세종대왕의 업적이 조선 사회에 미친 영향을 분석하라",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 127.95329594612122,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "세종대왕의 업적은 장기적으로 중앙집권의 강화, 학문·문화의 확산, 기술·제도 혁신을 통해 조선 사회의 구조를 재편하고 사회적 이동성과 외교경제 네트워크의 기반을 확고히 했습니다.\n\n1443년 세종대왕이 훈민정음을 창제하고, 집현전을 중심으로 학문 체계와 정치 체제를 정비했으며 농업 기술서 편찬 추진과 역법 개편을 이끌었습니다. 또한 1423년 순자법 개정과 과전법 제정은 관리 기반과 재정 체계를 다졌고, 교육 활성화와 학문추구를 촉진했습니다.\n\n생원시 급제와 진사시 합격의 확대는 사회적 이동성을 높였고, 자치통감강목 권19의 하 간행과 공안 시정 도모를 통해 행정의 일관성과 법치 기반을 강화했습니다.\n\n한편 명-일 감합무역과 일본의 감합선 도항(1404-1547) 같은 외교경제 네트워크의 구축은 조선의 경제질서를 확장했고, 고려시대의 교류 맥과 연결되어 후대 사회변동의 토대가 되었습니다. 이러한 흐름은 조선후기 사회변동연구에서도 중요한 사례로 다뤄집니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 0.7692307692307692,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.7692307692307693,
+      "evidence_diversity": 0.576361055720541,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6133307438233483,
+    "weighted_metrics": {
+      "tbox_consistency": 0.08097165991902833,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.08097165991902834,
+      "evidence_diversity": 0.03033479240634426,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "세종대왕의 업적이 조선 사회에 미친 영향을 분석하라",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 118.06175589561462,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "세종대왕의 업적은 직후 사회에 문자 해독력과 행정 효율의 급격한 확산을 가져오고, 이를 바탕으로 과전법 개정과 공안 전면 개정을 통한 중앙집권 강화가 이루어져 유교적 관료사회가 더욱 굳건해지는 영향을 미쳤습니다. \n\n세종대왕은 1443년 훈민정음 창제와 1446년 반포를 통해 문자 보급을 가속화하고 집현전 중심의 학문 진흥 및 역법 개편을 추진함으로써 교육 활성화와 학문추구의 열풍을 확산시켰습니다. 이로 인해 문해 인구가 늘고 행정 문서의 표준화와 기록 관리가 개선되어 국가 운영의 안정성이 즉각적으로 강화되었고, 과학기구 발명과 농업 기술서 편찬 추진이 도입되어 사회 전반의 기술적 발전이 촉진되었습니다. 조선의 황금기를 연 성군인 세종의 이러한 정책은 왕권 중심의 통치 체제를 견고히 하는 데 기여했습니다.\n\n한편 과전법 개정과 공안 전면 개정 같은 제도 개편은 중앙집권화를 강화하고 관료제의 체질을 다지는 방향으로 작용했습니다. 과전법 개정은 토지 분배와 조세 체계의 조정으로 귀족 세력의 영향력을 다소 억제하고 국가 재정의 안정성을 높였으며, 공안 전면 개정은 공법 차원의 법제 정비를 통해 행정 통제의 일관성을 강화했습니다. 이러한 변화의 사회적 파급은 기록과 교역의 확대, 관료 양성과 승진 체계의 재편, 지방 통제의 강화 등으로 나타났으며, 이는 조선 후기 사회변동연구와 같은 문헌에서도 주요 변곡점으로 분석됩니다. 또한 교육 활성화 및 학문추구의 효과를 중점적으로 다룬 조선후기 사회변동연구를 통해 이 시기의 사회구조가 점차 유교적 관료제의 틀 안에서 재편되었다고 평가됩니다.",
+    "num_extracted_entities": 6,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 1.2,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.8181818181818182,
+      "evidence_diversity": 0.6273082983655498,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 1.0138774702489044,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.0861244019138756,
+      "evidence_diversity": 0.03301622622976578,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "세종대왕의 업적이 조선 사회에 미친 영향을 분석하라",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 145.39023113250732,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "세종대왕의 업적은 그의 리더십과 정책 의도가 업적 형성의 주된 원인으로 작용하여, 훈민정음 창제와 이를 통한 문자 보급과 행정 소통의 강화, 집현전 중심의 학문 체계 정비, 농업 기술서 편찬과 역법 개편 및 과학기구 발명 장려, 교육 활성화와 인재 양성, 편찬사업과 법제 개혁 등을 통해 조선 사회의 교육·행정·경제·문화 전반을 혁신하고 결국 사회의 구조적 변화를 촉진하였습니다.\n\n원인 관점에서 보자면, 세종은 재위 기간인 1418년부터 1450년까지(세종대왕의 재위 기간) 집현전을 중심으로 학문과 정책의 연계를 강화하였습니다. 1443년 훈민정음 창제는 문자 보급과 행정의 표준화를 가능하게 하였고, 농업 기술서 편찬과 역법 개편은 사회 생산력과 사회 운영의 과학화를 촉진하였습니다. 또한 과학기구 발명 장려와 교육 활성화는 인재 양성과 기술 진보의 토양을 마련하였습니다. 이러한 정책은 학문 진흥과 인재 양성을 강조한 교육 기조와 더불어 중앙집권 체제를 다지는 데 기여하였습니다.\n\n이로써 조선 사회의 교육·행정·경제·문화 기반이 확충되며 사회 구성원의 자긍심과 공동체 의식이 강화되었습니다. 특히 세종대왕의 개혁은 문자 보급으로 관리의 업무 표준화와 민중과의 소통 개선을 가져왔고, 농업 기술서 편찬은 생산력 증가로 이어졌습니다. 또한 역법 개편과 과학기구 발명 장려는 기술·과학의 발전을 촉진하였고, 이러한 변화는 조선의 황금기를 연 성군이라는 평가와 맥락을 함께 만드셨습니다.\n\n이러한 맥락은 조선 후기 사회변동연구에서도 사회적 구조의 변화로 분석되며, 세종실록의 기록과 후기 왕권의 맥락에서도 확인됩니다. 또한 사관은 이러한 업적의 기록과 정당성을 확보하는 역할을 했고, 신서회와 회사 같은 사회조직도 정책의 확산과 실행에서 간접적으로 작용하였습니다. 중종과 명종 시기의 정책 전개 역시 세종대왕의 제도적 토대 위에서 이루어진 것으로 보이며, 이들 문헌과 기록은 업적의 사회적 파장을 이해하는 데 중요한 증거가 됩니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 0.9090909090909091,
+      "intent_preservation": 0.5833333333333334,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.7727272727272727,
+      "evidence_diversity": 0.6589889534840212,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6766294026554588,
+    "weighted_metrics": {
+      "tbox_consistency": 0.0956937799043062,
+      "intent_preservation": 0.30701754385964913,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.08133971291866028,
+      "evidence_diversity": 0.034683629130737956,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "이순신이 참전한 전투는 무엇이 있는가?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 179.36930584907532,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "이순신이 참전한 전투를 연도 순으로 정리하면 1592년 옥포해전, 당항포해전, 율포해전, 적진포해전, 부산포해전, 한산도대첩이 먼저 벌어졌고, 1593년경 해정창전투, 상주전투, 사천해전, 황석산성 전투가 뒤를 이으며, 1597-1598년의 정유재란이 이어진 뒤 1598년 노량해전이 마지막으로 벌어졌습니다. 또한 이순신탄신제, 이순신 탄핵·파면 사건 등과 선조의 교서(간행 1795)라는 문헌도 남아 있습니다.\n\n1592년의 전투들은 임진왜란 시작 직후 이순신의 지휘 아래 조선 수군의 해상 주도권 확립에 결정적 영향을 미쳤습니다. 옥포해전에서 첫 승리를 거두고, 이어 한산도대첩에서 거북선을 활용해 일본 수군을 대파함으로써 해상 교역로를 차단하고 조선의 방어선을 굳혔습니다. 이 시기의 연도는 1592년으로 기록되며, 이들 전투의 기록은 이후의 전개를 좌우하는 중요한 계기가 되었습니다. 이와 관련된 문헌으로는 선조의 교서가 있으며, 간행은 1795년으로 기록되어 있습니다.\n\n1593년경의 해정창전투, 상주전투, 사천해전, 황석산성 전투는 남해와 해안선에서 일본군의 보급선 차단과 거점 확보를 놓고 벌어진 작전들로, 이순신의 지휘 아래 수군의 활약이 지속되었습니다. 정유재란은 1597-1598년 사이에 벌어진 대규모 재공세로, 이순신은 명량대첩과 같은 해전에서 전략적 역량을 발휘하며 조선을 수호했으나 1598년 노량해전에서 전사하셨습니다. 임진왜란의 큰 맥락 속에서 이러한 전투들이 서로 연결되어 전쟁의 흐름을 좌우했습니다. 이 과정에서 이순신탄신제와 이순신 탄핵·파면 사건 같은 인물의 행적과 일생에 관한 기록도 남아 있으며, 관련된 문헌으로는 선조의 교서(간행 1795)가 거론됩니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 1.0,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.7142857142857143,
+      "evidence_diversity": 0.42929478917821157,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.8872561167236652,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.5263157894736842,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.07518796992481203,
+      "evidence_diversity": 0.022594462588326925,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "이순신이 참전한 전투는 무엇이 있는가?",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 132.90061783790588,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "이순신이 참전한 주요 전투를 연대순으로 제시하면 옥포해전(1592년), 황석산성 전투(1592년), 당항포해전(1592년), 부산포해전(1592년), 관음포 전투(1592년), 안골포해전(1592년), 율포에서의 교전(1592년), 상주전투(1592년), 한산도 대첩(1592년), 사천해전(1594년), 명량대첩(1597년), 노량해전(1598년)입니다. 한산 진영은 한산도 대첩의 핵심 거점으로 알려져 있습니다. 또한 추출된 엔티티에 따르면 이순신탄신제와 선조의 교서(간행 1795) 등 후대의 기념 기록이 존재하며, 이로 인해 이순신의 공적은 신격화와 같은 해석이 더해졌습니다. 다만 탄핵·파면 사건에 관한 기록은 서로 다른 해석이 존재하는 부분으로 남아 있습니다. 본국송환에 관한 기록은 전승과 기록의 차이에 따라 다르게 전해지기도 합니다. 이 모든 내용은 추출된 엔티티를 바탕으로 한 설명이며, 각 사건의 연대와 맥락은 아래에서 간략히 정리합니다.\n\n임진왜란 기간 중 초기 전투들로서 전개된 이순신의 참전은 1592년의 해상 교전들로 시작되었고, 이후 남해안의 여러 해전에서 조선 수군의 주도권을 확립하였습니다. 옥포해전에서의 승리는 해군 전력의 기초를 다졌고, 이어 한산도 진영을 기점으로 한산도 대첩이 결정적 승리로 이어져 왜군의 해상 보급로를 차단하는 기틀이 마련되었습니다. 이후 사천해전과 명량대첩, 노량해전은 전쟁의 흐름을 최종적으로 종결지은 주요 전투들입니다. 선조의 교서와 같은 공식 기록은 이러한 공적을 확인시키는 문헌으로 작용하고 있으며, 이순신 탄신제 등은 후대의 기억 체계 속에서 그의 업적을 신화화하는 계기가 되었습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.85,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.8,
+      "evidence_diversity": 0.3954884891037233,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.8155520257423011,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.4473684210526315,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.08421052631578947,
+      "evidence_diversity": 0.02081518363703807,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "이순신이 참전한 전투는 무엇이 있는가?",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 204.25224995613098,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "이순신이 참전한 대표 전투로는 옥포해전(1592년), 한산도대첩(1592년), 율포해전(1592년경), 적진포해전(1592년경), 부산포해전(1592년경), 당항포해전(1594년), 사천해전(1594년 또는 1595년), 황석산성 전투, 해정창전투, 상주전투, 명량대첩(1597년), 노량해전(1598년)이 있으며, 경상우도수군우후로서 남해안 전투에도 참여했고 본영(여수)에서 출발해 사천해전에서 수군을 지휘하였으며, 추출된 엔티티로 이순신탄신제, 이순신 탄핵·파면 사건, 선조의 교서(간행 1795)도 언급됩니다.\n\n임진왜란 초기에는 옥포해전에서 이순신이 수군을 지휘해 승리를 거두었고, 이어 한산도대첩에서 거북선과 전술의 결합으로 결정적 승리를 이끌었습니다. 율포해전과 적진포해전, 부산포해전은 1592년경에 벌어진 해전들로, 이순신은 전라좌수사로서 해전에 참여하고 정운 등과 협력하는 기록이 남아 있습니다. 이후 1594년에는 당항포해전과 사천해전이 벌어졌으며 남해안 전투의 주축으로 기능했습니다. 1597년의 명량대첩과 1598년의 노량해전은 임진왜란 말기에 벌어진 주요 대전으로, 이순신의 지휘 아래 조선 수군의 큰 전과가 이루어졌습니다. 또한 경상우도수군우후로서 남해안 전투에 참여했고, 정유재란 기간에는 경상우도수군우후로서의 역할과 함께 본영(여수)에서 출발해 사천해전에서 수군을 지휘한 사례가 남아 있습니다. 한편 해전의 연대기와 이순신의 삶 전체를 다루는 기록으로는 전라좌수사로서의 활동, 경상우도수군우후의 임무 수행 등이 확인되며, 이와 더불어 이순신탄신제와 탄핵·파면 사건, 선조의 교서(1795 간행)와 같은 문헌도 관련되게 언급됩니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.75,
+      "evidence_diversity": 0.3603215550831918,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6242274502675363,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.07894736842105263,
+      "evidence_diversity": 0.018964292372799566,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "세종대왕이 훈민정음을 창제한 이유는?",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 103.54978609085083,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "세종대왕은 한자의 어려움으로 백성들이 읽고 쓸 수 없다는 문제를 해결하고 백성과의 소통을 원활하게 하기 위해 훈민정음(정음 28자)을 창제하였다.\n\n1443년 세종대왕과 집현전 학자들이 창제에 착수하여 1446년 반포된 이 창제 정책의 목적은 백성들이 쉽게 읽고 쓸 수 있도록 새로운 문자체계를 마련하는 것이었습니다. 이 과정은 학자들과의 합의와 연구를 통해 이루어졌으며 문헌으로 남아 있는 훈민정음 서문과 정음 28자 해석에도 그 취지가 명시되어 있습니다. 창제 과정에는 성삼문이 집현전 수찬으로 참여했고, 신숙주가 관련 활동을 한 것으로 언급되며, 최항이 직접 왕명을 받아 주관한 것으로 본문에 기록되어 있습니다.\n\n세종대의 창제 이후의 영향과 맥락으로는 훈민정음 서문과 정음 28자 해석 등의 문헌이 남아 있어 교육과 행정 소통의 기반이 되었습니다. 이 시기에는 1453년 창덕궁 감역관 임명 같은 국정 운영의 다양성이 나타났고, 계유정난과 같은 내부 정치 사건도 있었습니다. 더 넓은 국제 맥락으로는 명-일 감합무역, 일본의 감합선 도항(1404-1547) 등의 교역과 외교 흐름이 있었으며, 이런 환경 속에서도 창제 사업은 문해력을 확대한 중요한 전환점으로 남았습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.6,
+      "evidence_diversity": 0.6027668271587707,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6211982540609879,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.0631578947368421,
+      "evidence_diversity": 0.03172456985046161,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "세종대왕이 훈민정음을 창제한 이유는?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 119.3945631980896,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "세종대왕은 한자 중심 소통의 한계를 극복하고 백성이 쉽게 읽고 이해할 수 있는 문자 체계를 창제하여 훈민정음(정음 28자)을 반포했고, 훈민정음 서문에는 이것이 백성을 가르치는 올바른 소리로 쓰여야 한다고 명시되어 있습니다.\n\n창제의 원인은 한자 중심 소통의 큰 벽을 해소하고 일반 백성의 literate를 확산시키려는 필요에서 비롯되었습니다. 세종대왕은 1443년에 훈민정음 창제를 시작하여 1446년에 반포했고, 이 과정에는 집현전 학자들이 참여하였으며 성삼문은 수찬으로, 정인지 등과 함께 최항이 왕명의를 받아 주관하였고 신숙주도 관련 활동을 한 것으로 전해집니다. 이로써 훈민정음은 정음 28자(훈민정음)의 음가와 해석이 반영된 문자 체계로 완성되었습니다.\n\n훈민정음 서문은 백성을 가르치는 올바른 소리라는 목표를 분명히 밝히고 있으며, 정음 28자(훈민정음) 해석은 훈민정음 해례본과 함께 제시되어 있습니다.\n\n이와 더불어 같은 시기에 세종은 공안 전면 개정, 과전법 개정과 같은 관리 제도 개혁도 추진하였습니다. 이러한 문자 생활의 혁신과 더불어 관리 제도 개혁도 함께 이루어졌으며, 이는 왕권의 안정과 행정 효율성을 높이려는 포괄적 개혁의 일환으로 해석됩니다.",
+    "num_extracted_entities": 7,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.4375,
+      "evidence_diversity": 0.6485227098651101,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6065011952560584,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.046052631578947366,
+      "evidence_diversity": 0.03413277420342684,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "세종대왕이 훈민정음을 창제한 이유는?",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 102.25965189933777,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "세종대왕은 한자의 어려움으로 백성이 글을 배우기 어렵고 국정 소통이 원활하지 않다는 점을 해결하기 위해, 훈민정음 서문에 담긴 ‘백성을 가르치는 올바른 소리’라는 취지로 정음 28자를 가진 훈민정음을 1443년에 창제하여 1446년에 반포했습니다.\n\n원인과 영향 관계를 통해 보면, 한자의 복잡성으로 인한 읽고 쓰기 어려움이 국가 운영의 장애로 작용했고, 이를 해결하려는 의도에서 세종대왕은 집현전 학자들과 함께 민심을 반영하고 민정을 강화하려고 훈민정음을 창제했습니다. 성삼문·정인지·최항 등이 참여했고 신숙주도 활동했으며 이민 등도 참여했을 가능성이 있습니다. 제민창도 이 창제 과정을 행정적으로 지원했습니다. \n\n창제의 결과로 1443년 창제 시작, 1446년 반포된 훈민정음은 교육 활성화와 학문추구를 촉진했고, 백성을 위한 읽고 쓰기 능력을 대폭 향상시켰습니다. 이는 민심과 민정의 변화에 기여했으며 세종실록에 기록되어 있습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.74,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.625,
+      "evidence_diversity": 0.45349448049180435,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.7422891831837791,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.3894736842105263,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.06578947368421052,
+      "evidence_diversity": 0.023868130552200228,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "세종대왕과 정조의 업적을 비교하면?",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 156.47052001953125,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "세종대왕의 업적은 15세기 국정의 기틀을 다진 혁신에 집중되었고, 정조의 업적은 18세기 영조 이후의 정치 안정과 제도 정비 및 사회 규범 강화에 집중되어 시기 맥락이 다릅니다.\n\n세종대왕의 업적은 국정 기초를 다진 혁신에 집중되었고, 세종조사실과 세종대왕기념관 야외·세종대왕기념사업회 같은 현대의 기념으로 지속적으로 조명됩니다. 또한 문자 제도와 과학 기술의 발전 등 초석이 되었음을 암시합니다.\n\n정조의 업적은 18세기 정치 안정과 제도 정비에 초점을 두었고, 1747년 가체 금지 발의, 1756년 가체 금지 및 족두리 대체, 1761년 유생에 대한 칼 면제 특권 부여 같은 구체적 개혁으로 사회 규범과 신분 질서를 강화했습니다. 더불어 대전통편 편찬을 감독했고 현륭원을 관리하며 실록 편찬에도 관여했습니다. 1745년 제주 유품가솔 무술시험과 나주괘서사건도 이 시대의 정책 논의를 보여 줍니다.\n\n따라서 두 왕의 업적은 시기 맥락에 따라 형성되었고, 세종은 문자·과학 등 근본 기틀 확립에, 정조는 규범 강화와 제도 편찬으로 사회 질서 안정에 기여했습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 0.8,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.36666666666666664,
+      "evidence_diversity": 0.2439823643980616,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5567008261963892,
+    "weighted_metrics": {
+      "tbox_consistency": 0.08421052631578947,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.03859649122807017,
+      "evidence_diversity": 0.012841177073582188,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "세종대왕과 정조의 업적을 비교하면?",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 147.28757405281067,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "세종대왕의 업적이 정조의 업적에 비해 장기적으로 더 넓고 깊은 문화적·사회적 영향을 남겼습니다.\n\n세종대왕은 1446년 훈민정음을 반포하여 문자 해독과 보급의 혁명을 이끌고 문해율과 학문의 기반을 확장했습니다. 이로써 문화적 자긍심과 교육 체제가 뼈대 있게 발전했고, 세종조사실 같은 문헌으로 그의 업적이 체계적으로 정리되었습니다. 현대에는 세종대왕기념관 야외와 세종대왕기념사업회가 이러한 유산을 기억하고 보전하는 중요한 기억 공간으로 활용되고 있습니다.\n\n정조는 왕권 강화를 위한 탕평책과 학문 제도 강화를 통해 제도적 기반을 다졌습니다. 규장각, 성균관, 주자소의 기능을 강화하고 대전통편 편찬에 관여하는 등 학문과 법규의 체계화를 추진했습니다. 구체적으로 1777년 형구 규격 정립 지시, 1778년 가쇄 규정 축소, 1778년 4월 20일 경연고사비례 봉납, 1784년 작헌례 및 수리 시작, 1792년 고풍 명령 등의 정책으로 제도화가 깊어졌습니다. 또한 연잉군 왕세제 책봉은 왕권 정당성과 통치 기반의 확고화를 보여 주는 중요한 계기였고, 신임사화와 탄핵, 사망 같은 정치적 변화 속에서도 학문 중심의 제도적 기반을 유지하려는 노력이 두드러졌습니다. 이러한 점은 세종의 문화적 초점과 달리 제도·정치 영역에서의 지속적 강화로 나타납니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 0.6,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.4,
+      "evidence_diversity": 0.3954884891037233,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5471309731107222,
+    "weighted_metrics": {
+      "tbox_consistency": 0.0631578947368421,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.042105263157894736,
+      "evidence_diversity": 0.02081518363703807,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "세종대왕과 정조의 업적을 비교하면?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 248.49170875549316,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "세종대왕(세종)의 문화-과학 확산은 한글 창제와 보급, 천문학·의학·농업 기술의 발전으로 사회 전반의 지식 기반을 확장하여 장기적으로 가장 넓고 깊은 지속 효과를 남겼고, 정조의 제도 개혁은 실록 편찬 체계의 확립과 관리 규범의 정비를 통해 제도적 구조의 지속 가능성을 크게 강화했습니다.\n\n세종대왕은 1443년에 훈민정음을 창제하고 1446년에 반포하였으며, 집현전 학자들과 함께 학문을 진흥하고 지식을 보급하였습니다. 이 과정에서 세종조사실 등의 문헌이 남아 세종의 문화-과학 확산 의지를 보여 줍니다. 현대에는 세종대왕기념관 야외와 세종대왕기념사업회가 그의 업적을 기억하고 교육하는 역할을 합니다.\n\n정조는 1776년 즉위 후 1782년 외규장각 설치, 1784년 건원릉 수리, 1789년 지덕사 현판 사액 등을 통해 제도 개혁과 왕실 기구의 정비를 추진했습니다. 또한 대전통편 편찬안의 초고에 결재하고 재검토를 지시하는 등 편찬 절차를 체계화했고, 정조실록이나 정조사 같은 문헌으로 그의 정책이 기록되었습니다. 이와 함께 이조를 비롯한 관리 체계의 운영과 경연 절차의 기록은 현대 연구의 기본 자료가 됩니다. 정숙왕후는 왕실 맥락의 한 축으로 언급되며, 세종과 정조의 왕실 환경을 이해하는 데 참고 자료로 남아 있습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.3,
+      "evidence_diversity": 0.3954884891037233,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5787099204791433,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.03157894736842105,
+      "evidence_diversity": 0.02081518363703807,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "임진왜란이 조선 사회 전반에 끼친 장기적 영향은?",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 212.5559630393982,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "임진왜란은 조선 사회에 장기적으로 큰 변화를 남겼으며, 전쟁 이후 군영 창설과 군총 증가가 군사체계를 재편했고 비변사의 전시 기능이 강화되었으며, 회령 반란과 정유재란의 충격 속에 정치적 불안이 심화되었고 기축옥사 같은 숙청이 확산되었으며, 서원의 소실과 면천첩 거래 등 사회경제 구조의 변동이 수십 년에 걸쳐 지속되었습니다.\n\n임진왜란은 1592년 시작되어 1598년 경에 종결되었고, 이 기간에 지방 관아의 재정·업무 체계가 재편되며 가리층 유입이 급증했습니다. 전쟁 직후 임진왜란 이후 현종대까지 이어지는 군영 창설과 군총 증가가 본격화되었고, 옥포·한산해전 같은 해전은 전시 체제의 핵심 사례로 작동했습니다. 또한 면천첩의 매매 같은 사회경제적 변화도 기록됩니다.\n\n전쟁의 후폭풍으로 회령 반란과 정유재란 같은 반란과 충격이 잇따랐고, 기축옥사와 같은 정치적 숙청이 증가했습니다. 조선왕조실록과 같은 문헌에 따르면 비변사 등록 원본의 소실로 1616년까지의 행정 연속성에 큰 영향을 주었습니다. 이와 함께 서원의 소실과 사회적 긴장은 수십 년에 걸친 사회구조의 재편으로 이어졌고, 노비추쇄사업의 중단은 노동 인구 구성에도 변화를 가져왔습니다.",
+    "num_extracted_entities": 8,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.3888888888888889,
+      "evidence_diversity": 0.5482106005448051,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5961046514906623,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.04093567251461988,
+      "evidence_diversity": 0.02885318950235816,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "임진왜란이 조선 사회 전반에 끼친 장기적 영향은?",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 226.80118918418884,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "임진왜란은 조선 사회에 세대에 걸친 사회구조 변화와 제도 개혁의 흐름을 촉발했으며, 전후로 군영 창설과 군총 증가로 국방 체제가 재편되고, 본국송환과 회령 반란 등 국내 정치의 변동, 정유재란과 정묘호란의 여파가 외교·권력 구조를 재정비하는 계기가 되었습니다.\n\n1592년 시작-1598년 종결의 임진왜란 이후, 지방 관아의 재정·업무 재편이 가리층 유입을 촉진했고 현종대까지 군영 창설과 군총 증가로 국방 체제가 재편되었습니다. 비변사의 기능도 확대되어 전시 최고 기관으로 작동했고, 본국송환은 인구 구성에 변화를 남겼습니다.\n\n정유재란(1597–1598)과 정묘호란(1627)의 여파가 외교·왕권 재정비를 촉진했고, 회령 반란은 전후 사회 긴장을 드러냈습니다. 한산 진영의 해전은 해상력 강화의 필요를, 박진의 의병 활동은 민병의 가능성을 보여 주었습니다. 이 흐름은 『조선왕조실록』 등에 기록됩니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.85,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.4444444444444444,
+      "evidence_diversity": 0.4181656600790516,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.7793186604719968,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.4473684210526315,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.04678362573099415,
+      "evidence_diversity": 0.02200871895152903,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "임진왜란이 조선 사회 전반에 끼친 장기적 영향은?",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 248.10086297988892,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "임진왜란은 조선 사회의 장기 제도 변화를 촉발하여 군영 창설과 군총 증가를 통해 군사 행정 체계를 재편하고, 비변사의 기능을 확대해 전시 최고 기관으로의 권한을 강화했으며, 회령 반란과 관련된 이진은, 임진하, 임진부, 이진 등의 인물이 남긴 기록은 내부 정치 구조의 재편을 촉발했습니다.\n\n임진왜란은 1592년 시작되어 1598년 끝난 국난으로, 전쟁 이후 군영 창설(임진왜란 이후 ~ 현종대)과 군총 증가(임진왜란 이후 ~ 현종대)가 지속되며 군사 행정의 기틀을 강화시켰습니다. 또한 전시 상황에서의 비변사의 역할이 확대되어 전시 최고 기관으로서의 권한이 강화되었고, 전쟁 뒤 이와 관련한 기록은 비변사 등록으로 남아 있었으나 1616년까지 원본이 소실되는 등 기록 보존에 차질이 생겼습니다. 이 과정에서 면천첩의 매매와 같은 재정적 거래의 변화도 나타나 재정 관리 체계의 재편이 진행되었습니다. 이러한 제도적 변화는 회령 반란의 사건과 연계되어, 이진은, 임진하, 임진부, 이진 등의 인물이 관련 기록에 남아 있어 내부 정치 구조의 재편이 촉발되었음을 시사합니다.\n\n회령 반란은 임진왜란 직후의 사회적 불안과 권력 재편의 필요성을 드러낸 사례로 기록되며, 이진은, 임진하, 임진부, 이진 등의 인물이 관련되었다는 기록이 남아 있습니다. 이 사건은 전시 체계의 한계와 지방 권력의 분포 문제를 드러내며 중앙-지방 관료 체계의 재편을 촉발하였습니다. 결과적으로 전후 제도 변화의 방향은 관료 체계의 재편과 지방 관리 구조의 재정비, 전시 체제의 상설화와 같은 방향으로 정착되었고, 이는 실록과 비변사 등록 기록, 승정원일기 등 주요 문헌으로 확인됩니다. 또한 전후 사회의 재정 운영 측면에서 면천첩 매매와 같은 현실적 변화도 남아 있어, 전쟁이 재정 관리 방식과 행정 운영 방식의 구조적 변화를 이끌었다고 평가됩니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.36363636363636365,
+      "evidence_diversity": 0.6273082983655498,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5976095276651725,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.03827751196172249,
+      "evidence_diversity": 0.03301622622976578,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "경복궁은 누가 건설했는가?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 148.33104705810547,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "경복궁은 조선 왕조의 태조 이성계가 창건하였으며, 1395년경에 완성된 것으로 전해집니다.\n\n경복궁의 창건 배경은 조선의 왕권 중심 공간을 마련하고 국정 운영의 상징 공간으로 삼고자 한 의도에서 출발했습니다. 이성계는 경복궁을 설계하고 건설을 주도한 인물로 기록되며, 이에 대한 창건 사실은 조선왕조실록 등 당시 기록에 남아 있습니다. 또한 경복궁은 조선의 법궁(왕궁)으로서 여러 전각의 배치와 운영 체계가 정비되었고, 천추전 등 주요 공간들이 구성되어 왕실 업무의 중심지로 기능하였습니다. 한편 1553년에는 내수사 설치 및 관리 체계의 정비가 언급되고, 강녕전 수리 감독이 이뤄지는 등의 기록이 남아 있어 창건 이후에도 지속적으로 관리 체계가 강화되었습니다.\n\n근대에 들어서는 경복궁의 중건이 큰 변곡점으로 작용했습니다. 1865년에는 흥선대원군이 대규모 인력을 동원해 경복궁을 중건하도록 주도하였고, 이는 국력을 과시하고 왕권을 강화하기 위한 조선 후기의 대표적 국책 건축 사업으로 알려져 있습니다. 그 결과 경복궁의 주요 전각들과 공간 구성이 재정비되었으며, 1926년에는 일본인들에 의해 경복궁 전각이 훼손되었다가 1975년 원형대로 복원되었습니다. 이 과정에서 경복궁의 천추전, 강녕전, 수진궁, 주궁, 인경궁, 경우궁 같은 구성 요소들이 언급되며, 경복궁의 관리 조직으로도 수진궁과 주궁 등의 기관이 존재했습니다. 박인복은 경복궁 관련 기록에 등장하는 인물로 보이나 정확한 직책은 해석에 따라 다릅니다. 이외에도 경복궁은 조선의 수도 서울에 위치한 대표적 고궁으로서, 경복궁의 중건 정책은 당시의 국력 과시와 왕권 강화 의도를 반영합니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 1.0,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.16666666666666666,
+      "evidence_diversity": 0.3603215550831918,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.8259818362324487,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.5263157894736842,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.017543859649122806,
+      "evidence_diversity": 0.018964292372799566,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "경복궁은 누가 건설했는가?",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 160.6199450492859,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "경복궁은 조선의 새 왕조 상징으로, 태조 이성계의 주도 하에 1395년에 건립되었습니다.\n\n경복궁 창건의 주된 원인은 조선의 정통성과 국력을 과시하고 중앙집권 체제를 강화하기 위함이었습니다. 태조 이성계가 조선의 법궁으로 삼아 왕권의 중심으로 삼았고, 경복궁 내 각감청이 위치하였다고 전해집니다. 이 기록은 연도와 인물명을 명시하고 있으며, 문헌명으로 조선왕조실록에 기록되어 있습니다.\n\n그 뒤의 연대에서도 경복궁은 차례로 보수와 확대의 대상이 되었는데, 1553년 내수사 설치 및 제조 취임과 함께 경복궁 강녕전 수리 감독이 이루어졌습니다. 이후 1865년에는 흥선대원군의 주도 아래 경복궁 중건이 시행되어 조선 후기 최대 규모의 국책 건축 사업으로 논란이 되었고, 이는 국력 과시와 왕권 강화의 의도를 반영합니다. 또한 1926년 일본인들의 경복궁 전각 훼손이 있었고, 경복궁 천추전 등 전각의 위치와 건물 보존 상황에 변동이 있었습니다. 추출된 엔티티로 박인복, 수진궁, 주궁, 인경궁, 경우궁이 관련되어 있습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 1.0,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.25,
+      "evidence_diversity": 0.6027668271587707,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.8475140435346721,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.5263157894736842,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.02631578947368421,
+      "evidence_diversity": 0.03172456985046161,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "경복궁은 누가 건설했는가?",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 151.73904609680176,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "1395년경 태조 이성계가 경복궁을 창건하여 건설하였습니다. 경복궁은 조선의 왕권을 강화하고 국력을 과시하기 위한 상징적 공간으로 세워졌으며, 조선의 법궁(왕궁) 중 하나로서 왕권의 중심지 역할을 하였습니다. 조선의 창건 과정에서 경복궁은 천추전 등 주요 전각과 수진궁, 주궁, 인경궁 등 공간 구성으로 이루어졌으며, 이러한 맥락은 연대기상으로 조선의 건국 직후의 정책과 왕권 재정비의 핵심으로 설명됩니다. 또한 1553년에는 내수사가 설치되고 제조 취임이 이루어졌으며, 경복궁 강녕전 수리 감독이 함께 진행되었습니다. 이 시기 경복궁은 강녕전 등 주요 전각의 관리와 보수 체계가 강화되었고, 경복궁 천추전, 인경궁, 경우궁, 수진궁, 주궁 등 다양한 공간의 관리 체계가 부분적으로 정비되었습니다. 이러한 내용은 조선왕조실록 등 문헌명으로 기록되어 전해집니다.\n\n1865년에는 흥선대원군이 국력을 과시하고 왕권을 강화하기 위해 대규모 인력을 동원하여 경복궁 중건을 시행하였습니다. 이는 조선 후기의 대규모 국책 건축사업으로 당시 최대 규모의 건축 사업이었으며 막대한 재정 소모로 논란을 일으킨 것으로 전해집니다. 경복궁 중건은 경복궁의 상징성과 기능을 재정비하고, 왕권 강화 정책의 시각적·제도적 표현으로 작용했습니다. 이 과정은 흥선대원군의 실록과 같은 문헌에서 확인됩니다.\n\n한편 1926년 일본인들의 경복궁 전각 훼손이 발생하였고, 북관대첩비가 반환되어 전시되었던 장소이며 복제비가 세워진 장소 중 하나로 남아 있습니다. 이러한 일제강점기 기록과 관련 문헌은 일제총독부 문서 등에서 확인되며, 경복궁의 구조적 손상과 그 이후의 복원 정비 역사와 함께 기록되어 있습니다.\n\n참고로, 추출된 엔티티 중 박인복은 관련 기록이 남아 있을 가능성이 있어 언급합니다. 또한 경복궁의 구역으로는 천추전과 함께 경복궁의 내부 공간인 인경궁, 경우궁, 수진궁, 주궁 등이 존재하는데, 이들 역시 당시 관리 체계와 공간 구성의 일부로 다루어졌습니다. 이러한 맥락은 1553년의 내수사 설치 및 수리 감독과 1865년의 중건, 1926년의 훼손 사건 등의 흐름 속에서 연결됩니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 1.0,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.3125,
+      "evidence_diversity": 0.6156406399954366,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.8547705599997598,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.5263157894736842,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.03289473684210526,
+      "evidence_diversity": 0.03240213894712824,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "인조반정이 일어나게 된 배경은 무엇인가?",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 133.10130095481873,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "정치 파벌 간 갈등의 심화와 외교 환경 변화가 반정의 토대를 형성하였고, 1623년 광해군을 축출하고 인조를 옹립한 인조반정이 일어났습니다.\n\n배경은 크게 두 축으로 이루어집니다. 첫째는 내부 정치 파벌 간의 갈등이 격화된 점으로, 광해군의 재임 동안 권력이 특정 세력에 집중되었고 반대 진영의 저항이 커졌습니다. 둘째는 외교 환경의 변화로, 명나라 중심의 전통 질서가 약화되고 청나라의 세력 확장에 대한 대응 문제가 대두되면서 정책 방향의 재구성이 필요해졌습니다. 이 같은 요인들이 상호 작용하여 정권 재편의 가능성을 높였고, 1623년의 인조반정으로 이어졌습니다. 이 과정에서 인조반정 공신들이 두드러지게 부상하였으며, 기록은 인조실록에 자세히 남아 있습니다.\n\n정변은 궁중에 반정군이 진입해 광해군을 폐위하고 인조를 왕으로 옹립한 형태로 진행되었습니다. 이 직후 관료 교체와 정치 재편이 크게 이루어졌고, 정인홍은 참형되었다고 기록됩니다. 또한 회맹제, 가도사건, 임반의 변, 증광문과 병과 급제와 같은 사건들이 병행되어 관료 구성이 바뀌는 데 영향을 주었습니다. 이 시기의 정국은 인조반정의 직간접적 결과로 기해예송으로 이어지는 예송 논쟁의 불씨를 남겼으며, 이는 후대 정치 지형에도 큰 영향을 주었습니다. 모든 사실은 인조실록 등 연대기 자료에 기록되어 있습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.975,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.8333333333333334,
+      "evidence_diversity": 0.3900152049033158,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.8845622037668411,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.513157894736842,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.08771929824561403,
+      "evidence_diversity": 0.020527116047542936,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "인조반정이 일어나게 된 배경은 무엇인가?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 129.57268595695496,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "인조반정의 배경은 정치세력 간 갈등과 왕권 약화의 누적이며, 1623년 광해군 축출로 인조가 왕위에 올라 반정군이 궁중에 들어와 성공하고 정국 개편이 시작되었으며, 이후 인조반정 후 관료 교체와 정사공신 책록 및 삭훈, 대북파 처형·귀양이 이어졌고 이괄의 난과 갑인예송·기해예송의 대립으로 왕권이 재정비되면서 그 배경이 형성되었습니다.\n\n배경의 시작은 광해군 시기 정책과 인사에서 벌어진 정치세력 간 갈등이 점차 격화되면서 왕권이 약화된 점에 있습니다. 이로 인해 서인과 남인 간의 대립 구도가 심화되었고, 이러한 상황이 1623년의 인조반정으로 이어져 반정군이 궁중에 들어와 성공하며 광해군을 폐위하고 인조를 왕위에 올리는 계기가 되었습니다. 인조반정 이후에는 정국 개편이 이루어져 서인이 축출되고 남인이 등용되었으며, 인조반정 후 관료 교체가 진행되고 정사공신으로 책록되며 삭훈 기록이 남았습니다. 또한 반정의 성과로 대북파 처형·귀양이 실시되었고, 이 과정은 인조실록에 자세히 기록되어 있습니다. 이어서 이괄의 난이 발생했고, 갑인예송과 기해예송의 대립을 통해 왕권 재정비의 흐름이 지속되었습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 1.2,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.4166666666666667,
+      "evidence_diversity": 0.5301454277694697,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.9664988821633054,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.043859649122807015,
+      "evidence_diversity": 0.027902390935235246,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "인조반정이 일어나게 된 배경은 무엇인가?",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 159.92050623893738,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "배경은 정치 파벌 간 갈등과 왕권 불안정, 개혁 반대 분위기가 지배적이었으며, 1623년 인조반정으로 광해군이 폐위되고 인조가 즉위하는 것이 핵심이고 반정 이후 이조를 중심으로 서인 공신의 책봉과 관료 교체가 이루어졌습니다.\n\n당시의 파벌 갈등은 광해군 시절의 정책 갈등과 대북파와 소북파 간의 경쟁으로 심화되었고, 갑인예송 이후의 정권 교체가 인조반정 이후 약 50여 년 만의 일이라는 기록이 남아 있습니다. 이러한 정치적 불안과 파벌 갈등은 반정의 여건을 형성했고, 결국 1623년 반정군이 궁궐에 진입해 광해군을 폐위하고 인조를 즉위시키는 계기가 되었습니다.\n\n반정 직후에는 이조를 중심으로 서인 공신의 대거 책봉이 이루어졌고, 대북파의 세력은 처형·귀양으로 약화되었습니다. 이 과정에서 많은 관료가 교체되었고, 이로써 반정의 실질적 정치 재편이 완료되었습니다. 인조반정의 공신으로 이인정 등이 두드러지게 거론되었으며, 반정 이후의 정권 구조는 서인 진영의 강력한 영향력 아래 재편되었습니다. 또한 정인지 묘는 이 시기의 인물들을 상징하는 유적으로 남아 있으며, 인조실록에는 이 시기의 사건과 인물 움직임이 자세히 기록되어 있습니다.",
+    "num_extracted_entities": 9,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.9666666666666667,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.4166666666666667,
+      "evidence_diversity": 0.5301454277694697,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.8436918646194458,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.5087719298245614,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.043859649122807015,
+      "evidence_diversity": 0.027902390935235246,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "갑오개혁과 갑신정변의 차이점은?",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 135.30929803848267,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "갑신정변은 1884년에 일어난 소수 엘리트의 급진적 쿠데타 성격의 개혁 시도였고, 갑오개혁은 1894년 정부 주도 아래 이루어진 제도 개편 중심의 근대화 개혁으로 배경과 목표가 다릅니다.\n\n갑신정변의 배경은 국내의 보수적 권력구조에 대한 반발과 개화파의 영향 아래 급진적 개혁을 시도하려는 시도였습니다. 주도 인물로는 김옥균, 박영효, 홍영식 등이 있으며, 도승지 임명 등의 개혁 조치를 추진했습니다. 하지만 1884년 청의 개입으로 진압되었고, 이로 인해 외세의 간섭을 규정하는 감계 회담이 이어졌습니다(1885년, 1887년). 이 사건은 국내 권력구조의 불안정성과 외세 영향에 따라 실패로 귀결되었으며, 이후 국내 개혁에 대한 반성과 경로의 변화를 남겼습니다. 또한 갑신정변 가담 및 도승지 임명 같은 구체적 사건들이 기록에 남아 있습니다.\n\n반면 갑오개혁의 배경은 동학농민운동의 확산과 사회 불안, 국제 질서의 변화 속에서 제도와 관제를 근대적으로 바꿔야 한다는 필요성에서 비롯되었습니다. 1894년의 근대적 관제 개편을 포함한 정치·사회 개혁으로, 갑오개혁법에 따라 관제 체계가 재편되었고, 갑오경장으로 칙임관의 하한을 바꿔 정6품·종6품을 6품으로 단일화하는 등 품계 제도가 정리되었습니다. 또한 종친부가 종정부로 전환되고 일부 저품계 관직이 폐지되었으며, 갑오개혁으로 세손시강원과 보양청이 세자시강원으로 통합되고 경릉 관련 절차도 정리되었습니다(경릉 조성·공역 완료; 경릉으로 능호 결정 및 합부). 이 과정에서 1894년 7월의 갑오경장이 구체적으로 추진되었고, 이를 통해 관제의 현대화를 실현하려 했습니다. 이러한 변화의 핵심은 정부 주도 하에 체제와 관제를 근대적 방식으로 재편했다는 점입니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.25,
+      "evidence_diversity": 0.2439823643980616,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5654727560209506,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.02631578947368421,
+      "evidence_diversity": 0.012841177073582188,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "갑오개혁과 갑신정변의 차이점은?",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 135.81503200531006,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "갑오개혁은 1894년의 근대적 관제 개편 필요성과 삼정 논의의 제도화를 바탕으로 추진되었고, 갑신정변은 1884년 급진 개화파의 외교·개혁 의지에서 비롯되었으며 직후 영향은 다르게 나타났습니다. 갑오개혁은 실제 제도 변화로 이어져 중앙집권 강화와 관료제 개편의 형태로 빠르게 진행되었지만, 갑신정변은 청군의 개입으로 실패하고 개혁 의지가 좌절되었다는 점에서 차이가 있습니다.\n\n갑신정변의 원인은 무엇보다 내부의 낡은 제도와 외교적 불안정 상황 속에서 급진적으로 개화를 추진하려는 움직임이 컸습니다. 이 과정에서 1884년 갑신정변에 가담한 인물들로는 김옥균, 박영효 등이 있었고, 도승지가 임명되는 등 정치적 변화의 시도가 이루어졌습니다. 그러나 임오군란의 여파와 청의 개입으로 정변은 순식간에 좌절되었고, 정변의 직후 영향을 통해 보수적 재편과 외교적 관계 재정비가 이루어지며 급진 개혁의 길은 잠시 막히게 되었습니다. 이 시기의 핵심 맥락은 연도와 사건명으로는 1884년 갑신정변이며, 관련 인물로는 김옥균, 박영효 등이 거론됩니다.\n\n반면 갑오개혁의 원인은 1894년 고종의 주도 아래 근대적 관제의 재편 필요성이 강하게 대두되었고, 삼정 논의의 일부를 제도로 실현하려는 의도도 작용했습니다. 이 개혁은 1894년의 근대적 관제 개편을 통해 종친부를 종정부로 전환하고 일부 저품계 관직을 폐지하는 등의 제도적 변화를 포함했고, 세손시강원과 보양청이 세자시강원으로 통합되는 등 왕실과 관리 체계의 재구성을 추진했습니다. 또한 갑오개혁법의 제정과 함께 삼정 정책의 일부를 제도화하고 면리제 개편 추진, 무토궁방전의 폐지와 같은 구체적 조치들이 거론되었습니다. 이 과정의 대표적 인물로는 고종이 있으며, 관련 문헌으로는 갑오개혁법과 삼정 정책 등이 있습니다.\n\n요약하면, 갑신정변은 1884년의 급진 개혁 의지가 외교·내부 상황의 불안정 속에서 급격히 드러났으나 청군 개입으로 실패했고, 그 직후의 영향은 보수화와 외교 재정비로 귀결되었습니다. 반면 갑오개혁은 1894년의 체제적 개편 의지로 실제 제도 변화를 이끌었고, 종친부의 전환, 저품계 관직의 폐지, 세자시강원 체제의 정비 등을 통해 중앙집권 체제를 강화하는 방향으로 추진되어 즉각적인 제도 개편이 이루어졌습니다.",
+    "num_extracted_entities": 9,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.4375,
+      "evidence_diversity": 0.6156406399954366,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6047705599997598,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.046052631578947366,
+      "evidence_diversity": 0.03240213894712824,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "갑오개혁과 갑신정변의 차이점은?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 123.77775573730469,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "갑신정변의 배경은 보수적 권력층의 급진적 개혁 시도였고, 갑오개혁의 배경은 국내외 위기 속에서 점진적 근대화와 제도 개편을 추진한 차이가 있습니다.\n\n갑신정변은 1884년에 일어난 사건으로, 오혁, 한중혁, 정협, 이협 등 개화파 인물들이 주도하였고 도승지 임명까지 거론되었으나, 보수파의 반발과 청나라의 군사 개입으로 3일천하에 그쳤습니다. 이 과정에서 일본의 영향과 내부 권력 재편의 모색이 겹쳤지만 결국 실패로 끝났고, 이후 조선의 근대화 방향은 당대의 급진적 행보에서 더욱 신중하고 단계적인 방향으로 전환되는 계기가 되었습니다.\n\n갑오개혁은 1894년 고종 31년에 시작된 근대적 관제 개편으로, 동학농민운동의 확산과 외세의 간섭 속에서 추진된 제도 개편이 핵심입니다. 갑오개혁법으로 관제가 재편되었고, 종친부가 종정부로 전환되며 일부 저품계 관직이 폐지되었으며, 한성부 판윤이 없어지고 소윤이 한성부윤으로 개칭되었다가 다시 폐지되는 등의 변화가 있었다고 기록됩니다. 또한 세손시강원과 보양청이 세자시강원으로 통합되고, 삼정 정책의 일부가 제도적으로 실현되는 등 관제와 행정 체계가 현대적 방향으로 재편되었습니다. 이 과정에서 1894년의 사건들은 고종의 개혁 의지와 국내외 상황의 압력 속에서 추진된 점이 특징입니다.\n\n다른 한편으로, 갑신정변의 배경과 인물들인 오혁, 한중혁, 정협, 이협의 급진적 활동은 갑오개혁의 점진적 개혁 방향과 차이를 만든 요소로 작용했습니다. 갑오개혁의 배경은 국내 위기와 외세 간섭의 연쇄 속에서 제도 개편을 비교적 신중하고 체계적으로 추진한다는 방향으로 전환되었으며, 이는 이후의 근대화 흐름에 중요한 밑거름이 되었습니다. 문헌으로는 대표적으로 갑신정변 연구와 갑오개혁 연구 같은 학술서들이 있으며, 이를 통해 두 사건의 배경 차이가 구체적으로 확인됩니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.1,
+      "evidence_diversity": 0.49912765813124704,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5631119820069077,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.010526315789473684,
+      "evidence_diversity": 0.026269876743749844,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "조선시대 당쟁의 전개 과정과 그 영향을 설명하라",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 136.09974193572998,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "당쟁의 전개는 1761년 유생에 대한 칼 면제 특권 부여에서 시작되어, 1763년 비변사 보고 및 균역법 기준 징세, 1764년 가솔의 강제편입으로 군역 부과가 확대되며 갈등이 심화되었고, 1778년 가쇄 규정 축소로 정책 방향이 재편되었으며, 이 과정에서 형조판서 임명과 진사시 합격, 증광문과 병과 급제의 인재 선발 경로가 당파 간 인사권 경쟁에 큰 영향을 미쳤습니다. 또한 1771년 당쟁 사건과 같은 충돌이 표출되었고, 이 모든 흐름은 조선의 권력 구조와 정책 운영에 지속적인 영향을 남겼습니다.\n\n1761년(영조 37)에는 유생에게도 칼 면제 특권을 부여하는 조치가 있었고, 이로 인해 신분 간 특권 유지와 중앙 권력의 통제력 약화 사이에 긴장이 생겼습니다. 이어 1763년부터 비변사에 보고하여 균역법 기준에 따라 징세하도록 한 것은 가솔군관의 군포 징수 문제를 둘러싼 정책 충돌의 씨앗이 되었고, 1764년(영조 40)에는 본인의 희망을 무시하고 억지로 가솔을 편입시켜 군역을 부과하기 시작하면서 갈등이 정책 차원의 싸움으로 변질되었습니다. 이 시기의 쟁점은 비변사와 균역법, 군역의 책임 소재를 둘러싼 권력 다툼으로 구체화되었습니다.\n\n1778년(정조 2)에 가쇄 규정이 축소되면서 규율과 제도 운영의 방향이 바뀌는 계기가 되었고, 이 변화는 당쟁의 향방뿐 아니라 인재 등용 체계에도 영향을 미쳤습니다. 예를 들어 진사시 합격은 강릉참봉 임용으로 연결되었고, 증광문과 병과 급제는 황해도암행어사 파견으로 이어지는 등 문관 선발 경로가 당파의 이익과 연결되며 인사권 다툼의 단초가 되었습니다. 또한 형조판서 임명이나 암행어사 파견 같은 인사 조정 역시 동일한 당파 간의 경쟁 속에서 좌우되었음을 알 수 있습니다.",
+    "num_extracted_entities": 8,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.7999999999999999,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.3888888888888889,
+      "evidence_diversity": 0.6156406399954366,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.7575483377775375,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.4210526315789473,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.04093567251461988,
+      "evidence_diversity": 0.03240213894712824,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "조선시대 당쟁의 전개 과정과 그 영향을 설명하라",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 165.3459861278534,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "조선시대 당쟁은 정치적 불안정과 권력 재편의 배경 속에서 형성되었고, 16∼17세기에 동인과 서인으로 재편되며 왕권 강화와 관리 등용의 방향을 좌우하는 큰 영향을 미쳤으며, 1771년의 당쟁 사례에서도 김경지가 참여한 바 있습니다. \n\n당쟁의 원인은 주로 왕권 강화와 신진 사류의 등장에 따른 권력 재편 욕구에서 비롯되었습니다. 대표적 사례로 1498년 기묘사화에서 조광조를 중심으로 한 사림이 정치적 주도권을 확장하려 했고, 황보인을 중심으로 한 훈구파가 이에 반발했습니다. 이 과정은 조선왕조실록에 상세히 기록되어 당시의 정치 구조를 드러냅니다.\n\n그 후 당쟁은 16세기 말에서 17세기에 걸쳐 동인과 서인으로 재편되면서 제도적 불안정이 심화되었습니다. 예를 들어 1519년 갑자사화는 김안로를 중심으로 한 훈구파와 그에 대립한 사림파가 대립 구도로 번져 갔고, 1623년 정간의 변은 서인과 동인의 초기 갈등을 드러내며 환국의 전조가 되었습니다. 이들 사건은 조선왕조실록에 기록되어 중앙 인사 권력의 변화를 명확히 보여 줍니다.\n\n17세기에 들어서는 노론과 소론의 대립으로 당쟁의 양상이 전개되었고, 1641년 기사환국과 1674년 경신환국을 거치며 권력이 반복적으로 교체되었습니다. 이러한 환국들은 국가 정책의 방향을 좌우하고 관리 등용의 기준을 바꾸면서 국가 운영의 안정성을 해쳤습니다. 또한 1771년의 당쟁 사례에서도 김경지가 참여한 바가 기록되어, 당쟁이 조선 말기에 이르기까지 지속적으로 작동한 구조임을 시사합니다. 문헌으로는 주로 조선왕조실록과 관련 연구서가 남아 있습니다.",
+    "num_extracted_entities": 1,
+    "num_expanded_entities": 0,
+    "num_evidences": 3,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 0.5,
+      "intent_preservation": 1.0,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.75,
+      "evidence_diversity": 0.6826061944859853,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.8517161154992623,
+    "weighted_metrics": {
+      "tbox_consistency": 0.05263157894736842,
+      "intent_preservation": 0.5263157894736842,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.07894736842105263,
+      "evidence_diversity": 0.035926641815051855,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "조선시대 당쟁의 전개 과정과 그 영향을 설명하라",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 125.24029684066772,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "조선시대 당쟁은 권력 재편의 흐름 속에서 세력이 다투며 발전했고, 1771년의 격쟁 도입으로 공개적 대립이 체계화되었으며, 무신인 허쟁과 인물 김경지가 이 흐름에 관여하였습니다.\n\n전개 과정은 먼저 국난기와 권력 구도 속에서 당파 간 갈등이 축적되다가 점차 구조화되는 양상을 보였습니다. 정묘호란이 일어난 1627년에는 허쟁이 인동도호부와 같은 직책을 거쳐 무신으로 정치 무대에 모습을 드렸고, 이어 병자호란(1636)에도 관여한 것으로 전해집니다. 이러한 국난기 정치환경은 특정 가문이나 직파 세력이 정책 결정에 영향을 행사하는 경로를 열었고, 국정의 방향성에 대한 논쟁을 심화시켰습니다. 이후 억울한 민원을 임금 앞에 직접 제기하는 제도로 신문고가 폐지된 뒤 이를 대신해 실시된 격쟁이 도입되면서 당쟁의 표출이 보다 체계적으로 이루어지게 되었습니다. 격쟁의 범위와 형식은 자손의 조상에 대한 공경이나 처가 남편을 위한 사적 공론 등으로 제한되었다고 기록됩니다. 이러한 흐름은 당쟁의 형태를 강화하고 정치적 담론의 공개성을 높였다고 문헌에 남아 있습니다.\n\n주요 인물의 참여와 동기도 중요한데, 무신인 허쟁은 조선 말기까지 인동도호부, 동지중추부, 장흥부사 등의 직책을 역임하며 당쟁의 흐름에 관여하였고, 병자호란과 정묘호란 같은 국난기에도 참여한 것으로 확인됩니다. 또한 김경지는 당쟁에 참여한 인물로 기록되어 있으며, 이들 인물의 활동은 격쟁 제도 하의 정치적 대립과 인사 권한의 영향력 확산에 기여한 것으로 보입니다. 병난기 국면에서의 군사-정치적 연결과 인사 교체의 압력은 당쟁의 실질적 추진 동기로 작용하였고, 1771년의 격쟁 도입은 이러한 흐름을 더 공적으로 형식화했습니다. 이 시기 관련 기록은 연도별 사건명과 인물의 활동을 통해 확인됩니다.\n\n영향 측면에서 보면, 당쟁과 격쟁의 전개는 왕권과 신권의 균형에 지속적인 압력을 가하고 정책 결정의 일관성을 저하시킬 가능성을 남겼습니다. 또한 무신의 정치참여가 일정 부분 확대되고 국정 운영의 국면이 다변화되었다는 점에서 정치 구조의 변화에 영향을 주었다고 볼 수 있습니다. 다만 구체적 효과는 시기별 맥락에 따라 달라졌으며, 1771년의 격쟁 제도 도입은 이러한 영향의 한 예로서 공개적 대립의 도구로 기능했다는 점에서 주목됩니다. 이와 같은 내용은 1771년의 당쟁 관련 기록과 격쟁 제도에 대한 기록, 허쟁의 직책 및 국난 참여 기록, 김경지의 당쟁 참여 기록에 근거합니다. 문헌명으로는 조선시대 당쟁과 격쟁 관련 기록이 이를 뒷받침합니다.",
+    "num_extracted_entities": 3,
+    "num_expanded_entities": 0,
+    "num_evidences": 14,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 0.7272727272727273,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.2727272727272727,
+      "evidence_diversity": 0.7702436872383199,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.56685493090728,
+    "weighted_metrics": {
+      "tbox_consistency": 0.07655502392344497,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.028708133971291863,
+      "evidence_diversity": 0.040539141433595785,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "광해군의 재위 기간은?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 157.56234073638916,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "광해군의 재위 기간은 1608년부터 1623년까지입니다.\n\n광해군은 선조의 차남으로 세자 책봉이 이루어졌고 1608년에 즉위하여 1623년 인조반정으로 폐위되었습니다. 재위 기간 동안 내치의 안정과 국방 강화, 대동법 시험 실시, 양전 등 개혁적 시도를 하였고 창덕궁·창경궁 준공 등의 사업도 추진되었습니다. 이와 관련된 주요 기록은 광해군일기에 남아 있으며, 광해군묘는 그의 생애를 기리는 중요한 장소로 남아 있습니다. 또한 광해군의 재위 전후 맥락으로 제주 이배와 영창대군의 사사도 일어났습니다.\n\n추출된 엔티티를 통해 재위 기간의 맥락을 정리하면 다음과 같습니다. 먼저 광해군 세자 책봉은 선조의 차남으로 이루어졌고, 이 사실은 광해군일기에 기록되어 있습니다. 재위 기간 중에는 영창대군 사사와 제주 이배가 발생하여 광해군의 몰락으로 이어졌으며, 제주도에서 1641년 사망하였습니다. 또한 광해군의 초기 경력으로 재서용 논의(1574), 진사시 합격, 증광문과 병과 급제 등의 이력이 남아 있어 그의 정치 경력의 시작과 재위 과정의 기반을 이해하는 데 도움이 됩니다. 이와 함께 광해군묘와 광해군일기 같은 문헌은 재위 기간과 이후 사건들을 연결하는 핵심 근거로 작용합니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 0.4545454545454546,
+      "intent_preservation": 0.6666666666666666,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.22727272727272727,
+      "evidence_diversity": 0.6273082983655498,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6135584909825568,
+    "weighted_metrics": {
+      "tbox_consistency": 0.04784688995215311,
+      "intent_preservation": 0.3508771929824561,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.02392344497607655,
+      "evidence_diversity": 0.03301622622976578,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "광해군의 재위 기간은?",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 220.28506183624268,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "광해군의 재위 기간은 1608년부터 1623년까지입니다.\n\n광해군은 선조의 차남으로 세자에 책봉된 뒤 1608년에 즉위하였으며, 이 시기는 재위의 시작으로 기록됩니다. 광해군 세자 책봉은 그의 즉위를 뒷받침하는 중요한 전제였고, 재위 기간 동안 광해군일기와 같은 문헌에 그의 업적과 정책이 남아 있습니다. 또한 영창대군 사사와 죄목 12등급 분류 같은 정치적 논쟁의 흔적이 남아 있어 당시의 내정 상황을 파악하는 데 중요한 단서를 제공합니다.\n\n재위 기간 동안 대동법의 시험 실시, 양전의 추진, 적상산사고 설치, 창덕궁과 창경궁의 준공 등 다수의 정책과 건축 사업이 추진되었습니다. 창경궁은 광해군에 의해 창건되었으며, 외교 측면에서는 1609년 기유약조를 통해 통교가 재개되는 등의 조치가 이뤄졌습니다. 그러나 정치적 불안은 지속되어 1623년 인조반정으로 왕위를 잃고 폐위되었고, 이후 제주도에서 사망하였습니다. 이 시기의 주요 사건과 기록은 광해군일기를 비롯한 여러 문헌에 남아 있으며, 본국송환과 한산 진영과 같은 맥락적 사건들도 그의 재위 시대를 형성하는 요소로 논의됩니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 0.8,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.4,
+      "evidence_diversity": 0.3954884891037233,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5681836046896697,
+    "weighted_metrics": {
+      "tbox_consistency": 0.08421052631578947,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.042105263157894736,
+      "evidence_diversity": 0.02081518363703807,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "광해군의 재위 기간은?",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 162.83952689170837,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "광해군의 재위 기간은 1608년부터 1623년까지입니다.\n\n광해군은 선조의 차남으로 세자 책봉 후 1608년에 즉위하였고, 1623년 인조반정으로 폐위되었습니다. 이 기간 동안 대동법의 시험 실시, 양전의 시행, 적상산사고 설치, 창덕궁과 창경궁의 준공 등 개혁과 건축이 병행되었고 이는 광해군일기에 자세히 기록되어 있습니다. 또한 광해군 재위 기간에는 제주도 이배와 같이 정치적 갈등이 얽히는 사건들이 있었고, 영창대군의 사사나 죄목의 분류 등 당대의 정치적 논란이 제도적으로 언급됩니다. 더불어 영해군과 광평대군 등 다른 왕손에 관한 기록도 남아 있습니다. 이와 관련한 주요 문헌으로는 광해군일기가 확인되며, 광해군묘와 유형장군 묘 같은 장소 흔적도 존재합니다.\n\n재위 기간의 인과관계를 보면, 임진왜란 이후의 국정 안정과 권력 구조 재편을 시도하다가 결국 1623년 인조반정으로 폐위되는 경로를 밟았습니다. 이 과정에서 12등급의 죄목 분류나 광해군 시기의 정치적 탄압, 광해군일기에 남아 있는 기록들, 그리고 영창대군의 사사 등 사건들이 서로 얽혀 재상의 판단과 권력 다툼에 영향을 주었습니다. 또 창덕궁과 창경궁의 준공, 대동법의 시험, 양전의 시행 등 정책적 활동과 함께 광해군묘를 비롯한 여러 장소의 기록과 더불어 영해군, 광평대군 등 왕손에 대한 기록도 당시 정치의 맥락을 이해하는 데 참고가 됩니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 0.4666666666666667,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.26666666666666666,
+      "evidence_diversity": 0.42929478917821157,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5208400766234146,
+    "weighted_metrics": {
+      "tbox_consistency": 0.04912280701754386,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.02807017543859649,
+      "evidence_diversity": 0.022594462588326925,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "정묘호란이 발생한 이유는?",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 170.09937381744385,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "정묘호란의 발생 원인은 후금의 위협이 증가하고 조선이 명-후금 외교 충돌 속에서 생존 전략을 둘러싼 갈등에 직면한 데 있습니다. 구체적으로 1627년 인조 5년에 후금의 조선 침입이 일어나며 전쟁이 시작되었고, 이 과정에서 후금의 압력이 커지자 조선은 명-후금 외교 위치를 둘러싼 충돌을 겪었습니다. 이 시기의 기록은 조선왕조실록 등에서 확인됩니다.\n\n1627년 전개와 외교적 맥락은 다음과 같이 설명할 수 있습니다. 먼저 후금은 의주를 침탈하는 등 실질적인 군사 압력을 가했고, 조선은 강화도에 왕을 피난시키는 등 국가 생존을 위한 방어 조치를 취했습니다. 이 과정에서 성묘나 문묘출향 같은 외교적 의례와 회맹제 등의 절차가 이뤄졌고, 내부적으로 가도사건과 임반의 변 등의 대내외적 긴장도 증가했습니다. 이처럼 외교적 충돌과 군사적 압력의 누적이 정묘호란의 직접적 원인이 되었습니다.\n\n결과적으로 전쟁은 1627년 1월 중순부터 3월 초까지 약 두 달간 지속되었으며, 조선은 의주를 포함한 일부 지역이 함락되고 강화도로 피난하는 등 심한 국면을 맞이했습니다. 이 과정에서 2차적 전개로 박언배 같은 인물이 참전하여 전공을 세우기도 했습니다. 전쟁의 종결은 정묘약조의 체결로 이어졌고, 강화도에서의 왕 호종이 이루어졌습니다. 이로써 속환과 같은 외교적 조치가 이루어졌고, 성묘를 포함한 외교 의례가 진행되었다고 전해집니다. 정묘호란의 직접적 여파는 이후의 병자호란으로 이어져 삼전도 항복 및 인질 파견 사건이 벌어지는 등 큰 외교적 변화를 낳았으며, 이 모든 흐름은 조선의 외교가 명-후금 사이에서 어떻게 재정비되었는지를 보여 줍니다. 참고로 이 사건들에 대한 기록은 조선왕조실록과 연려실기정 등에서 확인됩니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.64,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.5333333333333333,
+      "evidence_diversity": 0.3603215550831918,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6751046432499925,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.3368421052631579,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.05614035087719298,
+      "evidence_diversity": 0.018964292372799566,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "정묘호란이 발생한 이유는?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 170.98383212089539,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "정묘호란의 발생 원인은 외교·정치의 연쇄적 원인으로, 1619년의 정묘약조를 계기로 여진(후금)과 조선의 대외관계가 긴장하게 되었고, 이후 내부 권력구조의 변화와 제도 개편이 누적되어 1627년 여진의 의주 공격으로 실제 전쟁이 벌어졌습니다.\n\n1619년 정묘약조 체결 이후 여진과 조선의 관계가 급변했고, 심양에서의 체포 및 사망 등 외교적 사건들이 관계를 악화시켰으며, 문묘출향과 성묘 같은 의례적·제도적 변화가 강화되었습니다. 또한 봉림대군의 즉위(1649년, 효종) 및 상수관 직명 폐지와 대통관 제도 도입 같은 제도 개혁이 외교정책의 틀을 재구성하였습니다. 1627년 1월 중순부터 3월 초까지 약 2개월간 조선은 강화도로 피난하고 각지의 의병이 활약하였으며, 의주를 함락시키는 전투를 포함한 전쟁이 벌어졌고, 결국 3월 3일 화약 성립으로 휴전에 이르렀습니다.\n\n이 충돌의 후폭풍은 병자호란(1636-37)으로 이어져 삼전도 항복이 벌어졌고, 이로써 조선의 외교정책은 또 다른 체제 변화의 국면으로 접어들었습니다. 또한 이러한 흐름 속에서 봉림대군의 즉위와 여러 제도 변화가 촉발되었으며, 이 모든 내용은 조선왕조실록 등 문헌에 기록되어 있습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.64,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.7142857142857143,
+      "evidence_diversity": 0.42929478917821157,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.697782432513139,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.3368421052631579,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.07518796992481203,
+      "evidence_diversity": 0.022594462588326925,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "정묘호란이 발생한 이유는?",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 216.42312026023865,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "청의 확장 정책과 조선의 명 의존 정책이 충돌한 결과입니다.\n\n1627년(인조 5년) 정묘호란은 청의 확장 의지가 강해지던 시기에 발생한 호란으로 시작되었습니다. 청은 의주를 공격하고 안주성 등에서 교전을 벌였으며, 정언호가 안주에서 후금과 교전하다가 자결했다는 기록도 남아 있습니다. 이 시기는 청과 조선 사이의 외교적 긴장이 극에 달한 때로, 전쟁으로 확전되었습니다.\n\n전쟁은 약 두 달간 지속된 끝에 화의가 성립하고 정묘약조가 체결되어 청의 철수와 양국의 관계 재정비가 이루어졌습니다. 전후에는 정미약조, 임신약조 같은 약조도 논의되었고, 문묘출향과 영묘고사 같은 의례가 거행되었으며 성묘 등 왕실의 의례가 강조되었습니다. 또한 이 시기의 역사적 현상으로 속환 논의가 제기되었고, 오늘날의 연구에서 정약용 선생 묘와 같은 현대의 역사 현장 방문은 이 사건의 이해를 돕습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.8,
+      "evidence_diversity": 0.15218358217012873,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6185359780089541,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.08421052631578947,
+      "evidence_diversity": 0.008009662219480459,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "영조와 정조의 정치 개혁 방식 차이는?",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 168.56902623176575,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "영조의 정치 개혁 방식은 안정 욕구를 바탕으로 당파 축출과 신원 재편에 중점을 둔 환국 계열의 정리에 의존했고, 제도적으로는 승정원일기의 보수·정리와 1746년 일기청 설치 등 중앙 기구의 기능 강화를 통해 실권을 재편해 왔습니다. 또한 을사환국, 기사환국, 갑술환국 같은 환국과 1725년의 사대신 신원, 1687년 가복 사례, 1702년 오시복의 편지 등으로 당파 구도를 재조정했습니다. 이를 바탕으로 영조실록의 기록 관리와 찬집청, 보사공신 복훈(복훈·녹훈추록) 등의 제도적 조치를 추진했습니다. \n\n다음으로 제도 변화 측면에서 영조의 행보를 보면, 1746년에 일기청을 설치하여 승정원일기의 보수 정리에 집중했고, 정자각의 수리 및 영조의 현지 점검을 통해 관리 감독 체계를 강화했습니다. 그 밖에 준천소의 임시 설치와 영조 관련 문헌 관리 체계, 탈락과 신원의 절차를 다룬 다양한 제도적 조치가 이어졌습니다. 이러한 흐름은 영조실록과 영조의 정책 문헌을 통해 확인됩니다.\n\n정조의 차이는 제도 중심의 체계적 확립과 왕권 강화에 초점을 두었다는 점입니다. 비록 구체적 사건들은 주로 영조 시기의 환국과 제도 보완에 연결되지만, 정조는 이미 확립된 제도 틀을 바탕으로 제도 자체의 정밀한 정비와 규범화를 추진했습니다. 이와 관련해 영조의 정치적 조치들(예: 을사환국, 사대신 신원, 일기청 설치 등)과 제도적 정비의 연계가 분명히 나타납니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 0.5454545454545454,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.18181818181818182,
+      "evidence_diversity": 0.3603215550831918,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5165719478751919,
+    "weighted_metrics": {
+      "tbox_consistency": 0.057416267942583726,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.019138755980861243,
+      "evidence_diversity": 0.018964292372799566,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "영조와 정조의 정치 개혁 방식 차이는?",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 198.86571407318115,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "영조의 개혁은 소론 축출과 노론의 신원 확립을 통한 권력 재편의 강력한 숙청 중심이었고, 정조의 개혁은 탕평파를 기반으로 한 균형 정치 아래 제도와 정책의 체계적 개혁과 상징적 정책으로 국정을 재정비하는 차이가 있습니다. 이를 뒷받침하는 대표적 사례로 을사환국, 정미환국, 경신처분, 을사처분, 이인좌의 난, 준천소 임시 설치, 사우 건립, 포충사 사액, 홍치중·김재로의 진출 등이 있습니다.\n\n영조의 배경은 왕권 안정과 당파 구도 재편이었습니다. 을사환국과 정미환국, 경신처분, 을사처분을 통해 소론을 축출하고 노론의 신원을 강화했습니다. 이인좌의 난과 준천소 임시 설치로 권력 기반을 굳혔습니다. 이러한 흐름은 영조실록에 기록되며 영조사가 이를 정리합니다.\n\n정조는 재위 기간(1776-1800년대) 동안 탕평파를 기반으로 한 균형 정치를 유지했습니다. 홍치중·김재로의 진출로 인사 구도를 재편했고, 제도 개혁과 더불어 사우 건립과 포충사 사액 등 상징적 정책으로 국가 이념을 재정비했습니다. 이러한 흐름은 영조실록과 영조사에 기록되어 있습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 0.33333333333333337,
+      "intent_preservation": 0.6166666666666667,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.2777777777777778,
+      "evidence_diversity": 0.4181656600790516,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5687923446825232,
+    "weighted_metrics": {
+      "tbox_consistency": 0.03508771929824562,
+      "intent_preservation": 0.32456140350877194,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.029239766081871343,
+      "evidence_diversity": 0.02200871895152903,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "영조와 정조의 정치 개혁 방식 차이는?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 195.29701209068298,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "영조의 정치 개혁은 재위 초기에 강하게 시작되어 시기적으로 분명한 구간을 통해 권력 구조를 재편한 반면, 정조의 개혁은 재위 기간 전반에 걸쳐 점진적으로 제도화와 기록 관리 강화에 집중한 차이가 있습니다.\n\n영조는 재위 직후의 정치 국면에서 탕평책을 바탕으로 소론을 축출하고 노론의 신원을 추진하는 을사환국(1724년~1725년)을 통해 당파 균형의 기초를 다졌습니다. 이어 1731년 균역법 제정을 통해 세금과 군역 체계를 개편했고, 1746년에는 승정원일기의 보수와 기록 체계 강화를 위해 일기청을 설치하였습니다. 또한 1759년에는 세손강서원에 좌·우권독과 좌·우유선을 배치하여 세손의 교육을 강화하였습니다. 이러한 일련의 조치는 영조실록과 승정원일기에 구체적으로 남아 있으며, 정책의 추진 시기도 분명하게 제시됩니다. 또한 영조사, 이조, 예조 등 제도권의 운용 변화도 이 시기에 두드러지게 나타납니다.\n\n정조는 재위 기간 동안에도 탕평책의 기조를 유지하되, 시기를 넓게 보는 제도적이고 구조적인 개혁에 더 무게를 두었습니다. 정조실록의 편찬을 주도하고 승정원일기의 관리 체계 강화와 이조·예조의 운영 개선을 통해 행정 체제를 안정화했고, 기록 관리의 강화와 실학 사상의 정책 반영을 통해 정책 실행의 체계성과 지속성을 확보하려 했습니다. 이러한 흐름은 정조실록을 통해 확인되며, 순조실록 등 후대 기록에서도 정조의 제도화 중심 개혁의 방향이 반복적으로 확인됩니다. 이처럼 영조와 정조의 차이는 시기적 집중의 차로 요약되며, 영조는 재위 초기에 급격한 숙청과 정책 도입으로 기반을 다진 반면, 정조는 재위 기간 전반에 걸쳐 제도화와 기록 관리 강화에 집중하였습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5833333333333334,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.3888888888888889,
+      "evidence_diversity": 0.4181656600790516,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6331198300626402,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.30701754385964913,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.04093567251461988,
+      "evidence_diversity": 0.02200871895152903,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "사화가 조선 정치에 미친 영향은?",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 177.70136618614197,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "사화는 직후 정파 재편과 인사 교체의 양상을 촉발하며, 훈구세력의 지배가 강화되거나 신진사류의 몰락으로 이어져 조선 초기 정치 구도를 재편했습니다.\n\n무오사화(1498), 갑자사화(1514), 기묘사화(1519)로 대표되며 신진사류 조광조 계열의 탄압과 훈구세력의 재확립이 벌어졌습니다. 특히 기묘사화로 조광조 일파가 몰락하고 김정, 김식 등도 처벌되어 사림의 대규모 숙청과 유배가 진행되었습니다. 이 과정에서 김굉필 문인들의 피화 역시 기록으로 남아 있습니다. 이러한 흐름은 조선왕조실록 같은 문헌명에 연도별로 남아 있습니다.\n\n갑자사화는 1514년의 사건으로 궁중 세력 장악을 강화하고 신진사류의 몰락을 심화시켰으며, 이 흐름은 중종반정(1506년)의 권력 재편과도 연결되었다는 점이 지적됩니다. 남곤, 심정, 홍경주 등 훈구세력의 탄핵 사례가 두드러졌습니다. 이로써 정권의 중심축이 훈구세력으로 재편되었고, 이후의 정치적 흐름에 큰 영향을 주었습니다.\n\n사화 직후에는 증광문과 급제로 인재를 등용하고 세자책봉주문사를 명나라에 파견하는 등 왕권 강화와 외교 절차가 함께 진행되었습니다. 더불어 명-일 감합무역, 일본의 감합선 도항과 같은 대외 관계의 맥락이 바뀌는 배경이 형성되었으며, 이는 외교 정책의 방향성에도 일정한 영향을 미쳤습니다. 이와 관련한 구체적 기록은 조선왕조실록과 같은 문헌에 남아 있습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.7999999999999999,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.8461538461538461,
+      "evidence_diversity": 0.6156406399954366,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.8056814911738488,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.4210526315789473,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.08906882591093117,
+      "evidence_diversity": 0.03240213894712824,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "사화가 조선 정치에 미친 영향은?",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 191.99479007720947,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "사화는 당파 갈등의 구조를 심화시키고, 사초·문건의 공개와 왕실 의도 같은 외부 요인에 의해 촉발되면서 무오사화(1498)에서 시작해 갑자사화(1504)와 중종반정으로 권력구도가 재편되었고, 이후 신임사화(약 1517년), 기묘사화(1519), 을사사화(1545) 같은 연쇄적 사건을 통해 신진사류와 훈구세력의 세력 구도가 반복적으로 재편되었으며, 다수의 문신들이 처벌·유배되며 정치의 안정성과 정책 수행이 크게 흔들렸습니다.\n\n사화의 원인은 크게 두 가지로 정리됩니다. 첫째, 당파 갈등의 구조입니다. 조선 초기에는 훈구세력이 권력의 주축으로 자리 잡았고, 점차 사림(신진사류) 계파가 성장하면서 왕권과 조정 내에서 세력 균형이 흔들렸습니다. 둘째, 외부 요인입니다. 무오사화(1498년) 때는 김종직의 조의제문과 김일손의 사초가 실록청에 제출되며 직접 탄핵 사유가 되었고, 실록청의 사초 내용이 문제를 야기하는 등 ‘문헌’이 실제 권력투쟁의 불씨가 되었습니다. 이러한 맥락 속에서 연산군 시대의 폭압적 정치와 왕실 의도도 사화의 발발에 작용하였습니다. 이와 같은 요인들은 다음 단계의 정치 재편으로 이어졌습니다.\n\n그 결과로 주요 사화들이 차례로 발생하며 조선 정치의 권력구조가 크게 흔들렸습니다. 1498년 무오사화는 문신들의 탄핵과 투옥으로 신진사류의 입지를 급격히 약화시켰고, 1504년 갑자사화는 궁중 세력의 정권 장악과 신진사류의 몰락(유배·처벌)을 촉발하였습니다. 이로 인해 중종반정이 일어나 훈구와 신진사류 간의 권력 재편이 이루어졌고, 이후 신임사화(약 1517년)와 기묘사화(1519)가 다시 한 번 학계와 관료집단의 구성과 입지를 크게 흔들었습니다. 이어 을사사화(1545)까지 이어지며 파벌 간 탄압과 정적 숙청이 반복되었고, 이 과정에서 신진사류의 정치적 진입과 훈구세력의 지위 변화가 반복되었습니다. 이러한 연쇄는 결국 조선 정치의 관료 구성을 재편하고, 장기간에 걸친 파벌 구조의 뼈대를 형성하는 데 결정적 영향을 미쳤습니다. 특히 중종반정으로 제도적·권력구조의 재정비가 이뤄지면서, 이후 노론과 소론 등 사림 내 파벌 구도가 성립하고, 이후의 정국 운영에 장기적 영향을 남겼습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 1.2,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.8076923076923077,
+      "evidence_diversity": 0.6156406399954366,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 1.0121592239673711,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.08502024291497975,
+      "evidence_diversity": 0.03240213894712824,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "사화가 조선 정치에 미친 영향은?",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 187.02949404716492,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "사화는 조선 정치에 즉시 큰 변화를 가져오고, 이후에도 당파 재편과 숙청의 흐름을 지속시키며 정치 구조를 오래도록 재편했습니다.\n\n즉시 변화는 무오사화에서 갑자사화로의 연쇄를 통해 다수의 문신이 처벌되고 당파 구도가 재편된 것이 대표적입니다. 이 과정에서 1498년 연산군 시기의 사화로 김종직 제자들이 탄핵되어 처벌되었고, 김일손의 사초와 김종직의 조의제문이 직접적 동기가 되었다고 기록되며 문서상으로도 확인됩니다. 또한 춘추관 사초에 기록된 이극돈 관련 내용이 동기가 되었다는 점이 지적되며, 이화나 정화, 정지화, 정화제 등의 인물이 거론되곤 했습니다. 이러한 인물들은 당파 간 대립의 중심 축으로 작용했습니다. 이처럼 당대의 숙청은 즉시 권력 재편을 촉발했습니다.\n\n이후 흐름은 을사사화(중종 시기)로 확산되어 윤임 제거와 유인숙 제거가 벌어졌고, 이를 계기로 외척과 신진사류 간의 권력 다툼이 심화되었습니다. 1545년 문정대비의 수렴정치와 윤원형 등 소윤파의 공모로 대윤파 인사들이 역모죄로 몰려 대규모 처형·유배가 일어나고, 1546년에는 정황이 사인으로 있을 때 파직·유배가 거듭되었습니다. 신임사화(1721~1722년)에서는 소론의 급진파가 정국 주도권을 장악했고, 신임사화의 중요한 전개로 연잉군 왕세제 책봉이 이루어졌습니다. 한편 1721~1722년의 사화는 이후 정치 지형의 재편에 큰 영향을 남겼습니다. 이러한 흐름은 1498년 연산군의 사화, 1545년 을사사화, 1546년 사화, 1721~1722년 신임사화의 연쇄적 작용으로 정리됩니다. 관련 문헌으로 사화기략이 널리 인용되며, 각 사화의 동인과 전개를 종합적으로 보여줍니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.7999999999999999,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.8333333333333334,
+      "evidence_diversity": 0.6742655958230911,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.8074174874994609,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.4210526315789473,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.08771929824561403,
+      "evidence_diversity": 0.03548766293805743,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "정약용이 저술한 책의 제목은?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 169.9229109287262,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "목민심서가 정약용이 저술한 대표적인 책의 제목입니다.\n\n정약용은 조선 후기 실학자로서 나주 출신이며 자는 미용이고 호는 다산·여유당입니다. 그는 다수의 저술을 남겼는데, 그중 대표적인 책으로 목민심서가 있습니다. 목민심서는 지방 수령의 직무와 청렴한 행정 운영의 원칙을 다룬 실학 사상의 핵심 저작으로 꼽히며, 가좌책에 대해 자세히 다루는 등 그의 정책 사상과 행정 지침이 담겨 있습니다. 또한 정약용과 그의 형제인 정약전 간의 맥락 및 가족사의 흔적도 연구에 영향을 미친 것으로 전해집니다.\n\n대표 저술 연대에 관해서는 확정된 연도가 남아 있지 않으나, 목민심서는 18세기 말에 저술되어 19세기 초까지 널리 보급되었습니다. 1780년대에 이 책의 핵심 내용이 정리된 것으로 전해지며, 이후 여러 차례 판본과 주석이 추가되어 전승되었습니다. 또한 추출 엔티티로 제시된 1812년 정약용 제시라는 사건이 기록에 남아 있으나 구체적 맥락은 확실히 확인되지는 않습니다. 그의 생애와 연구 맥락은 정약용 선생 묘가 있는 장소, 강진 지역의 정약용 유적과 연관 지어 이해되기도 합니다. 이와 함께 형제인 정약전, 사약과 같은 사건 및 전약·도약정 같은 기관과 1764년 가솔 강제편입과 같은 역사적 맥락도 연구의 배경으로 언급됩니다. 이러한 엔티티들은 연구에서 서로 연결되어 정약용의 저술 활동을 이해하는 데 활용됩니다.\n\n추출된 엔티티 목록에는 다음이 포함됩니다: Person: 정약용, Document: 저술, Event: 1812년 정약용 제시, Place: 정약용 선생 묘, Place: 강진 정약용 유적, Person: 정약전, Event: 사약, Institution: 전약, Institution: 도약정, Event: 1764 가솔 강제편입. 이 항목들은 정약용의 생애와 저술 활동의 맥락을 해석하는 데 활용되는 주요 요소로 간주됩니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.16666666666666666,
+      "evidence_diversity": 0.31091750708257115,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5602237284429423,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.017543859649122806,
+      "evidence_diversity": 0.016364079320135325,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "정약용이 저술한 책의 제목은?",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 180.22362279891968,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "정약용의 대표 저술은 목민심서와 경세유표입니다.\n\n다산 정약용은 조선 후기 실학자로서 가좌책에 대해서도 자세히 다루었으며, 지방 수령 지침서로 널리 알려진 목민심서와 함께 경세유표를 대표 저술로 남겼습니다. 이 두 저작은 행정 관리의 도덕성과 실질적 개혁 방안을 제시한다는 점에서 그의 학문과 정치 사상을 구체화한 핵심 문헌으로 평가됩니다.\n\n추출된 엔티티를 반영하면, 1812년의 정약용 제시와 같은 사건, 형제인 정약전, 사약, 정약용 선생 묘, 강진 정약용 유적, 도약정, 증광문과 급제 등의 맥락도 그의 삶과 활동을 이해하는 데 함께 언급됩니다. 이러한 요소들은 목민심서와 경세유표의 저술 활동이 특정 시기와 가족·지역적 배경 속에서 어떻게 표출되었는지에 대한 배경 정보를 제공하며, 그의 생애와 사상 형성의 연속선상에 위치합니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.2222222222222222,
+      "evidence_diversity": 0.4181656600790516,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5717163212907103,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.023391812865497075,
+      "evidence_diversity": 0.02200871895152903,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "정약용이 저술한 책의 제목은?",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 137.12403774261475,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "정약용의 대표 저서는 목민심서와 경세유표이며, 이 외에도 다수의 저술이 남아 있습니다.\n\n다산 정약용의 저서는 대표적으로 목민심서와 경세유표가 꼽히며, 이 두 저서는 그의 학문과 실천 개혁 의지를 가장 잘 보여 줍니다. 또한 가좌책에 대한 자세한 논의가 목민심서와 함께 다루어 있으며, 정약용은 약 500권에 이르는 매우 방대한 저술 활동을 남긴 것으로 전해집니다. 이와 더불어 학문적 활동은 정약용 선생 묘가 있는 곳과 강진 정약용 유적 등 유적지에서도 연구의 중심이 됩니다.\n\n1812년 정약용 제시라는 사건이 기록되었고, 이와 관련된 사약의 맥락은 그의 생애와 저술 활동에 큰 영향을 주었습니다. 정약전은 형제로 알려져 있으며, 두 사람의 관계와 가족사는 그의 저술과 삶의 방향에 영향을 미친 것으로 여겨집니다. 도약정과 전약은 정약용의 학문 활동과 관련된 기관으로 언급되며, 이기조 선생 묘 역시 그의 학문적 전통과 연관된 유적지로 남아 있습니다. 또한 정약용의 묘와 강진의 유적은 그의 업적을 기념하고 연구의 현장으로 작용합니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.125,
+      "evidence_diversity": 0.31091750708257115,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5558377635306616,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.013157894736842105,
+      "evidence_diversity": 0.016364079320135325,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "병자호란의 결과로 조선에 어떤 영향을 끼쳤는가?",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 120.06515407562256,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "병자호란의 직후 조선은 청의 실질적 주권 간섭 아래 외교와 재정, 정치가 급격히 재편되었으며, 삼전도 항복과 인질 파견으로 청과의 종속관계가 강화되고, 사신 파견 및 포로 관리 체계가 강화되었으며, 청이 제작한 국인 등의 제도 변화와 함께 병조와 병방의 운영에도 큰 변화가 일어났습니다. \n\n전후 즉시의 영향은 먼저 외교 체계의 흐름 변화에 있습니다. 삼전도 항복으로 청의 요구를 수용하는 전통적 사대관계가 확립되었고, 1636년 병자호란 당시 사신 파견 및 포로 사건이 벌어졌으며, 병자호란창의록에 그 기록이 남아 있습니다. 또 하나의 상징적 변화로 청이 제작한 국인이 등장한 점은 조선이 청의 주권적 위상을 공식적으로 확인받는 제도적 표식으로 작용하였습니다. 이와 함께 전쟁 직후 조정의 외교적 중심은 청에 기울었고, 왕실의 위기감을 반영하는 인질 파견도 지속되었습니다. \n\n또한 재정과 행정의 변화가 두드러졌습니다. 전성기보다 악화된 재정 상황 아래 국정 운영 방식이 재편되었고, 전쟁의 여파로 병조·병방 같은 중앙기관의 운영과 인사 체계도 달라졌습니다. 전후에는 봉림대군의 즉위로 왕실 권력 구도가 재정비되었고, 이후 대통관 제도 도입 등의 행정 개혁이 일부 진행되었습니다. 그리고 이 모든 변화의 기록과 해석은 병자호란창의록 등 문헌에 남아 있으며, 일본과의 외교 맥락이나 명-일 감합무역의 전통적 교섭 구조를 배경으로 삼았던 조선의 외교 정책이 청 중심으로 재편되는 계기를 제공합니다. 또한 1633년경 강녕전 감역관 임명과 같은 관제의 변동 사례는 전후 정치 체제의 연속성과 변화 양상을 이해하는 데 참고가 됩니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.625,
+      "evidence_diversity": 0.5541483697052956,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6212709668265944,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.06578947368421052,
+      "evidence_diversity": 0.029165703668699767,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "병자호란의 결과로 조선에 어떤 영향을 끼쳤는가?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 138.79610633850098,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "병자호란의 직후 조선은 청과의 실질적 종속 관계가 강화되었고, 전쟁으로 수십만 명의 포로가 발생한 사회적 충격이 크며, 봉림대군의 즉위와 함께 왕권 재편이 진행되었고, 상수관 직명을 폐지하고 대통관 제도를 도입하는 등 제도적 개편이 이루어졌으며, 병조와 병방의 운영 변화도 나타났고, 청이 제작한 국인이 외교·경제 분야에 영향을 주는 흐름이 이어졌습니다. 또한 전쟁 과정에서 정묘호란과의 관계 악화, 1636년의 병자호란 당시 사신 파견 및 포로, 병자호란창의록의 기록, 심양에서의 체포 및 사망 사례 등도 중요한 직후의 맥락을 형성하였습니다. 이러한 변화 속에서 사회혼란이 커졌으며, 노비추쇄사업에도 영향을 주었습니다. \n\n전후 사회경제적 파장은 먼저 전쟁으로 대규모 포로가 발생한 점에서 시작됩니다. 전쟁 직후 한양 및 강화도 일대의 인구 구성과 노동력에 큰 타격이 있었고, 수탈과 교역의 불안정이 심화되었습니다. 노비추쇄사업 같은 사회적 정책에도 불안정성으로 인해 변동이 있었으며, 포로의 처리와 귀환이 지연되면서 농촌과 도시의 경제적 활력이 감소했습니다. 이러한 현상은 병자호란창의록에 기록된 당시의 상황과 사신 파견·포로 문제의 기록으로 뒷받침됩니다. \n\n다음으로 제도적·외교적 재편이 이어졌습니다. 상수관 직명을 폐지하고 대통관 제도를 도입한 것은 청과의 왕래 관리 체계를 바꾸는 중요한 변화였으며, 병조와 병방 같은 관청 운영에도 조정이 있었던 것으로 보입니다. 또한 봉림대군의 즉위로 왕권 재편이 진행되었고, 이 과정에서 외교적 흐름과 국내 통치 방식이 재정비되었습니다. 청이 제작한 국인과 같은 외교경제적 변화 역시 병자호란 이후의 관계 구조를 형성하는 요소로 남았습니다. 이러한 흐름은 연대기적 맥락에서 1636년의 전쟁과 1637년의 여파, 그리고 이후의 정치 체계 재편으로 이어졌습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.9666666666666667,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.6,
+      "evidence_diversity": 0.3954884891037233,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.8559029029352837,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.5087719298245614,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.0631578947368421,
+      "evidence_diversity": 0.02081518363703807,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "병자호란의 결과로 조선에 어떤 영향을 끼쳤는가?",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 145.51920795440674,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "직후의 영향은 정치적 재편과 외교구조의 재정립, 사회경제적 충격으로 요약되며, 조선은 청에 대한 종주를 인정하고 사신 파견 및 포로 처리의 의무가 강화되었으며 왕실의 남한산성 피난과 중앙권력의 재편, 노비추쇄사업의 영향을 받았습니다.\n\n1636년 청나라의 침입으로 시작된 병자호란의 직접적 전개에서 인조는 남한산성으로 피난했고, 이도장이 왕을 호종하여 남한산성에 들어갔으며, 1637년 삼전도 항복으로 전쟁이 종결되었습니다. 이 과정에서 병자호란창의록, 병진정사록, 창의록과 같은 기록물이 남아 당시의 정책 결정과 군사 운영을 남겼습니다. 또한 정묘호란의 악화된 관계가 이어져 전쟁으로 확전되는 흐름이 확인됩니다.  \n\n전쟁 직후 사회경제적으로는 큰 충격이 발생했습니다. 서울·강화도·경기도 일대에서 약 수십만 명의 조선인이 포로로 잡혀 간 것으로 기록되며 인구와 가족 구조에 큰 변동이 일었습니다. 전쟁으로 사회가 크게 불안정해지자 노비추쇄사업의 추진 환경이 재편되었고, 전쟁의 파생적 영향으로 강화도 피난 과정에서 종묘의 신주 문제와 같은 의례적 이슈도 제기되었습니다. 이러한 사회적 파급은 창의록 등에 기록된 불안정성과 정책적 대응의 맥락 속에서 이해됩니다. 청과의 외교적 질서에서도 종주 체계의 확립이 강화되었고, 이에 따라 사신 파견 및 포로 처리의 의무가 공식화되었습니다. 병조와 병방 같은 관청이 외교와 군사 행정을 담당했고, 이 시기의 정책은 병자호란창의록, 창의록 등 문헌에 상세히 남아 후대 연구의 기초가 되었습니다. 또한 청이 제작한 국인은 병자호란 이후의 외교 질서와 제도 변화의 상징으로 논의되며, 정묘호란의 맥락에서 외교 관계 재정립의 필요성과 방향을 제시하는 자료로 활용됩니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.5833333333333334,
+      "evidence_diversity": 0.31091750708257115,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6040833775657494,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.06140350877192983,
+      "evidence_diversity": 0.016364079320135325,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "이순신과 원균의 전략 차이는?",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 138.97617197036743,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "전시 상황과 지휘 체계 차이가 이순신과 원균의 전략 차이를 만든 주된 원인입니다.\n\n임진왜란 중 이순신은 한산도 대첩에서 보듯 좁은 해협과 기동전을 활용해 화포와 함대의 협력으로 결정적 승리를 이끌었습니다. 반면 원균은 임진왜란 초기 해전에서 대형 선대를 통한 전술에 의존하다가 칠천량 해전에서 큰 패를 당했고, 이로 인해 지휘 체계에서도 갈등이 생겼습니다. 이 차이는 이순신이 전라좌수사로서의 직위를 중심으로 삼도수군통제사 겸임처럼 작전을 조정하는 방식으로 이어졌습니다.\n\n정치적 맥락도 이 전략 차이에 영향을 주었습니다. 이순신 탄핵·파면 사건이 벌어진 뒤 선조의 교서(이순신에게 내린 교서, 간행 1795)로 그의 업적이 재조명되었고, 이순신 탄신제도 행해졌습니다. 임진왜란과 정유재란의 맥락 속에서 대마도 파견(1606)과 기축옥사, 1790 영흥부 정원 폐지 등은 지휘 체계의 안정성과 전략 선택에 영향을 준 정치적 환경으로 작용했습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.38461538461538464,
+      "evidence_diversity": 0.2439823643980616,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5796427965067805,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.04048582995951417,
+      "evidence_diversity": 0.012841177073582188,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "이순신과 원균의 전략 차이는?",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 188.0907621383667,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "이순신의 전략이 원균의 전략보다 훨씬 효과적이며, 이순신은 한산 진영을 기반으로 해상 기동전과 진형 운용으로 다수의 해전에서 결정적 승리를 거두었고 전라좌수사로서 수군을 이끌며 초대(겸직) 삼도수군통제사로 임용되고 백의종군과 이순신탄핵·파면 사건의 파장 속에서도 다시 수군을 수습하여 정유재란까지 큰 기여를 했습니다; 반면 원균은 초기 해전에서의 성과가 있었으나 대규모 해전에서의 전략적 한계와 패전의 위험을 보였으며, 이후 부산포해전·적진포해전 등 참여 기록은 남아 있지만 전체적으로 전략적 효과가 상대적으로 미미했습니다.\n\n전개 순서로 보면, 먼저 이순신은 옥포해전에서 승리하시고 한산도대첩에서 해군 주도권을 확립하셨으며, 당항포해전과 율포 교전에서도 지속적으로 승리를 이끌었습니다. 이 과정에서 한산 진영은 수군 운영의 핵심 거점으로 기능했고, 이순신은 전라좌수사로서 조선을 대표하는 해군 지휘관으로 활약하며 초대 삼도수군통제사로 임명되었습니다. 이성과 전략은 선조의 교서에 의해 재조명되었고, 이순신 탄신제와 같은 후대의 기념으로도 남아 있습니다. 한편 이 시기 원균은 부산포해전이나 적진포해전 등에서도 역할을 하였으나, 1597년의 탄핵·파면 사건과 같은 정치적 압박 속에서 해군 운영의 일관성을 잃기 쉽고, 백의종군을 거쳐 다시 수군을 수습하는 과정에서도 이순신에 비해 전략적으로 큰 전환점을 만들지 못했습니다. 정유재란의 전개 역시 두 사람의 전략 차이가 작용한 맥락으로 바라볼 수 있습니다. 또한 전쟁의 흐름은 정묘호란과 병자호란 시대의 혼란기로 넘어가며 조선 수군의 역할과 조직도 변화하였고, 이 과정에서 선조의 교서(간행 1795)가 전해진 바처럼 이순신의 업적은 후대에 깊이 기억되었습니다. 본국송환의 맥락 또한 이순신의 전략적 재편과 재임의 흐름 속에서 등장하는 사건들입니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.64,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.4375,
+      "evidence_diversity": 0.42929478917821157,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.6686470941672743,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.3368421052631579,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.046052631578947366,
+      "evidence_diversity": 0.022594462588326925,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "이순신과 원균의 전략 차이는?",
+    "query_type": "factual",
+    "success": true,
+    "execution_time": 173.0779778957367,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "전략 차이는 정치 상황과 자원, 무기 체계의 차이가 주된 원인이며, 이순신은 기동전 중심으로 다수의 해전에서 승리했고 원균은 정치적 압력과 자원 제약 속에서 전략적 선택이 제한되었습니다. \n\n정치 상황은 전략 운용에 직접적 영향을 주었습니다. 임진왜란 중 이순신은 1597년경의 탄핵·파면 사건에 직면했고, 1604년 선무공신 1등으로 책록되었으며 선조의 교서가 1795년 간행되어 이순신의 공적이 재확인되었습니다. 추출 엔티티에 따르면 이순, 한순, 전균, 이균 등의 표기도 등장하지만, 핵심은 이순신이 수군 지휘를 확고히 했다는 점입니다. \n\n자원과 무기 체계의 차이는 전략 차이에 결정적 영향을 주었습니다. 이순신은 옥포 해전(1592년)과 명량대첩(1597년)에서 기동전과 교란전술로 다수의 승리를 거두었고, 원균은 이순신과의 감독 관계 속에서 활동하며 정치적 압력과 자원 제약으로 작전 자유가 제한되었습니다. 따라서 정치 상황과 자원, 무기 체계의 차이가 이순신과 원균의 전략 차이를 만들어 냈습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.4,
+      "evidence_diversity": 0.3603215550831918,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.5873853450043784,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.042105263157894736,
+      "evidence_diversity": 0.018964292372799566,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_temporal_only",
+    "description": "Semantic Expander: temporal만 활성화",
+    "query": "정약용의 개혁 사상이 조선 후기 사회에 미친 영향은?",
+    "query_type": "causal",
+    "success": true,
+    "execution_time": 153.96598315238953,
+    "config": {
+      "semantic_expander": {
+        "temporal": true,
+        "causal_chain": false,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "정약용의 개혁 사상은 조선 후기 사회의 모순을 비판하고 목민심서와 가좌책 등 실학 저술로 관료제의 운영 원리와 세제·군역 제도의 합리화를 제시함으로써, 1763년 비변사 보고 및 균역법 기준 징세, 1764년 가솔 강제편입, 1761년 영조 37년 유생에 대한 칼 면제 특권 부여 등의 현안에 영향을 주었고, 1812년 정약용 제시를 통해 제도 개혁의 구체적 방향을 남겼습니다.\n\n원인과 형성에 의하면, 이조후기의 사회와 사상과 조선후기 사회변동연구 등에서 실학이 확산되며 환곡 운영의 부정, 아전의 횡포, 과세 체계의 불합리성에 대한 비판이 커졌습니다. 정약용은 본관 나주 출신으로 자 미용, 호 다산으로 알려져 있으며, 목민심서로 지방 수령의 직무를 구체화하고 가좌책으로 행정 실무의 개선점을 제시했습니다. 또한 정약용은 가집을 시행 주체에 따라 분류하는 체계(관가·이가 등)를 문헌에 남김으로써 행정 개혁의 실천적 분류를 제시했고, 이러한 저술은 이조후기의 사회와 사상을 이해하고 변화를 이끄는 지식 자원을 제공했습니다.\n\n영향과 결과에 따르면, 1761년 영조 37년 유생에 대한 칼 면제 특권 부여라는 당시 특권 구조의 맥락 속에서 그의 사상은 관료제의 권력 관계를 재구성하고 합리적 규범의 마련을 추구하는 방향으로 작용했습니다. 1763년 비변사 보고 및 균역법 기준 징세를 통해 균역법의 적용 기준을 제도화하려 했고, 1764년 가솔 강제편입은 가솔군관의 군포 문제를 제도적으로 다루려는 시도를 반영합니다. 이러한 흐름은 1812년 정약용 제시를 통해 구체적 제도 개혁 방향으로 발전하였으며, 목민심서와 가좌책 같은 저술과 가집의 시행 주체 분류를 통해 조선 후기 사회 변동에 지속적인 영향을 남겼습니다.",
+    "num_extracted_entities": 10,
+    "num_expanded_entities": 0,
+    "num_evidences": 15,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.7333333333333334,
+      "relation_coherence": 1.0,
+      "triple_validity": 0.5,
+      "evidence_diversity": 0.42929478917821157,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.7243488485532392,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.3859649122807018,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.05263157894736842,
+      "evidence_diversity": 0.022594462588326925,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_causal_only",
+    "description": "Semantic Expander: causal_chain만 활성화",
+    "query": "정약용의 개혁 사상이 조선 후기 사회에 미친 영향은?",
+    "query_type": "comparative",
+    "success": true,
+    "execution_time": 47.66476392745972,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": true,
+        "pgvector": false
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "죄송합니다. 질문 \"정약용의 개혁 사상이 조선 후기 사회에 미친 영향은?\"에 대해 충분한 근거 데이터를 찾지 못했습니다.\n\n관련 엔티티(이조후기의 사회와 사상, 정약용, 사회, 조선후기 사회변동연구, 강진 정약용 유적)는 발견되었으나, 현재 온톨로지 데이터베이스에서 해당 질문에 답변할 수 있는 구체적인 관계 정보가 부족합니다.\n\n가능한 원인:\n1. 해당 주제에 대한 상세 데이터가 아직 구축되지 않았습니다.\n2. 질문의 범위가 현재 데이터로 커버하기 어렵습니다.\n3. 쿼리 처리 중 시간 초과가 발생했습니다.\n\n더 구체적인 질문이나 특정 인물/사건에 대한 질문을 시도해 주세요.",
+    "num_extracted_entities": 7,
+    "num_expanded_entities": 0,
+    "num_evidences": 0,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 1.0,
+      "relation_coherence": 1.0,
+      "triple_validity": 1.0,
+      "evidence_diversity": 0.0,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.894736842105263,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.5263157894736842,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.10526315789473684,
+      "evidence_diversity": 0.0,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  },
+  {
+    "experiment_name": "iso_semantic_pgvector_only",
+    "description": "Semantic Expander: pgvector만 활성화",
+    "query": "정약용의 개혁 사상이 조선 후기 사회에 미친 영향은?",
+    "query_type": "deep_analysis",
+    "success": true,
+    "execution_time": 38.03092932701111,
+    "config": {
+      "semantic_expander": {
+        "temporal": false,
+        "causal_chain": false,
+        "pgvector": true
+      },
+      "aggregator_threads": {
+        "outgoing_relations": true,
+        "incoming_relations": true,
+        "entity_properties": true,
+        "connected_entities": true,
+        "type_and_summary": true
+      },
+      "entity_boost_mode": null
+    },
+    "final_answer": "죄송합니다. 질문 \"정약용의 개혁 사상이 조선 후기 사회에 미친 영향은?\"에 대해 충분한 근거 데이터를 찾지 못했습니다.\n\n관련 엔티티(이조후기의 사회와 사상, 정약용, 사회, 조선후기 사회변동연구, 강진 정약용 유적)는 발견되었으나, 현재 온톨로지 데이터베이스에서 해당 질문에 답변할 수 있는 구체적인 관계 정보가 부족합니다.\n\n가능한 원인:\n1. 해당 주제에 대한 상세 데이터가 아직 구축되지 않았습니다.\n2. 질문의 범위가 현재 데이터로 커버하기 어렵습니다.\n3. 쿼리 처리 중 시간 초과가 발생했습니다.\n\n더 구체적인 질문이나 특정 인물/사건에 대한 질문을 시도해 주세요.",
+    "num_extracted_entities": 21,
+    "num_expanded_entities": 0,
+    "num_evidences": 0,
+    "num_convergence_nodes": 0,
+    "raw_metrics": {
+      "tbox_consistency": 1.0,
+      "intent_preservation": 0.5,
+      "relation_coherence": 1.0,
+      "triple_validity": 1.0,
+      "evidence_diversity": 0.0,
+      "convergence_utilization": 1.0,
+      "property_group_selection": 0.0
+    },
+    "intent_aware_score": 0.631578947368421,
+    "weighted_metrics": {
+      "tbox_consistency": 0.10526315789473684,
+      "intent_preservation": 0.2631578947368421,
+      "relation_coherence": 0.10526315789473684,
+      "triple_validity": 0.10526315789473684,
+      "evidence_diversity": 0.0,
+      "convergence_utilization": 0.05263157894736842,
+      "property_group_selection": 0.0
+    }
+  }
+]

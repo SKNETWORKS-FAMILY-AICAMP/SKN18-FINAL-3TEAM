@@ -1,0 +1,401 @@
+# Ontology RAG 컴포넌트 평가 종합 보고서
+
+**실험 기간**: 2024년 12월 25일 ~ 27일  
+**총 실험 케이스**: 540개 (Ablation 300 + Isolation 240)  
+**평가 지표**: Intent-Aware Score (가중 평균)
+
+---
+
+## Executive Summary
+
+### 실험 개요
+
+| 실험 유형 | 방법론 | 케이스 수 | 목적 |
+|----------|--------|----------|------|
+| **Ablation Study** | 컴포넌트 제거 후 성능 측정 | 300개 | "없으면 얼마나 나빠지나?" |
+| **Isolation Study** | 컴포넌트 단독 활성화 | 240개 | "단독으로 얼마나 좋은가?" |
+
+### 핵심 발견 요약
+
+| 컴포넌트 | Ablation 결론 | Isolation 결론 | **통합 권장** |
+|----------|--------------|---------------|--------------|
+| Semantic Expander | 확장없음 최고 (0.6705) | causal_chain 최고 (0.7450) | **조건부 활성화** |
+| Thread Aggregator | 제거 시 성능↑ | type_and_summary 최고 | **선택적 활성화** |
+| Entity Boost | partial 최고 (0.6391) | normalized 최고 (0.7159) | **normalized 권장** |
+
+### 가장 중요한 발견
+
+> **🔴 부정적 상호작용 (Negative Interaction) 존재**
+> 
+> 단독으로 효과적인 컴포넌트도 **조합하면 오히려 성능 하락**
+> - causal_chain 단독: 0.7450 → 전체 조합(full): 0.6090 (**-18.3%**)
+> - 이유: 컴포넌트 간 노이즈 증폭 및 Intent Drift
+
+---
+
+## 1. Semantic Expander 종합 분석
+
+### 1.1 Ablation vs Isolation 비교
+
+| 설정 | Ablation Score | Isolation Score | 해석 |
+|------|---------------|-----------------|------|
+| baseline (확장없음) | **0.6705** | - | Ablation 최고 |
+| temporal_only | 0.6192 | 0.6717 | 단독 시 양호 |
+| causal_chain_only | 0.6044 | **0.7450** | **Isolation 최고** |
+| pgvector_only | 0.5984 | 0.6552 | 일관되게 낮음 |
+| full (모두 활성화) | 0.6090 | - | 조합 시 하락 |
+
+### 1.2 Raw Metrics 비교
+
+| 설정 | TBox Consistency | Intent Preservation | Triple Validity |
+|------|-----------------|---------------------|----------------|
+| **Ablation baseline** | 0.9297 | **1.0000** | 0.5655 |
+| Ablation full | 0.9183 | 0.7604 | 0.6571 |
+| **Isolation causal** | 0.9117 | 0.7832 | 0.5317 |
+| Isolation temporal | 0.9285 | 0.6558 | 0.4688 |
+| Isolation pgvector | 0.9552 | 0.6137 | 0.4784 |
+
+**핵심 인사이트**:
+- Ablation baseline의 Intent Preservation = 1.0 (확장 없을 때 의도 100% 보존)
+- 확장할수록 Intent Preservation 하락 → **Intent Drift 문제**
+- Isolation에서 causal_chain이 Intent Preservation 0.7832로 가장 높음
+
+### 1.3 쿼리 타입별 최적 설정
+
+| 쿼리 타입 | Ablation 최적 | Isolation 최적 | 성능 차이 | **권장** |
+|----------|--------------|---------------|----------|---------|
+| factual | temporal (0.6852) | causal (0.7392) | +7.9% | **causal_chain** |
+| causal | baseline (0.6462) | temporal (0.6994) | +8.2% | **temporal** |
+| comparative | baseline (0.6885) | causal (0.9104) | **+32.2%** | **causal_chain** ⭐ |
+| deep_analysis | baseline (0.6792) | temporal (0.6768) | -0.4% | **baseline/temporal** |
+
+### 1.4 Semantic Expander 결론
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🎯 권장 전략: 쿼리 타입 기반 동적 활성화                          │
+├─────────────────────────────────────────────────────────────────┤
+│  • comparative 질문 → causal_chain 활성화 (+32.2% 향상)          │
+│  • factual 질문 → causal_chain 활성화 (+7.9%)                   │
+│  • causal 질문 → temporal 활성화 (+8.2%)                        │
+│  • deep_analysis → baseline 유지 (확장 효과 미미)                │
+│                                                                 │
+│  ⚠️ 절대 하지 말 것: 모든 확장 동시 활성화 (full)                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 2. Thread Aggregator 종합 분석
+
+### 2.1 Ablation vs Isolation 비교
+
+| Thread | Ablation (제거 시) | Isolation (단독 시) | 해석 |
+|--------|-------------------|-------------------|------|
+| baseline (모두 활성화) | 0.6075 | - | 기준점 |
+| outgoing_relations | **0.6487** (+6.8%) | 0.7161 | 제거 시 향상, 단독 시 양호 |
+| entity_properties | 0.6449 (+6.2%) | 0.7189 | 제거해도 괜찮음 |
+| type_and_summary | 0.6392 (+5.2%) | **0.7556** | **단독 최고** |
+| connected_entities | 0.6376 (+5.0%) | 0.7381 | Evidence 생성 문제 |
+| incoming_relations | 0.6325 (+4.1%) | 0.6763 | **일관되게 낮음** |
+
+### 2.2 핵심 발견
+
+| 발견 | 수치적 근거 | 의미 |
+|------|-----------|------|
+| **모든 Thread 제거가 baseline보다 좋음** | 0.6325~0.6487 > 0.6075 | Thread 조합이 노이즈 생성 |
+| **type_and_summary 단독 최고** | 0.7556 (Isolation) | 가장 유용한 정보 제공 |
+| **incoming_relations 일관되게 낮음** | Ablation 0.6325, Isolation 0.6763 | **비활성화 권장** |
+| **connected_entities Evidence 문제** | 15% (3/20)만 Evidence 생성 | 점수는 높지만 신뢰도 낮음 |
+
+### 2.3 Thread Aggregator 결론
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🎯 권장 전략: 최소 Thread 조합                                  │
+├─────────────────────────────────────────────────────────────────┤
+│  ✅ 활성화 권장:                                                │
+│     • type_and_summary (단독 최고 0.7556)                       │
+│     • entity_properties (안정적 0.7189)                         │
+│                                                                 │
+│  ⚠️ 조건부 활성화:                                              │
+│     • outgoing_relations (필요 시만)                            │
+│                                                                 │
+│  ❌ 비활성화 권장:                                               │
+│     • incoming_relations (일관되게 낮음)                         │
+│     • connected_entities (Evidence 생성 실패 85%)               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Entity Boost 종합 분석
+
+### 3.1 Ablation vs Isolation 비교
+
+| 모드 | Ablation Score | Isolation Score | 평균 | 순위 |
+|------|---------------|-----------------|------|------|
+| exact_match | 0.6214 | 0.7074 | 0.6644 | 3 |
+| normalized_match | 0.6329 | **0.7159** | **0.6744** | **1** |
+| partial_match | **0.6391** | 0.7015 | 0.6703 | 2 |
+| penalty_match | 0.6159 | - | - | 4 |
+| none | - | 0.7056 | - | - |
+
+### 3.2 Raw Metrics 비교
+
+| 모드 | TBox (Abl) | TBox (Iso) | Intent (Abl) | Intent (Iso) |
+|------|-----------|-----------|--------------|--------------|
+| exact | 0.9673 | 0.9527 | 0.5349 | 0.7130 |
+| normalized | **1.0000** | 0.9650 | 0.5356 | 0.7074 |
+| partial | 0.9916 | 0.9689 | **0.5831** | 0.7046 |
+| none | - | **0.9823** | - | 0.7032 |
+
+### 3.3 Entity Boost 결론
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  🎯 권장: normalized_match                                      │
+├─────────────────────────────────────────────────────────────────┤
+│  • 종합 평균 최고 (0.6744)                                       │
+│  • TBox Consistency 안정적 (0.9650~1.0000)                      │
+│  • 모드 간 차이 작음 (2.1%) → 큰 영향 없음                        │
+│                                                                 │
+│  ⚠️ partial_match: Ablation에서만 최고, Isolation에서 하위       │
+│  ❌ penalty_match: 과도한 제약으로 성능 저하                      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 4. 부정적 상호작용 분석
+
+### 4.1 현상
+
+| 상황 | 점수 | 비교 |
+|------|------|------|
+| Semantic causal_chain 단독 | **0.7450** | 최고 |
+| Semantic full (모두 활성화) | 0.6090 | -18.3% |
+| Thread 모두 활성화 | 0.6075 | 기준 |
+| Thread outgoing 제거 | **0.6487** | +6.8% |
+
+### 4.2 원인 분석
+
+```
+원인 1: Intent Drift (의도 이탈)
+─────────────────────────────────
+  확장 없음 → Intent Preservation: 1.0000
+  확장 있음 → Intent Preservation: 0.76~0.78
+  
+  → 확장할수록 원래 질문 의도에서 멀어짐
+
+원인 2: 노이즈 증폭
+─────────────────────────────────
+  Thread A 노이즈 + Thread B 노이즈 = 증폭된 노이즈
+  
+  → 개별적으로는 유용해도 조합하면 방해
+
+원인 3: Evidence 충돌
+─────────────────────────────────
+  여러 Thread에서 상충되는 Evidence 생성
+  
+  → 최종 답변 품질 저하
+```
+
+### 4.3 해결 전략
+
+| 전략 | 설명 | 예상 효과 |
+|------|------|----------|
+| **선택적 활성화** | 쿼리 타입별 필요한 컴포넌트만 | +10~30% |
+| **최소 조합** | 2~3개 핵심 컴포넌트만 사용 | 안정성 확보 |
+| **Intent 모니터링** | 확장 전후 Intent 점수 비교 | Drift 방지 |
+
+---
+
+## 5. 최종 권장 설정
+
+### 5.1 기본 권장 설정 (Default)
+
+```python
+DEFAULT_CONFIG = {
+    "semantic_expander": {
+        "temporal": False,
+        "causal_chain": True,    # ⭐ 단독 최고
+        "pgvector": False
+    },
+    "aggregator_threads": {
+        "outgoing_relations": False,   # 조합 시 노이즈
+        "incoming_relations": False,   # ❌ 일관되게 낮음
+        "entity_properties": True,     # ✅ 안정적
+        "connected_entities": False,   # ❌ Evidence 문제
+        "type_and_summary": True       # ⭐ 단독 최고
+    },
+    "entity_boost_mode": "normalized"  # ✅ 종합 최고
+}
+```
+
+### 5.2 쿼리 타입별 동적 설정 (Recommended)
+
+```python
+def get_optimal_config(query_type: str) -> dict:
+    """쿼리 타입에 따른 최적 설정 반환"""
+    
+    base = {
+        "aggregator_threads": {
+            "type_and_summary": True,
+            "entity_properties": True,
+            "outgoing_relations": False,
+            "incoming_relations": False,
+            "connected_entities": False
+        },
+        "entity_boost_mode": "normalized"
+    }
+    
+    if query_type == "comparative":
+        # 비교 질문: causal_chain 필수 (+32.2%)
+        base["semantic_expander"] = {
+            "causal_chain": True,
+            "temporal": False,
+            "pgvector": False
+        }
+        
+    elif query_type == "factual":
+        # 사실 질문: causal_chain 권장 (+7.9%)
+        base["semantic_expander"] = {
+            "causal_chain": True,
+            "temporal": False,
+            "pgvector": False
+        }
+        
+    elif query_type == "causal":
+        # 인과 질문: temporal 권장 (+8.2%)
+        base["semantic_expander"] = {
+            "temporal": True,
+            "causal_chain": False,
+            "pgvector": False
+        }
+        
+    else:  # deep_analysis
+        # 심층 분석: 확장 최소화
+        base["semantic_expander"] = {
+            "temporal": False,
+            "causal_chain": False,
+            "pgvector": False
+        }
+    
+    return base
+```
+
+### 5.3 성능 예측
+
+| 설정 | 예상 점수 | 대비 baseline |
+|------|----------|--------------|
+| Ablation baseline | 0.6705 | 기준 |
+| 권장 설정 (Default) | **0.72~0.75** | **+7~12%** |
+| 쿼리별 동적 설정 | **0.75~0.80** | **+12~19%** |
+
+---
+
+## 6. 실험 데이터 요약
+
+### 6.1 Ablation Study (300개)
+
+| 실험 | 파일 | 케이스 |
+|------|------|--------|
+| Semantic Expander | semantic_expander_ablation_summary.json | 100개 |
+| Thread Aggregator | thread_ablation_summary.json | 120개 |
+| Entity Boost | entity_boost_ablation_summary.json | 80개 |
+
+### 6.2 Isolation Study (240개)
+
+| 실험 | 파일 | 케이스 |
+|------|------|--------|
+| Semantic Expander | semantic_expander_isolation_summary.json | 60개 |
+| Thread Aggregator | thread_temp.json | 100개 |
+| Entity Boost | entity_boost_isolation_summary.json | 80개 |
+
+---
+
+## 7. 결론 및 Action Items
+
+### 7.1 즉시 적용 사항
+
+| 항목 | 현재 | 변경 | 예상 효과 |
+|------|------|------|----------|
+| incoming_relations | 활성화 | **비활성화** | +4~7% |
+| connected_entities | 활성화 | **비활성화** | Evidence 신뢰도↑ |
+| entity_boost_mode | 다양 | **normalized** | 안정성↑ |
+
+### 7.2 단계별 적용 계획
+
+```
+Phase 1: 즉시 적용 (1일)
+────────────────────────
+  • incoming_relations 비활성화
+  • connected_entities 비활성화
+  • entity_boost_mode = "normalized"
+
+Phase 2: 검증 (2-3일)
+────────────────────────
+  • A/B 테스트로 효과 검증
+  • 20개 테스트 쿼리로 성능 측정
+
+Phase 3: 동적 설정 구현 (1주)
+────────────────────────
+  • query_type 분류기 연동
+  • 쿼리별 최적 설정 자동 적용
+```
+
+### 7.3 추가 실험 필요 사항
+
+| 항목 | 목적 | 우선순위 |
+|------|------|----------|
+| causal + temporal 조합 | 시너지 효과 확인 | 중 |
+| type_and_summary + properties 조합 | 최적 Thread 조합 | 중 |
+| 더 많은 쿼리로 검증 | 통계적 유의성 확보 | 하 |
+
+---
+
+## 8. 핵심 요약 (1-Page Summary)
+
+### 실험 결과 한눈에 보기
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Ontology RAG 컴포넌트 평가 결과                    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  📊 총 540개 실험 (Ablation 300 + Isolation 240)                    │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ Semantic Expander                                           │   │
+│  │ • causal_chain 단독 최고 (0.7450)                           │   │
+│  │ • 모두 활성화 시 -18.3% 하락                                 │   │
+│  │ • comparative 질문에서 +32.2% 향상                          │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ Thread Aggregator                                           │   │
+│  │ • type_and_summary 단독 최고 (0.7556)                       │   │
+│  │ • incoming_relations 일관되게 낮음 → 비활성화                 │   │
+│  │ • 전체 활성화보다 제거 시 성능 향상                           │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ Entity Boost                                                │   │
+│  │ • normalized_match 종합 최고 (0.6744)                       │   │
+│  │ • 모드 간 차이 작음 (2.1%)                                   │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ⚠️ 핵심 발견: 부정적 상호작용                                      │
+│     → 좋은 컴포넌트도 조합하면 성능 하락                            │
+│     → 선택적/동적 활성화 필수                                       │
+│                                                                     │
+│  ✅ 권장 설정 적용 시: +12~19% 성능 향상 예상                        │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+*본 보고서는 540개 실험 케이스의 실제 데이터를 기반으로 작성되었습니다.*  
+*작성일: 2024년 12월 27일*

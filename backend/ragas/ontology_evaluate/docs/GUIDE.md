@@ -110,6 +110,7 @@ def semantic_expander_node(state: GraphState) -> GraphState:
 **작업 내용**: 각 노드가 `test_config`를 인식하도록 최소한의 코드 추가
 
 **수정 파일**:
+
 - `nodes/kg/semantic_expander_node.py`
 - `nodes/kg/path_evidence_aggregator_node.py`
 - (필요시) `state.py`에 `test_config` 필드 추가
@@ -1017,7 +1018,7 @@ llm_judge.evaluate_triple_contribution(
 # → ("기여함", "건설 업적에 직접적으로 답함")
 ```
 
-**사용 모델**: `gpt-4o` (기본값)
+**사용 모델**: `gpt-5-nano` (기본값)
 
 ---
 
