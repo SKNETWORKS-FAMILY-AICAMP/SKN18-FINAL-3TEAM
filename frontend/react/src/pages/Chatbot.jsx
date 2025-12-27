@@ -16,6 +16,29 @@ import {
 } from "../api/chatApi";
 
 const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
+  // 스크롤바 스타일을 위한 CSS 추가
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .clarification-cards-scroll::-webkit-scrollbar {
+        height: 8px;
+      }
+      .clarification-cards-scroll::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+      }
+      .clarification-cards-scroll::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+      }
+      .clarification-cards-scroll::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
+
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [isThinking, setIsThinking] = useState(false);
@@ -849,6 +872,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                               어떤 방향의 정보가 더 궁금하신가요?
                             </div>
                             <div
+                              className="clarification-cards-scroll"
                               style={{
                                 display: "flex",
                                 gap: "12px",
