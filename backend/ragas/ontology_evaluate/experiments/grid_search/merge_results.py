@@ -14,9 +14,66 @@ from pathlib import Path
 from datetime import datetime
 
 
+def merge_files_by_type(output_dir: Path, file_pattern: str, output_name: str) -> int:
+    """
+    특정 패턴의 파일들을 flat list로 병합
+
+    Args:
+        output_dir: 결과 파일이 있는 디렉토리
+        file_pattern: 파일 패턴 (예: "batch_*_full.json")
+        output_name: 출력 파일명 (예: "grid_results_merged_full.json")
+
+    Returns:
+        병합된 항목 수
+    """
+    batch_files = sorted(output_dir.glob(file_pattern))
+
+    if not batch_files:
+        print(f"⚠️  {file_pattern} 파일을 찾을 수 없습니다.")
+        return 0
+
+    print(f"\n📂 {file_pattern}: {len(batch_files)}개 파일 발견")
+    for batch_file in batch_files:
+        print(f"  - {batch_file.name}")
+
+    # Flat list로 병합
+    merged_list = []
+
+    for batch_file in batch_files:
+        print(f"📥 {batch_file.name} 로드 중...")
+
+        with open(batch_file, 'r', encoding='utf-8') as f:
+            batch_data = json.load(f)
+
+        # Flat list 형태로 병합
+        if isinstance(batch_data, list):
+            merged_list.extend(batch_data)
+        else:
+            # 혹시 nested 형태면 results 추출
+            batch_results = batch_data.get("results", [])
+            merged_list.extend(batch_results)
+
+        print(f"  → {len(batch_data) if isinstance(batch_data, list) else len(batch_results)}개 항목 추가")
+
+    total_items = len(merged_list)
+    print(f"✅ 총 {total_items}개 항목 병합 완료")
+
+    # Flat list로 저장
+    output_file = output_dir / output_name
+    with open(output_file, 'w', encoding='utf-8') as f:
+        json.dump(merged_list, f, indent=2, ensure_ascii=False)
+
+    print(f"💾 병합 결과 저장: {output_file.name}")
+
+    return total_items
+
+
 def merge_batch_results(output_dir: Path):
     """
     배치 결과 파일들을 하나로 병합
+    - batch_*.json → grid_results_merged.json (flat list)
+    - batch_*_full.json → grid_results_merged_full.json (flat list)
+    - batch_*_summary.json → grid_results_merged_summary.json (flat list)
 
     Args:
         output_dir: 결과 파일이 있는 디렉토리
@@ -26,88 +83,78 @@ def merge_batch_results(output_dir: Path):
     print("="*70)
     print()
 
-    # 배치 결과 파일 찾기
-    batch_files = sorted(output_dir.glob("batch_*_results.json"))
+    # 1. Base 파일 병합 (batch_*.json - 이름에 _가 포함되지 않은 것)
+    print("🔹 Base 파일 병합 (batch_*.json)")
+    # batch_N.json 패턴 찾기 (batch_1.json, batch_2.json 등)
+    base_files = [f for f in sorted(output_dir.glob("batch_*.json"))
+                  if "_full" not in f.name and "_summary" not in f.name and "_temp" not in f.name]
 
-    if not batch_files:
-        print("❌ 배치 결과 파일을 찾을 수 없습니다!")
-        print(f"   경로: {output_dir}")
-        return
+    if base_files:
+        print(f"\n📂 batch_*.json: {len(base_files)}개 파일 발견")
+        for batch_file in base_files:
+            print(f"  - {batch_file.name}")
 
-    print(f"📂 발견된 배치 파일: {len(batch_files)}개")
-    for batch_file in batch_files:
-        print(f"  - {batch_file.name}")
-    print()
+        merged_list = []
+        for batch_file in base_files:
+            print(f"📥 {batch_file.name} 로드 중...")
+            with open(batch_file, 'r', encoding='utf-8') as f:
+                batch_data = json.load(f)
 
-    # 모든 결과 병합
-    merged_results = {
-        "metadata": {
-            "experiment_name": "optimized_grid_search",
-            "merged_at": datetime.now().isoformat(),
-            "num_batches": len(batch_files),
-            "batch_files": [f.name for f in batch_files]
-        },
-        "results": []
-    }
+            if isinstance(batch_data, list):
+                merged_list.extend(batch_data)
+                print(f"  → {len(batch_data)}개 항목 추가")
+            else:
+                batch_results = batch_data.get("results", [])
+                merged_list.extend(batch_results)
+                print(f"  → {len(batch_results)}개 항목 추가")
 
-    total_experiments = 0
-    for batch_file in batch_files:
-        print(f"📥 {batch_file.name} 로드 중...")
+        total_base = len(merged_list)
+        print(f"✅ 총 {total_base}개 항목 병합 완료")
 
-        with open(batch_file, 'r', encoding='utf-8') as f:
-            batch_data = json.load(f)
+        output_file = output_dir / "grid_results_merged.json"
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(merged_list, f, indent=2, ensure_ascii=False)
+        print(f"💾 병합 결과 저장: {output_file.name}")
+    else:
+        print("⚠️  batch_*.json 파일을 찾을 수 없습니다.")
+        total_base = 0
 
-        batch_results = batch_data.get("results", [])
-        merged_results["results"].extend(batch_results)
-        total_experiments += len(batch_results)
+    # 2. Full 파일 병합
+    print("\n🔹 Full 파일 병합 (batch_*_full.json)")
+    total_full = merge_files_by_type(output_dir, "batch_*_full.json", "grid_results_merged_full.json")
 
-        print(f"  → {len(batch_results)}개 실험 추가")
-
-    print()
-    print(f"✅ 총 {total_experiments}개 실험 결과 병합 완료")
-    print()
+    # 3. Summary 파일 병합
+    print("\n🔹 Summary 파일 병합 (batch_*_summary.json)")
+    total_summary = merge_files_by_type(output_dir, "batch_*_summary.json", "grid_results_merged_summary.json")
 
     # 통계 출력
-    config_counts = {}
-    for result in merged_results["results"]:
-        config_name = result.get("config_name", "unknown")
-        config_counts[config_name] = config_counts.get(config_name, 0) + 1
-
-    print("📊 설정별 실험 수:")
-    for config_name, count in sorted(config_counts.items()):
-        print(f"  - {config_name}: {count}개")
+    print("\n" + "="*70)
+    print("📊 병합 요약")
+    print("="*70)
+    print(f"  Base 파일:    {total_base}개 항목")
+    print(f"  Full 파일:    {total_full}개 항목")
+    print(f"  Summary 파일: {total_summary}개 항목")
     print()
 
-    # 병합 결과 저장
-    output_file = output_dir / "grid_results_merged.json"
-    with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(merged_results, f, indent=2, ensure_ascii=False)
+    # 설정별 통계 (Full 파일 기준)
+    full_file = output_dir / "grid_results_merged_full.json"
+    if full_file.exists():
+        with open(full_file, 'r', encoding='utf-8') as f:
+            full_data = json.load(f)
 
-    print(f"💾 병합 결과 저장: {output_file}")
-    print()
+        config_counts = {}
+        for result in full_data:
+            config_name = result.get("experiment_name", "unknown")
+            config_counts[config_name] = config_counts.get(config_name, 0) + 1
 
-    # 요약 통계 저장
-    summary = {
-        "merged_at": datetime.now().isoformat(),
-        "total_experiments": total_experiments,
-        "num_configs": len(config_counts),
-        "config_distribution": config_counts
-    }
-
-    summary_file = output_dir / "merge_summary.json"
-    with open(summary_file, 'w', encoding='utf-8') as f:
-        json.dump(summary, f, indent=2, ensure_ascii=False)
-
-    print(f"📝 요약 정보 저장: {summary_file}")
-    print()
+        print("📈 설정별 실험 수 (Full 기준):")
+        for config_name, count in sorted(config_counts.items()):
+            print(f"  - {config_name}: {count}개")
+        print()
 
     print("="*70)
-    print("✅ 병합 완료!")
+    print("✅ 모든 병합 완료!")
     print("="*70)
-    print()
-    print("다음 단계: 결과 분석")
-    print("  python -m backend.ragas.ontology_evaluate.experiments.grid_search.analyze_grid_results \\")
-    print(f"      --results {output_file}")
     print()
 
 

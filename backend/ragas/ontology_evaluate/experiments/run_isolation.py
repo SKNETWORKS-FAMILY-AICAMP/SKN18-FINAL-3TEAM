@@ -360,8 +360,8 @@ def main():
     parser.add_argument(
         "--limit",
         type=int,
-        default=20,
-        help="테스트 질문 개수 제한 (기본값: 20)"
+        default=None,
+        help="실행할 질문 개수 제한 (--start-query 이후부터 카운트, 기본값: None=무제한)"
     )
     parser.add_argument(
         "--intent-aware",
@@ -374,6 +374,12 @@ def main():
         dest="intent_aware",
         action="store_false",
         help="Intent-aware 평가 비활성화"
+    )
+    parser.add_argument(
+        "--start-query",
+        type=int,
+        default=0,
+        help="시작할 질문 인덱스 (0부터 시작, 기본값: 0)"
     )
 
     args = parser.parse_args()
@@ -390,9 +396,7 @@ def main():
 
     # 1. 테스트 질문 로드
     queries_data = load_queries(args.queries)
-    if args.limit:
-        queries_data = queries_data[:args.limit]
-    print(f"테스트 질문 개수: {len(queries_data)}")
+    print(f"전체 질문 개수: {len(queries_data)}")
 
     # Query type 분포 출력
     if args.intent_aware:
@@ -479,6 +483,10 @@ def main():
         print(f"\n전체 실험 설정 개수: {total_configs}개")
         print(f"총 실행 횟수: {total_configs} × {len(queries_data)} = {total_configs * len(queries_data)}회\n")
 
+        if args.start_query > 0 or args.limit:
+            print(f"⚠️  --start-query와 --limit 옵션은 단일 그룹 실행 시에만 사용 가능합니다.")
+            print(f"   전체 실행(--group all)에서는 무시됩니다.\n")
+
         for group_name, configs in all_experiments.items():
             print(f"\n{'='*70}")
             print(f"실험 그룹: {group_name} ({len(configs)}개 설정)")
@@ -522,6 +530,23 @@ def main():
     else:
         # 특정 실험 그룹만 실행
         configs = all_experiments[args.group]
+
+        # start_query와 limit 필터링
+        if args.start_query > 0:
+            if args.start_query >= len(queries_data):
+                print(f"❌ 오류: --start-query {args.start_query}는 질문 개수({len(queries_data)})를 초과합니다.")
+                return
+
+            queries_data = queries_data[args.start_query:]
+            print(f"\n⚠️  질문 인덱스 {args.start_query}부터 시작합니다.")
+            print(f"   건너뛴 질문: {args.start_query}개")
+
+        if args.limit:
+            queries_data = queries_data[:args.limit]
+            print(f"   실행 제한: {args.limit}개")
+
+        print(f"   최종 실행할 질문: {len(queries_data)}개\n")
+
         print(f"\n실험 설정 개수: {len(configs)}개")
         print(f"총 실행 횟수: {len(configs)} × {len(queries_data)} = {len(configs) * len(queries_data)}회\n")
 

@@ -22,6 +22,7 @@ from backend.langgraph_fuseki.config import (
     FIXED_SCORE_TEMPORAL,
     FIXED_SCORE_PGVECTOR
 )
+from backend.langgraph_fuseki.utils.fuseki_client import execute_sparql_query
 
 # 상위 디렉토리를 경로에 추가 (entity_expander_node와 동일한 방식)
 _base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # langgraph_fuseki
@@ -187,15 +188,8 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
             """
 
         try:
-            response = requests.post(
-                f"{FUSEKI_URL}/sparql",
-                data={"query": sparql},
-                headers={"Accept": "application/sparql-results+json"},
-                timeout=2
-            )
-
-            if response.status_code == 200:
-                results = response.json()
+            results = execute_sparql_query(FUSEKI_URL, sparql, timeout=2)
+            if results:
                 bindings = results.get("results", {}).get("bindings", [])
                 if bindings:
                     year = bindings[0].get("year", {}).get("value")
@@ -258,15 +252,8 @@ def expand_by_temporal_context(entities: list, ttl_data: dict, window_years: int
         """
 
         try:
-            response = requests.post(
-                f"{FUSEKI_URL}/sparql",
-                data={"query": sparql},
-                headers={"Accept": "application/sparql-results+json"},
-                timeout=3
-            )
-
-            if response.status_code == 200:
-                results = response.json()
+            results = execute_sparql_query(FUSEKI_URL, sparql, timeout=3)
+            if results:
                 bindings = results.get("results", {}).get("bindings", [])
 
                 for binding in bindings:
@@ -417,15 +404,8 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
             """
 
         try:
-            response = requests.post(
-                f"{FUSEKI_URL}/sparql",
-                data={"query": sparql},
-                headers={"Accept": "application/sparql-results+json"},
-                timeout=20
-            )
-
-            if response.status_code == 200:
-                results = response.json()
+            results = execute_sparql_query(FUSEKI_URL, sparql, timeout=20)
+            if results:
                 bindings = results.get("results", {}).get("bindings", [])
                 print(f"  │  │  └─ SPARQL 결과: {len(bindings)}개 발견")
 
@@ -452,7 +432,7 @@ def expand_by_causal_chain(entities: list, ttl_data: dict, max_hops: int = 3) ->
                             "relevance_score": calculate_relevance_score(None, "causal_chain", hop_count=hop_count)
                         })
             else:
-                print(f"  │  │  └─ SPARQL 실패 (HTTP {response.status_code})")
+                print(f"  │  │  └─ SPARQL 실패 (HTTP 500)")
         except Exception as e:
             print(f"  │  │  └─ 예외 발생 - {str(e)[:60]}")
 
@@ -494,17 +474,9 @@ def _calculate_hop_count(source_uri: str, target_uri: str, max_hops: int = 3) ->
         """
 
         try:
-            response = requests.post(
-                f"{FUSEKI_URL}/sparql",
-                data={"query": sparql},
-                headers={"Accept": "application/sparql-results+json"},
-                timeout=2
-            )
-
-            if response.status_code == 200:
-                result = response.json()
-                if result.get("boolean", False):
-                    return hop
+            result = execute_sparql_query(FUSEKI_URL, sparql, timeout=2)
+            if result and result.get("boolean", False):
+                return hop
         except:
             pass
 
@@ -734,17 +706,10 @@ def semantic_expander_node(state: GraphState) -> GraphState:
         """
         
         try:
-            response = requests.post(
-                f"{FUSEKI_URL}/sparql",
-                data={"query": sparql_query},
-                headers={"Accept": "application/sparql-results+json"},
-                timeout=2
-            )
-            
-            if response.status_code == 200:
-                results = response.json()
+            results = execute_sparql_query(FUSEKI_URL, sparql_query, timeout=2)
+            if results:
                 bindings = results.get("results", {}).get("bindings", [])
-                
+
                 for binding in bindings:
                     connected_label = binding.get("connectedLabel", {}).get("value", "")
                     if connected_label:

@@ -22,10 +22,10 @@ import time
 import threading
 import queue
 import requests
-import requests
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
+from backend.langgraph_fuseki.utils.fuseki_client import execute_sparql_query
 
 # 한국어 형태소 분석기 (조사/어미 자동 제거)
 try:
@@ -972,17 +972,10 @@ def entity_expander_node(state: GraphState) -> GraphState:
 
             try:
                 fuseki_url = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
-                
-                response = requests.post(
-                    f"{fuseki_url}/sparql",
-                    data={"query": sparql_query},
-                    headers={"Accept": "application/sparql-results+json"},
-                    timeout=5  # 5초 타임아웃 (증가)
-                )
 
-                if response.status_code == 200:
+                results = execute_sparql_query(fuseki_url, sparql_query, timeout=5)
+                if results:
                     sparql_executed = True
-                    results = response.json()
                     bindings = results.get("results", {}).get("bindings", [])
                     connection_count = len(bindings)
 

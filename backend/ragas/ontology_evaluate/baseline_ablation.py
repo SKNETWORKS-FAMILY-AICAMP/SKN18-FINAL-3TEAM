@@ -352,13 +352,23 @@ class AblationRunner:
                 result = self.run_single_experiment(query, config, graph_invoke_func)
                 results.append(result)
                 
-                # 매 5개 실험마다 임시 저장
+                # 매 5개 실험마다 임시 저장 (append 방식)
                 if len(results) % 5 == 0:
                     temp_file = self.output_dir / f"{group_name}_temp.json"
+
+                    # 기존 temp 파일이 있으면 읽어서 병합
+                    existing_temp = []
+                    if temp_file.exists():
+                        with open(temp_file, "r", encoding="utf-8") as f:
+                            existing_temp = json.load(f)
+
+                    # 기존 결과 + 이번 실행 결과 병합
+                    merged_temp = existing_temp + results
+
                     with open(temp_file, "w", encoding="utf-8") as f:
-                        json.dump(results, f, ensure_ascii=False, indent=2)
-                    print(f"  ├─ 임시 저장: {temp_file} ({len(results)}개 실험)")
-                    logger.info(f"임시 저장: {temp_file} ({len(results)}개 실험)")
+                        json.dump(merged_temp, f, ensure_ascii=False, indent=2)
+                    print(f"  ├─ 임시 저장: {temp_file} ({len(merged_temp)}개 실험)")
+                    logger.info(f"임시 저장: {temp_file} ({len(merged_temp)}개 실험)")
 
         # 최종 결과 저장
         output_file = self.output_dir / f"{group_name}_ablation.json"

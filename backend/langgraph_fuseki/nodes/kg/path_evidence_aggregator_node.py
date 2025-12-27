@@ -22,6 +22,7 @@ from backend.langgraph_fuseki.config import (
     QUERY_ENTITY_MATCH_BOOST_NORMALIZED
 )
 from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
+from backend.langgraph_fuseki.utils.fuseki_client import execute_sparql_query
 from langchain_openai import ChatOpenAI
 
 
@@ -268,15 +269,11 @@ def detect_convergence_nodes(inference_paths: dict, query_entities: list) -> lis
         """
 
         try:
-            response = requests.post(
-                f"{FUSEKI_URL}/sparql",
-                data={"query": sparql_query},
-                headers={"Accept": "application/sparql-results+json"},
-                timeout=3
-            )
+            import requests  # 로컬 import 유지
+            from backend.langgraph_fuseki.config import FUSEKI_URL
 
-            if response.status_code == 200:
-                results = response.json()
+            results = execute_sparql_query(FUSEKI_URL, sparql_query, timeout=3)
+            if results:
                 bindings = results.get("results", {}).get("bindings", [])
 
                 # 결과 파싱

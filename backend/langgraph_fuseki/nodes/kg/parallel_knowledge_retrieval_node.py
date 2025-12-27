@@ -24,6 +24,7 @@ from backend.langgraph_fuseki.config import (
     THREAD_WEIGHT_ENTITY_PROPERTIES,
     THREAD_WEIGHT_TYPE_AND_SUMMARY
 )
+from backend.langgraph_fuseki.utils.fuseki_client import execute_sparql_query
 
 
 # 추론 결과 저장 비활성화 (평가 모드에서는 불필요)
@@ -692,15 +693,8 @@ def get_1hop_neighbors(entity_uri: str, timeout: int = 2) -> list:
     """
 
     try:
-        response = requests.post(
-            f"{FUSEKI_URL}/sparql",
-            data={"query": sparql},
-            headers={"Accept": "application/sparql-results+json"},
-            timeout=timeout
-        )
-
-        if response.status_code == 200:
-            results = response.json()
+        results = execute_sparql_query(FUSEKI_URL, sparql, timeout=timeout)
+        if results:
             bindings = results.get("results", {}).get("bindings", [])
 
             neighbors = []
@@ -872,16 +866,10 @@ def execute_fuseki_direct(thread_type: str, sparql: str, debug: bool = False) ->
             _last_request_time[thread_type] = time.time()
         
         try:
-            response = requests.post(
-                endpoint,
-                data={"query": sparql},
-                headers={"Accept": "application/sparql-results+json"},
-                timeout=30
-            )
-            
-            # 에러 응답 상세 로그
-            if response.status_code != 200:
-                error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
+            result = execute_sparql_query(endpoint.replace("/sparql", ""), sparql, timeout=30)
+
+            if not result:
+                error_msg = "HTTP 500 or timeout"
                 if debug:
                     print(f"[DEBUG] {thread_type} 에러: {error_msg}")
                 return {
@@ -890,10 +878,9 @@ def execute_fuseki_direct(thread_type: str, sparql: str, debug: bool = False) ->
                     "error": error_msg,
                     "thread_type": thread_type
                 }
-            
-            result = response.json()
+
             bindings = result.get("results", {}).get("bindings", [])
-            
+
             return {
                 "status": "success",
                 "bindings": bindings,
@@ -901,7 +888,7 @@ def execute_fuseki_direct(thread_type: str, sparql: str, debug: bool = False) ->
                 "thread_type": thread_type,
                 "mode": "light"
             }
-            
+
         except requests.exceptions.ConnectionError:
             print(f"    ├─ SPARQL 연결 실패: {endpoint}")
             print(f"    └─ Fuseki 서버가 실행 중인지 확인하세요")
