@@ -151,8 +151,6 @@ def create_graph_flow(use_optimized: bool = None):
     return workflow.compile()
 
 
-# 그래프 인스턴스 생성 (기본값)
-graph = create_graph_flow(use_optimized=False)
-
-# 최적화된 그래프 인스턴스
-optimized_graph = create_graph_flow(use_optimized=True)
+# 주의: 모듈 레벨에서 그래프 인스턴스를 생성하지 않음
+# Django에서 import 시 자동 실행 방지
+# 필요할 때는 create_graph_flow() 함수를 직접 호출하세요

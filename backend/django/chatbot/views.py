@@ -12,6 +12,8 @@ from django.db.models import Count
 
 from .models import ChatMessage, ChatSession
 from backend.langgraph_structure1.graph import create_graph_flow
+from backend.langgraph_fuseki.graph import create_graph_flow as create_ontology_graph
+from backend.langgraph_fuseki.nodes.user_intent_clarification_node import UserClarificationRequired
 
 logger = logging.getLogger("chatbot")
 
@@ -117,15 +119,46 @@ def _handle_question(request, chat_session=None):
     error = None
     ai_response = ""
     fallback_answer = "어,어랏? 그게 뭐야아? 그거 조선말 맞아?"
+    
+    # ========== 재질문 관련 변수 초기화 (수정됨) ==========
+    needs_clarification = False
+    expansion_directions = []
+    clarification_question = ""
 
     _hydrate_summary_from_db(request)
     query = (request.data.get("query") or request.data.get("question") or "").strip()
     if not query:
         return Response({"error": "query is required"}, status=400)
 
+    # Thinking mode 파라미터 확인
+    thinking_mode = request.data.get("thinking_mode", False)
+
+    # 사용자 선택 확인 (재질문에 대한 응답)
+    user_selected_direction = None
+    user_selected_title = None
+    if query.startswith("__CLARIFICATION__:"):
+        parts = query.split(":", 2)  # "__CLARIFICATION__", direction_id, title
+        if len(parts) >= 2:
+            user_selected_direction = parts[1]
+        if len(parts) >= 3:
+            user_selected_title = parts[2]
+
+        # 원본 질문을 세션에서 복원
+        query = request.session.get("pending_clarification_query", query)
+        logger.info("[chat] User selected direction: %s (%s) for query: %s",
+                   user_selected_direction, user_selected_title, query)
+
+        # 사용자가 선택한 옵션을 사용자 메시지로 저장
+        if user_selected_title:
+            _store_message(request, ChatMessage.Role.USER, user_selected_title, chat_session=chat_session)
+
     try:
-        logger.info("[chat] POST question='%s'", query)
-        _store_message(request, ChatMessage.Role.USER, query, chat_session=chat_session)
+        logger.info("[chat] POST question='%s' thinking_mode=%s", query, thinking_mode)
+
+        # 재질문 응답이 아닌 경우에만 사용자 메시지 저장
+        if not user_selected_direction:
+            _store_message(request, ChatMessage.Role.USER, query, chat_session=chat_session)
+
         question_for_ai = query
 
         memory_summary = request.session.get("chat_memory_summary")
@@ -137,42 +170,129 @@ def _handle_question(request, chat_session=None):
             len(memory_summary) if memory_summary else 0,
         )
 
-        app = create_graph_flow()
-        response_state = asyncio.run(
-            app.ainvoke(
-                {
-                    "query": question_for_ai,
-                    "tag": "chat",
-                }
-            )
-        )
+        # Thinking 모드일 때만 ontology LangGraph 호출
+        if thinking_mode:
+            logger.info("[chat] Using ontology LangGraph (Thinking mode)")
+            app = create_ontology_graph()
+        else:
+            logger.info("[chat] Using standard LangGraph")
+            app = create_graph_flow()
+
+        # LangGraph 호출 시 사용자 선택 포함
+        invoke_params = {
+            "query": question_for_ai,
+            "tag": "chat",  # ★ Django API 모드 표시
+            "session_id": str(chat_session.id) if chat_session else "",
+        }
+
+        # 사용자 선택이 있으면 skip_clarification 활성화
+        if user_selected_direction:
+            invoke_params["user_selected_direction"] = user_selected_direction
+            invoke_params["skip_clarification"] = True  # 이미 선택했으므로 재질문 스킵
+            logger.info("[chat] User direction selected: %s, skip_clarification=True", user_selected_direction)
+        else:
+            # 첫 호출에서는 재질문을 위해 중단할 수 있도록 설정
+            invoke_params["skip_clarification"] = False
+            logger.info("[chat] First call, skip_clarification=False, expecting clarification")
+
+        # ★ 디버그: invoke_params 로깅
+        logger.info("[chat] LangGraph invoke_params: %s", {k: v for k, v in invoke_params.items() if k != 'query'})
+
+        response_state = asyncio.run(app.ainvoke(invoke_params))
         ai_response = response_state.get("final_answer") or fallback_answer
         logger.info("[chat] AI response len=%s", len(ai_response))
 
+        # 재질문 데이터 추출
+        needs_clarification = response_state.get("needs_clarification", False)
+        expansion_directions = response_state.get("expansion_directions", [])
+        clarification_question = response_state.get("clarification_question", "")
+        
+        # ★ 디버그: 재질문 상태 로깅
+        logger.info("[chat] Response state - needs_clarification=%s, expansion_directions_count=%d", 
+                   needs_clarification, len(expansion_directions))
+
+        # 재질문이 필요한 경우 AI 응답을 저장하지 않음 (사용자 선택 대기)
+        if not needs_clarification:
+            _store_message(
+                request,
+                ChatMessage.Role.ASSISTANT,
+                ai_response,
+                chat_session=chat_session,
+            )
+
+            new_summary = response_state.get("summary")
+            if new_summary:
+                    _store_summary_entry(request, new_summary, chat_session=chat_session)
+
+    except UserClarificationRequired as e:
+        # 사용자 재질문이 필요한 경우 (LangGraph가 중단됨)
+        logger.info("[chat] ★ UserClarificationRequired exception caught!")
+        logger.info("[chat] User clarification required, returning options to frontend")
+
+        # 예외에 포함된 state에서 재질문 데이터 추출
+        response_state = e.state
+        needs_clarification = response_state.get("needs_clarification", True)
+        expansion_directions = response_state.get("expansion_directions", [])
+        clarification_question = response_state.get("clarification_question", "")
+
+        # ★ 디버그: 예외에서 추출한 데이터 로깅
+        logger.info("[chat] From exception - needs_clarification=%s, directions=%d, question_len=%d",
+                   needs_clarification, len(expansion_directions), len(clarification_question))
+
+        # 재질문을 AI 메시지로 저장 (대화 기록에 포함)
+        # JSON 메타데이터를 메시지 앞에 추가 (프론트엔드 복원용)
+        import json
+        clarification_metadata = {
+            "type": "clarification",
+            "question": clarification_question,
+            "options": expansion_directions
+        }
+        message_with_metadata = f"__CLARIFICATION_METADATA__:{json.dumps(clarification_metadata, ensure_ascii=False)}"
         _store_message(
             request,
             ChatMessage.Role.ASSISTANT,
-            ai_response,
+            message_with_metadata,
             chat_session=chat_session,
         )
 
-        new_summary = response_state.get("summary")
-        if new_summary:
-                _store_summary_entry(request, new_summary, chat_session=chat_session)
+        # 원본 질문을 세션에 저장 (사용자 선택 시 사용)
+        request.session["pending_clarification_query"] = query
+        request.session.modified = True
+
+        # ai_response는 비워둠 (재질문만 반환)
+        ai_response = ""
+
     except Exception:
         logger.exception("[chat] langgraph failed")
         error = "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+        # 일반 오류 시에도 변수 초기화 (UnboundLocalError 방지)
+        needs_clarification = False
+        expansion_directions = []
+        clarification_question = ""
 
     chat_history = request.session.get("chat_history", [])
     active_session = _get_or_create_session_for_user(request, create=False)
-    return Response(
-        {
-            "chat_history": chat_history,
-            "error": error,
-            "active_session_id": active_session.id if active_session else None,
-            "answer": ai_response,
-        }
-    )
+
+    response_data = {
+        "chat_history": chat_history,
+        "error": error,
+        "active_session_id": active_session.id if active_session else None,
+        "answer": ai_response,
+    }
+
+    # Thinking 모드에서 재질문이 있는 경우 추가 정보 전달
+    # ★ 수정: thinking_mode 조건 제거 - 항상 재질문 데이터 반환
+    if needs_clarification and expansion_directions:
+        response_data["needs_clarification"] = True
+        response_data["clarification_question"] = clarification_question
+        response_data["expansion_directions"] = expansion_directions
+        logger.info("[chat] ★ Returning clarification to frontend: %d options", len(expansion_directions))
+    else:
+        # 재질문이 완료되었거나 없으면 세션 정리
+        request.session.pop("pending_clarification_query", None)
+        request.session.modified = True
+
+    return Response(response_data)
 
 
 class ChatQuestionView(APIView):
@@ -198,6 +318,7 @@ class ChatQuestionView(APIView):
         if stream_flag:
             error = None
             ai_response = ""
+            fallback_answer = "어,어랏? 그게 뭐야아? 그거 조선말 맞아?"
 
             _hydrate_summary_from_db(request)
             query = (
@@ -208,8 +329,11 @@ class ChatQuestionView(APIView):
             if not query:
                 return Response({"error": "query is required"}, status=400)
 
+            # Thinking mode 파라미터 확인
+            thinking_mode = request.data.get("thinking_mode", False)
+
             try:
-                logger.info("[chat][stream] POST question='%s'", query)
+                logger.info("[chat][stream] POST question='%s' thinking_mode=%s", query, thinking_mode)
                 _store_message(request, ChatMessage.Role.USER, query, chat_session=chat_session)
                 question_for_ai = query
 
@@ -217,7 +341,14 @@ class ChatQuestionView(APIView):
                 if not memory_summary:
                     memory_summary = _hydrate_summary_from_db(request)
 
-                app = create_graph_flow()
+                # Thinking 모드일 때만 ontology LangGraph 호출
+                if thinking_mode:
+                    logger.info("[chat][stream] Using ontology LangGraph (Thinking mode)")
+                    app = create_ontology_graph()
+                else:
+                    logger.info("[chat][stream] Using standard LangGraph")
+                    app = create_graph_flow()
+
                 response_state = asyncio.run(
                     app.ainvoke(
                         {

@@ -5,14 +5,16 @@ import api from "./axios";
  */
 
 // 질문 전송 및 답변 받기
-export const sendQuestion = async (question, sessionId = null) => {
+export const sendQuestion = async (question, sessionId = null, thinkingMode = false, abortSignal = null) => {
   const payload = {
     question: question,
+    thinking_mode: thinkingMode,
   };
   if (sessionId) {
     payload.session_id = sessionId;
   }
-  const response = await api.post("/api/chat/question/", payload);
+  const config = abortSignal ? { signal: abortSignal } : {};
+  const response = await api.post("/api/chat/question/", payload, config);
   return response.data;
 };
 

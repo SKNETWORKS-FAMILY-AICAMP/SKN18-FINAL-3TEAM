@@ -3,6 +3,7 @@ import axios from "axios";
 const api = axios.create({
   baseURL: "http://localhost:8000",
   withCredentials: true,
+  timeout: 200000, // 2000초 (LangGraph 실행 시간 고려)
 });
 
 // ============================================
@@ -52,8 +53,10 @@ api.interceptors.response.use(
 
     // 401 또는 403 에러 (인증/권한 실패) && 아직 재시도하지 않은 경우
     // 단, 시청 기록 저장 API는 403이 정상일 수 있으므로 제외
-    const isWatchLogsRequest = originalRequest.url?.includes('/api/activity/watch-logs/');
-    
+    const isWatchLogsRequest = originalRequest.url?.includes(
+      "/api/activity/watch-logs/"
+    );
+
     if (
       (error.response?.status === 401 || error.response?.status === 403) &&
       !originalRequest._retry &&
