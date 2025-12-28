@@ -26,107 +26,10 @@ sys.path.insert(0, str(PROJECT_ROOT))
 # LangGraph import
 from backend.langgraph_fuseki.graph import create_graph_flow
 
-# 평가자 import
-from backend.ragas.ontology_evaluate.evaluators import (
-    TBoxConsistencyEvaluator,
-    IntentPreservationEvaluator,
-    RelationCoherenceEvaluator,
-    PropertyGroupSelectionEvaluator,
-    TerminalTripleValidityEvaluator,
-    EvidenceDiversityEvaluator,
-    ConvergenceUtilizationEvaluator,
-    AnswerQualityEvaluator
-)
-from backend.ragas.ontology_evaluate.evaluators.intent_aware_evaluator import IntentAwareEvaluator
+# 공통 평가 모듈 import
+from backend.ragas.ontology_evaluate.common_eval import evaluate_state, build_test_config, get_ontology_schema
+from backend.ragas.ontology_evaluate.evaluators import AnswerQualityEvaluator
 from backend.ragas.ontology_evaluate.utils.llm_judge import LLMJudge
-
-
-def evaluate_state(
-    state_output: dict,
-    llm_judge: LLMJudge,
-    ontology_schema: dict,
-    query_type: str = None,
-    expected_property_groups: List[str] = None
-) -> dict:
-    """GraphState에 대해 모든 평가 메트릭 실행"""
-    # L1: TBox Consistency
-    tbox_evaluator = TBoxConsistencyEvaluator(ontology_schema)
-    tbox_result = tbox_evaluator.evaluate(state_output)
-
-    # L2: Intent Preservation
-    intent_evaluator = IntentPreservationEvaluator(llm_judge)
-    intent_result = intent_evaluator.evaluate(state_output)
-
-    # L2: Relation Coherence
-    relation_evaluator = RelationCoherenceEvaluator()
-    relation_result = relation_evaluator.evaluate(state_output)
-
-    # L2: Property Group Selection
-    property_group_result = None
-    if expected_property_groups:
-        property_group_evaluator = PropertyGroupSelectionEvaluator()
-        property_group_result = property_group_evaluator.evaluate(state_output, expected_property_groups)
-
-    # L3: Terminal Triple Validity
-    triple_evaluator = TerminalTripleValidityEvaluator(llm_judge)
-    triple_result = triple_evaluator.evaluate(state_output)
-
-    # L3: Evidence Diversity
-    diversity_evaluator = EvidenceDiversityEvaluator()
-    diversity_result = diversity_evaluator.evaluate(state_output)
-
-    # L3: Convergence Utilization
-    convergence_evaluator = ConvergenceUtilizationEvaluator()
-    convergence_result = convergence_evaluator.evaluate(state_output)
-
-    # Raw metrics
-    raw_metrics = {
-        "tbox_consistency": tbox_result["score"],
-        "intent_preservation": intent_result["score"],
-        "relation_coherence": relation_result["score"],
-        "triple_validity": triple_result["score"],
-        "evidence_diversity": diversity_result["score"],
-        "convergence_utilization": convergence_result["score"]
-    }
-
-    # Property Group Selection 점수 추가
-    if property_group_result:
-        raw_metrics["property_group_selection"] = property_group_result["score"]
-    else:
-        raw_metrics["property_group_selection"] = 0.5  # 기본값
-
-    # Intent-aware 평가
-    intent_aware_result = None
-    if query_type:
-        intent_aware_evaluator = IntentAwareEvaluator()
-        user_selected_direction = state_output.get("user_selected_direction")
-        intent_aware_result = intent_aware_evaluator.evaluate(
-            query_type,
-            raw_metrics,
-            user_selected_direction
-        )
-
-    return {
-        "raw_metrics": raw_metrics,
-        "intent_aware": intent_aware_result
-    }
-
-
-def build_test_config(config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Grid Search 설정을 LangGraph test_config 형식으로 변환
-
-    형식:
-        - semantic_expander: {temporal: bool, causal_chain: bool, pgvector: bool}
-        - aggregator_threads: {thread_name: bool}
-        - entity_boost_mode: "normalized" | "exact" | None
-    """
-    return {
-        "skip_clarification": True,
-        "semantic_expander": config.get("semantic_expander", {}),
-        "aggregator_threads": config.get("aggregator_threads", {}),
-        "entity_boost_mode": config.get("entity_boost_mode"),
-    }
 
 
 def run_single_config(
@@ -187,20 +90,20 @@ def run_single_config(
             state_output = graph.invoke(state)
 
             # 평가
+            print(f"    → 평가 중...")
             metrics = evaluate_state(
                 state_output,
                 llm_judge,
                 ontology_schema,
+                answer_quality_evaluator,
+                query=query,
                 query_type=query_type,
-                expected_property_groups=expected_property_groups
+                expected_property_groups=expected_property_groups,
+                use_intent_aware=True
             )
 
-            final_answer = state_output.get("final_answer", "")
             final_score = metrics["intent_aware"]["final_score"] if metrics["intent_aware"] else 0.0
-
-            # LLM Judge 품질 평가
-            print(f"    → LLM Judge 평가 중...")
-            llm_judge_quality = answer_quality_evaluator.evaluate(query, query_type, final_answer)
+            llm_judge_quality = metrics["llm_judge_quality"]
 
             q_elapsed = time.time() - q_start
 
@@ -310,7 +213,7 @@ def main():
     
     # LLM Judge 초기화
     print("✓ LLM Judge 초기화 중...")
-    llm_judge = LLMJudge(model="gpt-5-mini")
+    llm_judge = LLMJudge(model="gpt-5-nano")
     print("✓ LLM Judge 초기화 완료")
 
     # Answer Quality Evaluator 초기화
@@ -318,16 +221,8 @@ def main():
     answer_quality_evaluator = AnswerQualityEvaluator()
     print("✓ Answer Quality Evaluator 초기화 완료")
 
-    # 온톨로지 스키마 (간략화)
-    ontology_schema = {
-        "classes": ["Person", "Event", "Place", "Organization", "Battle", "Dynasty"],
-        "properties": {
-            "participatesIn": {"domain": "Person", "range": "Event"},
-            "built": {"domain": "Person", "range": "Place"},
-            "causedBy": {"domain": "Event", "range": "Event"},
-            "leadsTo": {"domain": "Event", "range": "Event"},
-        }
-    }
+    # 온톨로지 스키마 (공통 모듈 사용)
+    ontology_schema = get_ontology_schema()
 
     # 모든 설정 실행 (flat list로 수집)
     all_flat_results = []  # Ablation 형식

@@ -18,7 +18,7 @@ class AnswerQualityEvaluator:
 
     def __init__(self, model: str = None, api_key: str = None):
         if model is None:
-            model = os.getenv("OPENAI_MODEL", "gpt-5-mini")
+            model = os.getenv("OPENAI_MODEL", "gpt-5-nano")
         if api_key is None:
             api_key = os.getenv("OPENAI_API_KEY")
 
