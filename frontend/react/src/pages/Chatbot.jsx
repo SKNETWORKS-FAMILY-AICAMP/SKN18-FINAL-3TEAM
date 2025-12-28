@@ -433,8 +433,9 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
   return (
     <div
       style={{
-        height: "calc(100vh - 76px)",
-        maxHeight: "calc(100vh - 76px)",
+        marginTop: "96px",
+        height: "calc(100vh - 96px)",
+        maxHeight: "calc(100vh - 96px)",
         backgroundColor: COLORS.background,
         display: "flex",
         flexDirection: "row",
@@ -517,7 +518,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                 display: "flex",
                 flexDirection: "column",
                 gap: "8px",
-                alignItems: "flex-start",
+                alignItems: "stretch",
               }}
             >
               <button
@@ -542,23 +543,39 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                   }
                 }}
                 style={{
-                  alignSelf: "flex-start",
-                  border: "none",
-                  background: "transparent",
+                  width: "100%",
+                  background: "rgba(255, 255, 255, 0.7)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
+                  border: "1px solid rgba(255, 255, 255, 0.3)",
+                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
                   color: COLORS.dark,
                   cursor: "pointer",
                   fontSize: "16px",
-                  padding: "4px 0px",
-                  borderRadius: "8px",
-                  transition: "background 0.2s",
+                  fontWeight: "600",
+                  padding: "12px 20px",
+                  borderRadius: "16px",
+                  transition: "all 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = COLORS.lightGray;
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.85)";
+                  e.currentTarget.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.1)";
+                  e.currentTarget.style.transform = "translateY(-1px)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.7)";
+                  e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.06)";
+                  e.currentTarget.style.transform = "translateY(0)";
                 }}
               >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={COLORS.dark} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
                 새 채팅
               </button>
               <span
@@ -778,7 +795,9 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                 flex: 1,
                 overflowY: "auto",
                 overflowX: "hidden",
-                paddingRight: "8px",
+                paddingTop: "20px",
+                paddingRight: "16px",
+                paddingLeft: "16px",
                 paddingBottom: "120px",
                 touchAction: "pan-y",
                 WebkitOverflowScrolling: "touch",
@@ -796,18 +815,18 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "flex-end",
-                  gap: "12px",
+                  gap: "24px",
                 }}
               >
                 {messages.map((msg, index) => (
-                  <div key={index}>
+                  <div key={index} style={{ marginBottom: "8px" }}>
                     {/* 구분선 */}
                     {index > 0 && (
                       <div
                         style={{
                           height: "1px",
                           backgroundColor: COLORS.lightGray,
-                          margin: "8px 0",
+                          margin: "16px 0",
                           opacity: 0.5,
                         }}
                       />
@@ -819,19 +838,20 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                           msg.type === "user" ? "flex-end" : "flex-start",
                         alignItems: "flex-start",
                         gap: "12px",
+                        padding: "0 8px",
                       }}
                     >
                       {msg.type === "user" ? (
                         <div
                           style={{
                             marginBottom: "8px",
-                            padding: "10px 14px",
+                            padding: "12px 16px",
                             backgroundColor: COLORS.lightGray,
                             borderRadius: "12px",
                             fontSize: "14px",
                             color: COLORS.dark,
                             display: "inline-block",
-                            maxWidth: "70%",
+                            maxWidth: "68%",
                             wordWrap: "break-word",
                             lineHeight: "1.5",
                           }}
