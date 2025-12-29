@@ -2,6 +2,8 @@ import asyncio
 import logging
 import json
 import uuid
+import threading
+import queue
 
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -196,8 +198,7 @@ class ChatQuestionView(APIView):
         )
 
         if stream_flag:
-            error = None
-            ai_response = ""
+            error_text = None
 
             _hydrate_summary_from_db(request)
             query = (
@@ -208,50 +209,65 @@ class ChatQuestionView(APIView):
             if not query:
                 return Response({"error": "query is required"}, status=400)
 
-            try:
-                logger.info("[chat][stream] POST question='%s'", query)
-                _store_message(request, ChatMessage.Role.USER, query, chat_session=chat_session)
-                question_for_ai = query
+            logger.info("[chat][stream] POST question='%s'", query)
+            _store_message(request, ChatMessage.Role.USER, query, chat_session=chat_session)
+            question_for_ai = query
 
-                memory_summary = request.session.get("chat_memory_summary")
-                if not memory_summary:
-                    memory_summary = _hydrate_summary_from_db(request)
+            memory_summary = request.session.get("chat_memory_summary")
+            if not memory_summary:
+                memory_summary = _hydrate_summary_from_db(request)
 
-                app = create_graph_flow()
-                response_state = asyncio.run(
-                    app.ainvoke(
-                        {
-                            "query": question_for_ai,
-                            "tag": "chat",
-                        }
-                    )
-                )
-                ai_response = response_state.get("final_answer") or fallback_answer
-                logger.info("[chat][stream] AI response len=%s", len(ai_response))
+            app = create_graph_flow()
 
-                _store_message(
-                    request,
-                    ChatMessage.Role.ASSISTANT,
-                    ai_response,
-                    chat_session=chat_session,
-                )
-
-                new_summary = response_state.get("summary")
-                if new_summary:
-                    _store_summary_entry(request, new_summary, chat_session=chat_session)
-            except Exception:
-                logger.exception("[chat][stream] langgraph failed")
-                error = "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
-
-            # SSE 형태로 스트리밍 응답 (프론트에서 EventSource 또는 fetch reader로 처리)
+            # SSE 형태로 LangGraph 스트림 중계
             def sse_stream():
-                if error:
-                    yield f"data: {json.dumps({'type': 'error', 'text': error})}\n\n"
-                    return
-                chunk_size = 200
-                for i in range(0, len(ai_response), chunk_size):
-                    yield f"data: {json.dumps({'type': 'delta', 'text': ai_response[i:i+chunk_size]})}\n\n"
-                yield f"data: {json.dumps({'type': 'final', 'text': ai_response})}\n\n"
+                q: "queue.Queue[dict | None]" = queue.Queue()
+
+                def stream_callback(delta: str):
+                    # LangGraph 노드에서 토큰 단위로 호출
+                    q.put({"type": "delta", "text": delta})
+
+                def run_graph():
+                    try:
+                        response_state = asyncio.run(
+                            app.ainvoke(
+                                {
+                                    "query": question_for_ai,
+                                    "tag": "chat",
+                                    "stream_callback": stream_callback,
+                                }
+                            )
+                        )
+                        q.put({"type": "final_state", "state": response_state})
+                    except Exception:
+                        logger.exception("[chat][stream] langgraph failed")
+                        q.put({"type": "error", "text": "오류가 발생했습니다. 잠시 후 다시 시도해주세요."})
+                    finally:
+                        q.put(None)  # 종료 신호
+
+                threading.Thread(target=run_graph, daemon=True).start()
+
+                while True:
+                    item = q.get()
+                    if item is None:
+                        break
+                    if item["type"] == "delta":
+                        yield f"data: {json.dumps({'type': 'delta', 'text': item['text']})}\n\n"
+                    elif item["type"] == "error":
+                        yield f"data: {json.dumps({'type': 'error', 'text': item['text']})}\n\n"
+                    elif item["type"] == "final_state":
+                        state = item["state"]
+                        ai_response = state.get("final_answer") or fallback_answer
+                        _store_message(
+                            request,
+                            ChatMessage.Role.ASSISTANT,
+                            ai_response,
+                            chat_session=chat_session,
+                        )
+                        new_summary = state.get("summary")
+                        if new_summary:
+                            _store_summary_entry(request, new_summary, chat_session=chat_session)
+                        yield f"data: {json.dumps({'type': 'final', 'text': ai_response})}\n\n"
 
             return StreamingHttpResponse(
                 sse_stream(),

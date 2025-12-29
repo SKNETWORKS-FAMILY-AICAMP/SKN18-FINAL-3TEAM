@@ -67,6 +67,7 @@ def generate_node(state: GraphState) -> GraphState:
 
     최종적으로 Evidence로 통합해서 score 기준으로 정렬 후 LLM 호출
     """
+
     question = state.get("translated_query") or state.get("query", "")
     t0 = state.get("t0")
 

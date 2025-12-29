@@ -90,7 +90,7 @@ services:
     container_name: django_web
     env_file:
       - ../.env
-    command: ["/app/backend/django/entrypoint.sh", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+    command: ["/app/entrypoint.sh", "python", "manage.py", "runserver", "0.0.0.0:8000"]
     ports:
       - "8000:8000"
     volumes:

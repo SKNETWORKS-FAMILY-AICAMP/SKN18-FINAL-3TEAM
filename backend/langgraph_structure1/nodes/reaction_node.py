@@ -63,17 +63,38 @@ def reaction_node(state: GraphState) -> GraphState:
     client = create_model()
     MODEL_NAME = "gpt-5-mini"
 
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        response_format={"type": "text"},
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            # LLM에는 항상 "한국어 문장"만 보냄
-            {"role": "user", "content": f"(언어: {language}) 사용자 질문: {query}"},
-        ],
-    )
+    stream_callback = state.get("stream_callback")
 
-    reaction_text = response.choices[0].message.content.strip()
+    # 스트리밍 콜백이 있으면 토큰 단위로 흘려보내며 축적
+    if stream_callback:
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            response_format={"type": "text"},
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"(언어: {language}) 사용자 질문: {query}"},
+            ],
+            stream=True,
+        )
+
+        chunks = []
+        for chunk in response:
+            delta = chunk.choices[0].delta.content or ""
+            if delta:
+                stream_callback(delta)
+                chunks.append(delta)
+        reaction_text = "".join(chunks).strip()
+    else:
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            response_format={"type": "text"},
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"(언어: {language}) 사용자 질문: {query}"},
+            ],
+        )
+
+        reaction_text = response.choices[0].message.content.strip()
 
     
     return {

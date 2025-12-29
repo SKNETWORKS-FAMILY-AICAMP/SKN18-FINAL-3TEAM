@@ -15,6 +15,8 @@ from .views import (
 urlpatterns = [
     # 유니티가 /api/video/generate/ 로 접속하면 views.generate_scenario 실행
     path('generate/', views.generate_scenario, name='generate_scenario'),
+    # LangGraph로 영상 스크립트 생성 후 DB에 저장
+    path('create/', views.create_video_from_langgraph, name='video-create'),
 
     # ============================================
     # 영상 API

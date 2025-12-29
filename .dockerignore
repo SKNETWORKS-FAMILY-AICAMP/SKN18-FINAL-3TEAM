@@ -1,0 +1,45 @@
+# Version control
+.git
+.gitignore
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyd
+.Python
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+
+# Env files (inject via env_file/ENV)
+.env
+.env.*
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+
+# Node / frontend
+node_modules/
+frontend/node_modules/
+.npm/
+.yarn/
+.turbo/
+
+# Logs / temp
+*.log
+logs/
+tmp/
+
+# Local data/cache
+data/
+.cache/
