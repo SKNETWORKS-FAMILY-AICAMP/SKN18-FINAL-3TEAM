@@ -18,15 +18,18 @@ Usage:
 
 import argparse
 import json
-import time
 from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime
 
 # 공통 평가 모듈
-from backend.ragas.ontology_evaluate.common_eval import evaluate_state, build_test_config, get_ontology_schema
-from backend.ragas.ontology_evaluate.evaluators import AnswerQualityEvaluator
+from backend.ragas.ontology_evaluate.common_eval import get_ontology_schema
 from backend.ragas.ontology_evaluate.utils.llm_judge import LLMJudge
+from backend.ragas.ontology_evaluate.utils.experiment_utils import (
+    initialize_evaluators,
+    run_single_config_experiment,
+    save_experiment_results
+)
 
 # LangGraph import
 from backend.langgraph_fuseki.graph import create_graph_flow
@@ -125,190 +128,8 @@ class IsolationExperimentGenerator:
 
 
 # =====================================================
-# 실험 실행 함수 (grid_search 패턴)
+# 실험 실행 함수 (utils 함수 사용)
 # =====================================================
-
-def run_single_config(
-    config: Dict[str, Any],
-    queries: List[Dict],
-    graph,
-    llm_judge: LLMJudge,
-    ontology_schema: dict,
-    answer_quality_evaluator: AnswerQualityEvaluator,
-    group_name: str,
-    config_idx: int,
-    total_configs: int
-) -> List[Dict[str, Any]]:
-    """
-    단일 설정으로 모든 질문 실행 및 평가
-    grid_search_worker 패턴 사용
-    """
-    config_name = config.get("name", f"config_{config_idx}")
-    config_description = config.get("description", "")
-    test_config = build_test_config(config)
-
-    print(f"\n{'='*70}")
-    print(f"[{group_name}] 설정 {config_idx+1}/{total_configs}: {config_name}")
-    print(f"{'='*70}")
-
-    # 설정 정보 출력
-    se_config = config.get('semantic_expander', {})
-    if se_config:
-        print(f"  SE: {se_config}")
-
-    threads = config.get('aggregator_threads', {})
-    if threads:
-        active_threads = [k for k, v in threads.items() if v]
-        print(f"  Thread: {active_threads}")
-
-    boost_mode = config.get('entity_boost_mode')
-    if boost_mode:
-        print(f"  Boost: {boost_mode}")
-
-    flat_results = []
-    config_start = time.time()
-
-    for q_idx, query_data in enumerate(queries):
-        query = query_data.get("query", "")
-        query_type = query_data.get("query_type", "factual")
-        expected_property_groups = query_data.get("expected_property_groups", [])
-
-        print(f"\n  [{q_idx+1}/{len(queries)}] {query[:50]}...")
-        q_start = time.time()
-
-        try:
-            # LangGraph 실행
-            state = {
-                "user_query": query,
-                "test_config": test_config
-            }
-            state_output = graph.invoke(state)
-
-            # 평가
-            print(f"    → 평가 중...")
-            metrics = evaluate_state(
-                state_output,
-                llm_judge,
-                ontology_schema,
-                answer_quality_evaluator,
-                query=query,
-                query_type=query_type,
-                expected_property_groups=expected_property_groups,
-                use_intent_aware=True
-            )
-
-            final_score = metrics["intent_aware"]["final_score"] if metrics["intent_aware"] else 0.0
-            llm_judge_quality = metrics["llm_judge_quality"]
-
-            q_elapsed = time.time() - q_start
-
-            # 결과 저장
-            result = {
-                "experiment_name": config_name,
-                "description": config_description,
-                "query": query,
-                "query_type": query_type,
-                "config": {
-                    "semantic_expander": config.get("semantic_expander", {}),
-                    "aggregator_threads": config.get("aggregator_threads", {}),
-                    "entity_boost_mode": config.get("entity_boost_mode")
-                },
-                "state_output": state_output,
-                "execution_time": q_elapsed,
-                "success": True,
-                "error": None,
-                "metrics": {
-                    "raw_metrics": metrics["raw_metrics"],
-                    "intent_aware": metrics["intent_aware"],
-                    "final_score": final_score
-                },
-                "llm_judge_quality": llm_judge_quality
-            }
-
-            judge_score = llm_judge_quality.get('overall_score', 0) if llm_judge_quality else 0
-            print(f"    ✓ Score: {final_score:.4f} | LLM Judge: {judge_score:.4f} ({q_elapsed:.1f}s)")
-
-        except Exception as e:
-            q_elapsed = time.time() - q_start
-            result = {
-                "experiment_name": config_name,
-                "description": config_description,
-                "query": query,
-                "query_type": query_type,
-                "config": {
-                    "semantic_expander": config.get("semantic_expander", {}),
-                    "aggregator_threads": config.get("aggregator_threads", {}),
-                    "entity_boost_mode": config.get("entity_boost_mode")
-                },
-                "state_output": {},
-                "execution_time": q_elapsed,
-                "success": False,
-                "error": str(e),
-                "metrics": None
-            }
-            print(f"    ✗ Error: {str(e)[:100]}")
-
-        flat_results.append(result)
-
-    config_elapsed = time.time() - config_start
-
-    # 통계 출력
-    success_count = sum(1 for r in flat_results if r["success"])
-    if success_count > 0:
-        scores = [r["metrics"]["final_score"] for r in flat_results if r["success"] and r["metrics"]]
-        mean_score = sum(scores) / len(scores) if scores else 0.0
-        print(f"\n  Summary: mean={mean_score:.4f}, success={success_count}/{len(queries)}, time={config_elapsed:.1f}s")
-
-    return flat_results
-
-
-def save_experiment_results(results: list, output_dir: str, group_name: str):
-    """실험 결과를 2개 파일로 저장: Full + Summary (grid_search 패턴)"""
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-
-    # 1. Full 결과 저장
-    full_file = output_path / f"{group_name}_isolation_full.json"
-    with open(full_file, "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
-    print(f"\n✓ Full 결과: {full_file}")
-
-    # 2. Summary 결과 생성
-    summary_results = []
-    for result in results:
-        if result["success"] and result["metrics"]:
-            state = result.get("state_output", {})
-            metrics = result["metrics"]
-            ia = metrics.get("intent_aware", {})
-
-            summary_item = {
-                "experiment_name": result.get("experiment_name", ""),
-                "query": result.get("query", ""),
-                "query_type": result.get("query_type", ""),
-                "final_answer": state.get("final_answer", ""),
-                "num_extracted_entities": len(state.get("extracted_entities", [])),
-                "num_expanded_entities": len(state.get("expanded_entities", [])),
-                "num_evidences": len(state.get("evidences", [])),
-                "num_convergence_nodes": len(state.get("convergence_triple_tree", {}).get("nodes", [])),
-                "raw_metrics": metrics.get("raw_metrics", {}),
-                "intent_aware_score": ia.get("final_score", 0.0),
-                "weighted_metrics": ia.get("weighted_metrics", {}),
-                "llm_judge_quality": result.get("llm_judge_quality")
-            }
-        else:
-            summary_item = {
-                "experiment_name": result.get("experiment_name", ""),
-                "query": result.get("query", ""),
-                "query_type": result.get("query_type", ""),
-                "success": False,
-                "error": result.get("error")
-            }
-        summary_results.append(summary_item)
-
-    summary_file = output_path / f"{group_name}_isolation_summary.json"
-    with open(summary_file, "w", encoding="utf-8") as f:
-        json.dump(summary_results, f, ensure_ascii=False, indent=2)
-    print(f"✓ Summary: {summary_file}")
 
 
 def main():
@@ -355,18 +176,10 @@ def main():
     graph = create_graph_flow()
     print("✓ LangGraph 초기화 완료")
 
-    # LLM Judge 초기화
-    print("✓ LLM Judge 초기화 중...")
-    llm_judge = LLMJudge()
-    print("✓ LLM Judge 초기화 완료")
-
-    # Answer Quality Evaluator 초기화
-    print("✓ Answer Quality Evaluator 초기화 중...")
-    answer_quality_evaluator = AnswerQualityEvaluator()
-    print("✓ Answer Quality Evaluator 초기화 완료")
-
-    # 온톨로지 스키마
-    ontology_schema = get_ontology_schema()
+    # 평가자 초기화
+    print("✓ 평가자 초기화 중...")
+    llm_judge, answer_quality_evaluator, ontology_schema = initialize_evaluators()
+    print("✓ 평가자 초기화 완료")
 
     # 실험 설정 생성
     generator = IsolationExperimentGenerator()
@@ -384,21 +197,27 @@ def main():
 
             all_results = []
             for config_idx, config in enumerate(configs):
-                results = run_single_config(
-                    config,
-                    queries_data,
-                    graph,
-                    llm_judge,
-                    ontology_schema,
-                    answer_quality_evaluator,
-                    group_name,
-                    config_idx,
-                    len(configs)
+                results = run_single_config_experiment(
+                    config=config,
+                    queries=queries_data,
+                    graph=graph,
+                    llm_judge=llm_judge,
+                    ontology_schema=ontology_schema,
+                    answer_quality_evaluator=answer_quality_evaluator,
+                    config_idx=config_idx,
+                    total_configs=len(configs),
+                    group_name=group_name,
+                    state_key="user_query"
                 )
                 all_results.extend(results)
 
             # 결과 저장
-            save_experiment_results(all_results, args.output, group_name)
+            save_experiment_results(
+                results=all_results,
+                output_dir=Path(args.output),
+                group_name=group_name,
+                experiment_type="isolation"
+            )
 
     else:
         # 특정 그룹만 실행
@@ -411,21 +230,27 @@ def main():
 
         all_results = []
         for config_idx, config in enumerate(configs):
-            results = run_single_config(
-                config,
-                queries_data,
-                graph,
-                llm_judge,
-                ontology_schema,
-                answer_quality_evaluator,
-                args.group,
-                config_idx,
-                len(configs)
+            results = run_single_config_experiment(
+                config=config,
+                queries=queries_data,
+                graph=graph,
+                llm_judge=llm_judge,
+                ontology_schema=ontology_schema,
+                answer_quality_evaluator=answer_quality_evaluator,
+                config_idx=config_idx,
+                total_configs=len(configs),
+                group_name=args.group,
+                state_key="user_query"
             )
             all_results.extend(results)
 
         # 결과 저장
-        save_experiment_results(all_results, args.output, args.group)
+        save_experiment_results(
+            results=all_results,
+            output_dir=Path(args.output),
+            group_name=args.group,
+            experiment_type="isolation"
+        )
 
     print(f"\n✅ 평가 완료!")
     print(f"종료 시간: {datetime.now()}")

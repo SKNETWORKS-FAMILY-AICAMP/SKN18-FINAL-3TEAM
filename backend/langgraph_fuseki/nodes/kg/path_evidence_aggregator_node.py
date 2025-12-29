@@ -23,6 +23,7 @@ from backend.langgraph_fuseki.config import (
 )
 from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
 from backend.langgraph_fuseki.utils.fuseki_client import execute_sparql_query
+from backend.langgraph_fuseki.utils.evidence_scoring import calculate_final_evidence_score
 from langchain_openai import ChatOpenAI
 
 
@@ -338,6 +339,89 @@ def extract_label_from_uri(uri: str) -> str:
     elif "/" in uri:
         return uri.split("/")[-1]
     return uri
+
+
+def _detect_entity_match_type(raw_data: dict, query_entities: list, thread_type: str) -> str:
+    """
+    Entity 매칭 타입 감지 (v2.0 scoring system용)
+
+    Args:
+        raw_data: Path data (SPARQL binding)
+        query_entities: 쿼리에서 추출된 엔티티 리스트
+        thread_type: Thread 타입
+
+    Returns:
+        "exact" | "partial" | "normalized" | "none"
+
+    Example:
+        >>> raw_data = {"entityLabel": {"value": "세조"}, ...}
+        >>> query_entities = [{"name": "세조"}]
+        >>> _detect_entity_match_type(raw_data, query_entities, "type_and_summary")
+        "exact"
+    """
+    if not query_entities:
+        return "none"
+
+    # calculate_improved_relevance_score()의 매칭 로직 재사용
+    subject = raw_data.get("subject", {}).get("value", "")
+    obj = raw_data.get("object", {}).get("value", "")
+    entity_label = raw_data.get("entityLabel", {}).get("value", "")
+    subject_label = raw_data.get("subjectLabel", {}).get("value", "")
+    object_label = raw_data.get("objectLabel", {}).get("value", "")
+
+    def normalize_name(name):
+        """이름 정규화 (공백 제거, 소문자 변환)"""
+        if not name:
+            return ""
+        return name.replace(" ", "").replace("_", "").lower()
+
+    # Thread별 매칭 대상 선택 (calculate_improved_relevance_score와 동일)
+    if thread_type == "incoming_relations":
+        priority_sources = [entity_label, subject_label]
+    elif thread_type == "outgoing_relations":
+        priority_sources = [entity_label, object_label]
+    else:
+        priority_sources = [entity_label, subject_label, object_label]
+
+    all_entity_names = []
+    all_entity_names_normalized = []
+
+    for name_source in priority_sources:
+        if name_source:
+            raw_name = name_source.split("#")[-1] if "#" in name_source else name_source
+            all_entity_names.append(raw_name)
+            all_entity_names_normalized.append(normalize_name(raw_name))
+
+    # URI도 추가
+    for uri_source in [subject, obj]:
+        if uri_source:
+            raw_name = uri_source.split("#")[-1] if "#" in uri_source else uri_source
+            if raw_name not in all_entity_names:
+                all_entity_names.append(raw_name)
+                all_entity_names_normalized.append(normalize_name(raw_name))
+
+    # 매칭 확인 (우선순위: exact > partial > normalized)
+    for entity in query_entities:
+        entity_name = entity.get("name", "") or entity.get("label", "")
+        if not entity_name:
+            continue
+
+        entity_name_normalized = normalize_name(entity_name)
+
+        # Exact match
+        if entity_name in all_entity_names or entity_name_normalized in all_entity_names_normalized:
+            return "exact"
+
+        # Partial match
+        if any(entity_name in name or name in entity_name for name in all_entity_names if name):
+            return "partial"
+
+        # Normalized match
+        if any(entity_name_normalized in norm_name or norm_name in entity_name_normalized
+               for norm_name in all_entity_names_normalized if norm_name):
+            return "normalized"
+
+    return "none"
 
 
 def extract_outgoing_relations(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None) -> list:
@@ -705,6 +789,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     thread_weights = state.get("thread_weights", {})
     query_type = state.get("query_type", "causal")
     query_entities = state.get("extracted_entities", [])
+    expanded_entities = state.get("expanded_entities", [])  # 확장된 엔티티 정보
     test_config = state.get("test_config")  # 테스트 설정
 
     # 테스트 설정 추출
@@ -785,22 +870,114 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     # 3. 모든 Thread의 경로를 하나로 병합
     all_evidences = []
 
+    # Query metadata 준비 (v2.0 scoring system용)
+    query = state.get("query", "")
+    # 간단한 키워드 추출 (명사 추출)
+    try:
+        from kiwipiepy import Kiwi
+        kiwi = Kiwi()
+        tokens = kiwi.tokenize(query)
+        core_keywords = [t.form for t in tokens if t.tag in ('NNG', 'NNP') and len(t.form) >= 2]
+    except:
+        import re
+        core_keywords = re.findall(r'[가-힣]{2,}', query)
+
+    query_metadata = {
+        "keywords": core_keywords[:5],  # 최대 5개
+        "query_type": query_type
+    }
+
     for thread_type, paths in inference_paths.items():
         for path in paths:
-            final_weight = path.get("weight", 0.2)
-
-            # 수렴 노드 플래그 (부스트는 제거됨)
+            # 수렴 노드 플래그
             raw_data = path.get("raw_data", {})
             convergence_node = raw_data.get("convergence_node")
+
+            # Evidence metadata 추출 (v2.0 scoring system)
+            expansion_method = raw_data.get("expansion_method", "none")
+            entity_match_type = _detect_entity_match_type(raw_data, query_entities, thread_type)
+
+            # ⭐ 확장 방법 내 세부 정보 추출 (hop_count, year_distance, similarity)
+            # 1. raw_data에서 직접 추출 시도
+            hop_count = raw_data.get("hop_count")
+            year_distance = raw_data.get("year_distance")
+            pgvector_similarity = raw_data.get("pgvector_similarity") or raw_data.get("similarity")
+            relevance_score = path.get("relevance_score") or path.get("relevance_score")
+
+            # 2. expanded_entities에서 확장 정보 찾기 (raw_data에 없을 경우)
+            if expanded_entities and (hop_count is None or year_distance is None or pgvector_similarity is None):
+                # path의 엔티티 URI나 label로 매칭
+                path_entity_uri = None
+                path_entity_label = None
+                
+                # raw_data에서 엔티티 정보 추출 (Thread 타입에 따라 다름)
+                if thread_type in ["outgoing_relations", "incoming_relations"]:
+                    path_entity_uri = raw_data.get("subject", {}).get("value", "") or raw_data.get("object", {}).get("value", "")
+                    path_entity_label = raw_data.get("subjectLabel", {}).get("value", "") or raw_data.get("objectLabel", {}).get("value", "")
+                elif thread_type == "entity_properties":
+                    path_entity_uri = raw_data.get("entity", {}).get("value", "")
+                    path_entity_label = raw_data.get("entityLabel", {}).get("value", "")
+                elif thread_type in ["connected_entities", "type_and_summary"]:
+                    path_entity_uri = raw_data.get("entity1", {}).get("value", "") or raw_data.get("entity2", {}).get("value", "")
+                    path_entity_label = raw_data.get("label1", {}).get("value", "") or raw_data.get("label2", {}).get("value", "")
+                
+                # expanded_entities에서 매칭되는 엔티티 찾기
+                for expanded_entity in expanded_entities:
+                    expanded_uri = expanded_entity.get("uri", "")
+                    expanded_name = expanded_entity.get("name", "")
+                    
+                    # URI 또는 이름으로 매칭
+                    if (path_entity_uri and expanded_uri and path_entity_uri == expanded_uri) or \
+                       (path_entity_label and expanded_name and path_entity_label == expanded_name):
+                        # 확장 정보 추출
+                        if expansion_method == "causal_chain" and hop_count is None:
+                            hop_count = expanded_entity.get("hop_count")
+                        elif expansion_method == "temporal" and year_distance is None:
+                            year_distance = expanded_entity.get("year_distance")
+                        elif expansion_method == "pgvector" and pgvector_similarity is None:
+                            pgvector_similarity = expanded_entity.get("pgvector_similarity") or expanded_entity.get("similarity")
+                        
+                        # relevance_score가 없으면 계산된 값 사용
+                        if relevance_score is None:
+                            relevance_score = expanded_entity.get("relevance_score")
+                        
+                        break  # 첫 번째 매칭에서 중단
+
+            # ⭐ 새로운 점수 계산 (v2.0 scoring system + 세부 점수 반영)
+            evidence_metadata = {
+                "expansion_method": expansion_method,
+                "thread_type": thread_type,
+                "entity_match_type": entity_match_type,
+                "connected_keyword_count": 0,  # TODO: SPARQL 분석 결과 추가 가능
+                # 확장 방법 내 세부 정보
+                "hop_count": hop_count,
+                "year_distance": year_distance,
+                "pgvector_similarity": pgvector_similarity,
+                "relevance_score": relevance_score
+            }
+
+            # calculate_final_evidence_score() 사용
+            final_weight = calculate_final_evidence_score(
+                evidence_metadata=evidence_metadata,
+                query_metadata=query_metadata,
+                base_weight=0.8,
+                fit_weight=0.2
+            )
 
             evidence = {
                 "type": thread_type,
                 "description": path.get("description", ""),
-                "weight": final_weight,
-                "relevance_score": path.get("relevance_score", 1.0),
+                "weight": final_weight,  # ✅ 새로운 점수 (1점 만점)
+                "relevance_score": path.get("relevance_score", 1.0),  # 유지 (참고용)
                 "source": f"Thread: {thread_type}",
                 "raw_data": path,
-                "is_convergence": convergence_node in convergence_node_uris if convergence_node else False
+                "is_convergence": convergence_node in convergence_node_uris if convergence_node else False,
+                # ⭐ v2.0 Scoring System Metadata
+                "metadata": {
+                    "expansion_method": expansion_method,
+                    "thread_type": thread_type,
+                    "entity_match_type": entity_match_type,
+                }
             }
 
             all_evidences.append(evidence)
@@ -853,26 +1030,38 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     print(f"  │\n  │   [LLM 기반 근거 선택]")
     print(f"  │     - 후보 근거: {len(candidate_evidences)}개 (점수 기반 선별)")
     
-    # 5-2. LLM이 질문 의도에 맞는 상위 15개 선택
+    # 5-2. LLM이 질문 의도에 맞는 상위 N개 선택
+    # ⭐ 쿼리 타입별 최적 Evidence 개수 (실험 데이터 기반)
+    # 출처: backend/ragas/ontology_evaluate/docs/experiments/EVIDENCE_CONTRIBUTION_ANALYSIS.md
+    OPTIMAL_EVIDENCE_COUNT = {
+        "factual": 5,        # N=4~5 권장 (소수 핵심 정보, 상위 5개까지 0.55 유지)
+        "causal": 8,         # N=5~8 권장 (인과 연결, 상위 8개까지 0.45 유지)
+        "comparative": 10,   # N=7~10 권장 (간접기여 중심, 상위 10개까지 0.33 유지)
+        "deep_analysis": 13  # N=10~15 권장 (다양한 정보, 상위 13개까지 0.81 유지)
+    }
+
     query = state.get("query", "")
     query_intent = state.get("query_intent", "")
     query_type = state.get("query_type", "causal")
-    
-    if len(candidate_evidences) <= 15:
-        # 후보가 15개 이하면 그대로 사용
+
+    # 쿼리 타입별 최적 개수 결정
+    optimal_k = OPTIMAL_EVIDENCE_COUNT.get(query_type, 10)  # 기본값: 10개
+
+    if len(candidate_evidences) <= optimal_k:
+        # 후보가 최적 개수 이하면 그대로 사용
         top_evidences = candidate_evidences
-        print(f"  │     - 최종 선택: {len(top_evidences)}개 (후보가 15개 이하)")
+        print(f"  │     - 최종 선택: {len(top_evidences)}개 (후보가 {optimal_k}개 이하)")
     else:
         # LLM으로 최종 선택
         top_evidences = select_top_evidences_with_llm(
-            candidate_evidences, 
-            query, 
-            query_intent, 
+            candidate_evidences,
+            query,
+            query_intent,
             query_type,
             state=state,
-            top_k=15
+            top_k=optimal_k  # ⭐ 쿼리 타입별 최적 개수
         )
-        print(f"  │     - 최종 선택: {len(top_evidences)}개 (LLM 판단)")
+        print(f"  │     - 최종 선택: {len(top_evidences)}개 (LLM 판단, {query_type} 최적: {optimal_k}개)")
 
     # 6. 순위 부여
     for i, ev in enumerate(top_evidences, 1):

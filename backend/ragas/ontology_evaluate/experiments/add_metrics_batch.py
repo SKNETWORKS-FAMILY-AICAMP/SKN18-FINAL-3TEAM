@@ -19,15 +19,13 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 # 공통 평가 모듈
-from backend.ragas.ontology_evaluate.common_eval import evaluate_state, get_ontology_schema
+from backend.ragas.ontology_evaluate.common_eval import evaluate_state
 from backend.ragas.ontology_evaluate.evaluators import AnswerQualityEvaluator
 from backend.ragas.ontology_evaluate.utils.llm_judge import LLMJudge
-
-
-def load_queries(queries_path: str) -> List[Dict[str, Any]]:
-    """질문 데이터 로드"""
-    with open(queries_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+from backend.ragas.ontology_evaluate.utils.experiment_utils import (
+    load_queries,
+    initialize_evaluators
+)
 
 
 def process_batch(
@@ -158,9 +156,7 @@ def main():
 
     # 4. 평가자 초기화
     print("\n🔧 평가자 초기화 중...")
-    llm_judge = LLMJudge()
-    answer_quality_evaluator = AnswerQualityEvaluator()
-    ontology_schema = get_ontology_schema()
+    llm_judge, answer_quality_evaluator, ontology_schema = initialize_evaluators()
     print("  ✓ 초기화 완료")
 
     # 5. 배치 평가

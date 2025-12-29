@@ -21,111 +21,12 @@ from typing import List, Dict, Any
 import sys
 
 # 공통 평가 모듈
-from backend.ragas.ontology_evaluate.common_eval import evaluate_state, get_ontology_schema
-from backend.ragas.ontology_evaluate.evaluators import AnswerQualityEvaluator
-from backend.ragas.ontology_evaluate.utils.llm_judge import LLMJudge
-
-
-def load_queries(queries_path: str) -> List[Dict[str, Any]]:
-    """질문 데이터 로드"""
-    with open(queries_path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def _save_experiment_results(results: list, output_dir: str, group_name: str, queries_data: list):
-    """실험 결과를 2개 파일로 저장: Full + Summary
-
-    run_ablation.py의 _save_experiment_results 함수와 동일한 로직
-
-    Args:
-        results: 실험 결과 리스트 (metrics 포함)
-        output_dir: 출력 디렉토리
-        group_name: 실험 그룹명
-        queries_data: 원본 질문 데이터
-    """
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-
-    # 1. Full 결과 저장 (기존 방식, 모든 state 포함)
-    full_file = output_path / f"{group_name}_ablation_full.json"
-    with open(full_file, "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False, indent=2)
-    print(f"  → Full 결과: {full_file}")
-
-    # 2. Summary 결과 생성 (점수, 수치만)
-    summary_results = []
-    for idx, result in enumerate(results):
-        query_idx = idx % len(queries_data)
-        query_data = queries_data[query_idx]
-
-        summary_item = {
-            "experiment_name": result.get("experiment_name", ""),
-            "description": result.get("description", ""),
-            "query": result.get("query", ""),
-            "query_type": query_data.get("query_type", "unknown"),
-            "success": result.get("success", False),
-            "execution_time": result.get("execution_time", 0.0),
-            "config": result.get("config", {}),
-        }
-
-        if result.get("success") and result.get("state_output"):
-            state = result["state_output"]
-
-            # 답변 추가
-            summary_item["final_answer"] = state.get("final_answer", "")
-
-            # 엔티티 개수
-            extracted_entities = state.get("extracted_entities", [])
-            expanded_entities = state.get("expanded_entities", [])
-            summary_item["num_extracted_entities"] = len(extracted_entities)
-            summary_item["num_expanded_entities"] = len(expanded_entities)
-
-            # Evidence 개수
-            evidences = state.get("evidences", [])
-            summary_item["num_evidences"] = len(evidences)
-
-            # Convergence nodes 개수
-            convergence_nodes = state.get("convergence_nodes", [])
-            summary_item["num_convergence_nodes"] = len(convergence_nodes)
-
-            # 메트릭 점수
-            if result.get("metrics"):
-                metrics = result["metrics"]
-
-                # Raw metrics
-                summary_item["raw_metrics"] = metrics.get("raw_metrics", {})
-
-                # Intent-aware final score
-                if metrics.get("intent_aware"):
-                    ia = metrics["intent_aware"]
-                    summary_item["intent_aware_score"] = ia.get("final_score", 0.0)
-                    summary_item["weighted_metrics"] = ia.get("weighted_metrics", {})
-                else:
-                    # Fallback: raw metrics 평균
-                    raw_scores = list(metrics.get("raw_metrics", {}).values())
-                    summary_item["intent_aware_score"] = sum(raw_scores) / len(raw_scores) if raw_scores else 0.0
-
-                # LLM Judge 답변 품질 점수 추가
-                if metrics.get("llm_judge_quality"):
-                    summary_item["llm_judge_quality"] = metrics["llm_judge_quality"]
-        else:
-            # 실패한 경우
-            summary_item["error"] = result.get("error", "Unknown error")
-            summary_item["final_answer"] = ""
-            summary_item["num_extracted_entities"] = 0
-            summary_item["num_expanded_entities"] = 0
-            summary_item["num_evidences"] = 0
-            summary_item["num_convergence_nodes"] = 0
-            summary_item["raw_metrics"] = {}
-            summary_item["intent_aware_score"] = 0.0
-
-        summary_results.append(summary_item)
-
-    # Summary 파일 저장
-    summary_file = output_path / f"{group_name}_ablation_summary.json"
-    with open(summary_file, "w", encoding="utf-8") as f:
-        json.dump(summary_results, f, ensure_ascii=False, indent=2)
-    print(f"  → Summary: {summary_file}")
+from backend.ragas.ontology_evaluate.common_eval import evaluate_state
+from backend.ragas.ontology_evaluate.utils.experiment_utils import (
+    load_queries,
+    save_experiment_results,
+    initialize_evaluators
+)
 
 
 def process_single_file(
@@ -194,7 +95,13 @@ def process_single_file(
 
     # 3. Full + Summary 파일 저장
     print(f"\n💾 결과 저장 중...")
-    _save_experiment_results(results, output_dir, group_name, queries_data)
+    save_experiment_results(
+        results=results,
+        output_dir=Path(output_dir),
+        group_name=group_name,
+        experiment_type="ablation",
+        queries_data=queries_data
+    )
 
     print(f"\n✅ 완료! Metrics 추가: {metrics_added}/{len(results)}개")
     return metrics_added
@@ -255,16 +162,12 @@ def main():
     # 1. 공통 데이터 로드
     print("📂 공통 데이터 로드 중...")
     queries_data = load_queries(args.queries)
-    ontology_schema = get_ontology_schema()
     print(f"  ✓ 질문 데이터: {len(queries_data)}개")
-    print(f"  ✓ 온톨로지 스키마 로드 완료")
 
     # 2. 평가자 초기화
     print("\n🔧 평가자 초기화 중...")
-    llm_judge = LLMJudge()
-    answer_quality_evaluator = AnswerQualityEvaluator()
-    print("  ✓ LLM Judge 초기화 완료")
-    print("  ✓ Answer Quality Evaluator 초기화 완료")
+    llm_judge, answer_quality_evaluator, ontology_schema = initialize_evaluators()
+    print("  ✓ 평가자 초기화 완료")
 
     # 3. 처리할 그룹 결정
     if args.group == "all":

@@ -13,6 +13,8 @@ import argparse
 from pathlib import Path
 from typing import List, Dict, Any
 
+from backend.ragas.ontology_evaluate.utils.experiment_utils import save_experiment_results
+
 
 def merge_and_save_results(
     batch_dir: Path,
@@ -46,48 +48,13 @@ def merge_and_save_results(
 
     print(f"\n  총 결과: {len(all_results)}개")
 
-    # 3. Full 결과 저장
-    full_file = output_dir / f"{group_name}_isolation_full.json"
-    with open(full_file, "w", encoding="utf-8") as f:
-        json.dump(all_results, f, ensure_ascii=False, indent=2)
-    print(f"\n✓ Full 결과 저장: {full_file}")
-
-    # 4. Summary 결과 생성
-    summary_results = []
-    for result in all_results:
-        if result.get("success") and result.get("metrics"):
-            state = result.get("state_output", {})
-            metrics = result["metrics"]
-            ia = metrics.get("intent_aware", {})
-
-            summary_item = {
-                "experiment_name": result.get("experiment_name", ""),
-                "query": result.get("query", ""),
-                "query_type": result.get("query_type", ""),
-                "final_answer": state.get("final_answer", ""),
-                "num_extracted_entities": len(state.get("extracted_entities", [])),
-                "num_expanded_entities": len(state.get("expanded_entities", [])),
-                "num_evidences": len(state.get("evidences", [])),
-                "num_convergence_nodes": len(state.get("convergence_triple_tree", {}).get("nodes", [])),
-                "raw_metrics": metrics.get("raw_metrics", {}),
-                "intent_aware_score": ia.get("final_score", 0.0) if ia else 0.0,
-                "weighted_metrics": ia.get("weighted_metrics", {}) if ia else {},
-                "llm_judge_quality": result.get("llm_judge_quality")
-            }
-        else:
-            summary_item = {
-                "experiment_name": result.get("experiment_name", ""),
-                "query": result.get("query", ""),
-                "query_type": result.get("query_type", ""),
-                "success": False,
-                "error": result.get("error")
-            }
-        summary_results.append(summary_item)
-
-    summary_file = output_dir / f"{group_name}_isolation_summary.json"
-    with open(summary_file, "w", encoding="utf-8") as f:
-        json.dump(summary_results, f, ensure_ascii=False, indent=2)
-    print(f"✓ Summary 결과 저장: {summary_file}")
+    # 3. Full + Summary 결과 저장
+    save_experiment_results(
+        results=all_results,
+        output_dir=output_dir,
+        group_name=group_name,
+        experiment_type="isolation"
+    )
 
     # 5. 통계 출력
     success_count = sum(1 for r in all_results if r.get("metrics"))
