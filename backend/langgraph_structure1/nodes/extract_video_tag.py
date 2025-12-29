@@ -23,17 +23,12 @@ def extract_video_tag(state: GraphState) -> GraphState:
     - 전쟁
     - 정치
     - 왕실
-    - 사회
     - 문화
     - 과학기술
-    - 예술
-    - 신분제
     - 군사제도
     - 인물
     - 경제
-    - 행정
-    - 법과 형벌
-    - 의례
+    - 물품
     - 문헌·기록
 
     [판단 기준]
@@ -91,6 +86,7 @@ def extract_video_tag(state: GraphState) -> GraphState:
         **state,
         "video_tags": result_text,
     }
+
 
 
 if __name__ == "__main__":
