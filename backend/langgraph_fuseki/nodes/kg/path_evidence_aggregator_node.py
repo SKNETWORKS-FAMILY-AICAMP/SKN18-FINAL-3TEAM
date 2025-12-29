@@ -27,24 +27,52 @@ from backend.langgraph_fuseki.utils.evidence_scoring import calculate_final_evid
 from langchain_openai import ChatOpenAI
 
 
-def calculate_improved_relevance_score(path_data: dict, query_entities: list = None, thread_type: str = "", entity_boost_mode: str = None) -> float:
+def calculate_improved_relevance_score(path_data: dict, query_entities: list = None, thread_type: str = "", entity_boost_mode: str = None, selected_properties: list = None) -> float:
     """
     개선된 경로의 relevance score 계산
 
     개선 사항:
     1. 쿼리 엔티티와의 직접 연결성 강화
     2. Thread 타입별 가중치 조정
+    3. Predicate 중요도 차별화 (기본 중요도 + selected_properties 매칭 부스트)
 
     Args:
         path_data: 경로 데이터 (binding 정보)
         query_entities: 쿼리에서 추출된 엔티티 리스트
         thread_type: Thread 타입 (outgoing_relations, incoming_relations 등)
         entity_boost_mode: 엔티티 부스트 모드 ("exact_match", "partial_match", "normalized_match", "penalty_match", None)
+        selected_properties: Stage 1-B에서 선택된 프로퍼티 목록 (예: ["built", "builtBy", "founded"])
 
     Returns:
         relevance score (테스트 모드에서 조건 안 맞으면 0.0 반환하여 필터링)
     """
     score = 1.0
+    
+    # 0. Predicate 중요도 점수 (기본 중요도 + selected_properties 매칭 부스트)
+    predicate_score = 1.0
+    predicate = path_data.get("predicate", {}).get("value", "")
+    if predicate:
+        predicate_name = predicate.split("#")[-1] if "#" in predicate else predicate
+        
+        # 기본 predicate 중요도 (일부 중요한 predicate에 기본 부스트)
+        # 예: "participatesIn", "leadsTo", "causes" 등은 기본적으로 중요
+        important_predicates = {
+            "participatesIn": 1.2,
+            "leadsTo": 1.2,
+            "causes": 1.2,
+            "built": 1.15,
+            "builtBy": 1.15,
+            "founded": 1.15,
+            "governs": 1.1,
+            "rules": 1.1,
+        }
+        predicate_score = important_predicates.get(predicate_name, 1.0)
+        
+        # selected_properties 매칭 시 추가 부스트
+        if selected_properties and predicate_name in selected_properties:
+            predicate_score *= 1.3  # selected_properties 매칭 시 30% 추가 부스트
+    
+    score *= predicate_score
 
     # 1. 쿼리 엔티티와의 직접 연결 여부 (강화 - 차별화를 위해)
     query_entity_match_boost = 1.0  # 기본값 (매칭 없음)
@@ -424,7 +452,7 @@ def _detect_entity_match_type(raw_data: dict, query_entities: list, thread_type:
     return "none"
 
 
-def extract_outgoing_relations(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None) -> list:
+def extract_outgoing_relations(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None, selected_properties: list = None) -> list:
     """엔티티에서 나가는 모든 관계 추출 (엔티티 → ?)"""
     paths = []
     seen = set()
@@ -442,7 +470,7 @@ def extract_outgoing_relations(bindings: list, base_weight: float, query_entitie
         seen.add(key)
 
         # 개선된 Relevance score 계산
-        relevance_score = calculate_improved_relevance_score(binding, query_entities, "outgoing_relations", entity_boost_mode)
+        relevance_score = calculate_improved_relevance_score(binding, query_entities, "outgoing_relations", entity_boost_mode, selected_properties)
 
         # 0점 경로는 필터링 (entity_boost_mode 테스트 시)
         if entity_boost_mode and relevance_score == 0.0:
@@ -465,10 +493,12 @@ def extract_outgoing_relations(bindings: list, base_weight: float, query_entitie
             "raw_data": binding
         })
 
-    return paths[:30]
+    # weight 기준으로 정렬 (내림차순)
+    paths.sort(key=lambda x: x["weight"], reverse=True)
+    return paths
 
 
-def extract_incoming_relations(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None) -> list:
+def extract_incoming_relations(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None, selected_properties: list = None) -> list:
     """엔티티로 들어오는 모든 관계 추출 (? → 엔티티)"""
     paths = []
     seen = set()
@@ -486,7 +516,7 @@ def extract_incoming_relations(bindings: list, base_weight: float, query_entitie
         seen.add(key)
 
         # 개선된 Relevance score 계산
-        relevance_score = calculate_improved_relevance_score(binding, query_entities, "incoming_relations", entity_boost_mode)
+        relevance_score = calculate_improved_relevance_score(binding, query_entities, "incoming_relations", entity_boost_mode, selected_properties)
 
         # 0점 경로는 필터링 (entity_boost_mode 테스트 시)
         if entity_boost_mode and relevance_score == 0.0:
@@ -509,10 +539,12 @@ def extract_incoming_relations(bindings: list, base_weight: float, query_entitie
             "raw_data": binding
         })
 
-    return paths[:30]
+    # weight 기준으로 정렬 (내림차순)
+    paths.sort(key=lambda x: x["weight"], reverse=True)
+    return paths
 
 
-def extract_entity_properties(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None) -> list:
+def extract_entity_properties(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None, selected_properties: list = None) -> list:
     """엔티티의 모든 속성 추출 (리터럴 값)"""
     paths = []
     seen = set()
@@ -529,7 +561,7 @@ def extract_entity_properties(bindings: list, base_weight: float, query_entities
         seen.add(key)
 
         # 개선된 Relevance score 계산
-        relevance_score = calculate_improved_relevance_score(binding, query_entities, "entity_properties", entity_boost_mode)
+        relevance_score = calculate_improved_relevance_score(binding, query_entities, "entity_properties", entity_boost_mode, selected_properties)
 
         # 0점 경로는 필터링 (entity_boost_mode 테스트 시)
         if entity_boost_mode and relevance_score == 0.0:
@@ -555,10 +587,12 @@ def extract_entity_properties(bindings: list, base_weight: float, query_entities
             "raw_data": binding
         })
 
-    return paths[:30]
+    # weight 기준으로 정렬 (내림차순)
+    paths.sort(key=lambda x: x["weight"], reverse=True)
+    return paths
 
 
-def extract_connected_entities(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None) -> list:
+def extract_connected_entities(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None, selected_properties: list = None) -> list:
     """
     연결된 엔티티들 간의 관계 추출 (2-hop)
     """
@@ -577,7 +611,7 @@ def extract_connected_entities(bindings: list, base_weight: float, query_entitie
         seen.add(key)
 
         # Relevance score 계산 (entity_boost_mode 테스트용)
-        relevance_score = calculate_improved_relevance_score(binding, query_entities, "connected_entities", entity_boost_mode)
+        relevance_score = calculate_improved_relevance_score(binding, query_entities, "connected_entities", entity_boost_mode, selected_properties)
 
         # 0점 경로는 필터링
         if entity_boost_mode and relevance_score == 0.0:
@@ -600,10 +634,12 @@ def extract_connected_entities(bindings: list, base_weight: float, query_entitie
             "raw_data": binding
         })
 
-    return paths[:20]
+    # weight 기준으로 정렬 (내림차순)
+    paths.sort(key=lambda x: x["weight"], reverse=True)
+    return paths
 
 
-def extract_type_and_summary(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None) -> list:
+def extract_type_and_summary(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None, selected_properties: list = None) -> list:
     """엔티티 타입과 요약 정보 추출"""
     paths = []
     seen = set()
@@ -622,7 +658,7 @@ def extract_type_and_summary(bindings: list, base_weight: float, query_entities:
         seen.add(key)
 
         # Relevance score 계산 (entity_boost_mode 테스트용)
-        relevance_score = calculate_improved_relevance_score(binding, query_entities, "type_and_summary", entity_boost_mode)
+        relevance_score = calculate_improved_relevance_score(binding, query_entities, "type_and_summary", entity_boost_mode, selected_properties)
 
         # 0점 경로는 필터링
         if entity_boost_mode and relevance_score == 0.0:
@@ -648,12 +684,15 @@ def extract_type_and_summary(bindings: list, base_weight: float, query_entities:
             "summary": summary,
             "category": category,
             "year": year,
-            "weight": base_weight,
+            "weight": base_weight * relevance_score,
+            "relevance_score": relevance_score,
             "description": description,
             "raw_data": binding
         })
     
-    return paths[:20]
+    # weight 기준으로 정렬 (내림차순)
+    paths.sort(key=lambda x: x["weight"], reverse=True)
+    return paths
 
 
 def select_top_evidences_with_llm(
@@ -661,7 +700,7 @@ def select_top_evidences_with_llm(
     query: str,
     query_intent: str = "",
     query_type: str = "causal",
-    top_k: int = 15,
+    top_k: int = None,  # None이면 LLM이 개수 결정
     state: GraphState = None
 ) -> list:
     """
@@ -672,12 +711,16 @@ def select_top_evidences_with_llm(
         query: 사용자 질문
         query_intent: 질문의 핵심 의도
         query_type: 질문 유형 (causal, deep_analysis 등)
-        top_k: 선택할 근거 개수
+        top_k: 선택할 근거 개수 (None이면 LLM이 결정)
     
     Returns:
-        LLM이 선택한 상위 top_k개 근거
+        LLM이 선택한 근거 리스트
     """
-    if len(candidate_evidences) <= top_k:
+    if len(candidate_evidences) == 0:
+        return []
+    
+    # top_k가 None이 아니고 후보가 그보다 적으면 그대로 반환
+    if top_k is not None and len(candidate_evidences) <= top_k:
         return candidate_evidences
     
     try:
@@ -702,6 +745,24 @@ def select_top_evidences_with_llm(
         
         intent_info = f"\n질문의 핵심 의도: {query_intent}\n" if query_intent else ""
         
+        # 쿼리 타입별 권장 개수 (가이드라인)
+        OPTIMAL_EVIDENCE_COUNT = {
+            "factual": 5,
+            "causal": 8,
+            "comparative": 10,
+            "deep_analysis": 13
+        }
+        recommended_count = OPTIMAL_EVIDENCE_COUNT.get(query_type, 10)
+        
+        if top_k is not None:
+            # top_k가 지정된 경우: 기존 로직 (하위 호환성)
+            count_instruction = f"정확히 **{top_k}개**를 선택하세요."
+        else:
+            # top_k가 None인 경우: LLM이 개수 결정
+            count_instruction = f"""**개수 결정**: 질문 유형({query_type})에 따라 권장 개수는 약 {recommended_count}개입니다. 
+질문에 답변하기에 충분한 개수를 스스로 판단하여 선택하세요. 
+너무 적으면 정보가 부족하고, 너무 많으면 불필요한 정보가 포함될 수 있습니다."""
+        
         prompt = f"""당신은 역사 질문에 가장 적합한 근거를 선택하는 전문가입니다.
 
 ## 질문
@@ -709,7 +770,7 @@ def select_top_evidences_with_llm(
 {intent_info}질문 유형: {query_type}
 
 ## 후보 근거 목록 (총 {len(candidate_evidences)}개)
-아래 근거들은 점수 기반으로 선별된 후보입니다. 질문의 의도와 가장 관련성이 높은 **상위 {top_k}개**를 선택하세요.
+아래 근거들은 점수 기반으로 선별된 상위 30개 후보입니다. 질문의 의도와 가장 관련성이 높은 근거를 선택하세요.
 
 {evidence_text}
 
@@ -724,7 +785,7 @@ def select_top_evidences_with_llm(
 {{"selected_indices": [1, 3, 5, 7, 9, 12, 15, 18, 20, 22, 25, 28, 30, 33, 35]}}
 
 **중요:**
-- 정확히 {top_k}개를 선택하세요.
+- {count_instruction}
 - 번호는 1부터 시작합니다 (위 목록의 [1], [2], ...).
 - JSON 형식만 출력하세요."""
         
@@ -752,22 +813,37 @@ def select_top_evidences_with_llm(
             if 1 <= idx <= len(candidate_evidences):
                 selected_evidences.append(candidate_evidences[idx - 1])
         
-        # 선택된 개수가 top_k보다 적으면 나머지는 점수 순으로 채움
-        if len(selected_evidences) < top_k:
-            remaining_count = top_k - len(selected_evidences)
-            selected_set = {id(ev) for ev in selected_evidences}
-            for ev in candidate_evidences:
-                if len(selected_evidences) >= top_k:
-                    break
-                if id(ev) not in selected_set:
-                    selected_evidences.append(ev)
-        
-        return selected_evidences[:top_k]
+        # top_k가 지정된 경우에만 개수 제한 및 보완
+        if top_k is not None:
+            # 선택된 개수가 top_k보다 적으면 나머지는 점수 순으로 채움
+            if len(selected_evidences) < top_k:
+                remaining_count = top_k - len(selected_evidences)
+                selected_set = {id(ev) for ev in selected_evidences}
+                for ev in candidate_evidences:
+                    if len(selected_evidences) >= top_k:
+                        break
+                    if id(ev) not in selected_set:
+                        selected_evidences.append(ev)
+            return selected_evidences[:top_k]
+        else:
+            # LLM이 결정한 개수 그대로 반환
+            return selected_evidences
         
     except Exception as e:
         print(f"        └─ LLM 기반 선택 실패: {e}, 점수 기반으로 대체")
         # 실패 시 점수 기반으로 대체
-        return candidate_evidences[:top_k]
+        if top_k is not None:
+            return candidate_evidences[:top_k]
+        else:
+            # top_k가 None이면 권장 개수만큼 반환
+            OPTIMAL_EVIDENCE_COUNT = {
+                "factual": 5,
+                "causal": 8,
+                "comparative": 10,
+                "deep_analysis": 13
+            }
+            recommended_count = OPTIMAL_EVIDENCE_COUNT.get(query_type, 10)
+            return candidate_evidences[:recommended_count]
 
 
 def path_evidence_aggregator_node(state: GraphState) -> GraphState:
@@ -790,6 +866,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     query_type = state.get("query_type", "causal")
     query_entities = state.get("extracted_entities", [])
     expanded_entities = state.get("expanded_entities", [])  # 확장된 엔티티 정보
+    selected_properties = state.get("selected_properties", [])  # Stage 1-B에서 선택된 프로퍼티
     test_config = state.get("test_config")  # 테스트 설정
 
     # 테스트 설정 추출
@@ -830,15 +907,15 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
         base_weight = thread_weights.get(thread_type, 1.0)  # config 값 사용, 기본값 1.0
 
         if thread_type == "outgoing_relations":
-            paths = extract_outgoing_relations(bindings, base_weight, query_entities, entity_boost_mode)
+            paths = extract_outgoing_relations(bindings, base_weight, query_entities, entity_boost_mode, selected_properties)
         elif thread_type == "incoming_relations":
-            paths = extract_incoming_relations(bindings, base_weight, query_entities, entity_boost_mode)
+            paths = extract_incoming_relations(bindings, base_weight, query_entities, entity_boost_mode, selected_properties)
         elif thread_type == "entity_properties":
-            paths = extract_entity_properties(bindings, base_weight, query_entities, entity_boost_mode)
+            paths = extract_entity_properties(bindings, base_weight, query_entities, entity_boost_mode, selected_properties)
         elif thread_type == "connected_entities":
-            paths = extract_connected_entities(bindings, base_weight, query_entities, entity_boost_mode)
+            paths = extract_connected_entities(bindings, base_weight, query_entities, entity_boost_mode, selected_properties)
         elif thread_type == "type_and_summary":
-            paths = extract_type_and_summary(bindings, base_weight, query_entities, entity_boost_mode)
+            paths = extract_type_and_summary(bindings, base_weight, query_entities, entity_boost_mode, selected_properties)
         else:
             # 알 수 없는 Thread는 빈 리스트
             paths = []
@@ -970,6 +1047,47 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
                 use_query_type_aware=use_query_type_aware
             )
 
+            # ⭐ Trace 정보 구성 (프론트엔드 시각화용)
+            # 경로 추적: 키워드 → 엔티티 → 프로퍼티/관계
+            
+            # 엔티티의 키워드 추적 정보 가져오기
+            entity_name = raw_data.get("entityLabel", {}).get("value", "") or \
+                         raw_data.get("subjectLabel", {}).get("value", "") or \
+                         raw_data.get("label1", {}).get("value", "")
+            
+            # extracted_entities에서 해당 엔티티의 키워드 추적 정보 찾기
+            keyword_trace_info = {}
+            extracted_entities = state.get("extracted_entities", [])
+            for entity in extracted_entities:
+                if entity.get("name") == entity_name:
+                    keyword_trace_info = entity.get("keyword_trace", {})
+                    break
+            
+            trace_info = {
+                "source_entity": {
+                    "name": entity_name,
+                    "type": raw_data.get("type", {}).get("value", "").split("#")[-1] if raw_data.get("type") else "",
+                    "uri": raw_data.get("subject", {}).get("value", "") or
+                          raw_data.get("entity1", {}).get("value", "")
+                },
+                "expansion_method": expansion_method,
+                "expansion_details": {
+                    "hop_count": hop_count,
+                    "year_distance": year_distance,
+                    "pgvector_similarity": pgvector_similarity
+                },
+                "thread": thread_type,
+                "predicate": raw_data.get("predicate", {}).get("value", "").split("#")[-1] if raw_data.get("predicate") else "",
+                "predicate_display": path.get("predicate_display", ""),
+                "entity_match_type": entity_match_type,
+                # 키워드 추적 정보 추가
+                "matched_keyword": keyword_trace_info.get("matched_keyword", ""),
+                "is_from_expansion": keyword_trace_info.get("is_from_expansion", False),
+                "keyword_expansion_method": keyword_trace_info.get("expansion_method", ""),
+                # 키워드 확장 추적 정보
+                "keyword_expansion_trace": state.get("keyword_expansion_trace", {})
+            }
+
             evidence = {
                 "type": thread_type,
                 "description": path.get("description", ""),
@@ -983,7 +1101,9 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
                     "expansion_method": expansion_method,
                     "thread_type": thread_type,
                     "entity_match_type": entity_match_type,
-                }
+                },
+                # ⭐ 경로 추적 정보 (프론트엔드 시각화용)
+                "trace": trace_info
             }
 
             all_evidences.append(evidence)
@@ -1028,17 +1148,37 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     if len(sorted_evidences) > 25:
         print(f"  │     ... 외 {len(sorted_evidences) - 25}개")
 
+
+    # # 5. 점수 기반으로 쿼리 타입별 최적 개수 선택
+    # # 5-1. 점수 기반으로 상위 후보 선별 (30-50개)
+    # candidate_count = min(max(30, len(sorted_evidences) // 2), len(sorted_evidences))
+    # # ⭐ 쿼리 타입별 최적 Evidence 개수 (실험 데이터 기반)
+    # # 출처: backend/ragas/ontology_evaluate/docs/experiments/EVIDENCE_CONTRIBUTION_ANALYSIS.md
+    # OPTIMAL_EVIDENCE_COUNT = {
+    #     "factual": 5,        # N=4~5 권장 (소수 핵심 정보, 상위 5개까지 0.55 유지)
+    #     "causal": 8,         # N=5~8 권장 (인과 연결, 상위 8개까지 0.45 유지)
+    #     "comparative": 10,   # N=7~10 권장 (간접기여 중심, 상위 10개까지 0.33 유지)
+    #     "deep_analysis": 13  # N=10~15 권장 (다양한 정보, 상위 13개까지 0.81 유지)
+    # }
+
+    # query_type = state.get("query_type", "causal")
+    # optimal_k = OPTIMAL_EVIDENCE_COUNT.get(query_type, 10)  # 기본값: 10개
+
+    # # 점수 기반으로 상위 N개 선택 (LLM 없이)
+    # top_evidences = sorted_evidences[:optimal_k]
+    # print(f"  │\n  │   [점수 기반 근거 선택]")
+    # print(f"  │     - 최종 선택: {len(top_evidences)}개 (점수 기반, {query_type} 최적: {optimal_k}개)")
+
     # 5. 하이브리드 방식: 점수 기반 선별 → LLM 기반 최종 선택
-    # 5-1. 점수 기반으로 상위 후보 선별 (30-50개)
-    candidate_count = min(max(30, len(sorted_evidences) // 2), len(sorted_evidences))
+    # 5-1. 점수 기반으로 상위 30개 후보 선별
+    candidate_count = min(30, len(sorted_evidences))
     candidate_evidences = sorted_evidences[:candidate_count]
     
     print(f"  │\n  │   [LLM 기반 근거 선택]")
     print(f"  │     - 후보 근거: {len(candidate_evidences)}개 (점수 기반 선별)")
     
-    # 5-2. LLM이 질문 의도에 맞는 상위 N개 선택
-    # ⭐ 쿼리 타입별 최적 Evidence 개수 (실험 데이터 기반)
-    # 출처: backend/ragas/ontology_evaluate/docs/experiments/EVIDENCE_CONTRIBUTION_ANALYSIS.md
+    # 5-2. LLM이 질문 의도에 맞는 근거 선택 (개수는 LLM이 결정)
+    # ⭐ 쿼리 타입별 최적 Evidence 개수 (가이드라인으로 사용)
     OPTIMAL_EVIDENCE_COUNT = {
         "factual": 5,        # N=4~5 권장 (소수 핵심 정보, 상위 5개까지 0.55 유지)
         "causal": 8,         # N=5~8 권장 (인과 연결, 상위 8개까지 0.45 유지)
@@ -1050,24 +1190,19 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     query_intent = state.get("query_intent", "")
     query_type = state.get("query_type", "causal")
 
-    # 쿼리 타입별 최적 개수 결정
-    optimal_k = OPTIMAL_EVIDENCE_COUNT.get(query_type, 10)  # 기본값: 10개
 
-    if len(candidate_evidences) <= optimal_k:
-        # 후보가 최적 개수 이하면 그대로 사용
-        top_evidences = candidate_evidences
-        print(f"  │     - 최종 선택: {len(top_evidences)}개 (후보가 {optimal_k}개 이하)")
-    else:
-        # LLM으로 최종 선택
-        top_evidences = select_top_evidences_with_llm(
-            candidate_evidences,
-            query,
-            query_intent,
-            query_type,
-            state=state,
-            top_k=optimal_k  # ⭐ 쿼리 타입별 최적 개수
-        )
-        print(f"  │     - 최종 선택: {len(top_evidences)}개 (LLM 판단, {query_type} 최적: {optimal_k}개)")
+    # LLM이 직접 evidence 개수를 결정하도록 호출 (top_k=None)
+    # OPTIMAL_EVIDENCE_COUNT는 가이드라인으로만 사용됨
+    top_evidences = select_top_evidences_with_llm(
+        candidate_evidences,
+        query,
+        query_intent,
+        query_type,
+        state=state,
+        top_k=None  # ⭐ LLM이 개수 결정 (OPTIMAL_EVIDENCE_COUNT는 가이드라인으로 사용)
+    )
+    optimal_k = OPTIMAL_EVIDENCE_COUNT.get(query_type, 10)
+    print(f"  │     - 최종 선택: {len(top_evidences)}개 (LLM 판단, {query_type} 권장: {optimal_k}개)")
 
     # 6. 순위 부여
     for i, ev in enumerate(top_evidences, 1):

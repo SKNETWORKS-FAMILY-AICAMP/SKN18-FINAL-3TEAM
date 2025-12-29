@@ -46,7 +46,7 @@ def run_batch_experiment(
     timestamp: str
 ) -> List[Dict[str, Any]]:
     """
-    배치 질문들을 Baseline과 v3.0 설정으로 실행
+    배치 질문들을 v4.0 설정으로 실행
 
     Args:
         queries: 질문 리스트
@@ -58,15 +58,14 @@ def run_batch_experiment(
         timestamp: 타임스탬프
 
     Returns:
-        실험 결과 리스트 (Baseline + v3.0)
+        실험 결과 리스트 (v4.0)
     """
     all_results = []
     
     # 실험 설정
-    baseline_config = ExperimentConfig.get_baseline_config()
-    v3_config = ExperimentConfig.get_v3_config()
+    v4_config = ExperimentConfig.get_v4_config()
     
-    configs = [baseline_config, v3_config]
+    configs = [v4_config]
     
     for config_idx, config in enumerate(configs):
         config_name = config["name"]
@@ -191,7 +190,7 @@ def main():
     print(f"Batch {batch_num} 완료")
     print("=" * 80)
     print(f"총 질문: {len(queries)}개")
-    print(f"총 결과: {len(all_results)}개 (Baseline {len(queries)}개 + v3.0 {len(queries)}개)")
+    print(f"총 결과: {len(all_results)}개 (v4.0 {len(queries)}개)")
     print(f"총 시간: {batch_elapsed:.1f}초 ({batch_elapsed/60:.1f}분)")
     
     # 설정별 평균 점수 출력

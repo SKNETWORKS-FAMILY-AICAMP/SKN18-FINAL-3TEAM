@@ -125,21 +125,50 @@ def user_intent_clarification_node(state: GraphState) -> GraphState:
 
         # ========== Stage 1-B 백그라운드 실행 또는 결과 확인 ==========
         stage1b_result = {}
+        from backend.langgraph_fuseki.nodes.classify_node import _STAGE1B_RESULTS
 
-        def run_stage1b_background_test():
-            """백그라운드 스레드에서 Stage 1-B 실행 (테스트 모드)"""
-            nonlocal stage1b_result
-            try:
-                stage1b_result = query_classifier_stage1b_background(state)
-            except Exception as e:
-                print(f"[WARN] Stage 1-B 백그라운드 실행 실패: {e}")
-                stage1b_result = {"status": "error", "error": str(e)}
-
-        # ========== 체크포인트 복원 시 Stage 1-B 결과 확인 ==========
-        if stage1b_task_id_from_checkpoint:
-            # 체크포인트에서 복원된 경우: 전역 딕셔너리에서 결과 확인
-            from backend.langgraph_fuseki.nodes.classify_node import _STAGE1B_RESULTS
-
+        # 우선순위 1: Stage 1-A에서 시작된 Stage 1-B 확인 (가장 중요!)
+        if stage1b_started and stage1b_task_id:
+            print(f"[INFO] Stage 1-A에서 시작된 Stage 1-B 확인 중 (task_id={stage1b_task_id})")
+            if stage1b_task_id in _STAGE1B_RESULTS:
+                task_info = _STAGE1B_RESULTS[stage1b_task_id]
+                current_status = task_info.get("status", "running")
+                
+                if current_status == "completed":
+                    # 이미 완료된 경우
+                    stage1b_result = task_info.get("result", {})
+                    print(f"[INFO] Stage 1-B 백그라운드 결과 수신 완료 (task_id={stage1b_task_id})")
+                elif current_status == "error":
+                    # 이미 에러가 발생한 경우
+                    stage1b_result = task_info.get("result", {"status": "error"})
+                    print(f"[WARN] Stage 1-B 백그라운드 실행 실패 (task_id={stage1b_task_id})")
+                elif current_status == "running":
+                    # 아직 실행 중이면 완료까지 대기 (타임아웃 없이)
+                    print(f"[INFO] Stage 1-B 백그라운드 실행 중, 완료까지 대기... (task_id={stage1b_task_id})")
+                    wait_start = time.time()
+                    
+                    while True:
+                        task_info = _STAGE1B_RESULTS.get(stage1b_task_id, {})
+                        current_status = task_info.get("status", "running")
+                        
+                        if current_status == "completed":
+                            stage1b_result = task_info.get("result", {})
+                            elapsed = time.time() - wait_start
+                            print(f"[INFO] Stage 1-B 백그라운드 완료 (대기 시간={elapsed:.1f}초)")
+                            break
+                        elif current_status == "error":
+                            stage1b_result = task_info.get("result", {"status": "error"})
+                            print(f"[WARN] Stage 1-B 백그라운드 실행 실패")
+                            break
+                        
+                        time.sleep(0.5)  # 0.5초마다 확인
+            else:
+                print(f"[WARN] Stage 1-B task_id={stage1b_task_id} 결과 없음, 새로 시작")
+                stage1b_task_id = None  # 새로 시작하도록 플래그 리셋
+        
+        # 우선순위 2: 체크포인트에서 복원된 Stage 1-B 확인
+        if not stage1b_result and stage1b_task_id_from_checkpoint:
+            print(f"[INFO] 체크포인트에서 Stage 1-B 확인 중 (task_id={stage1b_task_id_from_checkpoint})")
             if stage1b_task_id_from_checkpoint in _STAGE1B_RESULTS:
                 task_info = _STAGE1B_RESULTS[stage1b_task_id_from_checkpoint]
                 if task_info.get("status") == "completed":
@@ -149,32 +178,44 @@ def user_intent_clarification_node(state: GraphState) -> GraphState:
                     stage1b_result = task_info.get("result", {"status": "error"})
                     print(f"[WARN] Stage 1-B 백그라운드 실행 실패 (task_id={stage1b_task_id_from_checkpoint})")
                 elif task_info.get("status") == "running":
-                    # 아직 실행 중이면 대기
-                    print(f"[INFO] Stage 1-B 백그라운드 실행 중, 대기... (task_id={stage1b_task_id_from_checkpoint})")
-                    max_wait = 60.0
+                    # 아직 실행 중이면 완료까지 대기 (타임아웃 없이)
+                    print(f"[INFO] Stage 1-B 백그라운드 실행 중, 완료까지 대기... (task_id={stage1b_task_id_from_checkpoint})")
                     wait_start = time.time()
-
-                    while time.time() - wait_start < max_wait:
+                    
+                    while True:
                         task_info = _STAGE1B_RESULTS.get(stage1b_task_id_from_checkpoint, {})
                         if task_info.get("status") == "completed":
                             stage1b_result = task_info.get("result", {})
-                            print(f"[INFO] Stage 1-B 백그라운드 완료 (대기 시간={time.time() - wait_start:.1f}초)")
+                            elapsed = time.time() - wait_start
+                            print(f"[INFO] Stage 1-B 백그라운드 완료 (대기 시간={elapsed:.1f}초)")
                             break
                         elif task_info.get("status") == "error":
                             stage1b_result = task_info.get("result", {"status": "error"})
+                            print(f"[WARN] Stage 1-B 백그라운드 실행 실패")
                             break
                         time.sleep(0.5)
-
-                    if time.time() - wait_start >= max_wait:
-                        print("[WARN] Stage 1-B 백그라운드 시간 초과")
-                        stage1b_result = {"status": "timeout"}
             else:
                 print(f"[WARN] Stage 1-B task_id={stage1b_task_id_from_checkpoint} 결과 없음")
-        else:
-            # 체크포인트 없이 새로 실행하는 경우
-            stage1b_thread = threading.Thread(target=run_stage1b_background_test, daemon=True)
+        
+        # 우선순위 3: 새로 시작 (위에서 결과를 받지 못한 경우만)
+        if not stage1b_result:
+            def run_stage1b_background_test():
+                """백그라운드 스레드에서 Stage 1-B 실행 (테스트 모드)"""
+                nonlocal stage1b_result
+                try:
+                    stage1b_result = query_classifier_stage1b_background(state)
+                except Exception as e:
+                    print(f"[WARN] Stage 1-B 백그라운드 실행 실패: {e}")
+                    stage1b_result = {"status": "error", "error": str(e)}
+            
+            print("[INFO] Stage 1-B 백그라운드 작업 새로 시작...")
+            stage1b_thread = threading.Thread(target=run_stage1b_background_test, daemon=False)  # daemon=False로 변경하여 완료까지 대기
             stage1b_thread.start()
-            stage1b_thread.join(timeout=10.0)  # 최대 10초 대기
+            stage1b_thread.join()  # 타임아웃 없이 완료까지 대기
+            
+            if not stage1b_result:
+                print("[WARN] Stage 1-B 백그라운드 작업이 결과를 반환하지 않음")
+                stage1b_result = {"status": "error", "error": "No result returned"}
 
         # 사용자가 이미 선택한 방향이 있는지 확인 (Django에서 전달)
         user_selected_direction_id = state.get("user_selected_direction")
@@ -224,7 +265,7 @@ def user_intent_clarification_node(state: GraphState) -> GraphState:
             "node_execution_times": node_times
         }
 
-        # Stage 1-B 성공 시 결과 통합
+        # Stage 1-B 성공 시 결과 통합 (필수!)
         if stage1b_result.get("status") == "success":
             if stage1b_result.get("query_type"):
                 result_state["query_type"] = stage1b_result["query_type"]
@@ -235,6 +276,18 @@ def user_intent_clarification_node(state: GraphState) -> GraphState:
                 result_state["selected_property_groups"] = stage1b_result["selected_property_groups"]
                 result_state["selected_properties"] = stage1b_result.get("selected_properties", [])
             print("[INFO] Stage 1-B 백그라운드 결과가 state에 통합되었습니다.")
+        else:
+            # Stage 1-B 결과가 없거나 실패한 경우 경고 출력
+            error_msg = stage1b_result.get("error", "알 수 없는 오류")
+            print(f"[ERROR] Stage 1-B 백그라운드 결과를 받지 못했습니다. 상태: {stage1b_result.get('status', 'unknown')}, 오류: {error_msg}")
+            print("[WARN] Stage 2에서 Stage 1-B 결과가 필요하지만 없습니다. 기본값으로 진행합니다.")
+            # 기본값 설정 (하위 호환성)
+            if not result_state.get("query_type"):
+                result_state["query_type"] = state.get("query_type_initial", "causal")
+            if not result_state.get("expanded_keywords"):
+                result_state["expanded_keywords"] = []
+            if not result_state.get("selected_properties"):
+                result_state["selected_properties"] = []
 
         return result_state
 

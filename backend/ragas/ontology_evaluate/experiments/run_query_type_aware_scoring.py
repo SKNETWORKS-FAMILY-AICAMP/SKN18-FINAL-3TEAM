@@ -1,12 +1,7 @@
 """
-Query-Type Aware Scoring System v3.0 실험
+Query-Type Aware Scoring System v4.0 실험
 
-모든 Component (Semantic Expander, Thread Aggregator, Entity Boost)가
-쿼리 타입별로 다른 점수를 받도록 업데이트된 시스템을 검증합니다.
-
-실험 설계:
-1. Baseline: Quick Win 설정 (기존 최적 설정)
-2. v3.0: 쿼리 타입별 Component 점수 차별화 (새로운 설정)
+v4.0 설정으로만 실험 실행 (Baseline 실행하지 않음)
 
 Usage:
     # 전체 80개 질문 실행
@@ -16,7 +11,7 @@ Usage:
     python -m backend.ragas.ontology_evaluate.experiments.run_query_type_aware_scoring --limit 20
 
     # 로그 저장
-    python -m backend.ragas.ontology_evaluate.experiments.run_query_type_aware_scoring > logs/v3_experiment.log 2>&1
+    python -m backend.ragas.ontology_evaluate.experiments.run_query_type_aware_scoring > logs/v4_experiment.log 2>&1
 """
 
 import argparse
@@ -30,8 +25,6 @@ from backend.ragas.ontology_evaluate.evaluators import AnswerQualityEvaluator
 from backend.ragas.ontology_evaluate.utils.llm_judge import LLMJudge
 from backend.ragas.ontology_evaluate.utils.experiment_utils import (
     run_single_query,
-    compare_experiment_results,
-    print_comparison_summary,
     load_queries,
     initialize_evaluators
 )
@@ -84,6 +77,23 @@ class ExperimentConfig:
             "description": "Query-Type Aware Scoring v3.0 (모든 Component 쿼리 타입별 점수)",
             # 주의: evidence_scoring.py가 자동으로 쿼리 타입별 점수 적용
             # config.py 수정 불필요 (scoring 로직만 변경)
+        }
+
+    @staticmethod
+    def get_v4_config() -> Dict[str, Any]:
+        """
+        v4.0: Query-Type Aware Scoring System v4.0
+
+        v4.0는 그래프 구조 자체를 변경한 버전입니다.
+        컴포넌트 on/off 설정이 아닌 그래프 자체의 변경이므로
+        기본 설정을 사용합니다.
+        """
+        return {
+            "name": "v4_query_type_aware",
+            "description": "Query-Type Aware Scoring v4.0 (그래프 구조 변경)",
+            # 주의: 그래프 구조 자체가 변경되었으므로 컴포넌트 설정 불필요
+            # build_test_config가 experiment_name에서 "query_type_aware"를 감지하여
+            # use_query_type_aware=True로 자동 설정됨
         }
 
 
@@ -161,7 +171,7 @@ def run_experiment(
 # =====================================================
 
 def main():
-    parser = argparse.ArgumentParser(description="Query-Type Aware Scoring v3.0 실험")
+    parser = argparse.ArgumentParser(description="Query-Type Aware Scoring v4.0 실험")
     parser.add_argument("--limit", type=int, default=None, help="실행할 질문 수 제한 (기본: 전체 80개)")
     parser.add_argument("--output-dir", type=str, default=None, help="결과 저장 디렉토리")
     args = parser.parse_args()
@@ -176,7 +186,7 @@ def main():
     if args.output_dir:
         RESULTS_DIR = Path(args.output_dir)
     else:
-        RESULTS_DIR = DATA_DIR / "query_type_aware_v3_results"
+        RESULTS_DIR = DATA_DIR / "results_v4"
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -199,16 +209,15 @@ def main():
     graph = create_graph_flow()
 
     # 4. 실험 설정
-    baseline_config = ExperimentConfig.get_baseline_config()
-    v3_config = ExperimentConfig.get_v3_config()
+    v4_config = ExperimentConfig.get_v4_config()
 
-    # 5. Baseline 실험 실행
+    # 5. v4.0 실험 실행
     print(f"\n{'#'*80}")
-    print("# 1단계: Baseline (Quick Win) 실험")
+    print("# v4.0 (Query-Type Aware) 실험")
     print(f"{'#'*80}")
 
-    baseline_results = run_experiment(
-        config=baseline_config,
+    v4_results = run_experiment(
+        config=v4_config,
         queries=queries,
         graph=graph,
         llm_judge=llm_judge,
@@ -216,60 +225,17 @@ def main():
         answer_quality_evaluator=answer_quality_evaluator
     )
 
-    # Baseline 결과 저장
-    baseline_output = RESULTS_DIR / f"baseline_quick_win_{TIMESTAMP}.json"
-    with open(baseline_output, "w", encoding="utf-8") as f:
-        json.dump(baseline_results, f, ensure_ascii=False, indent=2)
-    print(f"\nBaseline 결과 저장: {baseline_output}")
-
-    # 6. v3.0 실험 실행
-    print(f"\n{'#'*80}")
-    print("# 2단계: v3.0 (Query-Type Aware) 실험")
-    print(f"{'#'*80}")
-
-    v3_results = run_experiment(
-        config=v3_config,
-        queries=queries,
-        graph=graph,
-        llm_judge=llm_judge,
-        ontology_schema=ontology_schema,
-        answer_quality_evaluator=answer_quality_evaluator
-    )
-
-    # v3.0 결과 저장
-    v3_output = RESULTS_DIR / f"v3_query_type_aware_{TIMESTAMP}.json"
-    with open(v3_output, "w", encoding="utf-8") as f:
-        json.dump(v3_results, f, ensure_ascii=False, indent=2)
-    print(f"\nv3.0 결과 저장: {v3_output}")
-
-    # 7. 비교 분석
-    print(f"\n{'#'*80}")
-    print("# 3단계: 결과 비교 분석")
-    print(f"{'#'*80}")
-
-    comparison = compare_experiment_results(
-        baseline_results=baseline_results,
-        experiment_results=v3_results,
-        baseline_name="Baseline (Quick Win)",
-        experiment_name="v3.0 (Query-Type Aware)"
-    )
-
-    # 비교 결과 저장
-    comparison_output = RESULTS_DIR / f"comparison_{TIMESTAMP}.json"
-    with open(comparison_output, "w", encoding="utf-8") as f:
-        json.dump(comparison, f, ensure_ascii=False, indent=2)
-    print(f"\n비교 결과 저장: {comparison_output}")
-
-    # 요약 출력
-    print_comparison_summary(comparison)
+    # v4.0 결과 저장
+    v4_output = RESULTS_DIR / f"v4_query_type_aware_{TIMESTAMP}.json"
+    with open(v4_output, "w", encoding="utf-8") as f:
+        json.dump(v4_results, f, ensure_ascii=False, indent=2)
+    print(f"\nv4.0 결과 저장: {v4_output}")
 
     print(f"\n{'#'*80}")
     print("# 실험 완료!")
     print(f"{'#'*80}")
     print(f"\n결과 파일:")
-    print(f"  - Baseline: {baseline_output}")
-    print(f"  - v3.0: {v3_output}")
-    print(f"  - 비교: {comparison_output}")
+    print(f"  - v4.0: {v4_output}")
     print(f"\n저장 위치: {RESULTS_DIR}")
 
 

@@ -80,7 +80,7 @@ DATA_THREADS = {
                 OPTIONAL {{ ?object rdfs:label ?objectLabel }}
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
-            }} LIMIT 100
+            }} LIMIT 30
         """
     },
     "incoming_relations": {
@@ -98,7 +98,7 @@ DATA_THREADS = {
                 OPTIONAL {{ ?subject rdfs:label ?subjectLabel }}
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
-            }} LIMIT 100
+            }} LIMIT 30
         """
     },
     "entity_properties": {
@@ -114,7 +114,7 @@ DATA_THREADS = {
                 ?entity ?predicate ?value .
                 FILTER(isLiteral(?value))
                 FILTER(?predicate != rdfs:label)
-            }} LIMIT 100
+            }} LIMIT 30
         """
     },
     "connected_entities": {
@@ -145,7 +145,7 @@ DATA_THREADS = {
                 FILTER(?entity1 != ?entity2)
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
-            }} LIMIT 100
+            }} LIMIT 30
         """,
         "use_bidirectional_bfs": True  # 양방향 BFS 활성화 플래그
     },
@@ -163,7 +163,7 @@ DATA_THREADS = {
                 OPTIONAL {{ ?entity hist:hasSummary ?summary }}
                 OPTIONAL {{ ?entity hist:hasCategory ?category }}
                 OPTIONAL {{ ?entity hist:hasYear ?year }}
-            }} LIMIT 50
+            }} LIMIT 30
         """
     }
 }
@@ -816,7 +816,7 @@ SELECT ?s ?p ?o ?sLabel WHERE {{
     ?entity ?p ?o .
     BIND(?entity AS ?s)
     OPTIONAL {{ ?s rdfs:label ?sLabel }}
-}} LIMIT 100"""
+}} LIMIT 30"""
 
 
 def execute_inference_api(thread_type: str, sparql: str, hypothetical: list = None, query_type: str = None) -> dict:
