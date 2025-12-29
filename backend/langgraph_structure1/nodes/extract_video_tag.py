@@ -81,10 +81,25 @@ def extract_video_tag(state: GraphState) -> GraphState:
 
     result_text = response.choices[0].message.content.strip()
 
-    # tags만 추출해서 db에 저장
+    # JSON 파싱 시도
+    tags: list = []
+    evidence = {}
+    try:
+        parsed = json.loads(result_text)
+        if isinstance(parsed, dict):
+            tags = parsed.get("tags") or []
+            evidence = parsed.get("evidence") or {}
+            if isinstance(tags, str):
+                tags = [t.strip() for t in tags.split(",") if t.strip()]
+    except Exception:
+        tags = []
+        evidence = {}
+
     return {
         **state,
-        "video_tags": result_text,
+        "video_tags": tags,
+        "video_tag_evidence": evidence,
+        "extracted_tags_json": result_text,
     }
 
 

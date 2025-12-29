@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView, RetrieveAPIView, CreateAPIView, UpdateAPIView, DestroyAPIView
 from openai import OpenAI
 from dotenv import load_dotenv
+from asgiref.sync import sync_to_async
 
 # 모델 및 시리얼라이저 (Dev 브랜치 기준)
 from .models import Video
@@ -119,7 +120,7 @@ async def create_video_from_langgraph(request):
     """
     프론트에서 설명을 보내면 LangGraph(tag=video)로 스크립트/태그 생성 후
     title + tags를 사용해 Video 레코드를 생성합니다.
-    video_url은 클라이언트가 주면 그대로 사용하고, 없으면 빈 문자열로 저장합니다.
+    video_url은 임시로 옵션 처리 (추후 필수화 예정).  # 수정 필요
     """
     if request.method != "POST":
         return JsonResponse({"error": "Only POST method allowed"}, status=405)
@@ -132,6 +133,8 @@ async def create_video_from_langgraph(request):
     description = body.get("description", "") or ""
     video_url = body.get("video_url", "") or ""
     thumbnail_url = body.get("thumbnail_url")  # 옵션
+    # if not video_url:
+    #     return JsonResponse({"error": "video_url is required"}, status=400)  # 수정 필요
 
     try:
         app = create_graph_flow()
@@ -141,12 +144,31 @@ async def create_video_from_langgraph(request):
         }
         result_state = await app.ainvoke(initial_state)
     except Exception as e:
-        print(f"❌ [LangGraph Error] {e}")
+        print(f"[LangGraph Error] {e}")
         return JsonResponse({"error": "Failed to generate video script"}, status=500)
 
     script_json = result_state.get("scene_script") or {}
-    title = script_json.get("title") or (description[:50] or "Untitled Video")
+    title = (
+        script_json.get("title_ko")
+        or script_json.get("title")
+        or (description[:50] or "Untitled Video")
+    )
+    # title이 한글이 아니라면 질의 일부를 사용해 한국어로 보정
+    if title and not any("가" <= ch <= "힣" for ch in title):
+        title = description[:50] or title
     tags = result_state.get("video_tags") or []
+    # 문자열로 넘어오는 경우 대비
+    if isinstance(tags, str):
+        try:
+            parsed = json.loads(tags)
+            if isinstance(parsed, dict):
+                tags = parsed.get("tags") or []
+            elif isinstance(parsed, list):
+                tags = parsed
+        except Exception:
+            tags = [t.strip() for t in tags.split(",") if t.strip()]
+    if not isinstance(tags, list):
+        tags = []
 
     payload = {
         "title": title,
@@ -157,15 +179,18 @@ async def create_video_from_langgraph(request):
 
     try:
         serializer = VideoCreateSerializer(data=payload)
-        serializer.is_valid(raise_exception=True)
-        video = serializer.save()
+        await sync_to_async(serializer.is_valid)(raise_exception=True)
+        video = await sync_to_async(serializer.save)()
     except Exception as e:
-        print(f"❌ [Video Save Error] {e}")
+        print(f"[Video Save Error] {e}")
         return JsonResponse({"error": "Failed to save video"}, status=500)
+
+    # serializer.data는 내부에서 동기 ORM을 호출하므로 스레드에서 실행
+    serialized = await sync_to_async(lambda: VideoSerializer(video).data)()
 
     return JsonResponse(
         {
-            "data": VideoSerializer(video).data,
+            "data": serialized,
             "message": "Video created via LangGraph",
         },
         status=201,

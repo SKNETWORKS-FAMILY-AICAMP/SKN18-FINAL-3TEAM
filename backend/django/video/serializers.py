@@ -60,6 +60,8 @@ class VideoDetailSerializer(serializers.ModelSerializer):
 
 class VideoCreateSerializer(serializers.ModelSerializer):
     """영상 생성용 Serializer (관리자용)"""
+    # 임시로 video_url 필수 해제 (추후 필수화 시 삭제)  # 수정 필요
+    video_url = serializers.CharField(allow_blank=True, required=False)
 
     class Meta:
         model = Video
