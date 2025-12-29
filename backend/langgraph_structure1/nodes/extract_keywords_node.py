@@ -16,14 +16,16 @@ def extract_keywords_node(state: GraphState) -> GraphState:
     QUESTION_STOPWORDS = {"누구", "뭐", "무엇", "언제", "어디", "왜", "어떻게"}
     DOMAIN_CONTEXT = {"조선", "조선시대"}
     TOPIC_KEYWORDS = {"정치", "경제", "사회", "문화", "외교", "군사", "행정", "제도", "법", "교육"}
-    GENERIC_STOPWORDS = {"시대", "설명", "업적", "이유", "배경", "특징", "의미", "대해", "대한", "것", "수"}
+    GENERIC_STOPWORDS = {"시대", "설명", "업적", "이유", "배경", "특징", "의미", "대해", "대한", "것", "수", "대하"}
     STRUCTURE_WORDS = {"구조", "체계", "기구", "정책", "운영", "원리"}
     PERSON_SUFFIX = {"대왕", "왕", "장군", "황제", "공", "선생", "대감"}
     EVENT_SUFFIX = {"사건"}
+    # 도메인 우선순위 단어 (지명/인명 등)
+    PRIORITY_TERMS = {"정조", "화성", "수원", "수원화성"}
 
     # (2) 범용어 패널티 / 도메인 핵심어 보너스
     GENERIC_NOUN_PENALTY = {"군인", "사람", "인물"}   # 필요 시 확장
-    DOMAIN_PRIORITY_TERMS = {"의병"}                 # 필요 시 확장
+    DOMAIN_PRIORITY_TERMS = {"의병"} | PRIORITY_TERMS                 # 필요 시 확장
 
     # (3) “몇 명/몇” 같은 카운트 질문 감지 (예외 처리용)
     COUNT_MARKERS = {"몇", "몇명", "명", "수", "몇 명"}
@@ -139,6 +141,9 @@ def extract_keywords_node(state: GraphState) -> GraphState:
             score += 60.0
         if w in GENERIC_NOUN_PENALTY:
             score -= 15.0
+        # 우선순위 키워드(정조/화성 등)는 추가 가산
+        if w in PRIORITY_TERMS:
+            score += 80.0
         scored[w] = max(scored.get(w, 0.0), score)
 
     # (6) 예외 처리: "조선시대 왕이 몇 명" 류
@@ -211,6 +216,14 @@ def extract_keywords_node(state: GraphState) -> GraphState:
             keywords.append(w)
             if len(keywords) >= TOP_N:
                 break
+
+    # 4) 우선순위 키워드가 포함돼 있지 않으면 보정 시도
+    if len(keywords) < TOP_N:
+        for p in PRIORITY_TERMS:
+            if p in query and p not in keywords:
+                keywords.append(p)
+                if len(keywords) >= TOP_N:
+                    break
 
     return {
         **state,
