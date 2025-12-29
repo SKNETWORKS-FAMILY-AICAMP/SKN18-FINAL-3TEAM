@@ -207,7 +207,7 @@ class PostgresVectorService:
         self,
         query: str,
         top_k: int = 10,
-        threshold: float = 0.5
+        threshold: float = 0.2
     ) -> List[Dict]:
         """유사 청크 검색 (코사인 유사도)
 
