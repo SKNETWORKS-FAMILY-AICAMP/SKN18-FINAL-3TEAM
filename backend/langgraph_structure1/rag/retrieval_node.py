@@ -79,6 +79,8 @@ def retrieval_node(state: GraphState) -> GraphState:
 
     elapsed = time.perf_counter() - t0
 
+    print(f"[DEBUG] 벡터 검색 시간: {elapsed:.2f}초")
+
     # 디버그
     print(
         f"[DEBUG] 벡터 검색 결과: query={question!r}, keywords={keywords}, "
