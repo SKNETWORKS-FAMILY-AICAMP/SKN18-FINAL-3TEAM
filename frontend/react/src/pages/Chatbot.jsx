@@ -14,25 +14,74 @@ import {
   createChatSession,
   deleteChatSession,
 } from "../api/chatApi";
+import MarkdownRenderer from "../components/common/MarkdownRenderer";
+import EvidencePathView from "../components/common/EvidencePathView";
 
 const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
   // 스크롤바 스타일을 위한 CSS 추가
   useEffect(() => {
-    const style = document.createElement('style');
+    const style = document.createElement("style");
     style.textContent = `
       .clarification-cards-scroll::-webkit-scrollbar {
-        height: 8px;
+        height: 6px;
       }
       .clarification-cards-scroll::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 3px;
+        margin: 0 8px; /* 스크롤바가 카드 영역에만 표시되도록 */
       }
       .clarification-cards-scroll::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 3px;
+        transition: background 0.2s ease;
       }
       .clarification-cards-scroll::-webkit-scrollbar-thumb:hover {
-        background: #555;
+        background: rgba(0, 0, 0, 0.4);
+      }
+      .clarification-cards-scroll::-webkit-scrollbar-thumb:active {
+        background: rgba(0, 0, 0, 0.6);
+      }
+      
+      /* Firefox 스크롤바 스타일 */
+      .clarification-cards-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0, 0, 0, 0.2) rgba(0, 0, 0, 0.05);
+      }
+      
+      /* 사이드바 스크롤바 스타일 */
+      .sidebar-scroll::-webkit-scrollbar {
+        width: 6px;
+      }
+      .sidebar-scroll::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 3px;
+      }
+      .sidebar-scroll::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 3px;
+        transition: background 0.2s ease;
+      }
+      .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.4);
+      }
+      
+      /* 세션 삭제 버튼 스타일 */
+      .session-delete-btn {
+        opacity: 0.8 !important; /* 항상 보이도록 변경 */
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+      .session-delete-btn:hover {
+        opacity: 1 !important;
+        background: rgba(239, 68, 68, 0.15) !important;
+        transform: scale(1.1) !important;
+      }
+      
+      .session-item:hover .session-delete-btn {
+        opacity: 1 !important;
+      }
+      
+      .session-delete-btn:hover {
+        color: #EF4444 !important;
       }
     `;
     document.head.appendChild(style);
@@ -64,11 +113,19 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
     console.log("[hydrateMessages] 🔍 Raw messages from DB:", sessionMessages);
     const normalized = sessionMessages.map((msg) => {
       // 재질문 메타데이터 체크
-      console.log("[hydrateMessages] Checking message:", { role: msg.role, contentStart: msg.content?.substring(0, 50) });
-      if (msg.role === "assistant" && msg.content.startsWith("__CLARIFICATION_METADATA__:")) {
+      console.log("[hydrateMessages] Checking message:", {
+        role: msg.role,
+        contentStart: msg.content?.substring(0, 50),
+      });
+      if (
+        msg.role === "assistant" &&
+        msg.content.startsWith("__CLARIFICATION_METADATA__:")
+      ) {
         console.log("[hydrateMessages] ✅ Found clarification metadata!");
         try {
-          const jsonStr = msg.content.substring("__CLARIFICATION_METADATA__:".length);
+          const jsonStr = msg.content.substring(
+            "__CLARIFICATION_METADATA__:".length
+          );
           console.log("[hydrateMessages] JSON string:", jsonStr);
           const metadata = JSON.parse(jsonStr);
           console.log("[hydrateMessages] Parsed metadata:", metadata);
@@ -79,21 +136,54 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
             isActive: false, // 과거 기록은 비활성화
           };
         } catch (e) {
-          console.error("[hydrateMessages] ❌ Failed to parse clarification metadata:", e);
+          console.error(
+            "[hydrateMessages] ❌ Failed to parse clarification metadata:",
+            e
+          );
           console.error("[hydrateMessages] Content was:", msg.content);
           // 파싱 실패 시 일반 메시지로 fallback
           return {
             type: "assistant",
             text: msg.content,
+            evidences: msg.evidences || [],
           };
         }
       }
 
       // 일반 메시지
-      return {
+      const messageObj = {
         type: msg.role === "assistant" ? "assistant" : "user",
         text: msg.content,
       };
+
+      // evidences가 있으면 포함
+      console.log("[hydrateMessages] Checking for evidences:", {
+        hasEvidences: !!msg.evidences,
+        evidencesType: typeof msg.evidences,
+        isArray: Array.isArray(msg.evidences),
+        length: msg.evidences?.length,
+        evidences: msg.evidences,
+      });
+
+      if (
+        msg.evidences &&
+        Array.isArray(msg.evidences) &&
+        msg.evidences.length > 0
+      ) {
+        messageObj.evidences = msg.evidences;
+        console.log(
+          "[hydrateMessages] ✅ Found evidences:",
+          msg.evidences.length,
+          msg.evidences
+        );
+      } else if (msg.evidences) {
+        console.log(
+          "[hydrateMessages] ⚠️ Evidences exists but not array or empty:",
+          msg.evidences
+        );
+      }
+
+      return messageObj;
     });
     setMessages(normalized);
   };
@@ -321,7 +411,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
     }
   };
 
-  const simulateStreamingResponse = (text) => {
+  const simulateStreamingResponse = (text, evidences = []) => {
     setStreamingText("");
     let index = 0;
     const interval = setInterval(() => {
@@ -330,7 +420,11 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
         index++;
       } else {
         clearInterval(interval);
-        setMessages((prev) => [...prev, { type: "assistant", text: text }]);
+        const messageObj = { type: "assistant", text: text };
+        if (evidences && Array.isArray(evidences) && evidences.length > 0) {
+          messageObj.evidences = evidences;
+        }
+        setMessages((prev) => [...prev, messageObj]);
         setStreamingText("");
       }
     }, 20);
@@ -374,7 +468,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
       );
 
       if (response.answer) {
-        simulateStreamingResponse(response.answer);
+        simulateStreamingResponse(response.answer, response.evidences || []);
       } else {
         simulateStreamingResponse("답변을 받을 수 없습니다.");
       }
@@ -453,11 +547,10 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
             onClick={() => setShowHistory(!showHistory)}
             style={{
               position: "fixed",
-              left: showHistory ? "300px" : "0px",
-              top: "126px",
-              width: "auto",
-              height: "auto",
-              padding: "8px",
+              left: showHistory ? "280px" : "40px", // 닫혀있을 때는 사이드바보다 오른쪽에
+              top: "110px",
+              width: "72px",
+              height: "72px",
               backgroundColor: "transparent",
               border: "none",
               outline: "none",
@@ -466,27 +559,27 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
               alignItems: "center",
               justifyContent: "center",
               zIndex: 1001,
-              transition: "left 0.3s ease",
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "scale(1.1)";
+              e.currentTarget.style.transform = "scale(1.08)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "scale(1)";
             }}
           >
             <svg
-              width="36"
-              height="36"
+              width="81"
+              height="81"
               viewBox="0 0 24 24"
               fill="none"
               stroke={COLORS.dark}
-              strokeWidth="3"
+              strokeWidth="4"
               strokeLinecap="round"
               strokeLinejoin="round"
               style={{
                 transform: showHistory ? "rotate(180deg)" : "rotate(0deg)",
-                transition: "transform 0.3s ease",
+                transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               }}
             >
               <line x1="5" y1="12" x2="19" y2="12" />
@@ -501,26 +594,77 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
               left: showHistory ? "0" : "-320px",
               top: "96px",
               width: "300px",
-              backgroundColor: "transparent",
+              backgroundColor: "rgba(255, 255, 255, 0.95)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              borderLeft: "none",
+              borderTopRightRadius: "20px",
+              borderBottomRightRadius: "20px",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
               display: "flex",
               flexDirection: "column",
               overflowY: "auto",
               overflowX: "hidden",
               height: "calc(100vh - 96px)",
-              padding: "40px 20px",
-              transition: "left 0.3s ease",
+              padding: "32px 24px",
+              transition: "left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               zIndex: 1000,
             }}
           >
             <div
               style={{
-                padding: "0 0 16px 0",
+                padding: "0 0 24px 0",
                 display: "flex",
                 flexDirection: "column",
-                gap: "8px",
+                gap: "16px",
                 alignItems: "stretch",
+                borderBottom: `1px solid ${COLORS.border}`,
+                marginBottom: "24px",
               }}
             >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  marginBottom: "8px",
+                }}
+              >
+                <div
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "8px",
+                    backgroundColor: COLORS.primary,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke={COLORS.dark}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                  </svg>
+                </div>
+                <span
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: "700",
+                    color: COLORS.dark,
+                  }}
+                >
+                  대화 기록
+                </span>
+              </div>
               <button
                 onClick={async () => {
                   try {
@@ -533,6 +677,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                     const newSession = await createChatSession();
                     setSelectedSessionId(newSession.id);
                     setMessages([]);
+                    setShowHistory(false); // 사이드바 자동 접기
                     const raw = await getChatHistory();
                     const history = Array.isArray(raw)
                       ? raw
@@ -544,165 +689,285 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                 }}
                 style={{
                   width: "100%",
-                  background: "rgba(255, 255, 255, 0.7)",
-                  backdropFilter: "blur(12px)",
-                  WebkitBackdropFilter: "blur(12px)",
-                  border: "1px solid rgba(255, 255, 255, 0.3)",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06)",
+                  background: `linear-gradient(135deg, ${COLORS.primary} 0%, ${COLORS.sub_color} 100%)`,
+                  border: "none",
+                  boxShadow: `0 4px 16px ${COLORS.primary}40`,
                   color: COLORS.dark,
                   cursor: "pointer",
-                  fontSize: "16px",
+                  fontSize: "15px",
                   fontWeight: "600",
-                  padding: "12px 20px",
-                  borderRadius: "16px",
-                  transition: "all 0.2s ease",
+                  padding: "14px 20px",
+                  borderRadius: "12px",
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: "8px",
+                  gap: "10px",
+                  position: "relative",
+                  overflow: "hidden",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.85)";
-                  e.currentTarget.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.1)";
-                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.transform =
+                    "translateY(-2px) scale(1.02)";
+                  e.currentTarget.style.boxShadow = `0 8px 25px ${COLORS.primary}50`;
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.7)";
-                  e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.06)";
-                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.transform = "translateY(0) scale(1)";
+                  e.currentTarget.style.boxShadow = `0 4px 16px ${COLORS.primary}40`;
                 }}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={COLORS.dark} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={COLORS.dark}
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 2v20M2 12h20"></path>
                 </svg>
-                새 채팅
+                새 채팅 시작
               </button>
-              <span
-                style={{
-                  fontSize: "16px",
-                  fontWeight: "600",
-                  color: COLORS.dark,
-                  marginTop: "4px",
-                  paddingLeft: "2px",
-                }}
-              >
-                대화 기록
-              </span>
             </div>
             <div
               style={{
                 flex: 1,
                 overflowY: "auto",
                 padding: "0",
-                paddingLeft: "2px",
+                // 커스텀 스크롤바
+                scrollbarWidth: "thin",
+                scrollbarColor: `${COLORS.border} transparent`,
               }}
+              className="sidebar-scroll"
             >
-              {chatHistory.map((session) => (
+              {chatHistory.length === 0 ? (
                 <div
-                  key={session.id}
-                  onClick={async () => {
-                    setSelectedSessionId(session.id);
-                    setMessages([]);
-                    try {
-                      const sessionData = await getChatSession(session.id);
-                      hydrateMessages(sessionData?.messages || []);
-                    } catch (error) {
-                      console.error("세션 불러오기 실패:", error);
-                    }
-                  }}
                   style={{
-                    position: "relative",
-                    padding: "12px",
-                    marginBottom: "8px",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    backgroundColor:
-                      selectedSessionId === session.id
-                        ? COLORS.tertiary
-                        : "transparent",
-                    transition: "background 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (selectedSessionId !== session.id) {
-                      e.currentTarget.style.backgroundColor = COLORS.lightGray;
-                    }
-                    const btn = e.currentTarget.querySelector(
-                      ".session-delete-btn"
-                    );
-                    if (btn) btn.style.opacity = 1;
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedSessionId !== session.id) {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }
-                    const btn = e.currentTarget.querySelector(
-                      ".session-delete-btn"
-                    );
-                    if (btn) btn.style.opacity = 0;
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "40px 20px",
+                    textAlign: "center",
+                    color: COLORS.gray,
                   }}
                 >
+                  <svg
+                    width="48"
+                    height="48"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ marginBottom: "16px", opacity: 0.5 }}
+                  >
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                  </svg>
                   <div
                     style={{
-                      fontSize: "13px",
+                      fontSize: "14px",
                       fontWeight: "500",
-                      color: COLORS.dark,
-                      marginBottom: "4px",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      marginBottom: "8px",
                     }}
                   >
-                    {session.title || session.first_message || "대화"}
+                    아직 대화가 없습니다
                   </div>
                   <div
                     style={{
-                      fontSize: "11px",
-                      color: COLORS.gray,
+                      fontSize: "12px",
+                      lineHeight: "1.5",
+                      opacity: 0.7,
                     }}
                   >
-                    {session.created_at
-                      ? new Date(session.created_at).toLocaleDateString("ko-KR")
-                      : ""}
+                    새 채팅을 시작해보세요
                   </div>
-                  <button
-                    className="session-delete-btn"
-                    onClick={async (e) => {
-                      e.stopPropagation();
+                </div>
+              ) : (
+                chatHistory.map((session) => (
+                  <div
+                    key={session.id}
+                    className="session-item"
+                    onClick={async () => {
+                      setSelectedSessionId(session.id);
+                      setMessages([]);
+                      setShowHistory(false); // 사이드바 자동 접기
                       try {
-                        await deleteChatSession(session.id);
-                        const filtered = (chatHistory || []).filter(
-                          (s) => s.id !== session.id
-                        );
-                        setChatHistory(filtered);
-                        if (selectedSessionId === session.id) {
-                          setSelectedSessionId(null);
-                          setMessages([]);
-                        }
+                        const sessionData = await getChatSession(session.id);
+                        hydrateMessages(sessionData?.messages || []);
                       } catch (error) {
-                        console.error("세션 삭제 실패:", error);
+                        console.error("세션 불러오기 실패:", error);
                       }
                     }}
                     style={{
-                      position: "absolute",
-                      top: "50%",
-                      right: "16px",
-                      transform: "translateY(-50%)",
-                      width: "20px",
-                      height: "20px",
-                      borderRadius: "50%",
-                      border: "none",
-                      background: "transparent",
-                      color: COLORS.gray,
+                      position: "relative",
+                      padding: "16px",
+                      marginBottom: "12px",
+                      borderRadius: "12px",
                       cursor: "pointer",
-                      opacity: 0,
-                      transition: "opacity 0.2s",
+                      backgroundColor:
+                        selectedSessionId === session.id
+                          ? `${COLORS.primary}20`
+                          : "rgba(255, 255, 255, 0.6)",
+                      border:
+                        selectedSessionId === session.id
+                          ? `2px solid ${COLORS.primary}`
+                          : "2px solid transparent",
+                      backdropFilter: "blur(10px)",
+                      WebkitBackdropFilter: "blur(10px)",
+                      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                      boxShadow:
+                        selectedSessionId === session.id
+                          ? `0 4px 20px ${COLORS.primary}30`
+                          : "0 2px 8px rgba(0, 0, 0, 0.06)",
+                      overflow: "visible",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedSessionId !== session.id) {
+                        e.currentTarget.style.backgroundColor =
+                          "rgba(255, 255, 255, 0.8)";
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                        e.currentTarget.style.boxShadow =
+                          "0 6px 20px rgba(0, 0, 0, 0.1)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedSessionId !== session.id) {
+                        e.currentTarget.style.backgroundColor =
+                          "rgba(255, 255, 255, 0.6)";
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow =
+                          "0 2px 8px rgba(0, 0, 0, 0.06)";
+                      }
                     }}
                   >
-                    ×
-                  </button>
-                </div>
-              ))}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "12px",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: "14px",
+                            fontWeight: "600",
+                            color: COLORS.dark,
+                            marginBottom: "4px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            lineHeight: "1.4",
+                          }}
+                        >
+                          {session.title ||
+                            session.first_message ||
+                            "새로운 대화"}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            color: COLORS.gray,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                          }}
+                        >
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12,6 12,12 16,14"></polyline>
+                          </svg>
+                          {session.created_at
+                            ? new Date(session.created_at).toLocaleDateString(
+                                "ko-KR",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                }
+                              )
+                            : ""}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      className="session-delete-btn"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          await deleteChatSession(session.id);
+                          const filtered = (chatHistory || []).filter(
+                            (s) => s.id !== session.id
+                          );
+                          setChatHistory(filtered);
+                          if (selectedSessionId === session.id) {
+                            setSelectedSessionId(null);
+                            setMessages([]);
+                          }
+                        } catch (error) {
+                          console.error("세션 삭제 실패:", error);
+                        }
+                      }}
+                      style={{
+                        position: "absolute",
+                        bottom: "12px",
+                        right: "12px",
+                        width: "24px",
+                        height: "24px",
+                        border: "none",
+                        background: "rgba(0, 0, 0, 0.08)", // 약간 더 진한 배경
+                        color: "#999999",
+                        cursor: "pointer",
+                        opacity: 0.8, // 더 잘 보이도록 조정
+                        transition: "opacity 0.2s ease, color 0.2s ease",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 10,
+                        pointerEvents: "auto",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = "#EF4444";
+                        e.currentTarget.style.opacity = "1";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = "#999999";
+                        e.currentTarget.style.opacity = "0.8";
+                      }}
+                    >
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M3 6h18"></path>
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                      </svg>
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </>
@@ -782,7 +1047,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
               width: "100%",
               marginLeft: "auto",
               marginRight: "auto",
-              paddingLeft: showHistory ? "280px" : "0px",
+              paddingLeft: showHistory ? "340px" : "60px", // 사이드바 너비 + 여백, 닫혀있을 때도 토글 버튼 공간 확보
               height: "100%",
               minHeight: 0,
               position: "relative",
@@ -798,7 +1063,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                 paddingTop: "20px",
                 paddingRight: "16px",
                 paddingLeft: "16px",
-                paddingBottom: "120px",
+                paddingBottom: "180px", // 패딩 증가 (120px → 180px)
                 touchAction: "pan-y",
                 WebkitOverflowScrolling: "touch",
               }}
@@ -878,6 +1143,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                           <div
                             style={{
                               flex: 1,
+                              minWidth: 0, // flex item이 축소될 수 있도록
+                              overflow: "hidden", // 컨테이너 overflow 제어
                             }}
                           >
                             <div
@@ -899,18 +1166,53 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                                 overflowX: "auto",
                                 overflowY: "hidden",
                                 paddingBottom: "8px",
+                                // paddingLeft: "5px", // 첫 번째 카드 여백 더 증가
+                                paddingRight: "40px", // 마지막 카드 여백 더 대폭 증가
+                                // marginLeft: "-5px", // 패딩으로 인한 시각적 오프셋 보정
+                                marginRight: "-40px", // 패딩으로 인한 시각적 오프셋 보정
                                 WebkitOverflowScrolling: "touch", // iOS 부드러운 스크롤
                                 scrollbarWidth: "thin", // Firefox 스크롤바
                                 msOverflowStyle: "auto", // IE/Edge 스크롤바
+                                scrollBehavior: "smooth", // 부드러운 스크롤
+                                // 터치 디바이스에서 스크롤 관성 개선
+                                touchAction: "pan-x",
+                                // 스크롤 스냅 효과
+                                scrollSnapType: "x proximity",
+                                // 컨테이너 최대 너비 제한 해제
+                                width: "100%",
+                                maxWidth: "none",
+                                // 스크롤바 스타일링 (Webkit 기반 브라우저)
+                                "&::-webkit-scrollbar": {
+                                  height: "6px",
+                                },
+                                "&::-webkit-scrollbar-track": {
+                                  backgroundColor: "transparent",
+                                },
+                                "&::-webkit-scrollbar-thumb": {
+                                  backgroundColor: "rgba(0,0,0,0.2)",
+                                  borderRadius: "3px",
+                                },
                               }}
                             >
                               {msg.options?.map((option, idx) => {
-                                const isDisabled = !msg.isActive || isSubmitting;
+                                const isDisabled =
+                                  !msg.isActive || isSubmitting;
                                 return (
                                   <button
                                     key={option.id}
-                                    onClick={() => {
+                                    onClick={(e) => {
                                       if (msg.isActive && !isSubmitting) {
+                                        // 클릭 시 즉시 시각적 피드백
+                                        e.currentTarget.style.transform =
+                                          "scale(0.98)";
+                                        e.currentTarget.style.borderColor =
+                                          COLORS.primary;
+                                        e.currentTarget.style.backgroundColor =
+                                          COLORS.primary;
+                                        e.currentTarget.style.color =
+                                          COLORS.dark;
+
+                                        // 선택 처리
                                         handleClarificationChoice(
                                           option.direction_id,
                                           option.title
@@ -919,8 +1221,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                                     }}
                                     disabled={isDisabled}
                                     style={{
-                                      minWidth: "220px",
-                                      maxWidth: "280px",
+                                      minWidth: "180px", // 카드 최소 너비 줄임 (220px → 180px)
+                                      maxWidth: "240px", // 카드 최대 너비 줄임 (280px → 240px)
                                       padding: "16px",
                                       backgroundColor: COLORS.white,
                                       border: `2px solid ${COLORS.border}`,
@@ -929,13 +1231,18 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                                         ? "not-allowed"
                                         : "pointer",
                                       textAlign: "left",
-                                      transition: "all 0.2s",
-                                      opacity: 1,
+                                      transition: "all 0.2s ease-out",
+                                      opacity: isDisabled ? 0.6 : 1,
                                       flexShrink: 0,
-                                      // 마지막 카드에 추가 여백 (스크롤 끝까지 보이도록)
+                                      boxShadow: isDisabled
+                                        ? "0 1px 3px rgba(0,0,0,0.04)"
+                                        : "0 2px 8px rgba(0,0,0,0.06)", // 기본 그림자 추가
+                                      scrollSnapAlign: "start", // 스크롤 스냅 정렬
+                                      // 첫 번째와 마지막 카드 여백 개선
+                                      marginLeft: idx === 0 ? "12px" : "0px", // 첫 카드 여백 증가
                                       marginRight:
                                         idx === msg.options.length - 1
-                                          ? "24px"
+                                          ? "32px" // 마지막 카드 여백 대폭 증가 (8px → 32px)
                                           : "0px",
                                     }}
                                     onMouseEnter={(e) => {
@@ -945,9 +1252,9 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                                         e.currentTarget.style.backgroundColor =
                                           COLORS.tertiary;
                                         e.currentTarget.style.transform =
-                                          "translateY(-2px)";
+                                          "translateY(-3px) scale(1.02)";
                                         e.currentTarget.style.boxShadow =
-                                          "0 4px 12px rgba(0,0,0,0.1)";
+                                          "0 8px 25px rgba(0,0,0,0.12)";
                                       }
                                     }}
                                     onMouseLeave={(e) => {
@@ -957,61 +1264,74 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                                         e.currentTarget.style.backgroundColor =
                                           COLORS.white;
                                         e.currentTarget.style.transform =
-                                          "translateY(0)";
-                                        e.currentTarget.style.boxShadow = "none";
+                                          "translateY(0) scale(1)";
+                                        e.currentTarget.style.boxShadow =
+                                          "0 2px 8px rgba(0,0,0,0.06)";
                                       }
                                     }}
-                                >
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: "700",
-                                      color: COLORS.primary,
-                                      marginBottom: "8px",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "6px",
+                                    onTouchStart={(e) => {
+                                      if (!isDisabled) {
+                                        e.currentTarget.style.transform =
+                                          "scale(0.98)";
+                                      }
+                                    }}
+                                    onTouchEnd={(e) => {
+                                      if (!isDisabled) {
+                                        e.currentTarget.style.transform =
+                                          "translateY(0) scale(1)";
+                                      }
                                     }}
                                   >
-                                    <span
+                                    <div
                                       style={{
-                                        width: "24px",
-                                        height: "24px",
-                                        borderRadius: "50%",
-                                        backgroundColor: COLORS.primary,
-                                        color: COLORS.dark,
+                                        fontSize: "12px",
+                                        fontWeight: "700",
+                                        color: COLORS.primary,
+                                        marginBottom: "8px",
                                         display: "flex",
                                         alignItems: "center",
-                                        justifyContent: "center",
-                                        fontSize: "13px",
-                                        fontWeight: "700",
+                                        gap: "6px",
                                       }}
                                     >
-                                      {idx + 1}
-                                    </span>
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "15px",
-                                      fontWeight: "600",
-                                      color: COLORS.dark,
-                                      marginBottom: "8px",
-                                      lineHeight: "1.3",
-                                    }}
-                                  >
-                                    {option.title}
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "13px",
-                                      color: COLORS.gray,
-                                      lineHeight: "1.5",
-                                    }}
-                                  >
-                                    {option.description}
-                                  </div>
-                                </button>
-                              );
+                                      <span
+                                        style={{
+                                          width: "24px",
+                                          height: "24px",
+                                          borderRadius: "50%",
+                                          backgroundColor: COLORS.primary,
+                                          color: COLORS.dark,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          fontSize: "13px",
+                                          fontWeight: "700",
+                                        }}
+                                      >
+                                        {idx + 1}
+                                      </span>
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "15px",
+                                        fontWeight: "600",
+                                        color: COLORS.dark,
+                                        marginBottom: "8px",
+                                        lineHeight: "1.3",
+                                      }}
+                                    >
+                                      {option.title}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "13px",
+                                        color: COLORS.gray,
+                                        lineHeight: "1.5",
+                                      }}
+                                    >
+                                      {option.description}
+                                    </div>
+                                  </button>
+                                );
                               })}
                             </div>
                           </div>
@@ -1035,16 +1355,19 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                           </div>
                           <div
                             style={{
-                              fontSize: "14px",
-                              color: COLORS.dark,
-                              lineHeight: "1.5",
-                              whiteSpace: "pre-wrap",
-                              wordWrap: "break-word",
                               marginBottom: "8px",
                               flex: 1,
+                              width: "100%",
+                              maxWidth: "100%",
+                              overflow: "hidden",
+                              minWidth: 0,
+                              boxSizing: "border-box",
                             }}
                           >
-                            {msg.text}
+                            <MarkdownRenderer content={msg.text} />
+                            {msg.evidences && msg.evidences.length > 0 && (
+                              <EvidencePathView evidences={msg.evidences} />
+                            )}
                           </div>
                         </>
                       )}
@@ -1161,15 +1484,10 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                     </div>
                     <div
                       style={{
-                        fontSize: "14px",
-                        color: COLORS.dark,
-                        lineHeight: "1.5",
-                        whiteSpace: "pre-wrap",
-                        wordWrap: "break-word",
                         flex: 1,
                       }}
                     >
-                      {streamingText}
+                      <MarkdownRenderer content={streamingText} />
                       <span
                         style={{
                           display: "inline-block",
@@ -1200,13 +1518,14 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
               style={{
                 position: "fixed",
                 bottom: "40px",
-                left: showHistory ? "calc(50% + 140px)" : "50%",
+                left: showHistory ? "calc(50% + 170px)" : "calc(50% + 30px)", // 사이드바 상태에 따른 중앙 조정
                 transform: "translateX(-50%)",
                 width: "100%",
                 maxWidth: "900px",
                 marginLeft: "auto",
                 marginRight: "auto",
                 zIndex: 998,
+                transition: "left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               }}
             >
               <form
@@ -1382,6 +1701,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
               justifyContent: "center",
               flex: 1,
               gap: "32px",
+              paddingLeft: showHistory ? "340px" : "60px",
+              transition: "padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
             }}
           >
             <div

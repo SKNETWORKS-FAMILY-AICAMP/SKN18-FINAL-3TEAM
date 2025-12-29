@@ -44,12 +44,19 @@ def _get_or_create_session_for_user(request, *, create=True):
     return chat_session
 
 
-def _store_message(request, role, content, chat_session=None):
+def _store_message(request, role, content, chat_session=None, evidences=None):
     """
     모든 사용자의 채팅 메시지를 세션에만 적재합니다.
+    evidences가 제공되면 함께 저장합니다.
     """
     history = request.session.get('chat_history', [])
-    history.append({'role': role, 'content': content})
+    msg_data = {'role': role, 'content': content}
+
+    # evidences가 있으면 함께 저장
+    if evidences is not None and role == 'assistant':
+        msg_data['evidences'] = evidences
+
+    history.append(msg_data)
     request.session['chat_history'] = history
     request.session.modified = True
     logger.info("[chat] store_message role=%s, history_len=%s, session_key=%s", role, len(history), request.session.session_key)
@@ -61,10 +68,21 @@ def _store_message(request, role, content, chat_session=None):
             logger.warning("[chat] cannot persist message: chat_session missing.")
             return
 
+    # DB에 저장할 때 evidences를 JSON으로 인코딩하여 content에 포함
+    db_content = content
+    if evidences is not None and role == 'assistant':
+        import json
+        # evidences를 메타데이터로 저장
+        metadata = {
+            "content": content,
+            "evidences": evidences
+        }
+        db_content = f"__EVIDENCE_METADATA__:{json.dumps(metadata, ensure_ascii=False)}"
+
     ChatMessage.objects.create(
         session=chat_session,
         role=role,
-        content=content,
+        content=db_content,
     )
     chat_session.save(update_fields=['updated_at'])
 
@@ -188,8 +206,11 @@ def _handle_question(request, chat_session=None):
         # 사용자 선택이 있으면 skip_clarification 활성화
         if user_selected_direction:
             invoke_params["user_selected_direction"] = user_selected_direction
+            if user_selected_title:
+                invoke_params["user_selected_title"] = user_selected_title
             invoke_params["skip_clarification"] = True  # 이미 선택했으므로 재질문 스킵
-            logger.info("[chat] User direction selected: %s, skip_clarification=True", user_selected_direction)
+            logger.info("[chat] User direction selected: %s (%s), skip_clarification=True", 
+                       user_selected_direction, user_selected_title or "no title")
         else:
             # 첫 호출에서는 재질문을 위해 중단할 수 있도록 설정
             invoke_params["skip_clarification"] = False
@@ -201,6 +222,10 @@ def _handle_question(request, chat_session=None):
         response_state = asyncio.run(app.ainvoke(invoke_params))
         ai_response = response_state.get("final_answer") or fallback_answer
         logger.info("[chat] AI response len=%s", len(ai_response))
+
+        # ★ Evidences 정보 추출 (경로 시각화용)
+        evidences = response_state.get("evidences", [])
+        logger.info("[chat] Evidences count=%s", len(evidences))
 
         # 재질문 데이터 추출
         needs_clarification = response_state.get("needs_clarification", False)
@@ -218,6 +243,7 @@ def _handle_question(request, chat_session=None):
                 ChatMessage.Role.ASSISTANT,
                 ai_response,
                 chat_session=chat_session,
+                evidences=evidences,  # ★ evidences 포함
             )
 
             new_summary = response_state.get("summary")
@@ -278,6 +304,7 @@ def _handle_question(request, chat_session=None):
         "error": error,
         "active_session_id": active_session.id if active_session else None,
         "answer": ai_response,
+        "evidences": evidences if 'evidences' in locals() else [],  # ★ evidences 포함 (Thinking 모드일 때만 존재)
     }
 
     # Thinking 모드에서 재질문이 있는 경우 추가 정보 전달
@@ -414,14 +441,34 @@ class ChatSessionView(APIView):
         session = ChatSession.objects.filter(id=session_id, user=request.user).first()
         if session is None:
             return Response({"error": "session not found"}, status=404)
-        messages = [
-            {
+
+        messages = []
+        for msg in ChatMessage.objects.filter(session=session).order_by("created_at"):
+            actual_content = msg.content  # DB에서 가져온 원본 content
+            evidences = None
+
+            # ★ evidences 메타데이터 복원
+            if msg.role == 'assistant' and actual_content.startswith("__EVIDENCE_METADATA__:"):
+                try:
+                    import json
+                    json_str = actual_content[len("__EVIDENCE_METADATA__:"):]
+                    metadata = json.loads(json_str)
+                    actual_content = metadata.get("content", actual_content)  # 실제 답변 텍스트
+                    evidences = metadata.get("evidences", [])
+                except Exception as e:
+                    logger.error("[chat] Failed to parse evidence metadata: %s", e)
+
+            msg_data = {
                 "role": msg.role,
-                "content": msg.content,
+                "content": actual_content,
                 "created_at": msg.created_at,
             }
-            for msg in ChatMessage.objects.filter(session=session).order_by("created_at")
-        ]
+
+            if evidences is not None:
+                msg_data["evidences"] = evidences
+
+            messages.append(msg_data)
+
         return Response(
             {
                 "session": _build_session_payload(session),
