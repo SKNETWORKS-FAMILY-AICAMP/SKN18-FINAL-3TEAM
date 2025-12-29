@@ -69,7 +69,9 @@ def run_single_query(
             "query": query,
             "query_type": query_type,
             "entities": expected_entities,
-            "executed_nodes": []
+            "executed_nodes": [],
+            "skip_clarification": True,  # 실험 모드: 대화형 입력 스킵
+            "tag": "experiment"  # 실험 모드 태그
         }
 
         # test_config가 있으면 추가
@@ -403,6 +405,7 @@ def launch_parallel_workers(
         cmd = [
             "nohup",
             sys.executable,
+            "-u",  # unbuffered 모드 (로그 즉시 출력)
             "-m", worker_module,
             "--batch-file", str(batch_file),
             "--output", str(output_file),
@@ -413,12 +416,21 @@ def launch_parallel_workers(
         if extra_args:
             cmd.extend(extra_args)
 
-        with open(log_file, "w") as log_f:
+        # 로그 파일을 append 모드로 열어서 에러도 기록
+        with open(log_file, "a") as log_f:
+            # 시작 메시지 기록
+            log_f.write(f"\n{'='*80}\n")
+            log_f.write(f"Worker 시작: {datetime.now()}\n")
+            log_f.write(f"명령어: {' '.join(cmd)}\n")
+            log_f.write(f"{'='*80}\n")
+            log_f.flush()
+            
             process = subprocess.Popen(
                 cmd,
                 stdout=log_f,
                 stderr=subprocess.STDOUT,
-                cwd=str(project_root)
+                cwd=str(project_root),
+                bufsize=0  # unbuffered
             )
 
         processes.append(process)

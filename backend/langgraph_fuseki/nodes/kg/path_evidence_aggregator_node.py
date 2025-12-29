@@ -956,12 +956,18 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
                 "relevance_score": relevance_score
             }
 
+            # Baseline vs v3.0 구분: test_config에서 확인
+            use_query_type_aware = True  # 기본값 (v3.0)
+            if test_config:
+                use_query_type_aware = test_config.get("use_query_type_aware", True)
+            
             # calculate_final_evidence_score() 사용
             final_weight = calculate_final_evidence_score(
                 evidence_metadata=evidence_metadata,
                 query_metadata=query_metadata,
                 base_weight=0.8,
-                fit_weight=0.2
+                fit_weight=0.2,
+                use_query_type_aware=use_query_type_aware
             )
 
             evidence = {

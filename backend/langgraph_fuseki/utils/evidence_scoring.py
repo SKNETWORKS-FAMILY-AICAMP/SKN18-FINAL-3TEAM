@@ -374,7 +374,8 @@ COMPONENT_IMPORTANCE_BY_QUERY_TYPE = {
 
 def calculate_evidence_score(
     evidence_metadata: Dict,
-    query_type: str = "factual"
+    query_type: str = "factual",
+    use_query_type_aware: bool = True  # True: v3.0 (쿼리 타입별), False: Baseline (전역 평균)
 ) -> float:
     """
     실험 데이터 기반 Evidence 점수 계산 (1점 만점)
@@ -431,14 +432,15 @@ def calculate_evidence_score(
     thread_type = evidence_metadata.get("thread_type")
     entity_match_type = evidence_metadata.get("entity_match_type", "none")
 
-    # ⭐ Semantic Expander: 쿼리 타입별 점수 사용
-    if query_type in NORMALIZED_SEMANTIC_BY_QUERY_TYPE:
+    # ⭐ Semantic Expander: Baseline vs v3.0 구분
+    if use_query_type_aware and query_type in NORMALIZED_SEMANTIC_BY_QUERY_TYPE:
+        # v3.0: 쿼리 타입별 점수 사용
         base_semantic_score = NORMALIZED_SEMANTIC_BY_QUERY_TYPE[query_type].get(
             expansion_method,
             0.0  # baseline (확장 없음)
         )
     else:
-        # fallback: 전역 평균
+        # Baseline: 전역 평균 점수 사용 (Quick Win 실험 당시 점수)
         base_semantic_score = NORMALIZED_PERFORMANCE["semantic_expander"].get(
             expansion_method,
             0.0
@@ -476,27 +478,29 @@ def calculate_evidence_score(
         # detail_factor를 base_semantic_score에 적용
         semantic_score = base_semantic_score * detail_factor
 
-    # ⭐ Thread Aggregator: 쿼리 타입별 점수 사용
-    if query_type in NORMALIZED_THREAD_BY_QUERY_TYPE:
+    # ⭐ Thread Aggregator: Baseline vs v3.0 구분
+    if use_query_type_aware and query_type in NORMALIZED_THREAD_BY_QUERY_TYPE:
+        # v3.0: 쿼리 타입별 점수 사용
         thread_score = NORMALIZED_THREAD_BY_QUERY_TYPE[query_type].get(
             thread_type,
             0.5  # 평균값 (정보 없을 때)
         )
     else:
-        # fallback: 전역 평균
+        # Baseline: 전역 평균 점수 사용
         thread_score = NORMALIZED_THREAD_GLOBAL.get(
             thread_type,
             0.5
         )
 
-    # ⭐ Entity Boost: 쿼리 타입별 점수 사용
-    if query_type in NORMALIZED_BOOST_BY_QUERY_TYPE:
+    # ⭐ Entity Boost: Baseline vs v3.0 구분
+    if use_query_type_aware and query_type in NORMALIZED_BOOST_BY_QUERY_TYPE:
+        # v3.0: 쿼리 타입별 점수 사용
         boost_score = NORMALIZED_BOOST_BY_QUERY_TYPE[query_type].get(
             entity_match_type,
             0.5  # 평균값 (정보 없을 때)
         )
     else:
-        # fallback: 전역 평균
+        # Baseline: 전역 평균 점수 사용
         boost_score = NORMALIZED_BOOST_GLOBAL.get(
             entity_match_type,
             1.0  # none (boost 없음, 전역에서는 1.0이 최고)
@@ -581,7 +585,8 @@ def calculate_final_evidence_score(
     evidence_metadata: Dict,
     query_metadata: Dict,
     base_weight: float = 0.8,
-    fit_weight: float = 0.2
+    fit_weight: float = 0.2,
+    use_query_type_aware: bool = True  # True: v3.0, False: Baseline
 ) -> float:
     """
     최종 Evidence 점수 (1점 만점)
@@ -631,7 +636,8 @@ def calculate_final_evidence_score(
     # 1. 기본 점수 (실험 데이터 기반)
     base_score = calculate_evidence_score(
         evidence_metadata,
-        query_type=query_metadata.get("query_type", "factual")
+        query_type=query_metadata.get("query_type", "factual"),
+        use_query_type_aware=use_query_type_aware
     )
 
     # 2. 적합도 점수 (Query-Evidence 매칭)

@@ -138,6 +138,7 @@ def build_test_config(config: Dict[str, Any]) -> Dict[str, Any]:
 
     Args:
         config: 실험 설정
+            - name: 실험 이름 (예: "baseline_quick_win", "v3_query_type_aware")
             - semantic_expander: {temporal: bool, causal_chain: bool, pgvector: bool}
             - aggregator_threads: {thread_name: bool}
             - entity_boost_mode: "normalized" | "exact" | None
@@ -145,9 +146,15 @@ def build_test_config(config: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         LangGraph test_config 형식
     """
+    # Baseline vs v3.0 구분: experiment_name으로 판단
+    experiment_name = config.get("name", "")
+    use_query_type_aware = "v3" in experiment_name.lower() or "query_type_aware" in experiment_name.lower()
+    
     return {
         "skip_clarification": True,
         "semantic_expander": config.get("semantic_expander", {}),
         "aggregator_threads": config.get("aggregator_threads", {}),
         "entity_boost_mode": config.get("entity_boost_mode"),
+        "use_query_type_aware": use_query_type_aware,  # Baseline: False, v3.0: True
+        "experiment_name": experiment_name  # 디버깅용
     }
