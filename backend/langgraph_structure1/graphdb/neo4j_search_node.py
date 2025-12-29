@@ -1,10 +1,12 @@
 import json
+import time  # ✅ 추가
 from backend.langgraph_structure1.state import GraphState
 from backend.langgraph_structure1.graphdb.create_cypher import create_cypher
 from backend.langgraph_structure1.graphdb.summary_utils import run_gain
 
 
 def neo4j_search_node(state: GraphState) -> GraphState:
+    t0 = time.perf_counter()  # ✅ 시작
     """
     질문을 기반으로 Cypher를 생성하고 Neo4j에서 검색한 결과를 state에 합쳐 반환한다.
     - run_gain은 이제 dict를 반환:
@@ -27,16 +29,19 @@ def neo4j_search_node(state: GraphState) -> GraphState:
 
     gain = run_gain(ko_question=question, cypher=cypher)
 
+    elapsed = time.perf_counter() - t0  # ✅ 종료
+    print(f"[TIMER] neo4j_search_node: {elapsed:.2f}s")
+
     candidates = gain.get("candidates", []) or []
     hop2_mean = gain.get("hop2_mean_similarity")
     hop3_mean = gain.get("hop3_mean_similarity")
     hop2_cnt = gain.get("hop2_count", 0)
     hop3_cnt = gain.get("hop3_count", 0)
 
-    print("[Neo4j 검색 결과] (preview 30 / total 표시)")
-    preview = candidates[:30]
+    print("[Neo4j 검색 결과] (preview 10 / total 표시)")
+    preview = candidates[:10]
     print(json.dumps(preview, ensure_ascii=False, indent=2))
-    if len(candidates) > 30:
+    if len(candidates) > 10:
         print(f"... (total={len(candidates)})")
 
     print(f"[Neo4j] hop2_mean_similarity={hop2_mean} (n={hop2_cnt})")

@@ -35,8 +35,8 @@ ALLOWED_LABELS = [
 # ===== 터짐 방지 상수 =====
 MAIN_LIMIT = 5
 SEED_EVENT_LIMIT = 30
-HOP2_NODE_LIMIT = 200
-HOP3_NODE_LIMIT = 300
+HOP2_NODE_LIMIT = 100
+HOP3_NODE_LIMIT = 100
 
 # ===== 키워드 추출 =====
 _KIWI = Kiwi()
