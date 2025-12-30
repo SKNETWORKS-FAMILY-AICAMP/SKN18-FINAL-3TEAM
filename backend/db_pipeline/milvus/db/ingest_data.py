@@ -1,5 +1,5 @@
 import pandas as pd
-from embedding import get_embedding_model
+from backend.db_pipeline.common.embedding_model import get_embedding
 
 # 본문 청크 설정
 CHUNK = 5000        # 한 청크 길이
@@ -40,7 +40,7 @@ def insert_data(collection, csv_path="data/encykorea_cleaned.csv"):
             rows.append((cat, title, summary, trimmed, embed_text))
 
     # 임베딩 모델 (싱글톤)
-    embedding_model = get_embedding_model()
+    embedding_model = get_embedding()
 
     inserted = 0
     # 배치 단위 insert로 gRPC 메시지 크기 제한 회피

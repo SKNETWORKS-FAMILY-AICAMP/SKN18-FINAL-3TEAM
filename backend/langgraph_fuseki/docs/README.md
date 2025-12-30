@@ -437,16 +437,16 @@ graph TB
 
 ### 단계별 요약
 
-| 단계          | 이름                         | 노드 타입 | 병렬 처리   | LLM         | 사용자 입력 | SPARQL | 주요 작업                                                                  |
-| ------------- | ---------------------------- | --------- | ----------- | ----------- | ----------- | ------ | -------------------------------------------------------------------------- |
-| **Stage 0**   | History Check                | 노드      | ❌          | ✅ 1회      | ❌          | ❌     | 조선시대 역사 질문 필터링 (비역사 질문 조기 종료)                          |
-| **Stage 1**   | Query Classifier             | 노드      | ❌          | ✅ 2회      | ❌          | ❌     | 질문 분류 + 키워드 추출 + 확장 방향 생성                                   |
-| **Stage 1.5** | User Intent Clarification    | 노드      | ❌          | ❌          | ✅ 필요시   | ❌     | 사용자 선택 대기                                                           |
-| **Stage 2**   | Entity Expander              | 노드      | ❌          | ✅ 1회      | ❌          | ✅ N회 | 키워드 확장 + TTL 매칭 + pgvector 검색 + SPARQL 스코어링 → 상위 30개 선택 |
-| **Stage 3**   | Semantic Expander            | 노드      | ❌          | ❌          | ❌          | ✅ 3회 | 시간적/인과/벡터 기반 엔티티 확장 (30개 → ~75개)                           |
-| **Stage 4**   | Parallel Knowledge Retrieval | 노드      | ✅ 5 Thread | ❌          | ❌          | ✅ 5회 | 5개 관점 병렬 검색 + 양방향 BFS (최대 3-hop) + 프로퍼티 FILTER             |
-| **Stage 5**   | Path Evidence Aggregator     | 노드      | ❌          | ❌          | ❌          | ❌     | 경로 추출 + 근거 통합 + 수렴 노드 감지 (1.1배 부스트) → 상위 15개 선택     |
-| **Stage 6**   | Story Generator              | 노드      | ❌          | ✅ 1회      | ❌          | ❌     | 선택된 방향을 반영하여 최종 스토리 생성 (-입니다 체)                       |
+| 단계          | 이름                         | 노드 타입 | 병렬 처리   | LLM    | 사용자 입력 | SPARQL | 주요 작업                                                                 |
+| ------------- | ---------------------------- | --------- | ----------- | ------ | ----------- | ------ | ------------------------------------------------------------------------- |
+| **Stage 0**   | History Check                | 노드      | ❌          | ✅ 1회 | ❌          | ❌     | 조선시대 역사 질문 필터링 (비역사 질문 조기 종료)                         |
+| **Stage 1**   | Query Classifier             | 노드      | ❌          | ✅ 2회 | ❌          | ❌     | 질문 분류 + 키워드 추출 + 확장 방향 생성                                  |
+| **Stage 1.5** | User Intent Clarification    | 노드      | ❌          | ❌     | ✅ 필요시   | ❌     | 사용자 선택 대기                                                          |
+| **Stage 2**   | Entity Expander              | 노드      | ❌          | ✅ 1회 | ❌          | ✅ N회 | 키워드 확장 + TTL 매칭 + pgvector 검색 + SPARQL 스코어링 → 상위 30개 선택 |
+| **Stage 3**   | Semantic Expander            | 노드      | ❌          | ❌     | ❌          | ✅ 3회 | 시간적/인과/벡터 기반 엔티티 확장 (30개 → ~75개)                          |
+| **Stage 4**   | Parallel Knowledge Retrieval | 노드      | ✅ 5 Thread | ❌     | ❌          | ✅ 5회 | 5개 관점 병렬 검색 + 양방향 BFS (최대 3-hop) + 프로퍼티 FILTER            |
+| **Stage 5**   | Path Evidence Aggregator     | 노드      | ❌          | ❌     | ❌          | ❌     | 경로 추출 + 근거 통합 + 수렴 노드 감지 (1.1배 부스트) → 상위 15개 선택    |
+| **Stage 6**   | Story Generator              | 노드      | ❌          | ✅ 1회 | ❌          | ❌     | 선택된 방향을 반영하여 최종 스토리 생성 (-입니다 체)                      |
 
 **병렬 처리 요약**:
 
@@ -491,23 +491,23 @@ LLM 호출 1회만 사용 (비용 절감)
 ```python
 def query_classifier_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
-    
+
     # 1. 규칙 기반 분류
     query_type = classify_query_type_by_rules(query)
-    
+
     # 2. 키워드 추출 (kiwipiepy)
     basic_keywords = extract_keywords_with_kiwi(query)
-    
+
     # 3. LLM 확장 방향 생성
     expansion_directions = generate_llm_based_directions(
         query, basic_keywords, query_type
     )
-    
+
     # 4. 재질문 텍스트 생성
     clarification_question = generate_clarification_question(
         strategy="mixed", directions=expansion_directions, query=query
     )
-    
+
     return {
         **state,
         "query_type": query_type,
@@ -521,6 +521,7 @@ def query_classifier_node(state: GraphState) -> GraphState:
 **처리 시간**: ~2-3초 (LLM 호출 2회)
 
 **효과**:
+
 - ✅ 단순화된 구조: 복잡한 병렬 처리 제거
 - ✅ 명확한 책임: 한 노드에서 모든 분류 작업 완료
 - ✅ 유지보수성: 코드 이해 및 디버깅 용이
@@ -665,6 +666,7 @@ for keyword, instances in expanded_keywords_dict.items():
 ```
 
 **예시**:
+
 ```
 질문: "궁궐을 건축한 왕들은?"
 사용자 선택: "건설 중심 답변"
@@ -690,7 +692,7 @@ for keyword in expanded_keywords:
             "uri": uri, "name": keyword, "type": entity_type,
             "match_method": "exact", "relevance_score": 1.0
         })
-    
+
     # 부분 매칭 (최대 3개)
     for label, uri in ttl_data["label_to_uri"].items():
         if keyword in label:
@@ -715,6 +717,7 @@ if len(matched_entities) < 20 and USE_PGVECTOR:
 #### 2-4. SPARQL 기반 엔티티 스코어링
 
 **점수 구성**:
+
 1. 기본 점수: 정확 매칭 1.0, 부분 매칭 0.7, pgvector 0.0~1.0
 2. 엔티티 이름 매칭: 키워드가 엔티티 이름에 포함되면 +0.5/keyword
 3. 연결 노드 매칭: 연결된 노드의 label에 키워드 포함 시 +0.1/connection (최대 +0.3)
@@ -728,6 +731,7 @@ top_entities = matched_entities[:30]
 ```
 
 **효과**:
+
 - ✅ 통합 처리: 키워드 확장과 엔티티 추출을 한 노드에서 처리
 - ✅ 방향 반영: 사용자 선택 방향에 맞는 키워드 확장
 - ✅ 성능 최적화: TTL 캐싱으로 연속 질문 시 속도 향상

@@ -309,6 +309,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
     try {
       const token = localStorage.getItem("access_token");
       if (!token) {
+        simulateStreamingResponse("로그인 후에 질문할 수 있어요.");
+        setIsSubmitting(false);
         localStorage.clear();
         // 프론트엔드 URL로 리다이렉트
         const frontendUrl =

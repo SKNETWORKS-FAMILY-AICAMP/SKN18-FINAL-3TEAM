@@ -5,6 +5,7 @@ from backend.langgraph_structure1.nodes.generate_node import generate_node
 from backend.langgraph_structure1.nodes.tone_adjust_node import tone_adjust_node, route_tone_adjust_node
 from backend.langgraph_structure1.nodes.scene_split_node import scene_split_node
 from backend.langgraph_structure1.rag.hybrid_node import hybrid_node
+from backend.langgraph_structure1.nodes.extract_video_tag import extract_video_tag
 
 # [병합 완료] 두 노드 모두 임포트
 from backend.langgraph_structure1.nodes.background_gen_node import background_gen_node
@@ -20,6 +21,7 @@ def create_graph_flow():
     workflow.add_node("tone_adjust_node", tone_adjust_node)
     workflow.add_node("scene_split_node", scene_split_node)
     workflow.add_node("hybrid_node", hybrid_node)
+    workflow.add_node("extract_video_tag", extract_video_tag)
     
     # 신규 노드들 등록
     workflow.add_node("reaction_node", reaction_node)           # 리액션용
@@ -58,7 +60,8 @@ def create_graph_flow():
     )
 
     # [복구 완료] 장면 분리 -> 배경 생성 -> 종료
-    workflow.add_edge("scene_split_node", "background_gen_node")
+    workflow.add_edge("scene_split_node", "extract_video_tag")
+    workflow.add_edge("extract_video_tag", "background_gen_node")
     workflow.add_edge("background_gen_node", END)
 
     # 그래프 compile
