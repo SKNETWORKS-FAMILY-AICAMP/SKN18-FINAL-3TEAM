@@ -71,8 +71,8 @@ MATERIALS_SAMPLE_N = 80
 PERSONA_ORDER = ["foreigner_culture_history", "kids_child"]
 QTYPE_ORDER = ["SIMPLE", "CONNECTIVE"]
 
-MODEL_GENERATE = "gpt-4.1-mini"
-MODEL_TRANSLATE = "gpt-4.1-mini"
+MODEL_GENERATE = "gpt-5-mini"
+MODEL_TRANSLATE = "gpt-5-mini"
 
 # =====================
 # PERSONAS

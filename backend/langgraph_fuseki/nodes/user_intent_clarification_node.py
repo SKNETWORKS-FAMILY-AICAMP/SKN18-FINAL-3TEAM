@@ -85,18 +85,25 @@ def user_intent_clarification_node(state: GraphState) -> GraphState:
     skip_clarification = state.get("skip_clarification", False)
 
     if skip_clarification:
-        # 사용자가 이미 선택함
+        # 사용자가 이미 선택함 (체크포인트 복원)
         selected_direction = get_selected_direction(state, expansion_directions)
+        basic_keywords = state.get("basic_keywords", [])
+        
         print(f"  사용자 선택: {selected_direction.get('title', 'N/A') if selected_direction else 'None'}")
+        print(f"  ★ 복원된 basic_keywords: {basic_keywords}")
+        print(f"  ★ 복원된 expansion_directions: {len(expansion_directions)}개")
         
         node_end = time.time()
         execution_time = node_end - node_start
         node_times = state.get("node_execution_times", {})
         node_times["user_intent_clarification"] = execution_time
 
+        # ★ 중요: 세션에서 복원된 데이터를 명시적으로 state에 전달
         return {
             **state,
             "needs_clarification": False,
+            "basic_keywords": basic_keywords,  # ★ 명시적 전달
+            "expansion_directions": expansion_directions,  # ★ 명시적 전달
             "executed_nodes": state.get("executed_nodes", []) + ["user_intent_clarification"],
             "node_execution_times": node_times
         }

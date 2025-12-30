@@ -390,12 +390,17 @@ def calculate_evidence_score(
     - temporal: year_distance에 따라 감쇠 (0년: 1.0, 10년: 0.5, 20년+: 0.0)
     - pgvector: similarity에 따라 점수 (유사도 × 가중치)
 
+    ⭐ Predicate 중요도 반영:
+    - Thread 점수에 predicate 중요도 곱하기 (1.05 ~ 1.10)
+    - 예: factual에서 중요한 predicate → 0.6 × (1.1 × 0.8264) + ...
+
     Args:
         evidence_metadata: Evidence 메타데이터
             {
                 "expansion_method": "causal_chain" | "temporal" | "pgvector" | "none",
                 "thread_type": "type_and_summary" | "entity_properties" | ...,
                 "entity_match_type": "exact" | "partial" | "normalized" | "none",
+                "predicate": "participatesIn" | "leadsTo" | "causes" | ... (선택),
                 "hop_count": int (causal_chain용, 선택),
                 "year_distance": int (temporal용, 선택),
                 "pgvector_similarity": float (pgvector용, 선택),
@@ -406,15 +411,16 @@ def calculate_evidence_score(
     Returns:
         0.0 ~ 1.0 범위의 점수
 
-    Example - factual 쿼리 + causal_chain (1-hop):
+    Example - factual 쿼리 + 중요한 predicate:
         >>> metadata = {
         ...     "expansion_method": "causal_chain",
-        ...     "hop_count": 1,  # 1-hop: 최고 점수
+        ...     "hop_count": 1,
         ...     "thread_type": "type_and_summary",
-        ...     "entity_match_type": "normalized"
+        ...     "entity_match_type": "normalized",
+        ...     "predicate": "participatesIn"  # 중요한 predicate
         ... }
         >>> calculate_evidence_score(metadata, query_type="factual")
-        0.849  # 1.0×0.10 + 1.0×0.60 + 0.83×0.30 = 0.849
+        0.859  # 1.0×0.10 + (1.1×0.8264)×0.60 + 0.83×0.30 = 0.859
 
     Example - causal 쿼리 + causal_chain (3-hop, 감쇠 적용):
         >>> metadata = {
@@ -431,6 +437,7 @@ def calculate_evidence_score(
     expansion_method = evidence_metadata.get("expansion_method", "none")
     thread_type = evidence_metadata.get("thread_type")
     entity_match_type = evidence_metadata.get("entity_match_type", "none")
+    predicate = evidence_metadata.get("predicate", "")  # ⭐ predicate 정보 추가
 
     # ⭐ Semantic Expander: Baseline vs v3.0 구분
     if use_query_type_aware and query_type in NORMALIZED_SEMANTIC_BY_QUERY_TYPE:
@@ -481,16 +488,42 @@ def calculate_evidence_score(
     # ⭐ Thread Aggregator: Baseline vs v3.0 구분
     if use_query_type_aware and query_type in NORMALIZED_THREAD_BY_QUERY_TYPE:
         # v3.0: 쿼리 타입별 점수 사용
-        thread_score = NORMALIZED_THREAD_BY_QUERY_TYPE[query_type].get(
+        base_thread_score = NORMALIZED_THREAD_BY_QUERY_TYPE[query_type].get(
             thread_type,
             0.5  # 평균값 (정보 없을 때)
         )
     else:
         # Baseline: 전역 평균 점수 사용
-        thread_score = NORMALIZED_THREAD_GLOBAL.get(
+        base_thread_score = NORMALIZED_THREAD_GLOBAL.get(
             thread_type,
             0.5
         )
+
+    # ⭐ Predicate 중요도를 Thread 점수에 곱하기 (1.05 ~ 1.10)
+    predicate_boost = 1.0  # 기본값
+    if predicate:
+        # 중요한 predicate 목록 (1.05 ~ 1.10 범위)
+        important_predicates = {
+            # 매우 중요한 predicate (1.10)
+            "participatesIn": 1.10,
+            "leadsTo": 1.10,
+            "causes": 1.10,
+            
+            # 중요한 predicate (1.08)
+            "built": 1.08,
+            "builtBy": 1.08,
+            "founded": 1.08,
+            
+            # 보통 중요한 predicate (1.05)
+            "governs": 1.05,
+            "rules": 1.05,
+            "hasRole": 1.05,
+            "belongsTo": 1.05,
+        }
+        predicate_boost = important_predicates.get(predicate, 1.0)
+    
+    # Thread 점수에 predicate 중요도 적용
+    thread_score = base_thread_score * predicate_boost
 
     # ⭐ Entity Boost: Baseline vs v3.0 구분
     if use_query_type_aware and query_type in NORMALIZED_BOOST_BY_QUERY_TYPE:
@@ -512,10 +545,10 @@ def calculate_evidence_score(
         COMPONENT_IMPORTANCE_BY_QUERY_TYPE["factual"]  # 기본값
     )
 
-    # 3. 가중 평균 계산
+    # 3. 가중 평균 계산 (predicate 중요도가 thread_score에 이미 반영됨)
     final_score = (
         semantic_score * importance["semantic"] +
-        thread_score * importance["thread"] +
+        thread_score * importance["thread"] +  # ⭐ predicate_boost가 이미 적용됨
         boost_score * importance["boost"]
     )
 

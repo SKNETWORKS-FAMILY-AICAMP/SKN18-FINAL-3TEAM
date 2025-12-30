@@ -3,12 +3,78 @@
 
 쿼리 타입에 따라 기본 전략을 선택하고,
 LLM이 질문을 분석하여 동적으로 적절한 방향 설명을 생성합니다.
+property_groups.json에서 사용 가능한 그룹만 선택하도록 제약합니다.
 """
 
 from typing import Dict, List, Any
 import os
 import json
 from langchain_openai import ChatOpenAI
+
+from backend.langgraph_fuseki.config import PROPERTY_GROUPS_PATH
+
+
+# ========== Property Groups 로드 ==========
+
+# 캐싱용 변수
+_AVAILABLE_PROPERTY_GROUPS = None
+
+
+def load_available_property_groups() -> List[str]:
+    """property_groups.json에서 사용 가능한 그룹 목록 로드 (캐싱)"""
+    global _AVAILABLE_PROPERTY_GROUPS
+    
+    if _AVAILABLE_PROPERTY_GROUPS is not None:
+        return _AVAILABLE_PROPERTY_GROUPS
+    
+    try:
+        if PROPERTY_GROUPS_PATH.exists():
+            with open(PROPERTY_GROUPS_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                _AVAILABLE_PROPERTY_GROUPS = list(data.get("groups", {}).keys())
+                print(f"[intent_clarification] 사용 가능한 프로퍼티 그룹: {len(_AVAILABLE_PROPERTY_GROUPS)}개")
+        else:
+            print(f"[intent_clarification] property_groups.json 없음, 기본 그룹 사용")
+            _AVAILABLE_PROPERTY_GROUPS = [
+                "속성", "문서", "연결관계", "연도", "소속", "인과관계", "장소",
+                "참여", "부분", "포함", "직위", "기간중", "시기", "재위",
+                "법률", "시행", "지휘", "변경", "역할", "조사", "위치",
+                "세금", "협력", "저술", "시대", "반대", "설립", "날짜",
+                "복원", "승진", "외교", "교육"
+            ]
+    except Exception as e:
+        print(f"[intent_clarification] property_groups.json 로드 실패: {e}")
+        _AVAILABLE_PROPERTY_GROUPS = ["속성", "인과관계", "참여", "변경"]
+    
+    return _AVAILABLE_PROPERTY_GROUPS
+
+
+def validate_property_groups(directions: List[Dict], available_groups: List[str]) -> List[Dict]:
+    """
+    LLM이 생성한 property_groups를 검증하고 유효한 것만 유지
+    
+    Args:
+        directions: LLM이 생성한 방향 리스트
+        available_groups: 사용 가능한 그룹 목록
+    
+    Returns:
+        검증된 방향 리스트
+    """
+    for direction in directions:
+        original_groups = direction.get("property_groups", [])
+        valid_groups = [g for g in original_groups if g in available_groups]
+        
+        if not valid_groups:
+            # 유효한 그룹이 없으면 기본값 사용
+            valid_groups = ["속성", "인과관계"]
+            print(f"[intent_clarification] 유효하지 않은 그룹 '{original_groups}' → 기본값 사용")
+        elif len(valid_groups) < len(original_groups):
+            removed = set(original_groups) - set(valid_groups)
+            print(f"[intent_clarification] 유효하지 않은 그룹 제거: {removed}")
+        
+        direction["property_groups"] = valid_groups
+    
+    return directions
 
 
 # ========== LLM 기반 방향 생성 ==========
@@ -19,7 +85,8 @@ def generate_llm_based_directions(
     query_type: str = None
 ) -> List[Dict[str, Any]]:
     """
-    LLM을 사용하여 질문에 최적화된 확장 방향을 자유롭게 생성
+    LLM을 사용하여 질문에 최적화된 확장 방향을 생성
+    property_groups.json에서 사용 가능한 그룹만 선택하도록 제약
 
     Args:
         query: 사용자 질문
@@ -27,15 +94,19 @@ def generate_llm_based_directions(
         query_type: 질문 유형 (참고용, 필수 아님)
 
     Returns:
-        방향 리스트 (2-4개, 다양한 전략 조합 가능)
+        방향 리스트 (2-4개, 검증된 property_groups 포함)
     """
     llm = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL"),
         temperature=0.3
     )
+    
+    # 사용 가능한 프로퍼티 그룹 로드
+    available_groups = load_available_property_groups()
+    groups_list = ', '.join(available_groups)
 
-    # 전략 설명
-    strategy_descriptions = """
+    # 전략 설명 (사용 가능한 그룹 포함)
+    strategy_descriptions = f"""
 **사용 가능한 분석 차원:**
 1. **시간축**: 원인(이전), 직후 결과, 장기 영향
 2. **클래스**: 인물 중심, 사건 중심, 제도 중심
@@ -45,6 +116,9 @@ def generate_llm_based_directions(
 **중요**: 질문에 가장 적합한 2-4가지 방향을 **자유롭게 조합**하세요.
 - 같은 차원에서만 선택할 필요 없음
 - 예: "시간축(원인)" + "클래스(인물)" + "범위(국제)" 조합 가능
+
+**사용 가능한 프로퍼티 그룹 (반드시 이 목록에서만 선택!):**
+{groups_list}
 """
 
     prompt = f"""다음 질문을 분석하여, 사용자가 선택할 수 있는 2-4가지 답변 방향을 제시하세요.
@@ -112,6 +186,13 @@ def generate_llm_based_directions(
                 "property_groups": d.get("property_groups", []),
                 "example_keywords": []
             })
+
+        # property_groups 검증 (유효한 그룹만 유지)
+        directions = validate_property_groups(directions, available_groups)
+        
+        print(f"[intent_clarification] LLM 방향 생성 완료: {len(directions)}개")
+        for d in directions:
+            print(f"  - {d['title']}: {d['property_groups']}")
 
         return directions
 

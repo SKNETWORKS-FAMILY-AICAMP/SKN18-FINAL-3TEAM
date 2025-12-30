@@ -27,161 +27,82 @@ from backend.langgraph_fuseki.utils.evidence_scoring import calculate_final_evid
 from langchain_openai import ChatOpenAI
 
 
-def calculate_improved_relevance_score(path_data: dict, query_entities: list = None, thread_type: str = "", entity_boost_mode: str = None, selected_properties: list = None) -> float:
+def detect_entity_match_type(path_data: dict, query_entities: list, thread_type: str) -> str:
     """
-    개선된 경로의 relevance score 계산
-
-    개선 사항:
-    1. 쿼리 엔티티와의 직접 연결성 강화
-    2. Thread 타입별 가중치 조정
-    3. Predicate 중요도 차별화 (기본 중요도 + selected_properties 매칭 부스트)
-
+    Entity 매칭 타입만 감지 (부스트 없음)
+    
+    ⭐ 핵심 변경: 부스트 제거, 매칭 타입만 반환
+    - evidence_scoring.py에서 entity_match_type으로 점수 계산에 사용
+    
     Args:
         path_data: 경로 데이터 (binding 정보)
         query_entities: 쿼리에서 추출된 엔티티 리스트
-        thread_type: Thread 타입 (outgoing_relations, incoming_relations 등)
-        entity_boost_mode: 엔티티 부스트 모드 ("exact_match", "partial_match", "normalized_match", "penalty_match", None)
-        selected_properties: Stage 1-B에서 선택된 프로퍼티 목록 (예: ["built", "builtBy", "founded"])
+        thread_type: Thread 타입
 
     Returns:
-        relevance score (테스트 모드에서 조건 안 맞으면 0.0 반환하여 필터링)
+        "exact" | "partial" | "normalized" | "none"
     """
-    score = 1.0
-    
-    # 0. Predicate 중요도 점수 (기본 중요도 + selected_properties 매칭 부스트)
-    predicate_score = 1.0
-    predicate = path_data.get("predicate", {}).get("value", "")
-    if predicate:
-        predicate_name = predicate.split("#")[-1] if "#" in predicate else predicate
-        
-        # 기본 predicate 중요도 (일부 중요한 predicate에 기본 부스트)
-        # 예: "participatesIn", "leadsTo", "causes" 등은 기본적으로 중요
-        important_predicates = {
-            "participatesIn": 1.2,
-            "leadsTo": 1.2,
-            "causes": 1.2,
-            "built": 1.15,
-            "builtBy": 1.15,
-            "founded": 1.15,
-            "governs": 1.1,
-            "rules": 1.1,
-        }
-        predicate_score = important_predicates.get(predicate_name, 1.0)
-        
-        # selected_properties 매칭 시 추가 부스트
-        if selected_properties and predicate_name in selected_properties:
-            predicate_score *= 1.3  # selected_properties 매칭 시 30% 추가 부스트
-    
-    score *= predicate_score
+    if not query_entities:
+        return "none"
 
-    # 1. 쿼리 엔티티와의 직접 연결 여부 (강화 - 차별화를 위해)
-    query_entity_match_boost = 1.0  # 기본값 (매칭 없음)
-    match_type = None  # "exact", "partial", "normalized", None
-    if query_entities:
-        subject = path_data.get("subject", {}).get("value", "")
-        obj = path_data.get("object", {}).get("value", "")
-        entity_label = path_data.get("entityLabel", {}).get("value", "")
-        subject_label = path_data.get("subjectLabel", {}).get("value", "")
-        object_label = path_data.get("objectLabel", {}).get("value", "")
+    subject = path_data.get("subject", {}).get("value", "")
+    obj = path_data.get("object", {}).get("value", "")
+    entity_label = path_data.get("entityLabel", {}).get("value", "")
+    subject_label = path_data.get("subjectLabel", {}).get("value", "")
+    object_label = path_data.get("objectLabel", {}).get("value", "")
 
-        # 모든 가능한 엔티티 이름 수집 (정규화)
-        # Thread 타입에 따라 우선순위 다르게 처리
-        all_entity_names = []
-        all_entity_names_normalized = []
+    def normalize_name(name):
+        if not name:
+            return ""
+        return name.replace(" ", "").replace("_", "").lower()
 
-        def normalize_name(name):
-            """이름 정규화 (공백 제거, 소문자 변환)"""
-            if not name:
-                return ""
-            return name.replace(" ", "").replace("_", "").lower()
+    # Thread별 매칭 대상 선택
+    if thread_type == "incoming_relations":
+        priority_sources = [entity_label, subject_label]
+    elif thread_type == "outgoing_relations":
+        priority_sources = [entity_label, object_label]
+    else:
+        priority_sources = [entity_label, subject_label, object_label]
 
-        # Thread별 매칭 대상 선택
-        if thread_type == "incoming_relations":
-            # incoming: entityLabel(목적지)를 우선 체크
-            priority_sources = [entity_label, subject_label]
-        elif thread_type == "outgoing_relations":
-            # outgoing: entityLabel(출발지)를 우선 체크
-            priority_sources = [entity_label, object_label]
-        else:
-            # 나머지: 모든 라벨 체크
-            priority_sources = [entity_label, subject_label, object_label]
+    all_entity_names = []
+    all_entity_names_normalized = []
 
-        for name_source in priority_sources:
-            if name_source:
-                raw_name = name_source.split("#")[-1] if "#" in name_source else name_source
+    for name_source in priority_sources:
+        if name_source:
+            raw_name = name_source.split("#")[-1] if "#" in name_source else name_source
+            all_entity_names.append(raw_name)
+            all_entity_names_normalized.append(normalize_name(raw_name))
+
+    # URI도 추가
+    for uri_source in [subject, obj]:
+        if uri_source:
+            raw_name = uri_source.split("#")[-1] if "#" in uri_source else uri_source
+            if raw_name not in all_entity_names:
                 all_entity_names.append(raw_name)
                 all_entity_names_normalized.append(normalize_name(raw_name))
 
-        # URI도 추가 (subject, obj)
-        for uri_source in [subject, obj]:
-            if uri_source:
-                raw_name = uri_source.split("#")[-1] if "#" in uri_source else uri_source
-                if raw_name not in all_entity_names:
-                    all_entity_names.append(raw_name)
-                    all_entity_names_normalized.append(normalize_name(raw_name))
+    # 매칭 타입 감지 (우선순위: exact > partial > normalized)
+    for entity in query_entities:
+        entity_name = entity.get("name", "") or entity.get("label", "")
+        if not entity_name:
+            continue
 
-        # 쿼리 엔티티와 직접 매칭 확인 (더 정확하게)
-        for entity in query_entities:
-            entity_name = entity.get("name", "") or entity.get("label", "")
-            if not entity_name:
-                continue
-            
-            entity_name_normalized = normalize_name(entity_name)
-            
-            # 정확한 매칭 (매우 높은 부스트) - 차별화 강화
-            if entity_name in all_entity_names or entity_name_normalized in all_entity_names_normalized:
-                query_entity_match_boost = QUERY_ENTITY_MATCH_BOOST_EXACT
-                match_type = "exact"
-                break
-            # 부분 매칭 (중간 부스트)
-            elif any(entity_name in name or name in entity_name for name in all_entity_names if name):
-                query_entity_match_boost = QUERY_ENTITY_MATCH_BOOST_PARTIAL
-                match_type = "partial"
-                break
-            # 정규화된 부분 매칭
-            elif any(entity_name_normalized in norm_name or norm_name in entity_name_normalized
-                    for norm_name in all_entity_names_normalized if norm_name):
-                query_entity_match_boost = QUERY_ENTITY_MATCH_BOOST_NORMALIZED
-                match_type = "normalized"
-                break
+        entity_name_normalized = normalize_name(entity_name)
 
-    # 테스트 모드: entity_boost_mode에 따라 필터링
-    if entity_boost_mode:
-        if entity_boost_mode == "exact_match":
-            if match_type != "exact":
-                return 0.0  # 정확 매칭이 아니면 필터링
-        elif entity_boost_mode == "partial_match":
-            if match_type != "partial":
-                return 0.0  # 부분 매칭이 아니면 필터링
-        elif entity_boost_mode == "normalized_match":
-            if match_type != "normalized":
-                return 0.0  # 정규화 매칭이 아니면 필터링
-        elif entity_boost_mode == "penalty_match":
-            if match_type is not None:
-                return 0.0  # 매칭되면 필터링 (매칭 안 된 것만)
+        # Exact match
+        if entity_name in all_entity_names or entity_name_normalized in all_entity_names_normalized:
+            return "exact"
 
-    score *= query_entity_match_boost
+        # Partial match
+        if any(entity_name in name or name in entity_name for name in all_entity_names if name):
+            return "partial"
 
-    # 2. Thread 타입별 추가 가중치 (환경변수로 설정 가능)
-    if thread_type == "outgoing_relations":
-        score *= THREAD_WEIGHT_OUTGOING_RELATIONS
-    elif thread_type == "incoming_relations":
-        score *= THREAD_WEIGHT_INCOMING_RELATIONS
-    elif thread_type == "entity_properties":
-        score *= THREAD_WEIGHT_ENTITY_PROPERTIES
-    elif thread_type == "type_and_summary":
-        score *= THREAD_WEIGHT_TYPE_AND_SUMMARY
-    elif thread_type == "connected_entities":
-        score *= THREAD_WEIGHT_CONNECTED_ENTITIES
+        # Normalized match
+        if any(entity_name_normalized in norm_name or norm_name in entity_name_normalized
+               for norm_name in all_entity_names_normalized if norm_name):
+            return "normalized"
 
-    # 3. 관계 중요도에 따른 추가 차별화
-    # 쿼리 엔티티와 매칭되지 않은 경우 페널티 적용 (환경변수로 설정 가능)
-    # 테스트 모드가 아닐 때만 적용
-    if not entity_boost_mode and query_entity_match_boost == 1.0 and query_entities:
-        # 매칭되지 않은 경로는 페널티
-        score *= THREAD_TYPE_PENALTY_NO_MATCH
-
-    return score
+    return "none"
 
 
 def detect_convergence_nodes(inference_paths: dict, query_entities: list) -> list:
@@ -386,88 +307,6 @@ def extract_label_from_uri(uri: str) -> str:
         return uri.split("/")[-1]
     return uri
 
-
-def _detect_entity_match_type(raw_data: dict, query_entities: list, thread_type: str) -> str:
-    """
-    Entity 매칭 타입 감지 (v2.0 scoring system용)
-
-    Args:
-        raw_data: Path data (SPARQL binding)
-        query_entities: 쿼리에서 추출된 엔티티 리스트
-        thread_type: Thread 타입
-
-    Returns:
-        "exact" | "partial" | "normalized" | "none"
-
-    Example:
-        >>> raw_data = {"entityLabel": {"value": "세조"}, ...}
-        >>> query_entities = [{"name": "세조"}]
-        >>> _detect_entity_match_type(raw_data, query_entities, "type_and_summary")
-        "exact"
-    """
-    if not query_entities:
-        return "none"
-
-    # calculate_improved_relevance_score()의 매칭 로직 재사용
-    subject = raw_data.get("subject", {}).get("value", "")
-    obj = raw_data.get("object", {}).get("value", "")
-    entity_label = raw_data.get("entityLabel", {}).get("value", "")
-    subject_label = raw_data.get("subjectLabel", {}).get("value", "")
-    object_label = raw_data.get("objectLabel", {}).get("value", "")
-
-    def normalize_name(name):
-        """이름 정규화 (공백 제거, 소문자 변환)"""
-        if not name:
-            return ""
-        return name.replace(" ", "").replace("_", "").lower()
-
-    # Thread별 매칭 대상 선택 (calculate_improved_relevance_score와 동일)
-    if thread_type == "incoming_relations":
-        priority_sources = [entity_label, subject_label]
-    elif thread_type == "outgoing_relations":
-        priority_sources = [entity_label, object_label]
-    else:
-        priority_sources = [entity_label, subject_label, object_label]
-
-    all_entity_names = []
-    all_entity_names_normalized = []
-
-    for name_source in priority_sources:
-        if name_source:
-            raw_name = name_source.split("#")[-1] if "#" in name_source else name_source
-            all_entity_names.append(raw_name)
-            all_entity_names_normalized.append(normalize_name(raw_name))
-
-    # URI도 추가
-    for uri_source in [subject, obj]:
-        if uri_source:
-            raw_name = uri_source.split("#")[-1] if "#" in uri_source else uri_source
-            if raw_name not in all_entity_names:
-                all_entity_names.append(raw_name)
-                all_entity_names_normalized.append(normalize_name(raw_name))
-
-    # 매칭 확인 (우선순위: exact > partial > normalized)
-    for entity in query_entities:
-        entity_name = entity.get("name", "") or entity.get("label", "")
-        if not entity_name:
-            continue
-
-        entity_name_normalized = normalize_name(entity_name)
-
-        # Exact match
-        if entity_name in all_entity_names or entity_name_normalized in all_entity_names_normalized:
-            return "exact"
-
-        # Partial match
-        if any(entity_name in name or name in entity_name for name in all_entity_names if name):
-            return "partial"
-
-        # Normalized match
-        if any(entity_name_normalized in norm_name or norm_name in entity_name_normalized
-               for norm_name in all_entity_names_normalized if norm_name):
-            return "normalized"
-
-    return "none"
 
 
 def extract_outgoing_relations(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None, selected_properties: list = None) -> list:
@@ -1096,7 +935,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
 
             # Evidence metadata 추출 (v2.0 scoring system)
             expansion_method = raw_data.get("expansion_method", "none")
-            entity_match_type = _detect_entity_match_type(raw_data, query_entities, thread_type)
+            entity_match_type = detect_entity_match_type(raw_data, query_entities, thread_type)
 
             # ⭐ 확장 방법 내 세부 정보 추출 (hop_count, year_distance, similarity)
             # 1. raw_data에서 직접 추출 시도
@@ -1145,10 +984,28 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
                         break  # 첫 번째 매칭에서 중단
 
             # ⭐ 새로운 점수 계산 (v2.0 scoring system + 세부 점수 반영)
+            # Predicate 정보 추출
+            predicate_raw = raw_data.get("predicate", {})
+            if isinstance(predicate_raw, dict):
+                predicate_full = predicate_raw.get("value", "")
+            else:
+                predicate_full = predicate_raw or ""
+            
+            # predicate 이름만 추출 (URI에서 마지막 부분)
+            predicate_name = ""
+            if predicate_full:
+                if "#" in predicate_full:
+                    predicate_name = predicate_full.split("#")[-1]
+                elif "/" in predicate_full:
+                    predicate_name = predicate_full.split("/")[-1]
+                else:
+                    predicate_name = predicate_full
+
             evidence_metadata = {
                 "expansion_method": expansion_method,
                 "thread_type": thread_type,
                 "entity_match_type": entity_match_type,
+                "predicate": predicate_name,  # ⭐ predicate 정보 추가
                 "connected_keyword_count": 0,  # TODO: SPARQL 분석 결과 추가 가능
                 # 확장 방법 내 세부 정보
                 "hop_count": hop_count,

@@ -107,11 +107,14 @@ def create_graph_flow(use_optimized: bool = None):
         """시작점 결정: 사용자 선택 여부에 따라 분기"""
         user_selected_direction = state.get("user_selected_direction")
         skip_clarification = state.get("skip_clarification", False)
+        basic_keywords = state.get("basic_keywords", [])
+        expansion_directions = state.get("expansion_directions", [])
         
         if user_selected_direction and skip_clarification:
             # 사용자가 이미 선택했으면 Stage 1.5부터 시작 (체크포인트 복원)
-            # Stage 1.5에서 체크포인트 복원 + Stage 1-B 완료 대기 + 결과 통합 후 Stage 2로 진행
             print(f"[INFO] 체크포인트 복원: Stage 1.5부터 시작 (user_selected_direction={user_selected_direction})")
+            print(f"[INFO] ★ 입력 state의 basic_keywords: {len(basic_keywords)}개 → {basic_keywords}")
+            print(f"[INFO] ★ 입력 state의 expansion_directions: {len(expansion_directions)}개")
             return "user_intent_clarification"
         else:
             # 첫 실행이면 Stage 0부터 시작

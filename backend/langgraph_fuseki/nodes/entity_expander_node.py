@@ -125,7 +125,7 @@ def expand_keywords_with_direction(query: str, basic_keywords: list, description
         확장된 키워드 딕셔너리
     """
     llm = ChatOpenAI(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        model=os.getenv("OPENAI_MODEL"),
         temperature=0.3
     )
     
@@ -184,6 +184,79 @@ def expand_keywords_with_direction(query: str, basic_keywords: list, description
             content = content[4:]
     
     return json.loads(content)
+
+
+def select_property_groups_with_llm(query: str, keywords: list, available_groups: list) -> list:
+    """
+    LLM을 사용하여 질문과 키워드에 적합한 프로퍼티 그룹 선택
+    
+    Args:
+        query: 원본 질문
+        keywords: 추출된 키워드
+        available_groups: 선택 가능한 프로퍼티 그룹 목록
+    
+    Returns:
+        선택된 프로퍼티 그룹 리스트 (3-5개)
+    """
+    llm = ChatOpenAI(
+        model=os.getenv("OPENAI_MODEL"),
+        temperature=0.3
+    )
+    
+    keywords_text = ", ".join(keywords) if keywords else "없음"
+    groups_text = ", ".join(available_groups)
+    
+    selection_prompt = f"""당신은 역사 지식 그래프 전문가입니다.
+
+## 질문
+{query}
+
+## 추출된 키워드
+{keywords_text}
+
+## 사용 가능한 프로퍼티 그룹
+{groups_text}
+
+## 작업
+위 질문과 키워드에 가장 적합한 프로퍼티 그룹 3-5개를 선택하세요.
+
+**선택 기준:**
+- 질문의 핵심 의도와 관련된 그룹을 우선 선택
+- 키워드와 직접적으로 연결된 그룹 선택
+- 질문 유형에 따른 선택:
+  - "왜/이유/원인" → 인과관계, 외교, 통치
+  - "누구/인물" → 직위, 참여, 소속
+  - "언제/시기" → 연도, 시기, 기간중
+  - "어떻게/과정" → 시행, 참여, 법률
+  - "결과/영향" → 변경, 인과관계, 법률
+
+## 출력 형식 (JSON만)
+{{
+  "selected_groups": ["그룹1", "그룹2", "그룹3"]
+}}
+"""
+    
+    response = llm.invoke(selection_prompt)
+    content = response.content.strip()
+    
+    # JSON 파싱
+    if "```" in content:
+        content = content.split("```")[1]
+        if content.startswith("json"):
+            content = content[4:]
+    
+    result = json.loads(content)
+    selected = result.get("selected_groups", [])
+    
+    # 유효한 그룹만 필터링
+    valid_groups = [g for g in selected if g in available_groups]
+    
+    if not valid_groups:
+        # 기본 그룹 반환
+        valid_groups = ["속성", "인과관계", "참여", "변경"]
+        print(f"  ⚠️ LLM 선택 그룹이 없어 기본값 사용: {valid_groups}")
+    
+    return valid_groups
 
 
 def search_entities_with_pgvector(keywords: list, ttl_data: dict, top_k: int = 5) -> list:
@@ -343,41 +416,82 @@ def entity_expander_node(state: GraphState) -> GraphState:
     user_selected_direction = state.get("user_selected_direction")
     expansion_directions = state.get("expansion_directions", [])
     basic_keywords = state.get("basic_keywords", [])
+    thinking_callback = state.get("thinking_callback")
     
     print(f"\n{'='*70}")
     print(f"[Stage 2] Entity Expander (키워드 확장 + 엔티티 추출)")
     print(f"{'='*70}")
     print(f"  질문: '{query}'")
     print(f"  선택된 방향: {user_selected_direction}")
-    print(f"  기본 키워드: {basic_keywords}")
+    print(f"  ★ basic_keywords 수: {len(basic_keywords)}개")
+    print(f"  ★ basic_keywords 내용: {basic_keywords}")
+    print(f"  ★ expansion_directions 수: {len(expansion_directions)}개")
     
     if not query:
         print(f"  ERROR: query가 비어있습니다!")
         return state
     
-    # ========== 1. 사용자 선택 방향 기반 키워드 확장 ==========
+    if not basic_keywords:
+        print(f"  ⚠️ WARNING: basic_keywords가 비어있습니다! 세션 복원 확인 필요")
+    
+
+    # 🎯 Thinking 이벤트: Entity Expander 시작
+    if thinking_callback:
+        thinking_callback("entity_expansion_started", {
+            "title": "엔티티 확장 시작",
+            "stage": "Stage 2: Entity Expander",
+            "basic_keywords": basic_keywords,
+            "selected_direction": user_selected_direction
+        })
+    
+    # ========== 1. 사용자 선택 방향 정보 조회 ==========
     selected_direction_info = None
     if user_selected_direction and expansion_directions:
         for direction in expansion_directions:
             if direction.get("direction_id") == user_selected_direction:
                 selected_direction_info = direction
                 break
+        
+        if not selected_direction_info:
+            print(f"  ⚠️ 경고: direction_id '{user_selected_direction}'를 expansion_directions에서 찾을 수 없음")
+            print(f"  expansion_directions 수: {len(expansion_directions)}")
     
     expanded_keywords = basic_keywords.copy()
     expanded_keywords_dict = {}
     selected_property_groups = []
     selected_properties = []
     
-    if selected_direction_info:
-        description = selected_direction_info.get("description", "")
-        property_groups = selected_direction_info.get("property_groups", [])
+    # ========== 2. LLM 키워드 확장 (항상 실행) ==========
+    if basic_keywords:
+        # 방향 정보에서 description과 property_groups 가져오기
+        if selected_direction_info:
+            description = selected_direction_info.get("description", "")
+            property_groups = selected_direction_info.get("property_groups", [])
+            
+            print(f"  ★ 선택된 방향 정보 발견!")
+            print(f"  선택된 방향: {selected_direction_info.get('title', '')}")
+            print(f"  설명: {description}")
+            print(f"  프로퍼티 그룹: {property_groups}")
+        else:
+            # 방향 정보 없으면 기본값 사용
+            description = "역사적 맥락에서 관련 키워드 확장"
+            property_groups = []
+            print(f"  ⚠️ 선택된 방향 정보 없음, 기본 맥락으로 확장")
+            print(f"  기본 키워드: {basic_keywords}")
+
+        # 🎯 Thinking 이벤트: 키워드 확장 시작
+        if thinking_callback:
+            thinking_callback("keyword_expansion_started", {
+                "title": "LLM 키워드 확장 시작",
+                "direction_title": selected_direction_info.get('title', '역사적 맥락') if selected_direction_info else "역사적 맥락",
+                "direction_description": description,
+                "property_groups": property_groups,
+                "basic_keywords": basic_keywords
+            })
         
-        print(f"  선택된 방향: {selected_direction_info.get('title', '')}")
-        print(f"  설명: {description}")
-        print(f"  프로퍼티 그룹: {property_groups}")
-        
-        # LLM 키워드 확장
+        # ★ LLM 키워드 확장 (항상 실행)
         try:
+            print(f"  ★ LLM 키워드 확장 시작...")
             expanded_result = expand_keywords_with_direction(
                 query, basic_keywords, description, property_groups
             )
@@ -390,24 +504,69 @@ def entity_expander_node(state: GraphState) -> GraphState:
             # 중복 제거
             expanded_keywords = list(set(expanded_keywords))
             
-            print(f"  확장된 키워드: {len(expanded_keywords)}개")
+            print(f"  ★ LLM 확장된 키워드: {len(expanded_keywords)}개")
             print(f"  확장 매핑: {expanded_keywords_dict}")
+
+            # 🎯 Thinking 이벤트: 키워드 확장 완료
+            if thinking_callback:
+                thinking_callback("keyword_expansion_completed", {
+                    "title": "LLM 키워드 확장 완료",
+                    "expanded_keywords": expanded_keywords,
+                    "expansion_mapping": expanded_keywords_dict,
+                    "total_keywords": len(expanded_keywords)
+                })
             
         except Exception as e:
-            print(f"  키워드 확장 실패: {e}")
+            print(f"  ⚠️ LLM 키워드 확장 실패: {e}")
+            import traceback
+            traceback.print_exc()
         
-        # 프로퍼티 그룹에서 실제 프로퍼티 추출
+        # ========== 3. 프로퍼티 그룹 선택 (항상 실행) ==========
         from backend.langgraph_fuseki.nodes.classify_node import load_property_groups
         all_groups = load_property_groups()
         
-        for group_name in property_groups:
-            if group_name in all_groups:
-                selected_properties.extend(all_groups[group_name])
+        if property_groups:
+            # 방향 정보에서 프로퍼티 그룹 사용
+            for group_name in property_groups:
+                if group_name in all_groups:
+                    selected_properties.extend(all_groups[group_name])
+            
+            selected_property_groups = property_groups
+            print(f"  ★ 방향 기반 프로퍼티 그룹: {property_groups}")
+        else:
+            # ★ 방향 정보 없으면 LLM으로 프로퍼티 그룹 선택
+            print(f"  ★ LLM 기반 프로퍼티 그룹 선택 시작...")
+            try:
+                selected_property_groups = select_property_groups_with_llm(
+                    query, basic_keywords, list(all_groups.keys())
+                )
+                
+                for group_name in selected_property_groups:
+                    if group_name in all_groups:
+                        selected_properties.extend(all_groups[group_name])
+                
+                print(f"  ★ LLM 선택 프로퍼티 그룹: {selected_property_groups}")
+            except Exception as e:
+                print(f"  ⚠️ LLM 프로퍼티 그룹 선택 실패: {e}, 기본 그룹 사용")
+                # 기본 그룹 사용
+                selected_property_groups = ["속성", "인과관계", "참여", "변경"]
+                for group_name in selected_property_groups:
+                    if group_name in all_groups:
+                        selected_properties.extend(all_groups[group_name])
         
-        selected_property_groups = property_groups
         selected_properties = list(set(selected_properties))
-        
-        print(f"  선택된 프로퍼티: {len(selected_properties)}개")
+        print(f"  ★ 선택된 프로퍼티: {len(selected_properties)}개")
+    
+    else:
+        print(f"  ⚠️ basic_keywords가 비어있어 키워드 확장 및 프로퍼티 선택 불가")
+
+    # 🎯 Thinking 이벤트: TTL 매칭 시작
+    if thinking_callback:
+        thinking_callback("ttl_matching_started", {
+            "title": "TTL 데이터 매칭 시작",
+            "keywords_to_match": expanded_keywords,
+            "matching_methods": ["정확 매칭", "부분 매칭"]
+        })
     
     # ========== 2. TTL 데이터 로드 및 엔티티 매칭 ==========
     ttl_data = load_ttl_entities()
@@ -456,10 +615,27 @@ def entity_expander_node(state: GraphState) -> GraphState:
                         break
     
     print(f"  TTL 매칭 결과: {ttl_matched}개")
+
+    # 🎯 Thinking 이벤트: TTL 매칭 완료
+    if thinking_callback:
+        thinking_callback("ttl_matching_completed", {
+            "title": "TTL 매칭 완료",
+            "matched_entities": ttl_matched,
+            "exact_matches": len([e for e in matched_entities if e.get("match_method") == "exact"]),
+            "partial_matches": len([e for e in matched_entities if e.get("match_method") == "partial"])
+        })
     
     # ========== 3. pgvector 유사도 검색 (fallback) ==========
     pgvector_added = 0
     if len(matched_entities) < 20 and USE_PGVECTOR:
+        # 🎯 Thinking 이벤트: pgvector 검색 시작
+        if thinking_callback:
+            thinking_callback("pgvector_search_started", {
+                "title": "pgvector 유사도 검색 시작",
+                "reason": f"TTL 매칭 결과 부족 ({len(matched_entities)}개 < 20개)",
+                "search_keywords": expanded_keywords
+            })
+
         try:
             vector_results = search_entities_with_pgvector(
                 expanded_keywords, ttl_data, top_k=15
@@ -474,11 +650,28 @@ def entity_expander_node(state: GraphState) -> GraphState:
                     pgvector_added += 1
             
             print(f"  pgvector 추가 결과: {pgvector_added}개")
+
+            # 🎯 Thinking 이벤트: pgvector 검색 완료
+            if thinking_callback:
+                thinking_callback("pgvector_search_completed", {
+                    "title": "pgvector 검색 완료",
+                    "added_entities": pgvector_added,
+                    "total_entities": len(matched_entities)
+                })
+
         except Exception as e:
             print(f"  pgvector 검색 실패: {e}")
     
     # ========== 4. SPARQL 기반 엔티티 스코어링 ==========
     print(f"  SPARQL 기반 스코어링 중...")
+
+    # 🎯 Thinking 이벤트: SPARQL 스코어링 시작
+    if thinking_callback:
+        thinking_callback("sparql_scoring_started", {
+            "title": "SPARQL 기반 스코어링 시작",
+            "entities_to_score": len(matched_entities),
+            "scoring_factors": ["기본 점수", "이름 매칭", "연결 노드 매칭"]
+        })
     
     for entity in matched_entities:
         try:
@@ -504,6 +697,20 @@ def entity_expander_node(state: GraphState) -> GraphState:
             method = entity.get("match_method", "")
             score = entity.get("final_score", 0)
             print(f"    {i:2d}. [{method:7s}] [{entity_type:12s}] {name} (점수: {score:.2f})")
+
+    # 🎯 Thinking 이벤트: Entity Expander 완료
+    if thinking_callback:
+        top_entity_names = [e.get("name", "") for e in top_entities[:10]]
+        thinking_callback("entity_expansion_completed", {
+            "title": "엔티티 확장 완료",
+            "final_entity_count": len(top_entities),
+            "top_entities": top_entity_names,
+            "processing_summary": {
+                "ttl_matches": ttl_matched,
+                "pgvector_additions": pgvector_added,
+                "final_selection": len(top_entities)
+            }
+        })
     
     # 실행 시간 계산
     node_end = time.time()

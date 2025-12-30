@@ -20,7 +20,7 @@ ontology_evaluate/
 │   └── l3_terminal_knowledge.py       # L3: Terminal Triple Validity, Evidence Diversity, Convergence
 ├── utils/                             # 유틸리티
 │   ├── __init__.py
-│   ├── llm_judge.py                   # LLM-as-Judge 구현 (GPT-4)
+│   ├── llm_judge.py                   # LLM-as-Judge 구현 (GPT-5)
 │   └── result_analyzer.py             # 결과 분석 도구
 ├── experiments/                       # 실험 스크립트
 │   ├── __init__.py
