@@ -96,6 +96,45 @@ FIXED_SCORE_PGVECTOR = float(os.getenv("FIXED_SCORE_PGVECTOR", "0.0"))  # ★ �
 # 자세한 내용: backend/ragas/ontology_evaluate/docs/LANGGRAPH_DYNAMIC_CONFIG_GUIDE.md
 # ============================================================
 
+# 쿼리 타입별 가중치 매트릭스 (Thread, Semantic, Entity Boost)
+WEIGHT_MATRIX = {
+    "factual": {
+        "thread": 0.60,      # Thread 가중치
+        "semantic": 0.10,    # Semantic 확장 가중치  
+        "entity_boost": 0.30 # Entity Boost 가중치
+    },
+    "causal": {
+        "thread": 0.45,
+        "semantic": 0.35,
+        "entity_boost": 0.20
+    },
+    "comparative": {
+        "thread": 0.65,
+        "semantic": 0.05,
+        "entity_boost": 0.30
+    },
+    "deep_analysis": {
+        "thread": 0.40,
+        "semantic": 0.40,
+        "entity_boost": 0.20
+    }
+}
+
+
+def get_weight_matrix_for_query_type(query_type: str) -> dict:
+    """
+    쿼리 타입에 따른 가중치 매트릭스 반환
+    
+    Args:
+        query_type: "factual", "causal", "comparative", "deep_analysis"
+    
+    Returns:
+        가중치 딕셔너리 {"thread": float, "semantic": float, "entity_boost": float}
+    """
+    return WEIGHT_MATRIX.get(query_type, WEIGHT_MATRIX["deep_analysis"])
+
+
+# 기존 QUERY_TYPE_CONFIGS (호환성 유지)
 QUERY_TYPE_CONFIGS = {
     "factual": {
         "semantic_expander": {

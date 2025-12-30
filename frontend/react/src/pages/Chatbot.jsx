@@ -17,6 +17,7 @@ import {
 } from "../api/chatApi";
 import MarkdownRenderer from "../components/common/MarkdownRenderer";
 import EvidencePathView from "../components/common/EvidencePathView";
+import ThinkingMode from "../components/common/ThinkingMode/ThinkingMode";
 
 const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
   // 스크롤바 스타일 및 드래그 색상을 위한 CSS 추가
@@ -128,6 +129,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
   const [hoveredDeleteBtn, setHoveredDeleteBtn] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [isThinkingMode, setIsThinkingMode] = useState(false); // Thinking 모드 상태 추가
+  const [thinkingEvents, setThinkingEvents] = useState([]); // Thinking 이벤트 저장
+  const [isThinkingComplete, setIsThinkingComplete] = useState(false); // Thinking 완료 상태
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const containerRef = useRef(null);
@@ -308,6 +311,12 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
     const userMessage = message.trim();
     setMessage("");
 
+    // Thinking 모드 초기화
+    if (isThinkingMode) {
+      setThinkingEvents([]);
+      setIsThinkingComplete(false);
+    }
+
     setMessages((prev) => [...prev, { type: "user", text: userMessage }]);
 
     requestAnimationFrame(() => {
@@ -320,6 +329,9 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
 
     // AbortController 생성
     abortControllerRef.current = new AbortController();
+
+    // 스트리밍 에러가 이미 처리되었는지 플래그 (try-catch 밖에서 선언)
+    let streamErrorHandled = false;
 
     try {
       const token = localStorage.getItem("access_token");
@@ -358,6 +370,11 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
             accumulatedText =
               streamEvent.fullText || accumulatedText + streamEvent.text;
             setStreamingText(accumulatedText);
+          } else if (streamEvent.type === "thinking") {
+            // Thinking 모드 이벤트 처리
+            if (isThinkingMode) {
+              setThinkingEvents((prev) => [...prev, streamEvent]);
+            }
           } else if (streamEvent.type === "clarification") {
             // 재질문 데이터 저장
             clarificationData = streamEvent;
@@ -365,9 +382,22 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
             // 최종 답변 완료
             accumulatedText = streamEvent.text;
             setStreamingText("");
+            if (isThinkingMode) {
+              setIsThinkingComplete(true);
+            }
             const messageObj = { type: "assistant", text: accumulatedText };
             // evidences는 나중에 추가 가능
             setMessages((prev) => [...prev, messageObj]);
+          } else if (streamEvent.type === "error") {
+            // 에러 타입 처리 - 이미 처리되었음을 표시
+            streamErrorHandled = true;
+            const errorMessage =
+              streamEvent.text ||
+              "오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+            setStreamingText("");
+            simulateStreamingResponse(errorMessage);
+            setIsSubmitting(false);
+            abortControllerRef.current = null;
           }
         }
       );
@@ -426,6 +456,12 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
         setMessages((prev) => prev.slice(0, -1));
         setIsSubmitting(false);
         abortControllerRef.current = null;
+        return;
+      }
+
+      // 스트리밍 에러가 이미 onStream 콜백에서 처리된 경우 중복 처리 방지
+      if (streamErrorHandled) {
+        console.log("스트리밍 에러가 이미 처리되었습니다.");
         return;
       }
 
@@ -508,8 +544,17 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
 
     setIsSubmitting(true);
 
+    // Thinking 모드 초기화
+    if (isThinkingMode) {
+      setThinkingEvents([]);
+      setIsThinkingComplete(false);
+    }
+
     // AbortController 생성
     abortControllerRef.current = new AbortController();
+
+    // 스트리밍 에러가 이미 처리되었는지 플래그 (try-catch 밖에서 선언)
+    let streamErrorHandled = false;
 
     try {
       const token = localStorage.getItem("access_token");
@@ -534,9 +579,17 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
             accumulatedText =
               streamEvent.fullText || accumulatedText + streamEvent.text;
             setStreamingText(accumulatedText);
+          } else if (streamEvent.type === "thinking") {
+            // Thinking 모드 이벤트 처리
+            if (isThinkingMode) {
+              setThinkingEvents((prev) => [...prev, streamEvent]);
+            }
           } else if (streamEvent.type === "final") {
             accumulatedText = streamEvent.text;
             setStreamingText("");
+            if (isThinkingMode) {
+              setIsThinkingComplete(true);
+            }
             const messageObj = { type: "assistant", text: accumulatedText };
             if (
               response.evidences &&
@@ -546,6 +599,16 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
               messageObj.evidences = response.evidences;
             }
             setMessages((prev) => [...prev, messageObj]);
+          } else if (streamEvent.type === "error") {
+            // 에러 타입 처리 - 이미 처리되었음을 표시
+            streamErrorHandled = true;
+            const errorMessage =
+              streamEvent.text ||
+              "오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+            setStreamingText("");
+            simulateStreamingResponse(errorMessage);
+            setIsSubmitting(false);
+            abortControllerRef.current = null;
           }
         }
       );
@@ -584,6 +647,12 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
         setMessages((prev) => prev.slice(0, -1));
         setIsSubmitting(false);
         abortControllerRef.current = null;
+        return;
+      }
+
+      // 스트리밍 에러가 이미 onStream 콜백에서 처리된 경우 중복 처리 방지
+      if (streamErrorHandled) {
+        console.log("스트리밍 에러가 이미 처리되었습니다.");
         return;
       }
 
@@ -1180,6 +1249,16 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                 e.stopPropagation();
               }}
             >
+              {/* Thinking Mode 컴포넌트 (Thinking 모드일 때만 표시) */}
+              {isThinkingMode && thinkingEvents.length > 0 && (
+                <div style={{ marginBottom: "24px" }}>
+                  <ThinkingMode 
+                    thinkingEvents={thinkingEvents} 
+                    isComplete={isThinkingComplete} 
+                  />
+                </div>
+              )}
+
               <div
                 style={{
                   minHeight: "100%",

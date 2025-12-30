@@ -582,6 +582,10 @@ def semantic_expander_node(state: GraphState) -> GraphState:
     extracted_entities = state.get("extracted_entities", [])
     ttl_data = state.get("ttl_data", {})
     test_config = state.get("test_config")  # 테스트 설정
+    query_type = state.get("query_type", "causal")
+    
+    # Thinking 모드 콜백 함수 가져오기
+    thinking_callback = state.get("thinking_callback")
 
     print(f"\n{'='*70}")
     print(f"[Stage 3/6] 의미론적 확장 (Semantic Expander)")
@@ -591,6 +595,40 @@ def semantic_expander_node(state: GraphState) -> GraphState:
     if not extracted_entities:
         print(f"  └─ 확장할 엔티티 없음 (skip)")
         return {**state}
+
+    # 🎯 Thinking 이벤트: Semantic 확장 시작
+    if thinking_callback:
+        # 가중치 매트릭스 가져오기
+        from backend.langgraph_fuseki.config import get_weight_matrix_for_query_type, get_config_for_query_type
+        weight_matrix = get_weight_matrix_for_query_type(query_type)
+        config = get_config_for_query_type(query_type)
+        semantic_config_weights = config.get("semantic_expander", {})
+        
+        thinking_callback("semantic_expansion_started", {
+            "title": "의미론적 확장 시작",
+            "query_type": query_type,
+            "entity_count": len(extracted_entities),
+            "weight_matrix": {
+                "semantic_weight": f"{weight_matrix['semantic']*100:.0f}%",
+                "thread_weight": f"{weight_matrix['thread']*100:.0f}%",
+                "entity_boost": f"{weight_matrix['entity_boost']*100:.0f}%"
+            },
+            "expansion_methods": {
+                "temporal": {
+                    "enabled": semantic_config_weights.get("temporal", False),
+                    "description": "시간적 맥락 (±10년)"
+                },
+                "causal_chain": {
+                    "enabled": semantic_config_weights.get("causal_chain", False),
+                    "description": "인과관계 체인 (최대 3홉)"
+                },
+                "pgvector": {
+                    "enabled": semantic_config_weights.get("pgvector", False),
+                    "description": "벡터 유사도 검색"
+                }
+            },
+            "status": "processing"
+        })
 
     # 테스트 모드 확인
     if test_config and "semantic_expander" in test_config:
@@ -609,13 +647,49 @@ def semantic_expander_node(state: GraphState) -> GraphState:
     pgvector_expanded = []
 
     if not semantic_config or semantic_config.get("temporal", True):
+        temporal_start = time.time()
         temporal_expanded = expand_by_temporal_context(extracted_entities, ttl_data, window_years=10)
+        temporal_elapsed = time.time() - temporal_start
+        
+        # 🎯 Thinking 이벤트: Temporal 확장 완료
+        if thinking_callback:
+            thinking_callback("temporal_expansion_completed", {
+                "title": "시간적 맥락 확장 완료",
+                "method": "temporal",
+                "results_count": len(temporal_expanded),
+                "processing_time": temporal_elapsed,
+                "status": "completed"
+            })
 
     if not semantic_config or semantic_config.get("causal_chain", True):
+        causal_start = time.time()
         causal_expanded = expand_by_causal_chain(extracted_entities, ttl_data, max_hops=3)
+        causal_elapsed = time.time() - causal_start
+        
+        # 🎯 Thinking 이벤트: Causal 확장 완료
+        if thinking_callback:
+            thinking_callback("causal_expansion_completed", {
+                "title": "인과관계 체인 확장 완료",
+                "method": "causal_chain",
+                "results_count": len(causal_expanded),
+                "processing_time": causal_elapsed,
+                "status": "completed"
+            })
 
     if not semantic_config or semantic_config.get("pgvector", True):
+        pgvector_start = time.time()
         pgvector_expanded = expand_by_pgvector(extracted_entities, query, top_k=15)
+        pgvector_elapsed = time.time() - pgvector_start
+        
+        # 🎯 Thinking 이벤트: PGVector 확장 완료
+        if thinking_callback:
+            thinking_callback("pgvector_expansion_completed", {
+                "title": "벡터 유사도 확장 완료",
+                "method": "pgvector",
+                "results_count": len(pgvector_expanded),
+                "processing_time": pgvector_elapsed,
+                "status": "completed"
+            })
 
     # 결과 병합 (중복 제거)
     all_expanded = []

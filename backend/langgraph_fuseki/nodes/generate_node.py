@@ -463,6 +463,17 @@ def story_generator_node(state: GraphState) -> GraphState:
     # 스트리밍 모드 확인 (state에서 전달)
     stream_mode = state.get("stream_mode", False)
     stream_callback = state.get("stream_callback", None)
+    thinking_callback = state.get("thinking_callback", None)
+    
+    # 🎯 Thinking 이벤트: 답변 생성 시작
+    if thinking_callback:
+        thinking_callback("answer_generation_started", {
+            "title": "답변 생성 시작",
+            "evidence_count": len(evidences),
+            "query_type": query_type,
+            "stream_mode": stream_mode,
+            "status": "processing"
+        })
     
     llm = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL"),

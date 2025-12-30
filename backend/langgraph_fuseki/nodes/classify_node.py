@@ -1025,6 +1025,9 @@ def query_classifier_stage1a_node(state: GraphState) -> GraphState:
     query_type_initial = state.get("query_type_initial", "")
     basic_keywords = state.get("basic_keywords", [])
     
+    # Thinking 모드 콜백 함수 가져오기
+    thinking_callback = state.get("thinking_callback")
+    
     # skip_clarification=True이고 이미 expansion_directions가 있으면 재생성하지 않음
     skip_clarification = state.get("skip_clarification", False)
     existing_expansion_directions = state.get("expansion_directions", [])
@@ -1043,6 +1046,15 @@ def query_classifier_stage1a_node(state: GraphState) -> GraphState:
     print("\n" + "=" * 70)
     print("[Stage 1-A] LLM 방향 생성")
     print("=" * 70)
+
+    # 🎯 Thinking 이벤트: 키워드 추출 완료
+    if thinking_callback:
+        thinking_callback("keywords_extracted", {
+            "title": "키워드 추출 완료",
+            "keywords": basic_keywords[:10],
+            "query_type": query_type_initial,
+            "status": "completed"
+        })
 
     # ========== Stage 1-B 백그라운드 시작 ==========
     # 전역 딕셔너리를 사용하여 노드 간 결과 공유
@@ -1075,6 +1087,15 @@ def query_classifier_stage1a_node(state: GraphState) -> GraphState:
     stage1b_thread.start()
     print(f"  ├─ [BACKGROUND] Stage 1-B 백그라운드 분석 시작 (키워드: {basic_keywords[:3]})")
 
+    # 🎯 Thinking 이벤트: 질문 분류 시작
+    if thinking_callback:
+        thinking_callback("classification_started", {
+            "title": "질문 분류 및 전략 수립",
+            "query_type": query_type_initial,
+            "strategies": ["semantic_expansion", "entity_extraction", "property_selection"],
+            "status": "processing"
+        })
+
     # ========== Stage 1-A: LLM 방향 생성 (Stage 1-B와 병렬) ==========
     from backend.langgraph_fuseki.nodes.intent_clarification_templates import generate_llm_based_directions
     direction_start = time.time()
@@ -1086,6 +1107,23 @@ def query_classifier_stage1a_node(state: GraphState) -> GraphState:
     classification_strategy = "mixed"
     direction_elapsed = time.time() - direction_start
     print(f"  ├─ 확장 방향: {len(expansion_directions)}개 생성 (LLM: {direction_elapsed:.2f}초)")
+
+    # 🎯 Thinking 이벤트: 의도 선택지 생성 완료
+    if thinking_callback:
+        thinking_callback("intent_options_generated", {
+            "title": "사용자 의도 선택지 생성",
+            "options": [
+                {
+                    "id": direction.get("direction_id", ""),
+                    "title": direction.get("title", ""),
+                    "description": direction.get("description", "")[:100] + "..." if len(direction.get("description", "")) > 100 else direction.get("description", "")
+                }
+                for direction in expansion_directions[:5]
+            ],
+            "total_count": len(expansion_directions),
+            "processing_time": direction_elapsed,
+            "status": "completed"
+        })
 
     # 재질문 텍스트 생성 (템플릿 기반)
     clarification_question = generate_clarification_question(

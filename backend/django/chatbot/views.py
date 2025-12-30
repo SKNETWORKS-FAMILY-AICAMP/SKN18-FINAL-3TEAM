@@ -2,6 +2,7 @@ import asyncio
 import logging
 import json
 import uuid
+import time
 
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -367,7 +368,7 @@ class ChatQuestionView(APIView):
                     user_selected_title = parts[2]
                 query = request.session.get("pending_clarification_query", query)
 
-            # 재질문 응답이 아닌 경우에만 사용자 메시지 저장
+            # 재질문 응답이 아닌 경우에만 사용자 메시지 저장 (동기 방식)
             if not user_selected_direction:
                 _store_message(request, ChatMessage.Role.USER, query, chat_session=chat_session)
 
@@ -379,9 +380,17 @@ class ChatQuestionView(APIView):
                     logger.info("[chat][stream] POST question='%s' thinking_mode=%s", query, thinking_mode)
                     question_for_ai = query
 
+                    # 비동기 컨텍스트에서 DB 접근을 위해 sync_to_async 사용
+                    from asgiref.sync import sync_to_async
+                    
+                    # 동기 함수를 비동기로 래핑
+                    async_hydrate_summary = sync_to_async(_hydrate_summary_from_db, thread_sensitive=True)
+                    async_store_message = sync_to_async(_store_message, thread_sensitive=True)
+                    async_store_summary = sync_to_async(_store_summary_entry, thread_sensitive=True)
+                    
                     memory_summary = request.session.get("chat_memory_summary")
                     if not memory_summary:
-                        memory_summary = _hydrate_summary_from_db(request)
+                        memory_summary = await async_hydrate_summary(request)
 
                     # Thinking 모드일 때만 ontology LangGraph 호출
                     if thinking_mode:
@@ -431,8 +440,31 @@ class ChatQuestionView(APIView):
                         except Exception as e:
                             logger.error(f"[chat][stream] Callback error: {e}")
                     
+                    # Thinking 모드 진행 상황 콜백 함수
+                    def thinking_callback(event_type: str, data: dict):
+                        """Thinking 모드 진행 상황을 큐에 저장"""
+                        try:
+                            thinking_event = {
+                                "type": "thinking",
+                                "event": event_type,
+                                "data": data,
+                                "timestamp": time.time()
+                            }
+                            if loop.is_running():
+                                asyncio.run_coroutine_threadsafe(
+                                    stream_queue.put(thinking_event), loop
+                                )
+                            else:
+                                loop.call_soon_threadsafe(
+                                    stream_queue.put_nowait, thinking_event
+                                )
+                        except Exception as e:
+                            logger.error(f"[chat][stream] Thinking callback error: {e}")
+                    
                     # 스트리밍 콜백을 state에 추가
                     invoke_params["stream_callback"] = stream_callback
+                    if thinking_mode:
+                        invoke_params["thinking_callback"] = thinking_callback
                     
                     # 비동기로 LangGraph 실행 (별도 태스크)
                     async def run_langgraph():
@@ -453,9 +485,10 @@ class ChatQuestionView(APIView):
                                         await stream_queue.put(("clarification", clarification_question, expansion_directions))
                                         return
                                     
-                                    # 최종 답변 저장
+                                    # 최종 답변 저장 (비동기 컨텍스트에서 DB 접근)
                                     evidences = final_state.get("evidences", [])
-                                    _store_message(
+                                    
+                                    await async_store_message(
                                         request,
                                         ChatMessage.Role.ASSISTANT,
                                         ai_response,
@@ -465,7 +498,7 @@ class ChatQuestionView(APIView):
                                     
                                     new_summary = final_state.get("summary")
                                     if new_summary:
-                                        _store_summary_entry(request, new_summary, chat_session=chat_session)
+                                        await async_store_summary(request, new_summary, chat_session=chat_session)
                                     
                                     await stream_queue.put(("final", ai_response))
                         except UserClarificationRequired as e:
@@ -475,7 +508,7 @@ class ChatQuestionView(APIView):
                             expansion_directions = response_state.get("expansion_directions", [])
                             clarification_question = response_state.get("clarification_question", "")
                             
-                            # 재질문을 AI 메시지로 저장
+                            # 재질문을 AI 메시지로 저장 (비동기 컨텍스트에서 DB 접근)
                             import json as json_module
                             clarification_metadata = {
                                 "type": "clarification",
@@ -483,7 +516,8 @@ class ChatQuestionView(APIView):
                                 "options": expansion_directions
                             }
                             message_with_metadata = f"__CLARIFICATION_METADATA__:{json_module.dumps(clarification_metadata, ensure_ascii=False)}"
-                            _store_message(
+                            
+                            await async_store_message(
                                 request,
                                 ChatMessage.Role.ASSISTANT,
                                 message_with_metadata,
@@ -518,6 +552,9 @@ class ChatQuestionView(APIView):
                                     elif item[0] == "error":
                                         yield f"data: {json.dumps({'type': 'error', 'text': item[1]})}\n\n"
                                         break
+                                elif isinstance(item, dict) and item.get("type") == "thinking":
+                                    # Thinking 모드 이벤트 전송
+                                    yield f"data: {json.dumps(item)}\n\n"
                                 else:
                                     # 일반 텍스트 청크
                                     yield f"data: {json.dumps({'type': 'delta', 'text': item})}\n\n"

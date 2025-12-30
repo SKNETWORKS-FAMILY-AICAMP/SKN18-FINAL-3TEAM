@@ -68,6 +68,16 @@ def user_intent_clarification_node(state: GraphState) -> GraphState:
     stage1b_task_id = state.get("stage1b_task_id")
 
     if skip_clarification:
+        # Thinking 모드 콜백 함수 가져오기
+        thinking_callback = state.get("thinking_callback")
+        
+        # 🎯 Thinking 이벤트: 사용자 선택 처리 시작
+        if thinking_callback:
+            thinking_callback("user_selection_processing", {
+                "title": "사용자 선택 처리 중",
+                "status": "processing"
+            })
+
         # 체크포인트에서 state 복원
         session_id = state.get("session_id")
         state, stage1b_task_id, stage1b_result = restore_checkpoint(session_id, state)
@@ -78,6 +88,20 @@ def user_intent_clarification_node(state: GraphState) -> GraphState:
         
         # 사용자 선택 처리
         selected_direction = get_selected_direction(state, expansion_directions)
+        
+        # 🎯 Thinking 이벤트: 선택된 의도와 1-B 결과 통합
+        if thinking_callback and selected_direction:
+            thinking_callback("intent_integration", {
+                "title": "의도 분석 및 전략 통합",
+                "selected_intent": {
+                    "title": selected_direction.get("title", ""),
+                    "description": selected_direction.get("description", "")[:150] + "..." if len(selected_direction.get("description", "")) > 150 else selected_direction.get("description", "")
+                },
+                "stage1b_status": stage1b_result.get("status", "unknown"),
+                "expanded_keywords": stage1b_result.get("expanded_keywords", [])[:10] if stage1b_result.get("status") == "success" else [],
+                "selected_properties": stage1b_result.get("selected_properties", [])[:5] if stage1b_result.get("status") == "success" else [],
+                "status": "completed"
+            })
         
         # 결과 반환
         return build_result_state(state, selected_direction, stage1b_result, node_start)

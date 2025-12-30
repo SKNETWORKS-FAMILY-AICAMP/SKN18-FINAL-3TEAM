@@ -225,6 +225,9 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
 
     # Thread 가중치 설정
     thread_weights = THREAD_WEIGHTS.get(query_type, THREAD_WEIGHTS["causal"])
+    
+    # Thinking 모드 콜백 함수 가져오기
+    thinking_callback = state.get("thinking_callback")
 
     # 실행할 Thread 선택 (test_config에 따라)
     if test_config and "aggregator_threads" in test_config:
@@ -244,6 +247,30 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
         print(f"{'='*70}")
         print(f"  ├─ [일반 모드] Thread 수: {len(DATA_THREADS)}개")
         print(f"  ├─ 엔티티: {len(entities)}개")
+
+    # 🎯 Thinking 이벤트: Thread 가중치 정보 전송
+    if thinking_callback:
+        # 가중치 매트릭스 가져오기
+        from backend.langgraph_fuseki.config import get_weight_matrix_for_query_type
+        weight_matrix = get_weight_matrix_for_query_type(query_type)
+        
+        # Thread별 결과 수 미리 계산 (예상값)
+        estimated_thread_results = {}
+        for thread_name in active_threads:
+            estimated_thread_results[thread_name] = f"검색 중..."
+        
+        thinking_callback("thread_weights_applied", {
+            "title": "Thread 가중치 적용",
+            "query_type": query_type,
+            "weight_matrix": {
+                "thread": f"{weight_matrix['thread']*100:.0f}%",
+                "semantic": f"{weight_matrix['semantic']*100:.0f}%", 
+                "entity_boost": f"{weight_matrix['entity_boost']*100:.0f}%"
+            },
+            "active_threads": active_threads,
+            "entity_count": len(entities),
+            "status": "processing"
+        })
 
     if selected_groups:
         print(f"  └─ 프로퍼티 필터: {', '.join(selected_groups[:3])}{'...' if len(selected_groups) > 3 else ''} ({len(selected_groups)}개)")
@@ -340,6 +367,21 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
     node_elapsed = time.time() - node_start
     print(f"  └─ 완료: {total_bindings}개 결과 ({node_elapsed:.2f}초)")
     print()
+
+    # 🎯 Thinking 이벤트: SPARQL 검색 완료
+    if thinking_callback:
+        # Thread별 결과 수 계산
+        thread_results = {}
+        for thread_name, thread_results_list in results.items():
+            thread_results[thread_name] = len(thread_results_list)
+        
+        thinking_callback("sparql_search_completed", {
+            "title": "SPARQL 지식 검색 완료",
+            "total_results": total_bindings,
+            "thread_results": thread_results,
+            "processing_time": node_elapsed,
+            "status": "completed"
+        })
 
     # 지식 검색 결과를 TTL로 저장 (옵션)
     inference_ttl_path = None

@@ -47,6 +47,13 @@ api.interceptors.response.use(
 
     // 네트워크 에러인 경우 (백엔드 서버가 실행되지 않은 경우)
     if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
+      // 백엔드가 꺼진 경우 토큰이 유효한지 확인 불가
+      // 하지만 사용자가 로그인 상태로 보이면 강제 로그아웃 처리
+      const token = localStorage.getItem("access_token");
+      if (token) {
+        console.warn("⚠️ 네트워크 에러 발생. 백엔드 서버가 실행되지 않았을 수 있습니다.");
+        // 토큰은 유지하되, 사용자에게 알림은 상위에서 처리
+      }
       // 네트워크 에러는 그대로 전달 (상위에서 처리)
       return Promise.reject(error);
     }
@@ -91,19 +98,29 @@ api.interceptors.response.use(
           // Refresh 토큰도 만료된 경우
           console.error("❌ Refresh 토큰 만료! 로그아웃 처리...");
 
-          // 토큰 삭제
+          // 모든 토큰 및 사용자 데이터 삭제
           localStorage.removeItem("access_token");
           localStorage.removeItem("refresh_token");
+          localStorage.removeItem("user");
 
-          // 홈 페이지로 리다이렉트 (로그인 버튼 표시됨)
+          // 강제 새로고침하여 상태 초기화
           window.location.href = "/";
+          window.location.reload();
 
           return Promise.reject(refreshError);
         }
       } else {
-        // Refresh 토큰이 없는 경우 홈 페이지로
+        // Refresh 토큰이 없는 경우
         console.warn("⚠️ Refresh 토큰 없음. 로그인 필요.");
+
+        // 모든 토큰 및 사용자 데이터 삭제
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("user");
+
+        // 강제 새로고침하여 상태 초기화
         window.location.href = "/";
+        window.location.reload();
       }
     }
 

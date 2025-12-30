@@ -345,7 +345,8 @@ const EvidencePathView = ({ evidences = [] }) => {
     setSelectedNode(node);
   }, []);
 
-  const handleNodeHover = useCallback((node) => {
+  // 노드 호버 핸들러
+  const handleNodeHover = useCallback((node, prevNode) => {
     if (node) {
       setHoveredNode(node);
       // 노드 위치 기준으로 툴팁 위치 설정

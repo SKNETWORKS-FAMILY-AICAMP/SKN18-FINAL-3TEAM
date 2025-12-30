@@ -41,6 +41,7 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
     
     let fullText = "";
     let clarificationData = null;
+    let streamError = null; // 스트리밍 에러 플래그
     
     try {
       while (true) {
@@ -54,11 +55,15 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
         for (const line of lines) {
           if (line.startsWith("data: ")) {
             try {
-              const data = JSON.parse(line.substring(6));
+              const jsonStr = line.substring(6);
+              const data = JSON.parse(jsonStr);
               
               if (data.type === "delta") {
                 fullText += data.text;
                 onStream({ type: "delta", text: data.text, fullText });
+              } else if (data.type === "thinking") {
+                // Thinking 모드 이벤트 처리
+                onStream({ type: "thinking", event: data.event, data: data.data, timestamp: data.timestamp });
               } else if (data.type === "clarification") {
                 clarificationData = {
                   needs_clarification: true,
@@ -70,16 +75,37 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
                 fullText = data.text;
                 onStream({ type: "final", text: data.text });
               } else if (data.type === "error") {
-                throw new Error(data.text || "스트리밍 중 오류가 발생했습니다.");
+                // 에러 타입은 onStream으로만 처리하고 throw하지 않음
+                const errorMessage = data.text || "스트리밍 중 오류가 발생했습니다.";
+                streamError = errorMessage; // 에러 플래그 설정
+                onStream({ type: "error", text: errorMessage });
+                // throw하지 않고 루프 종료
+                break;
               }
             } catch (e) {
-              console.error("[chatApi] Parse error:", e, "Line:", line);
+              // JSON 파싱 오류인 경우에만 로그 출력
+              if (e instanceof SyntaxError) {
+                console.error("[chatApi] Parse error:", e, "Line:", line);
+              } else {
+                // 예상치 못한 에러는 다시 throw
+                throw e;
+              }
             }
           }
+        }
+        
+        // 스트리밍 에러가 발생하면 루프 종료
+        if (streamError) {
+          break;
         }
       }
     } finally {
       reader.releaseLock();
+    }
+    
+    // 스트리밍 에러가 발생했으면 에러를 throw
+    if (streamError) {
+      throw new Error(streamError);
     }
     
     // 최종 응답 반환
