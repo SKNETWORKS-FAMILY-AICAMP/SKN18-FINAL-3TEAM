@@ -4,7 +4,7 @@ import time
 from config import milvus_config
 from db.connection import connect_milvus
 from db.collection import get_collection
-from embedding import get_embedding_model
+from backend.db_pipeline.common.embedding_model import get_embedding as get_embedding_model
 import openai
 import numpy as np
 
