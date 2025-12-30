@@ -7,23 +7,25 @@ import { COLORS } from '../../../constants/theme';
 const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [visibleEvents, setVisibleEvents] = useState([]);
+  const [currentStep, setCurrentStep] = useState(0);
 
-  // 이벤트가 추가될 때마다 점진적으로 표시
+  // 이벤트가 추가될 때마다 점진적으로 표시 (더 빠른 애니메이션)
   useEffect(() => {
     if (thinkingEvents.length > visibleEvents.length) {
       const timer = setTimeout(() => {
         setVisibleEvents(thinkingEvents.slice(0, visibleEvents.length + 1));
-      }, 300); // 300ms 간격으로 이벤트 표시
+        setCurrentStep(visibleEvents.length + 1);
+      }, 150); // 150ms로 더 빠르게
       return () => clearTimeout(timer);
     }
   }, [thinkingEvents, visibleEvents]);
 
-  // 완료 시 자동으로 접기
+  // 완료 시 자동으로 접기 (더 빠르게)
   useEffect(() => {
     if (isComplete && thinkingEvents.length > 0) {
       const timer = setTimeout(() => {
         setIsExpanded(false);
-      }, 2000); // 2초 후 자동으로 접기
+      }, 1500); // 1.5초 후 자동으로 접기
       return () => clearTimeout(timer);
     }
   }, [isComplete, thinkingEvents.length]);
@@ -51,10 +53,28 @@ const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
   };
 
   const getEventColor = (eventType, status) => {
-    if (status === 'completed') return COLORS.success;
+    if (status === 'completed') return COLORS.success || '#10B981';
     if (status === 'processing') return COLORS.primary;
-    if (status === 'error') return COLORS.error;
+    if (status === 'error') return COLORS.error || '#EF4444';
     return COLORS.gray;
+  };
+
+  const getProgressPercentage = (eventType) => {
+    const progressMap = {
+      keywords_extracted: 10,
+      classification_started: 20,
+      intent_options_generated: 30,
+      user_selection_processing: 40,
+      intent_integration: 50,
+      semantic_expansion_started: 60,
+      temporal_expansion_completed: 70,
+      causal_expansion_completed: 75,
+      pgvector_expansion_completed: 80,
+      thread_weights_applied: 85,
+      sparql_search_completed: 90,
+      answer_generation_started: 95
+    };
+    return progressMap[eventType] || 0;
   };
 
   const renderEventContent = (event) => {
@@ -129,10 +149,41 @@ const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
                 marginBottom: '8px',
                 padding: '8px',
                 backgroundColor: '#f8f9fa',
-                borderRadius: '4px'
+                borderRadius: '4px',
+                border: '1px solid #e9ecef'
               }}>
-                <div><strong>가중치 매트릭스 ({data.query_type}):</strong></div>
-                <div>Thread: {data.weight_matrix.thread_weight} | Semantic: {data.weight_matrix.semantic_weight} | Entity: {data.weight_matrix.entity_boost}</div>
+                <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                  <span style={{ color: COLORS.primary }}>가중치 매트릭스</span> ({data.query_type})
+                </div>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <span style={{ 
+                    padding: '2px 6px', 
+                    backgroundColor: '#e3f2fd', 
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontWeight: '500'
+                  }}>
+                    Semantic: {Math.round(data.weight_matrix.semantic_weight * 100)}%
+                  </span>
+                  <span style={{ 
+                    padding: '2px 6px', 
+                    backgroundColor: '#f3e5f5', 
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontWeight: '500'
+                  }}>
+                    Thread: {Math.round(data.weight_matrix.thread_weight * 100)}%
+                  </span>
+                  <span style={{ 
+                    padding: '2px 6px', 
+                    backgroundColor: '#e8f5e8', 
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontWeight: '500'
+                  }}>
+                    Entity: {Math.round(data.weight_matrix.entity_boost * 100)}%
+                  </span>
+                </div>
               </div>
             )}
             <div style={{ fontSize: '11px', color: COLORS.gray }}>
@@ -170,10 +221,41 @@ const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
                 color: COLORS.gray,
                 padding: '8px',
                 backgroundColor: '#f8f9fa',
-                borderRadius: '4px'
+                borderRadius: '4px',
+                border: '1px solid #e9ecef'
               }}>
-                <div><strong>가중치 매트릭스 ({data.query_type}):</strong></div>
-                <div>Thread: {data.weight_matrix.thread} | Semantic: {data.weight_matrix.semantic} | Boost: {data.weight_matrix.entity_boost}</div>
+                <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                  <span style={{ color: COLORS.primary }}>가중치 매트릭스</span> ({data.query_type})
+                </div>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <span style={{ 
+                    padding: '2px 6px', 
+                    backgroundColor: '#f3e5f5', 
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontWeight: '500'
+                  }}>
+                    Thread: {Math.round(data.weight_matrix.thread * 100)}%
+                  </span>
+                  <span style={{ 
+                    padding: '2px 6px', 
+                    backgroundColor: '#e3f2fd', 
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontWeight: '500'
+                  }}>
+                    Semantic: {Math.round(data.weight_matrix.semantic * 100)}%
+                  </span>
+                  <span style={{ 
+                    padding: '2px 6px', 
+                    backgroundColor: '#e8f5e8', 
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontWeight: '500'
+                  }}>
+                    Boost: {Math.round(data.weight_matrix.entity_boost * 100)}%
+                  </span>
+                </div>
               </div>
             )}
           </div>
@@ -186,10 +268,24 @@ const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
               SPARQL 검색 완료: <strong>{data.total_results}개</strong> 결과
             </div>
             {data.thread_results && (
-              <div style={{ fontSize: '11px', color: COLORS.gray }}>
-                {Object.entries(data.thread_results).map(([thread, count]) => 
-                  `${thread}: ${count}개`
-                ).join(', ')}
+              <div style={{ 
+                fontSize: '11px', 
+                color: COLORS.gray,
+                marginBottom: '4px'
+              }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {Object.entries(data.thread_results).map(([thread, count]) => (
+                    <span key={thread} style={{ 
+                      padding: '2px 6px', 
+                      backgroundColor: '#e8f4fd', 
+                      borderRadius: '4px',
+                      fontSize: '10px',
+                      fontWeight: '500'
+                    }}>
+                      {thread}: {count}개
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
             <div style={{ fontSize: '11px', color: COLORS.gray }}>
@@ -219,13 +315,21 @@ const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
     }
   };
 
+  if (thinkingEvents.length === 0) {
+    return null;
+  }
+
+  const currentProgress = visibleEvents.length > 0 ? 
+    getProgressPercentage(visibleEvents[visibleEvents.length - 1]?.event) : 0;
+
   return (
     <div style={{
       marginBottom: '16px',
       border: `1px solid ${COLORS.border}`,
       borderRadius: '12px',
       overflow: 'hidden',
-      backgroundColor: COLORS.white
+      backgroundColor: COLORS.white,
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)'
     }}>
       {/* 헤더 */}
       <div
@@ -260,6 +364,18 @@ const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
           }}>
             {visibleEvents.length}단계
           </span>
+          {!isComplete && (
+            <span style={{ 
+              fontSize: '11px', 
+              color: COLORS.primary,
+              backgroundColor: 'rgba(255,255,255,0.9)',
+              padding: '2px 6px',
+              borderRadius: '8px',
+              fontWeight: '500'
+            }}>
+              {currentProgress}%
+            </span>
+          )}
         </div>
         <div style={{
           transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -269,6 +385,23 @@ const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
           ▼
         </div>
       </div>
+
+      {/* 진행률 바 */}
+      {!isComplete && (
+        <div style={{
+          height: '3px',
+          backgroundColor: '#f0f0f0',
+          position: 'relative'
+        }}>
+          <div style={{
+            height: '100%',
+            backgroundColor: COLORS.primary,
+            width: `${currentProgress}%`,
+            transition: 'width 0.3s ease',
+            borderRadius: '0 3px 3px 0'
+          }} />
+        </div>
+      )}
 
       {/* 내용 */}
       {isExpanded && (

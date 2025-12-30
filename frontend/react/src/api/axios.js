@@ -17,12 +17,6 @@ api.interceptors.request.use(
     if (token) {
       // Authorization 헤더에 Bearer 토큰 추가
       config.headers.Authorization = `Bearer ${token}`;
-      console.log(
-        "📤 API 요청:",
-        config.url,
-        "| 토큰 첨부:",
-        token.substring(0, 20) + "..."
-      );
     }
 
     return config;
@@ -31,6 +25,20 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+
+// ============================================
+// 로그아웃 처리 함수 (인터셉터 정의 전에 선언)
+// ============================================
+const handleLogout = () => {
+  // 모든 토큰 및 사용자 데이터 삭제
+  localStorage.clear();
+
+  // 강제 새로고침하여 상태 초기화 (비동기로 처리하여 진행 중인 요청이 완료될 시간 제공)
+  setTimeout(() => {
+    window.location.href = "/";
+    window.location.reload();
+  }, 100);
+};
 
 // ============================================
 // 응답 인터셉터: 토큰 만료 시 자동으로 리프레시
@@ -47,13 +55,6 @@ api.interceptors.response.use(
 
     // 네트워크 에러인 경우 (백엔드 서버가 실행되지 않은 경우)
     if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
-      // 백엔드가 꺼진 경우 토큰이 유효한지 확인 불가
-      // 하지만 사용자가 로그인 상태로 보이면 강제 로그아웃 처리
-      const token = localStorage.getItem("access_token");
-      if (token) {
-        console.warn("⚠️ 네트워크 에러 발생. 백엔드 서버가 실행되지 않았을 수 있습니다.");
-        // 토큰은 유지하되, 사용자에게 알림은 상위에서 처리
-      }
       // 네트워크 에러는 그대로 전달 (상위에서 처리)
       return Promise.reject(error);
     }
@@ -67,7 +68,7 @@ api.interceptors.response.use(
     if (
       (error.response?.status === 401 || error.response?.status === 403) &&
       !originalRequest._retry &&
-      !isWatchLogsRequest // 시청 기록 저장 API는 제외
+      !isWatchLogsRequest
     ) {
       originalRequest._retry = true;
 
@@ -75,8 +76,6 @@ api.interceptors.response.use(
 
       if (refreshToken) {
         try {
-          console.log("🔄 Access 토큰 만료! Refresh 토큰으로 갱신 시도...");
-
           // Refresh 토큰으로 새로운 Access 토큰 요청
           const response = await axios.post(
             "http://localhost:8000/api/token/refresh/",
@@ -89,39 +88,19 @@ api.interceptors.response.use(
 
           // 새 토큰 저장
           localStorage.setItem("access_token", newAccessToken);
-          console.log("✅ 토큰 갱신 성공!");
 
           // 원래 요청에 새 토큰 적용 후 재시도
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           return api(originalRequest);
         } catch (refreshError) {
           // Refresh 토큰도 만료된 경우
-          console.error("❌ Refresh 토큰 만료! 로그아웃 처리...");
-
-          // 모든 토큰 및 사용자 데이터 삭제
-          localStorage.clear();
-
-          // 강제 새로고침하여 상태 초기화
-          // setTimeout을 사용하여 localStorage 정리가 완료된 후 새로고침
-          setTimeout(() => {
-            window.location.href = "/";
-            window.location.reload();
-          }, 100);
-
+          handleLogout();
           return Promise.reject(refreshError);
         }
       } else {
         // Refresh 토큰이 없는 경우
-        console.warn("⚠️ Refresh 토큰 없음. 로그인 필요.");
-
-        // 모든 토큰 및 사용자 데이터 삭제
-        localStorage.clear();
-
-        // 강제 새로고침하여 상태 초기화
-        setTimeout(() => {
-          window.location.href = "/";
-          window.location.reload();
-        }, 100);
+        handleLogout();
+        return Promise.reject(error);
       }
     }
 

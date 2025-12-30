@@ -217,9 +217,6 @@ def _handle_question(request, chat_session=None):
             invoke_params["skip_clarification"] = False
             logger.info("[chat] First call, skip_clarification=False, expecting clarification")
 
-        # ★ 디버그: invoke_params 로깅
-        logger.info("[chat] LangGraph invoke_params: %s", {k: v for k, v in invoke_params.items() if k != 'query'})
-
         response_state = asyncio.run(app.ainvoke(invoke_params))
         ai_response = response_state.get("final_answer") or fallback_answer
         logger.info("[chat] AI response len=%s", len(ai_response))
@@ -325,14 +322,22 @@ class ChatQuestionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # 세션 지정 (없으면 현재 세션 키 기준으로 생성)
-        session_id = request.data.get("session_id")
-        if session_id:
-            chat_session = ChatSession.objects.filter(id=session_id, user=request.user).first()
-            if not chat_session:
-                return Response({"error": "invalid session"}, status=400)
-        else:
-            chat_session = _get_or_create_session_for_user(request)
+        # 변수 초기화 (try 블록 밖에서)
+        chat_session = None
+        stream_flag = False
+        
+        try:
+            # 세션 지정 (없으면 현재 세션 키 기준으로 생성)
+            session_id = request.data.get("session_id")
+            if session_id:
+                chat_session = ChatSession.objects.filter(id=session_id, user=request.user).first()
+                if not chat_session:
+                    return Response({"error": "invalid session"}, status=400)
+            else:
+                chat_session = _get_or_create_session_for_user(request)
+        except Exception as e:
+            logger.error(f"[ChatQuestionView] Error in initial processing: {str(e)}", exc_info=True)
+            return Response({"error": f"Server error: {str(e)}"}, status=500)
 
         # 스트리밍 요청 여부 (query string 또는 body)
         stream_flag = (
@@ -420,25 +425,34 @@ class ChatQuestionView(APIView):
                     # 스트리밍을 위한 큐 (asyncio.Queue 사용)
                     import asyncio
                     stream_queue = asyncio.Queue()
-                    loop = asyncio.get_event_loop()
+                    try:
+                        loop = asyncio.get_running_loop()
+                    except RuntimeError:
+                        loop = asyncio.get_event_loop()
                     
                     # 스트리밍 콜백 함수 (각 청크를 큐에 저장)
                     def stream_callback(chunk_text: str):
                         """스트리밍 청크를 큐에 저장 (비동기 큐에 추가)"""
                         try:
+                            logger.info(f"[chat][stream] Callback received chunk: {len(chunk_text)} chars")
                             # 동기 함수에서 비동기 큐에 추가
+                            # LangGraph는 동기 컨텍스트에서 실행되므로 다른 스레드에서 호출될 수 있음
                             if loop.is_running():
-                                # 이미 실행 중인 루프가 있으면 call_soon_threadsafe 사용
-                                asyncio.run_coroutine_threadsafe(
+                                # 실행 중인 루프가 있으면 run_coroutine_threadsafe 사용
+                                future = asyncio.run_coroutine_threadsafe(
                                     stream_queue.put(chunk_text), loop
                                 )
+                                logger.info(f"[chat][stream] Chunk queued via run_coroutine_threadsafe")
+                                # 결과를 기다리지 않음 (non-blocking)
                             else:
-                                # 루프가 실행 중이 아니면 직접 추가
-                                loop.call_soon_threadsafe(
-                                    stream_queue.put_nowait, chunk_text
-                                )
+                                # 루프가 실행 중이 아니면 직접 추가 시도
+                                try:
+                                    stream_queue.put_nowait(chunk_text)
+                                    logger.info(f"[chat][stream] Chunk queued via put_nowait")
+                                except asyncio.QueueFull:
+                                    logger.warn(f"[chat][stream] Queue full, dropping chunk")
                         except Exception as e:
-                            logger.error(f"[chat][stream] Callback error: {e}")
+                            logger.error(f"[chat][stream] Callback error: {e}", exc_info=True)
                     
                     # Thinking 모드 진행 상황 콜백 함수
                     def thinking_callback(event_type: str, data: dict):
@@ -450,16 +464,18 @@ class ChatQuestionView(APIView):
                                 "data": data,
                                 "timestamp": time.time()
                             }
+                            logger.info(f"[chat][thinking] Sending thinking event: {event_type}")
                             if loop.is_running():
                                 asyncio.run_coroutine_threadsafe(
                                     stream_queue.put(thinking_event), loop
                                 )
                             else:
-                                loop.call_soon_threadsafe(
-                                    stream_queue.put_nowait, thinking_event
-                                )
+                                try:
+                                    stream_queue.put_nowait(thinking_event)
+                                except asyncio.QueueFull:
+                                    logger.warn(f"[chat][stream] Queue full, dropping thinking event")
                         except Exception as e:
-                            logger.error(f"[chat][stream] Thinking callback error: {e}")
+                            logger.error(f"[chat][stream] Thinking callback error: {e}", exc_info=True)
                     
                     # 스트리밍 콜백을 state에 추가
                     invoke_params["stream_callback"] = stream_callback
@@ -470,11 +486,14 @@ class ChatQuestionView(APIView):
                     async def run_langgraph():
                         nonlocal ai_response
                         try:
+                            logger.info("[chat][stream] Starting LangGraph execution")
                             async for event in app.astream(invoke_params):
+                                logger.info(f"[chat][stream] LangGraph event: {list(event.keys())}")
                                 # 마지막 상태 처리
                                 if "__end__" in event:
                                     final_state = event["__end__"]
                                     ai_response = final_state.get("final_answer", "") or fallback_answer
+                                    logger.info(f"[chat][stream] Final answer length: {len(ai_response)}")
                                     
                                     # 재질문 데이터 확인
                                     needs_clarification = final_state.get("needs_clarification", False)
@@ -500,6 +519,7 @@ class ChatQuestionView(APIView):
                                     if new_summary:
                                         await async_store_summary(request, new_summary, chat_session=chat_session)
                                     
+                                    logger.info(f"[chat][stream] Sending final response: {len(ai_response)} chars")
                                     await stream_queue.put(("final", ai_response))
                         except UserClarificationRequired as e:
                             # 사용자 재질문이 필요한 경우
@@ -536,17 +556,21 @@ class ChatQuestionView(APIView):
                     langgraph_task = asyncio.create_task(run_langgraph())
                     
                     # 스트리밍 청크 전송
+                    logger.info("[chat][stream] Starting stream processing")
+                    chunk_sent = 0
                     while True:
                         try:
                             # 큐에서 항목 가져오기 (타임아웃 0.1초)
                             try:
                                 item = await asyncio.wait_for(stream_queue.get(), timeout=0.1)
+                                logger.info(f"[chat][stream] Got item from queue: {type(item)}")
                                 
                                 if isinstance(item, tuple):
                                     if item[0] == "clarification":
                                         yield f"data: {json.dumps({'type': 'clarification', 'question': item[1], 'options': item[2]})}\n\n"
                                         break
                                     elif item[0] == "final":
+                                        logger.info(f"[chat][stream] Yielding final response: {len(item[1])} chars")
                                         yield f"data: {json.dumps({'type': 'final', 'text': item[1]})}\n\n"
                                         break
                                     elif item[0] == "error":
@@ -554,14 +578,18 @@ class ChatQuestionView(APIView):
                                         break
                                 elif isinstance(item, dict) and item.get("type") == "thinking":
                                     # Thinking 모드 이벤트 전송
+                                    logger.info(f"[chat][stream] Sending thinking event: {item.get('event')}")
                                     yield f"data: {json.dumps(item)}\n\n"
                                 else:
                                     # 일반 텍스트 청크
+                                    logger.info(f"[chat][stream] Yielding delta chunk: {len(item)} chars")
                                     yield f"data: {json.dumps({'type': 'delta', 'text': item})}\n\n"
+                                    chunk_sent += 1
                             except asyncio.TimeoutError:
                                 # 큐가 비어있으면 계속 대기
                                 if langgraph_task.done():
                                     # 태스크가 완료되었는데 큐가 비어있으면 종료
+                                    logger.info(f"[chat][stream] LangGraph task completed, chunks sent: {chunk_sent}")
                                     break
                                 continue
                         except Exception as e:
@@ -570,6 +598,7 @@ class ChatQuestionView(APIView):
                     
                     # 태스크 완료 대기
                     await langgraph_task
+                    logger.info(f"[chat][stream] Stream processing completed, total chunks: {chunk_sent}")
                             
                 except Exception as e:
                     logger.exception("[chat][stream] sse_stream failed")
@@ -588,13 +617,35 @@ class ChatQuestionView(APIView):
                             yield chunk
                         except StopAsyncIteration:
                             break
+                        except Exception as e:
+                            # 제너레이터 내부 예외 처리
+                            logger.exception(f"[chat][stream] Generator error: {e}")
+                            error_msg = "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+                            yield f"data: {json.dumps({'type': 'error', 'text': error_msg})}\n\n"
+                            break
+                except Exception as e:
+                    # 최상위 예외 처리
+                    logger.exception(f"[chat][stream] Stream generator failed: {e}")
+                    error_msg = "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+                    yield f"data: {json.dumps({'type': 'error', 'text': error_msg})}\n\n"
                 finally:
-                    loop.close()
+                    try:
+                        loop.close()
+                    except Exception as e:
+                        logger.error(f"[chat][stream] Error closing event loop: {e}")
 
-            return StreamingHttpResponse(
-                sse_stream(),
-                content_type="text/event-stream",
-            )
+            try:
+                return StreamingHttpResponse(
+                    sse_stream(),
+                    content_type="text/event-stream",
+                )
+            except Exception as e:
+                logger.exception(f"[chat][stream] Failed to create StreamingHttpResponse: {e}")
+                # 스트리밍 응답 생성 실패 시 일반 에러 응답 반환
+                return Response(
+                    {"error": "스트리밍 응답 생성에 실패했습니다. 잠시 후 다시 시도해주세요."},
+                    status=500
+                )
 
         return _handle_question(request, chat_session=chat_session)
 

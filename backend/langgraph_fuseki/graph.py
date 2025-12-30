@@ -91,15 +91,15 @@ def create_graph_flow(use_optimized: bool = None):
 
     workflow = StateGraph(GraphState)
 
-    # ========== 노드 등록 ==========
-    workflow.add_node("history_check", history_check_node)  # 0단계
-    workflow.add_node("query_classifier", query_classifier_node)  # 1단계
-    workflow.add_node("user_intent_clarification", user_intent_clarification_node)  # 1.5단계 (Phase 1)
-    workflow.add_node("entity_expander", entity_expander_node)  # 2단계
-    workflow.add_node("semantic_expander", semantic_expander_node)  # 3단계
-    workflow.add_node("parallel_knowledge_retrieval", parallel_knowledge_retrieval_node)  # 4단계
-    workflow.add_node("path_evidence_aggregator", path_evidence_aggregator_node)  # 5단계
-    workflow.add_node("story_generator", story_generator_node)  # 6단계
+    # 노드 등록
+    workflow.add_node("history_check", history_check_node)  # Stage 0
+    workflow.add_node("query_classifier", query_classifier_node)  # Stage 1
+    workflow.add_node("user_intent_clarification", user_intent_clarification_node)  # Stage 1.5
+    workflow.add_node("entity_expander", entity_expander_node)  # Stage 2 (키워드 확장 + 엔티티 추출)
+    workflow.add_node("semantic_expander", semantic_expander_node)  # Stage 3
+    workflow.add_node("parallel_knowledge_retrieval", parallel_knowledge_retrieval_node)  # Stage 4
+    workflow.add_node("path_evidence_aggregator", path_evidence_aggregator_node)  # Stage 5
+    workflow.add_node("story_generator", story_generator_node)  # Stage 6
 
     # ========== 플로우 정의 ==========
     # 0. 조건부 시작점: 사용자 선택이 있으면 Stage 1.5부터, 없으면 Stage 0부터

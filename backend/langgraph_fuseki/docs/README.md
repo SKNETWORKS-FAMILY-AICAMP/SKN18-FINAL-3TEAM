@@ -60,7 +60,7 @@ graph TB
         N0[history_check_node<br/>Stage 0: 역사 필터링]
         N1[classify_node<br/>Stage 1: 질문 분류]
         N1_5[user_intent_clarification<br/>Stage 1.5: 사용자 의도 확인]
-        N2[entity_expander_node<br/>Stage 2: 엔티티 추출]
+        N2[entity_expander_node<br/>Stage 2: 키워드 확장 + 엔티티 추출]
         N3[semantic_expander_node<br/>Stage 3: 의미론적 확장]
         N4[parallel_knowledge_retrieval<br/>Stage 4: 5-Thread SPARQL]
         N5[path_evidence_aggregator<br/>Stage 5: 근거 통합]
@@ -92,9 +92,10 @@ graph TB
     N5 --> N6
 
     N0 -.LLM 1회.-> OpenAI
-    N1 -.LLM 2회 병렬.-> OpenAI
+    N1 -.LLM 2회.-> OpenAI
     N1_5 -.LLM 1회 방향생성.-> OpenAI
     N1_5 -.사용자 입력.-> User
+    N2 -.LLM 1회 키워드확장.-> OpenAI
     N6 -.LLM 1회 답변생성.-> OpenAI
 
     N2 -.캐시 로드.-> TTL
@@ -110,6 +111,7 @@ graph TB
     style Fuseki fill:#fff3e0,stroke:#e65100,stroke-width:3px
     style OpenAI fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     style N1_5 fill:#fff9c4,stroke:#f57f17,stroke-width:3px
+    style N2 fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px
     style N3 fill:#ffe0b2,stroke:#e65100,stroke-width:2px
     style N5 fill:#b2dfdb,stroke:#00695c,stroke-width:2px
 ```
@@ -125,15 +127,11 @@ graph TB
     Start([사용자 질문]) --> Stage0[Stage 0: History Check<br/>역사 관련 여부 체크]
 
     Stage0 -->|비역사| Exit([조기 종료])
-    Stage0 -->|역사| Stage1_0[Stage 1-0: 공통 단계<br/>규칙 분류 + 키워드 추출]
+    Stage0 -->|역사| Stage1[Stage 1: Query Classifier<br/>질문 분류 + 키워드 추출 + 방향 생성]
 
-    Stage1_0 --> Stage1_A[Stage 1-A: LLM 방향 생성<br/>재질문 텍스트 생성]
-    Stage1_0 -->|백그라운드 스레드| Stage1_B[Stage 1-B: 키워드 확장<br/>LLM 정밀 분류 + 프로퍼티 그룹]
+    Stage1 --> Stage1_5[Stage 1.5: User Intent Clarification<br/>사용자 선택 대기]
 
-    Stage1_A --> Stage1_5[Stage 1.5: User Intent Clarification<br/>사용자 선택 대기]
-    Stage1_B -.결과 통합.-> Stage1_5
-
-    Stage1_5 --> Stage2[Stage 2: Entity Extractor<br/>TTL + pgvector 하이브리드]
+    Stage1_5 --> Stage2[Stage 2: Entity Expander<br/>키워드 확장 + 엔티티 추출 통합]
     Stage2 --> Stage3[Stage 3: Semantic Expander<br/>시간적/인과/벡터 확장]
     Stage3 --> Stage4[Stage 4: Parallel Knowledge Retrieval<br/>5개 Thread 병렬 SPARQL]
 
@@ -153,10 +151,9 @@ graph TB
     Stage6 --> Answer([최종 답변])
 
     style Stage0 fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style Stage1_0 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style Stage1_A fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style Stage1_B fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,stroke-dasharray: 5 5
+    style Stage1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
     style Stage1_5 fill:#fff9c4,stroke:#f57f17,stroke-width:3px
+    style Stage2 fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px
     style Stage4 fill:#ffe0b2,stroke:#e65100,stroke-width:2px
     style Stage6 fill:#b2dfdb,stroke:#00695c,stroke-width:2px
 ```
@@ -443,11 +440,9 @@ graph TB
 | 단계          | 이름                         | 노드 타입 | 병렬 처리   | LLM         | 사용자 입력 | SPARQL | 주요 작업                                                                  |
 | ------------- | ---------------------------- | --------- | ----------- | ----------- | ----------- | ------ | -------------------------------------------------------------------------- |
 | **Stage 0**   | History Check                | 노드      | ❌          | ✅ 1회      | ❌          | ❌     | 조선시대 역사 질문 필터링 (비역사 질문 조기 종료)                          |
-| **Stage 1-0** | 공통 단계                    | 함수      | ❌          | ❌          | ❌          | ❌     | 규칙 기반 분류 + 키워드 추출 (kiwi)                                        |
-| **Stage 1-A** | LLM 방향 생성                | 노드      | ✅ 스레드   | ✅ 1회      | ❌          | ❌     | LLM 확장 방향 생성 + 재질문 텍스트 (Stage 1-B와 병렬)                      |
-| **Stage 1-B** | 키워드 확장                  | 함수      | ✅ 내부     | ✅ 2회 병렬 | ❌          | ❌     | LLM 정밀 분류 + 키워드 확장 + 프로퍼티 그룹 선택 (백그라운드 스레드)       |
-| **Stage 1.5** | User Intent Clarification    | 노드      | ❌          | ❌          | ✅ 필요시   | ❌     | 사용자 선택 대기 + Stage 1-B 결과 통합                                     |
-| **Stage 2**   | Entity Extractor             | 노드      | ✅ 내부     | ❌          | ❌          | ✅ N회 | TTL 병렬 로딩 + 백그라운드 키워드 확장 + SPARQL 배치 처리 → 상위 30개 선택 |
+| **Stage 1**   | Query Classifier             | 노드      | ❌          | ✅ 2회      | ❌          | ❌     | 질문 분류 + 키워드 추출 + 확장 방향 생성                                   |
+| **Stage 1.5** | User Intent Clarification    | 노드      | ❌          | ❌          | ✅ 필요시   | ❌     | 사용자 선택 대기                                                           |
+| **Stage 2**   | Entity Expander              | 노드      | ❌          | ✅ 1회      | ❌          | ✅ N회 | 키워드 확장 + TTL 매칭 + pgvector 검색 + SPARQL 스코어링 → 상위 30개 선택 |
 | **Stage 3**   | Semantic Expander            | 노드      | ❌          | ❌          | ❌          | ✅ 3회 | 시간적/인과/벡터 기반 엔티티 확장 (30개 → ~75개)                           |
 | **Stage 4**   | Parallel Knowledge Retrieval | 노드      | ✅ 5 Thread | ❌          | ❌          | ✅ 5회 | 5개 관점 병렬 검색 + 양방향 BFS (최대 3-hop) + 프로퍼티 FILTER             |
 | **Stage 5**   | Path Evidence Aggregator     | 노드      | ❌          | ❌          | ❌          | ❌     | 경로 추출 + 근거 통합 + 수렴 노드 감지 (1.1배 부스트) → 상위 15개 선택     |
@@ -455,17 +450,9 @@ graph TB
 
 **병렬 처리 요약**:
 
-- ✅ **Stage 1-A와 Stage 1-B**: Python Threading으로 병렬 실행
-  - Stage 1-A: 메인 스레드에서 LLM 방향 생성
-  - Stage 1-B: 백그라운드 스레드에서 LLM 정밀 분류 + 키워드 확장
-- ✅ **Stage 1-B 내부**: ThreadPoolExecutor로 LLM 2회 병렬 호출
-- ✅ **Stage 2 내부**:
-  - TTL 로딩: ThreadPoolExecutor로 파일 청크 병렬 파싱 (OptimizedTTLLoader)
-  - 백그라운드 키워드 확장: threading.Thread로 LLM 키워드 확장 (필요 시)
-  - SPARQL 배치 처리: ThreadPoolExecutor로 엔티티별 SPARQL 쿼리 병렬 실행 (BatchSPARQLExecutor)
 - ✅ **Stage 4**: ThreadPoolExecutor로 5개 SPARQL 쿼리 병렬 실행
 
-**총 LLM 호출**: 5회 (역사 체크 1회 + Stage 1-A 방향 생성 1회 + Stage 1-B 2회 병렬 + Story Generator 1회)
+**총 LLM 호출**: 5회 (역사 체크 1회 + Stage 1 분류 2회 + Stage 2 키워드 확장 1회 + Story Generator 1회)
 **총 SPARQL 호출**: 8 + N회 (Semantic Expander 3회 + 병렬 검색 5회 + 엔티티 스코어링 N회)
 
 ---
@@ -492,132 +479,51 @@ LLM 호출 1회만 사용 (비용 절감)
 
 ### Stage 1: Query Classifier
 
-**역할**: 질문 분류 및 사용자 의도 확인을 위한 3단계 구조
+**역할**: 질문 분류, 키워드 추출, 확장 방향 생성을 통합한 단일 노드
 
-#### Stage 1-0: 공통 단계
+#### 작업 내용
 
-**역할**: 규칙 기반 분류 + 키워드 추출 (kiwipiepy)
-
-```python
-# 1. 규칙 기반 query_type 분류
-query_type_initial = classify_query_type_by_rules(query)
-# 결과: "causal", "factual", "comparative", "deep_analysis"
-
-# 2. 키워드 추출 (kiwipiepy)
-from kiwipiepy import Kiwi
-kiwi = Kiwi()
-basic_keywords = extract_keywords_with_kiwi(query)
-# 예시: "궁궐을 건축한 왕들은 누가 있는지?"
-# 결과: ['궁궐', '건축', '왕']
-```
-
-**처리 시간**: ~0.1초 (빠른 전처리)
-
-#### Stage 1-A: LLM 방향 생성 (메인 스레드)
-
-**역할**: LLM 기반 확장 방향 생성 + 재질문 텍스트 생성
+1. **규칙 기반 질문 분류**: `causal`, `factual`, `comparative`, `deep_analysis`
+2. **키워드 추출**: kiwipiepy를 사용한 명사 추출
+3. **LLM 기반 확장 방향 생성**: 질문 분석하여 2-4개 답변 방향 동적 생성
+4. **재질문 텍스트 생성**: 템플릿 기반 사용자 선택 인터페이스
 
 ```python
-# LLM 확장 방향 생성
-expansion_directions = generate_llm_based_directions(
-    query=query,
-    keywords=basic_keywords[:5],
-    query_type=query_type_initial
-)
-# 결과: 2-4개의 확장 방향 리스트
-
-# 재질문 텍스트 생성 (템플릿 기반)
-clarification_question = generate_clarification_question(
-    strategy="mixed",
-    directions=expansion_directions,
-    query=query,
-    use_llm=False  # 템플릿 기반
-)
+def query_classifier_node(state: GraphState) -> GraphState:
+    query = state.get("query", "")
+    
+    # 1. 규칙 기반 분류
+    query_type = classify_query_type_by_rules(query)
+    
+    # 2. 키워드 추출 (kiwipiepy)
+    basic_keywords = extract_keywords_with_kiwi(query)
+    
+    # 3. LLM 확장 방향 생성
+    expansion_directions = generate_llm_based_directions(
+        query, basic_keywords, query_type
+    )
+    
+    # 4. 재질문 텍스트 생성
+    clarification_question = generate_clarification_question(
+        strategy="mixed", directions=expansion_directions, query=query
+    )
+    
+    return {
+        **state,
+        "query_type": query_type,
+        "basic_keywords": basic_keywords,
+        "expansion_directions": expansion_directions,
+        "clarification_question": clarification_question,
+        "needs_clarification": True
+    }
 ```
 
-**처리 시간**: ~1-2초 (LLM 호출 1회)
-
-#### Stage 1-B: 키워드 확장 (백그라운드 스레드)
-
-**역할**: LLM 정밀 분류 + 키워드 확장 + 프로퍼티 그룹 선택
-
-**병렬 처리**: Stage 1-A와 동시에 실행 (Python Threading)
-
-```python
-# Stage 1-A 노드 내부에서 백그라운드 스레드 시작
-stage1b_thread = threading.Thread(
-    target=run_stage1b_background,
-    daemon=True
-)
-stage1b_thread.start()
-
-# Stage 1-B 내부: LLM 2회 병렬 호출
-def query_classifier_stage1b_background(state: GraphState):
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        # Thread 1: 의도 분석 + 프로퍼티 그룹 선택
-        future1 = executor.submit(analyze_intent_and_properties)
-
-        # Thread 2: 키워드 확장
-        future2 = executor.submit(expand_keywords)
-
-        # 결과 대기 (병렬 실행으로 약 40-50% 시간 단축)
-        result1 = future1.result()  # query_type, intent, property_groups
-        result2 = future2.result()  # expanded_keywords
-```
-
-**처리 시간**: ~2-3초 (LLM 호출 2회 병렬, 백그라운드 실행)
-
-#### Thread 1: 의도 분석 + 프로퍼티 그룹 선택
-
-**작업 내용**:
-
-1. 질문 유형 분류: `causal`, `factual`, `deep_analysis`, `comparative`
-2. 핵심 의도 파악: 예) "궁궐을 건설한 왕 찾기"
-3. 프로퍼티 그룹 선택: 최대 5개 (32개 그룹 중 선택)
-
-**프로퍼티 그룹 선택 로직**:
-
-```
-질문: "궁궐을 지은 왕"
-  ↓
-프로퍼티 그룹 목록 제공 (명확한 행위 그룹만)
-  - 건설, 설립, 통치, 임명, 사망, 처벌, 유배, 전쟁, 반란...
-  - 제외: "속성"(623개), "기타"(1783개) 등 범용 그룹
-  ↓
-LLM이 관련 그룹 선택 (최대 5개)
-  → ["건설", "설립", "통치"]
-  ↓
-선택된 그룹에서 실제 프로퍼티 추출
-  → ["built", "builtBy", "constructed", "founded", "established", ...]
-  ↓
-SPARQL FILTER 적용 (Stage 4에서 사용)
-  FILTER(?predicate IN (hist:built, hist:builtBy, hist:founded, ...))
-```
+**처리 시간**: ~2-3초 (LLM 호출 2회)
 
 **효과**:
-
-- ✅ 정확도 향상: 관련 프로퍼티만 검색 → 노이즈 감소
-- ✅ 속도 향상: FILTER로 검색 범위 축소
-- ✅ 하드코딩 없음: 데이터 추가 시 `extract_property_groups.py` 재실행만 하면 자동 업데이트
-
-#### Thread 2: 키워드 확장
-
-**작업 내용**:
-
-- 일반명사를 구체적 인스턴스로 확장 (5-10개)
-
-```
-질문: "궁궐을 건축한 왕들은?"
-  ↓
-키워드: ["궁궐", "건축", "왕"]
-  ↓
-LLM으로 키워드 확장
-  → {"궁궐": ["경복궁", "창덕궁", "경덕궁", "창경궁"],
-      "왕": ["태조", "세종", "숙종"]}
-  ↓
-Entity Extractor에서 TTL 매칭
-  → 경복궁, 창덕궁, 태조, 세종 등 엔티티 발견
-```
+- ✅ 단순화된 구조: 복잡한 병렬 처리 제거
+- ✅ 명확한 책임: 한 노드에서 모든 분류 작업 완료
+- ✅ 유지보수성: 코드 이해 및 디버깅 용이
 
 ---
 
@@ -729,143 +635,103 @@ prompt = f"""다음 질문을 분석하여, 사용자가 선택할 수 있는 2-
 
 ---
 
-### Stage 2: Entity Extractor
+### Stage 2: Entity Expander
 
-**역할**: Query Classifier에서 받은 확장된 키워드와 프로퍼티 그룹을 활용하여 관련 엔티티 추출
+**역할**: Stage 1에서 받은 키워드와 사용자 선택 방향을 활용하여 키워드 확장 + 엔티티 추출을 통합 처리
 
 #### 입력 데이터
 
-- ✅ 원본 키워드: `['궁궐', '건축', '왕']`
-- ✅ 확장된 키워드: `{"궁궐": ["경복궁", "창덕궁"], "왕": ["태조", "세종"]}`
-- ✅ 프로퍼티 그룹: `["건설", "설립", "통치"]`
+- ✅ 기본 키워드: `['궁궐', '건축', '왕']` (Stage 1에서 제공)
 - ✅ 사용자 선택 방향: `user_selected_direction` (Stage 1.5에서 설정)
+- ✅ 확장 방향 정보: `expansion_directions` (description, property_groups 포함)
 
-#### 2-1. TTL 정확 매칭 (캐시 활용)
+#### 2-1. 사용자 선택 방향 기반 키워드 확장 (LLM)
 
 ```python
-# ⚡ 캐싱: 파일 변경 없으면 메모리에서 즉시 반환
-_ttl_cache = None
-_ttl_cache_mtime = None
+# 선택된 방향 정보 추출
+selected_direction_info = find_selected_direction(user_selected_direction, expansion_directions)
+description = selected_direction_info.get("description", "")
+property_groups = selected_direction_info.get("property_groups", [])
 
-def load_ttl_entities():
-    if _ttl_cache and _ttl_cache_mtime == current_mtime:
-        return _ttl_cache  # 즉시 반환 (~0ms)
-    # 파일 읽기는 변경 시에만
+# LLM 키워드 확장
+expanded_result = expand_keywords_with_direction(
+    query, basic_keywords, description, property_groups
+)
+expanded_keywords_dict = expanded_result.get("expanded_keywords", {})
 
-# TTL 매칭 로직
-for keyword in all_keywords:  # 확장된 키워드 + 원본 키워드
-    # 1. 정확한 라벨 매칭
+# 확장된 키워드를 기본 키워드에 추가
+for keyword, instances in expanded_keywords_dict.items():
+    expanded_keywords.extend(instances)
+```
+
+**예시**:
+```
+질문: "궁궐을 건축한 왕들은?"
+사용자 선택: "건설 중심 답변"
+  ↓
+LLM 키워드 확장:
+  {"궁궐": ["경복궁", "창덕궁", "경덕궁"], "왕": ["태조", "세종", "숙종"]}
+  ↓
+최종 키워드: ['궁궐', '건축', '왕', '경복궁', '창덕궁', '경덕궁', '태조', '세종', '숙종']
+```
+
+#### 2-2. TTL 정확 매칭 (캐시 활용)
+
+```python
+# TTL 캐싱: 파일 변경 없으면 메모리에서 즉시 반환
+ttl_data = load_ttl_entities()  # 캐시된 데이터 사용
+
+# 정확한 라벨 매칭
+for keyword in expanded_keywords:
     if keyword in ttl_data["label_to_uri"]:
-        entities.append({"uri": uri, "name": keyword, "match_method": "exact"})
-
-    # 2. 부분 매칭
+        uri = ttl_data["label_to_uri"][keyword]
+        entity_type = ttl_data["uri_to_type"].get(uri, "Event")
+        matched_entities.append({
+            "uri": uri, "name": keyword, "type": entity_type,
+            "match_method": "exact", "relevance_score": 1.0
+        })
+    
+    # 부분 매칭 (최대 3개)
     for label, uri in ttl_data["label_to_uri"].items():
         if keyword in label:
-            entities.append({"uri": uri, "name": label, "match_method": "partial"})
+            matched_entities.append({
+                "uri": uri, "name": label, "type": entity_type,
+                "match_method": "partial", "relevance_score": 0.7
+            })
 ```
 
-**장점**:
+#### 2-3. pgvector 유사도 검색 (Fallback)
 
-- ✅ 속도: 네트워크 통신 없음 (~0ms)
-- ✅ 캐싱: 파일 I/O 최소화 (연속 질문 시 ~0.5초 절약)
-
-#### 2-2. pgvector 유사도 검색 (Fallback)
-
-TTL 정확 매칭으로 충분한 엔티티를 찾지 못한 경우:
+TTL 매칭으로 충분한 엔티티를 찾지 못한 경우:
 
 ```python
-from backend.db_pipeline.services.postgres_service import PostgresVectorService
-
-pgvector_service = PostgresVectorService()
-
-# 확장된 키워드로 벡터 검색
-query_text = " ".join(expanded_keywords)  # "경복궁 창덕궁 태조 세종"
-results = pgvector_service.search(
-    query=query_text,
-    top_k=15,
-    threshold=0.7  # 높은 유사도만 선택
-)
-
-# 결과에서 title 추출하여 TTL에서 URI 찾기
-for result in results:
-    entity_name = result["title"]
-    if entity_name in ttl_data["label_to_uri"]:
-        entities.append({
-            "uri": ttl_data["label_to_uri"][entity_name],
-            "name": entity_name,
-            "match_method": "pgvector",
-            "similarity": result["similarity"]
-        })
+if len(matched_entities) < 20 and USE_PGVECTOR:
+    vector_results = search_entities_with_pgvector(
+        expanded_keywords, ttl_data, top_k=15
+    )
+    # TTL에서 URI 찾기 및 추가
 ```
 
-#### 2-3. SPARQL 기반 엔티티 스코어링
-
-**목적**: 키워드와 관련된 엔티티를 우선 선택하기 위해 연결된 노드를 분석하여 관련성 점수 계산
+#### 2-4. SPARQL 기반 엔티티 스코어링
 
 **점수 구성**:
-
 1. 기본 점수: 정확 매칭 1.0, 부분 매칭 0.7, pgvector 0.0~1.0
 2. 엔티티 이름 매칭: 키워드가 엔티티 이름에 포함되면 +0.5/keyword
 3. 연결 노드 매칭: 연결된 노드의 label에 키워드 포함 시 +0.1/connection (최대 +0.3)
 
-**SPARQL 쿼리 (양방향 연결 검색)**:
-
-```sparql
-PREFIX hist: <http://www.example.org/korean-history#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-
-SELECT DISTINCT ?connectedLabel WHERE {
-    {
-        # 나가는 관계
-        <hist:Event_abc123> ?p ?connected .
-        ?connected rdfs:label ?connectedLabel .
-    }
-    UNION
-    {
-        # 들어오는 관계
-        ?connected ?p <hist:Event_abc123> .
-        ?connected rdfs:label ?connectedLabel .
-    }
-} LIMIT 50
-```
-
-**예시**:
-
-```
-질문: "일본 왜군과 조선이 싸운 전투"
-키워드: ["일본", "왜", "전투", "조선"]
-
-엔티티: hist:Event_진주성전투 (label: "진주성 전투(1차)")
-  ├─ 기본 점수: 1.0 (정확 매칭)
-  ├─ 이름 매칭: +0.5 ("전투" 포함)
-  └─ 연결 노드 분석 (SPARQL):
-      ├─ hist:Nation_일본 (label: "일본") → +0.1 ("일본" 매칭!)
-      ├─ hist:Nation_조선 (label: "조선") → +0.1 ("조선" 매칭!)
-      └─ hist:Place_한산도 (label: "한산도") → 매칭 없음
-
-총 점수: 1.0 + 0.5 + 0.2 = 1.7
-```
-
-#### 2-4. 우선순위 정렬 및 상위 30개 선택
+#### 2-5. 상위 30개 엔티티 선택
 
 ```python
-# 모든 엔티티에 대해 점수 계산
-for entity in matched_entities:
-    score = calculate_entity_score_with_connections(entity, all_keywords, ttl_data)
-    entity["relevance_score"] = score
-
-# 점수 기준으로 내림차순 정렬
-matched_entities.sort(key=lambda x: x.get("relevance_score", 0), reverse=True)
-
-# 상위 30개만 선택 (성능 최적화)
-matched_entities = matched_entities[:30]
+# 점수 기준으로 정렬 후 상위 30개 선택
+matched_entities.sort(key=lambda x: x.get("final_score", 0), reverse=True)
+top_entities = matched_entities[:30]
 ```
 
 **효과**:
-
-- ✅ 관련성 우선: 질문과 가장 관련 있는 엔티티부터 처리
-- ✅ 성능 최적화: 30개로 제한하여 후속 처리 속도 향상
-- ✅ 노이즈 감소: 낮은 점수의 무관한 엔티티 제거
+- ✅ 통합 처리: 키워드 확장과 엔티티 추출을 한 노드에서 처리
+- ✅ 방향 반영: 사용자 선택 방향에 맞는 키워드 확장
+- ✅ 성능 최적화: TTL 캐싱으로 연속 질문 시 속도 향상
+- ✅ 관련성 우선: SPARQL 기반 스코어링으로 관련 엔티티 우선 선택
 
 ---
 

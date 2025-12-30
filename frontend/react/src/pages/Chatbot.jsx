@@ -143,25 +143,17 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
     "사용자";
 
   const hydrateMessages = (sessionMessages = []) => {
-    console.log("[hydrateMessages] 🔍 Raw messages from DB:", sessionMessages);
     const normalized = sessionMessages.map((msg) => {
       // 재질문 메타데이터 체크
-      console.log("[hydrateMessages] Checking message:", {
-        role: msg.role,
-        contentStart: msg.content?.substring(0, 50),
-      });
       if (
         msg.role === "assistant" &&
         msg.content.startsWith("__CLARIFICATION_METADATA__:")
       ) {
-        console.log("[hydrateMessages] ✅ Found clarification metadata!");
         try {
           const jsonStr = msg.content.substring(
             "__CLARIFICATION_METADATA__:".length
           );
-          console.log("[hydrateMessages] JSON string:", jsonStr);
           const metadata = JSON.parse(jsonStr);
-          console.log("[hydrateMessages] Parsed metadata:", metadata);
           return {
             type: "clarification",
             question: metadata.question,
@@ -190,30 +182,12 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
       };
 
       // evidences가 있으면 포함
-      console.log("[hydrateMessages] Checking for evidences:", {
-        hasEvidences: !!msg.evidences,
-        evidencesType: typeof msg.evidences,
-        isArray: Array.isArray(msg.evidences),
-        length: msg.evidences?.length,
-        evidences: msg.evidences,
-      });
-
       if (
         msg.evidences &&
         Array.isArray(msg.evidences) &&
         msg.evidences.length > 0
       ) {
         messageObj.evidences = msg.evidences;
-        console.log(
-          "[hydrateMessages] ✅ Found evidences:",
-          msg.evidences.length,
-          msg.evidences
-        );
-      } else if (msg.evidences) {
-        console.log(
-          "[hydrateMessages] ⚠️ Evidences exists but not array or empty:",
-          msg.evidences
-        );
       }
 
       return messageObj;
@@ -237,7 +211,6 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
         setMessages([]);
       } catch (error) {
         if (error.response?.status === 404) {
-          console.warn("대화 기록 API가 아직 구현되지 않았습니다.");
           setChatHistory([]);
         } else {
           console.error("대화 기록 로드 실패:", error);
@@ -336,9 +309,9 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
     try {
       const token = localStorage.getItem("access_token");
       if (!token) {
-        simulateStreamingResponse("로그인 후에 질문할 수 있어요.");
-        setIsSubmitting(false);
-        abortControllerRef.current = null;
+        localStorage.clear();
+        window.location.href = "/";
+        window.location.reload();
         return;
       }
 
@@ -366,7 +339,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
         (streamEvent) => {
           // 스트리밍 이벤트 처리
           if (streamEvent.type === "delta") {
-            // 실시간으로 텍스트 업데이트
+            // 실시간으로 텍스트 업데이트 - 받는 즉시 표시
             accumulatedText =
               streamEvent.fullText || accumulatedText + streamEvent.text;
             setStreamingText(accumulatedText);
@@ -388,6 +361,10 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
             const messageObj = { type: "assistant", text: accumulatedText };
             // evidences는 나중에 추가 가능
             setMessages((prev) => [...prev, messageObj]);
+
+            // 스트리밍 완료 처리
+            setIsSubmitting(false);
+            abortControllerRef.current = null;
           } else if (streamEvent.type === "error") {
             // 에러 타입 처리 - 이미 처리되었음을 표시
             streamErrorHandled = true;
@@ -408,11 +385,6 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
         response.expansion_directions &&
         response.expansion_directions.length > 0
       ) {
-        console.log(
-          "[Chatbot] Showing clarification UI with",
-          response.expansion_directions.length,
-          "options"
-        );
         setStreamingText(""); // 스트리밍 텍스트 초기화
         setMessages((prev) => [
           ...prev,
@@ -451,7 +423,6 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
     } catch (error) {
       // 사용자가 취소한 경우
       if (error.name === "CanceledError" || error.code === "ERR_CANCELED") {
-        console.log("요청이 취소되었습니다.");
         // 마지막 사용자 메시지 제거
         setMessages((prev) => prev.slice(0, -1));
         setIsSubmitting(false);
@@ -461,7 +432,6 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
 
       // 스트리밍 에러가 이미 onStream 콜백에서 처리된 경우 중복 처리 방지
       if (streamErrorHandled) {
-        console.log("스트리밍 에러가 이미 처리되었습니다.");
         return;
       }
 
@@ -559,9 +529,9 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
     try {
       const token = localStorage.getItem("access_token");
       if (!token) {
-        simulateStreamingResponse("로그인 후에 질문할 수 있어요.");
-        setIsSubmitting(false);
-        abortControllerRef.current = null;
+        localStorage.clear();
+        window.location.href = "/";
+        window.location.reload();
         return;
       }
 
@@ -576,6 +546,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
         (streamEvent) => {
           // 스트리밍 이벤트 처리
           if (streamEvent.type === "delta") {
+            // 실시간으로 텍스트 업데이트 - 받는 즉시 표시
             accumulatedText =
               streamEvent.fullText || accumulatedText + streamEvent.text;
             setStreamingText(accumulatedText);
@@ -585,6 +556,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
               setThinkingEvents((prev) => [...prev, streamEvent]);
             }
           } else if (streamEvent.type === "final") {
+            // 최종 답변 완료 - 받는 즉시 처리
             accumulatedText = streamEvent.text;
             setStreamingText("");
             if (isThinkingMode) {
@@ -599,6 +571,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
               messageObj.evidences = response.evidences;
             }
             setMessages((prev) => [...prev, messageObj]);
+            setIsSubmitting(false);
+            abortControllerRef.current = null;
           } else if (streamEvent.type === "error") {
             // 에러 타입 처리 - 이미 처리되었음을 표시
             streamErrorHandled = true;
@@ -643,7 +617,6 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
     } catch (error) {
       // 사용자가 취소한 경우
       if (error.name === "CanceledError" || error.code === "ERR_CANCELED") {
-        console.log("요청이 취소되었습니다.");
         setMessages((prev) => prev.slice(0, -1));
         setIsSubmitting(false);
         abortControllerRef.current = null;
@@ -652,7 +625,6 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
 
       // 스트리밍 에러가 이미 onStream 콜백에서 처리된 경우 중복 처리 방지
       if (streamErrorHandled) {
-        console.log("스트리밍 에러가 이미 처리되었습니다.");
         return;
       }
 

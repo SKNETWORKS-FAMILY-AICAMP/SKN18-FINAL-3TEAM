@@ -21,6 +21,9 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
     const baseURL = api.defaults.baseURL || "";
     const url = `${baseURL}/api/chat/question/`;
     
+    console.log("[chatApi] Starting stream request to:", url);
+    console.log("[chatApi] Request payload:", payload);
+    
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -46,7 +49,10 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
     try {
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          console.log("[chatApi] Stream completed normally");
+          break;
+        }
         
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n\n");
@@ -56,7 +62,10 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
           if (line.startsWith("data: ")) {
             try {
               const jsonStr = line.substring(6);
+              if (jsonStr.trim() === "") continue; // 빈 데이터 스킵
+              
               const data = JSON.parse(jsonStr);
+              console.log("[chatApi] Received event:", data.type, data.text?.length || 0, "chars");
               
               if (data.type === "delta") {
                 fullText += data.text;
@@ -72,8 +81,14 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
                 };
                 onStream({ type: "clarification", ...clarificationData });
               } else if (data.type === "final") {
+                console.log("[chatApi] Received final response:", data.text?.length, "chars");
                 fullText = data.text;
                 onStream({ type: "final", text: data.text });
+                // final 이벤트 후 즉시 종료
+                return {
+                  answer: fullText,
+                  evidences: [],
+                };
               } else if (data.type === "error") {
                 // 에러 타입은 onStream으로만 처리하고 throw하지 않음
                 const errorMessage = data.text || "스트리밍 중 오류가 발생했습니다.";
@@ -99,13 +114,36 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
           break;
         }
       }
+    } catch (error) {
+      console.error("[chatApi] Stream reading error:", error);
+      // 연결이 끊어진 경우에도 지금까지 받은 데이터로 처리
+      if (fullText) {
+        console.log("[chatApi] Using partial response due to connection error");
+        onStream({ type: "final", text: fullText });
+        return {
+          answer: fullText,
+          evidences: [],
+        };
+      }
+      throw error;
     } finally {
       reader.releaseLock();
     }
     
+    console.log("[chatApi] Stream processing completed. ChunkCount:", chunkCount, "FullText length:", fullText.length);
+    
     // 스트리밍 에러가 발생했으면 에러를 throw
     if (streamError) {
       throw new Error(streamError);
+    }
+    
+    // 스트림이 비어있거나 데이터를 받지 못한 경우
+    if (chunkCount === 0 && !fullText && !clarificationData) {
+      console.warn("[chatApi] No data received from stream, falling back to non-streaming");
+      // 비스트리밍 모드로 재시도
+      const config = abortSignal ? { signal: abortSignal } : {};
+      const fallbackResponse = await api.post("/api/chat/question/", { ...payload, stream: false }, config);
+      return fallbackResponse.data;
     }
     
     // 최종 응답 반환
