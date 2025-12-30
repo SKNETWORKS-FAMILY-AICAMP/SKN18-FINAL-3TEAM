@@ -1252,9 +1252,9 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
               {/* Thinking Mode 컴포넌트 (Thinking 모드일 때만 표시) */}
               {isThinkingMode && thinkingEvents.length > 0 && (
                 <div style={{ marginBottom: "24px" }}>
-                  <ThinkingMode 
-                    thinkingEvents={thinkingEvents} 
-                    isComplete={isThinkingComplete} 
+                  <ThinkingMode
+                    thinkingEvents={thinkingEvents}
+                    isComplete={isThinkingComplete}
                   />
                 </div>
               )}

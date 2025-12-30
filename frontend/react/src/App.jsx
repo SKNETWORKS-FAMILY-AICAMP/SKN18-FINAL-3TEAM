@@ -111,6 +111,18 @@ const App = () => {
           // 네트워크 에러는 조용히 처리 (비로그인 상태로 설정)
           setIsLoggedIn(false);
           setUser(null);
+        } else if (error.response?.status === 401 || error.response?.status === 403) {
+          // 401/403 에러는 토큰 만료 또는 인증 실패
+          // axios 인터셉터에서 이미 처리했지만, 여기서도 상태 초기화
+          console.warn("⚠️ 인증 실패. 로그아웃 처리...");
+          localStorage.clear();
+          setIsLoggedIn(false);
+          setUser(null);
+          // 강제 새로고침
+          setTimeout(() => {
+            window.location.href = "/";
+            window.location.reload();
+          }, 100);
         } else {
           // 기타 에러는 콘솔에 표시
           console.error("인증 확인 실패:", error);

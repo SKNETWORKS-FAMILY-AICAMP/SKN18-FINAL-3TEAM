@@ -99,13 +99,14 @@ api.interceptors.response.use(
           console.error("❌ Refresh 토큰 만료! 로그아웃 처리...");
 
           // 모든 토큰 및 사용자 데이터 삭제
-          localStorage.removeItem("access_token");
-          localStorage.removeItem("refresh_token");
-          localStorage.removeItem("user");
+          localStorage.clear();
 
           // 강제 새로고침하여 상태 초기화
-          window.location.href = "/";
-          window.location.reload();
+          // setTimeout을 사용하여 localStorage 정리가 완료된 후 새로고침
+          setTimeout(() => {
+            window.location.href = "/";
+            window.location.reload();
+          }, 100);
 
           return Promise.reject(refreshError);
         }
@@ -114,13 +115,13 @@ api.interceptors.response.use(
         console.warn("⚠️ Refresh 토큰 없음. 로그인 필요.");
 
         // 모든 토큰 및 사용자 데이터 삭제
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("user");
+        localStorage.clear();
 
         // 강제 새로고침하여 상태 초기화
-        window.location.href = "/";
-        window.location.reload();
+        setTimeout(() => {
+          window.location.href = "/";
+          window.location.reload();
+        }, 100);
       }
     }
 
