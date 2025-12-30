@@ -1278,6 +1278,10 @@ def entity_expander_node(state: GraphState) -> GraphState:
         }
     
     state["executed_nodes"] = state.get("executed_nodes", []) + ["entity_expander"]
-    state["node_execution_times"] = node_times
+    
+    # 노드 실행 시간 기록 (기존 시간들 유지)
+    if "node_execution_times" not in state:
+        state["node_execution_times"] = {}
+    state["node_execution_times"]["entity_expander"] = node_elapsed
 
     return state

@@ -18,10 +18,21 @@ import MarkdownRenderer from "../components/common/MarkdownRenderer";
 import EvidencePathView from "../components/common/EvidencePathView";
 
 const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
-  // 스크롤바 스타일을 위한 CSS 추가
+  // 스크롤바 스타일 및 드래그 색상을 위한 CSS 추가
   useEffect(() => {
     const style = document.createElement("style");
+    style.id = "chatbot-selection-style";
     style.textContent = `
+      /* 챗봇 페이지 드래그 색상 - !important로 전역 스타일 오버라이드 */
+      ::selection {
+        background-color: ${COLORS.primary} !important;
+        color: #000000 !important;
+      }
+      ::-moz-selection {
+        background-color: ${COLORS.primary} !important;
+        color: #000000 !important;
+      }
+      
       .clarification-cards-scroll::-webkit-scrollbar {
         height: 6px;
       }
@@ -84,8 +95,18 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
         color: #EF4444 !important;
       }
     `;
+    // 기존 스타일이 있으면 제거 후 추가
+    const existingStyle = document.getElementById("chatbot-selection-style");
+    if (existingStyle) {
+      document.head.removeChild(existingStyle);
+    }
     document.head.appendChild(style);
-    return () => document.head.removeChild(style);
+    return () => {
+      const styleToRemove = document.getElementById("chatbot-selection-style");
+      if (styleToRemove) {
+        document.head.removeChild(styleToRemove);
+      }
+    };
   }, []);
 
   const [message, setMessage] = useState("");
@@ -527,9 +548,9 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
   return (
     <div
       style={{
-        marginTop: "96px",
-        height: "calc(100vh - 96px)",
-        maxHeight: "calc(100vh - 96px)",
+        marginTop: "72px", // 96px → 72px로 줄임 (24px 절약)
+        height: "calc(100vh - 72px)", // 높이도 맞춰서 조정
+        maxHeight: "calc(100vh - 72px)",
         backgroundColor: COLORS.background,
         display: "flex",
         flexDirection: "row",
@@ -548,7 +569,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
             style={{
               position: "fixed",
               left: showHistory ? "280px" : "40px", // 닫혀있을 때는 사이드바보다 오른쪽에
-              top: "110px",
+              top: "82px", // 96px → 82px로 조정 (헤더 높이 + 10px 여백)
               width: "72px",
               height: "72px",
               backgroundColor: "transparent",
@@ -592,7 +613,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
             style={{
               position: "fixed",
               left: showHistory ? "0" : "-320px",
-              top: "96px",
+              top: "72px", // 96px → 72px로 조정
               width: "300px",
               backgroundColor: "rgba(255, 255, 255, 0.95)",
               backdropFilter: "blur(20px)",
@@ -606,7 +627,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
               flexDirection: "column",
               overflowY: "auto",
               overflowX: "hidden",
-              height: "calc(100vh - 96px)",
+              height: "calc(100vh - 72px)", // 96px → 72px로 조정
               padding: "32px 24px",
               transition: "left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               zIndex: 1000,

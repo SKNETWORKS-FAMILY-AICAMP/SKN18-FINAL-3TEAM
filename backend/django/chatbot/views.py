@@ -223,6 +223,31 @@ def _handle_question(request, chat_session=None):
         ai_response = response_state.get("final_answer") or fallback_answer
         logger.info("[chat] AI response len=%s", len(ai_response))
 
+        # ★ 노드별 실행 시간 로그 출력
+        node_times = response_state.get("node_execution_times", {})
+        total_time = sum(node_times.values()) if node_times else 0
+        
+        if node_times:
+            logger.info("[chat] ========================================")
+            logger.info("[chat] 노드별 실행 시간:")
+            # 노드 실행 순서대로 출력
+            node_order = [
+                "history_check", "query_classifier", "user_intent_clarification", 
+                "entity_expander", "semantic_expander", "parallel_knowledge_retrieval",
+                "path_evidence_aggregator", "story_generator"
+            ]
+            for node_name in node_order:
+                if node_name in node_times:
+                    logger.info("[chat] - %s: %.2f초", node_name, node_times[node_name])
+            
+            # 기타 노드들 (순서에 없는 것들)
+            for node_name, time_val in node_times.items():
+                if node_name not in node_order:
+                    logger.info("[chat] - %s: %.2f초", node_name, time_val)
+            
+            logger.info("[chat] 총 실행 시간: %.2f초", total_time)
+            logger.info("[chat] ========================================")
+
         # ★ Evidences 정보 추출 (경로 시각화용)
         evidences = response_state.get("evidences", [])
         logger.info("[chat] Evidences count=%s", len(evidences))
