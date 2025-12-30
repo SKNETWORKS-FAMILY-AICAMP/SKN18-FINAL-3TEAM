@@ -18,7 +18,9 @@ class Video(models.Model):
         verbose_name='영상 제목'
     )
     video_url = models.TextField(
-        verbose_name='영상 URL'
+        verbose_name='영상 URL',
+        null=True,
+        blank=True,  # 수정 필요: 운영 시 필수 필드로 되돌릴 것
     )
     upload_date = models.DateTimeField(
         auto_now_add=True,

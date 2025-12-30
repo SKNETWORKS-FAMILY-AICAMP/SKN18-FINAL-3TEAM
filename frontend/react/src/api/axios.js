@@ -17,6 +17,12 @@ api.interceptors.request.use(
     if (token) {
       // Authorization 헤더에 Bearer 토큰 추가
       config.headers.Authorization = `Bearer ${token}`;
+      console.log(
+        "📤 API 요청:",
+        config.url,
+        "| 토큰 첨부:",
+        token.substring(0, 20) + "..."
+      );
     }
 
     return config;
@@ -72,14 +78,12 @@ api.interceptors.response.use(
 
     // 401 또는 403 에러 (인증/권한 실패) && 아직 재시도하지 않은 경우
     // 단, 시청 기록 저장 API는 403이 정상일 수 있으므로 제외
-    const isWatchLogsRequest = originalRequest.url?.includes(
-      "/api/activity/watch-logs/"
-    );
-
+    const isWatchLogsRequest = originalRequest.url?.includes('/api/activity/watch-logs/');
+    
     if (
       (error.response?.status === 401 || error.response?.status === 403) &&
       !originalRequest._retry &&
-      !isWatchLogsRequest
+      !isWatchLogsRequest // 시청 기록 저장 API는 제외
     ) {
       originalRequest._retry = true;
 
@@ -87,6 +91,8 @@ api.interceptors.response.use(
 
       if (refreshToken) {
         try {
+          console.log("🔄 Access 토큰 만료! Refresh 토큰으로 갱신 시도...");
+
           // Refresh 토큰으로 새로운 Access 토큰 요청
           const response = await axios.post(
             "http://localhost:8000/api/token/refresh/",
@@ -99,19 +105,28 @@ api.interceptors.response.use(
 
           // 새 토큰 저장
           localStorage.setItem("access_token", newAccessToken);
+          console.log("✅ 토큰 갱신 성공!");
 
           // 원래 요청에 새 토큰 적용 후 재시도
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           return api(originalRequest);
         } catch (refreshError) {
           // Refresh 토큰도 만료된 경우
+          console.error("❌ Refresh 토큰 만료! 로그아웃 처리...");
           handleLogout();
+          // 토큰 삭제
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+
+          // 홈 페이지로 리다이렉트 (로그인 버튼 표시됨)
+          window.location.href = "/";
+
           return Promise.reject(refreshError);
         }
       } else {
-        // Refresh 토큰이 없는 경우
-        handleLogout();
-        return Promise.reject(error);
+        // Refresh 토큰이 없는 경우 홈 페이지로
+        console.warn("⚠️ Refresh 토큰 없음. 로그인 필요.");
+        window.location.href = "/";
       }
     }
 

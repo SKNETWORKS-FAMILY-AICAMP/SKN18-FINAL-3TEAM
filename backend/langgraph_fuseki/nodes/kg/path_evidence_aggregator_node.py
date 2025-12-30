@@ -1064,18 +1064,17 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
             evidence = {
                 "type": thread_type,
                 "description": path.get("description", ""),
-                "weight": final_weight,  # ✅ 새로운 점수 (1점 만점)
+                "weight": final_weight,  # 새로운 점수 (1점 만점)
                 "relevance_score": path.get("relevance_score", 1.0),  # 유지 (참고용)
                 "source": f"Thread: {thread_type}",
                 "raw_data": path,
                 "is_convergence": convergence_node in convergence_node_uris if convergence_node else False,
-                # ⭐ v2.0 Scoring System Metadata
                 "metadata": {
                     "expansion_method": expansion_method,
                     "thread_type": thread_type,
                     "entity_match_type": entity_match_type,
                 },
-                # ⭐ 경로 추적 정보 (프론트엔드 시각화용)
+                # 경로 추적 정보 (프론트엔드 시각화용)
                 "trace": trace_info
             }
 
@@ -1125,7 +1124,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     # # 5. 점수 기반으로 쿼리 타입별 최적 개수 선택
     # # 5-1. 점수 기반으로 상위 후보 선별 (30-50개)
     # candidate_count = min(max(30, len(sorted_evidences) // 2), len(sorted_evidences))
-    # # ⭐ 쿼리 타입별 최적 Evidence 개수 (실험 데이터 기반)
+    # # 쿼리 타입별 최적 Evidence 개수 (실험 데이터 기반)
     # # 출처: backend/ragas/ontology_evaluate/docs/experiments/EVIDENCE_CONTRIBUTION_ANALYSIS.md
     # OPTIMAL_EVIDENCE_COUNT = {
     #     "factual": 5,        # N=4~5 권장 (소수 핵심 정보, 상위 5개까지 0.55 유지)
@@ -1151,7 +1150,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     print(f"  │     - 후보 근거: {len(candidate_evidences)}개 / 전체 {len(sorted_evidences)}개 (점수 기반 선별)")
     
     # 5-2. LLM이 질문 의도에 맞는 근거 선택 (개수는 LLM이 결정)
-    # ⭐ 쿼리 타입별 최적 Evidence 개수 (가이드라인으로 사용)
+    # 쿼리 타입별 최적 Evidence 개수 (가이드라인으로 사용)
     OPTIMAL_EVIDENCE_COUNT = {
         "factual": 5,        # N=4~5 권장 (소수 핵심 정보, 상위 5개까지 0.55 유지)
         "causal": 8,         # N=5~8 권장 (인과 연결, 상위 8개까지 0.45 유지)
@@ -1172,7 +1171,7 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
         query_intent,
         query_type,
         state=state,
-        top_k=None  # ⭐ LLM이 개수 결정 (OPTIMAL_EVIDENCE_COUNT는 가이드라인으로 사용)
+        top_k=None  # LLM이 개수 결정 (OPTIMAL_EVIDENCE_COUNT는 가이드라인으로 사용)
     )
     optimal_k = OPTIMAL_EVIDENCE_COUNT.get(query_type, 10)
     print(f"  │     - 최종 선택: {len(top_evidences)}개 (LLM 판단, {query_type} 권장: {optimal_k}개)")

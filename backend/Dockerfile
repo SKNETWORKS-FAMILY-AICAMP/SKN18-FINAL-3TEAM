@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app/backend
+    PYTHONPATH=/app/backend:/app
 
 WORKDIR /app
 
@@ -16,5 +16,6 @@ RUN curl -Ls https://astral.sh/uv/install.sh | sh \
     && /root/.local/bin/uv pip install --system --no-cache-dir -r /app/requirements.txt
 
 COPY backend /app/backend
+COPY frontend/video_pipeline /app/frontend/video_pipeline
 COPY backend/django/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
