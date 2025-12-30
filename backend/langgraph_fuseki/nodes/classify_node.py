@@ -1024,6 +1024,21 @@ def query_classifier_stage1a_node(state: GraphState) -> GraphState:
     query = state.get("query", "")
     query_type_initial = state.get("query_type_initial", "")
     basic_keywords = state.get("basic_keywords", [])
+    
+    # skip_clarification=True이고 이미 expansion_directions가 있으면 재생성하지 않음
+    skip_clarification = state.get("skip_clarification", False)
+    existing_expansion_directions = state.get("expansion_directions", [])
+    
+    print(f"[DEBUG] Stage 1-A 스킵 체크: skip_clarification={skip_clarification}, expansion_directions={len(existing_expansion_directions)}개")
+    
+    if skip_clarification and existing_expansion_directions:
+        print("\n" + "=" * 70)
+        print("[Stage 1-A] LLM 방향 생성 - 스킵 (이미 생성됨)")
+        print("=" * 70)
+        print(f"  └─ 기존 expansion_directions {len(existing_expansion_directions)}개 유지")
+        return state
+    elif skip_clarification and not existing_expansion_directions:
+        print(f"[WARN] skip_clarification=True이지만 expansion_directions가 없음. 재생성 진행.")
 
     print("\n" + "=" * 70)
     print("[Stage 1-A] LLM 방향 생성")

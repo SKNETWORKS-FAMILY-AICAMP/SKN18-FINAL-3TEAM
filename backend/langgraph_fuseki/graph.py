@@ -102,8 +102,35 @@ def create_graph_flow(use_optimized: bool = None):
     workflow.add_node("story_generator", story_generator_node)  # 6단계
 
     # ========== 플로우 정의 ==========
-    # 0. 시작: 역사 관련 여부 체크 (최우선)
-    workflow.set_entry_point("history_check")
+    # 0. 조건부 시작점: 사용자 선택이 있으면 Stage 1.5부터, 없으면 Stage 0부터
+    def determine_entry_point(state: GraphState) -> str:
+        """시작점 결정: 사용자 선택 여부에 따라 분기"""
+        user_selected_direction = state.get("user_selected_direction")
+        skip_clarification = state.get("skip_clarification", False)
+        
+        if user_selected_direction and skip_clarification:
+            # 사용자가 이미 선택했으면 Stage 1.5부터 시작 (체크포인트 복원)
+            # Stage 1.5에서 체크포인트 복원 + Stage 1-B 완료 대기 + 결과 통합 후 Stage 2로 진행
+            print(f"[INFO] 체크포인트 복원: Stage 1.5부터 시작 (user_selected_direction={user_selected_direction})")
+            return "user_intent_clarification"
+        else:
+            # 첫 실행이면 Stage 0부터 시작
+            print("[INFO] 새 실행: Stage 0부터 시작")
+            return "history_check"
+
+    # 가상의 시작 노드 추가
+    workflow.add_node("entry_router", lambda state: state)
+    workflow.set_entry_point("entry_router")
+    
+    # 시작점에서 조건부 분기
+    workflow.add_conditional_edges(
+        "entry_router",
+        determine_entry_point,
+        {
+            "history_check": "history_check",
+            "user_intent_clarification": "user_intent_clarification"
+        }
+    )
 
     # 1. 조건부 분기: 역사 관련 질문 여부에 따라 분기
     def route_after_history_check(state: GraphState) -> str:

@@ -209,16 +209,34 @@ def detect_convergence_nodes(inference_paths: dict, query_entities: list) -> lis
 
             # connected_entities 쓰레드에서 수렴 노드 추출
             if thread_type == "connected_entities":
-                convergence_node = raw_data.get("convergence_node")
-                entity1_label = raw_data.get("label1", "")
-                entity2_label = raw_data.get("label2", "")
+                convergence_node_raw = raw_data.get("convergence_node")
+                label1_raw = raw_data.get("label1", "")
+                label2_raw = raw_data.get("label2", "")
+
+                # dict 형태면 value 추출, 아니면 그대로 사용
+                if isinstance(convergence_node_raw, dict):
+                    convergence_node = convergence_node_raw.get("value", "")
+                else:
+                    convergence_node = convergence_node_raw
+                
+                if isinstance(label1_raw, dict):
+                    entity1_label = label1_raw.get("value", "")
+                else:
+                    entity1_label = label1_raw
+                
+                if isinstance(label2_raw, dict):
+                    entity2_label = label2_raw.get("value", "")
+                else:
+                    entity2_label = label2_raw
 
                 if convergence_node:
                     if convergence_node not in entity_connections:
                         entity_connections[convergence_node] = set()
 
-                    entity_connections[convergence_node].add(entity1_label)
-                    entity_connections[convergence_node].add(entity2_label)
+                    if entity1_label:
+                        entity_connections[convergence_node].add(entity1_label)
+                    if entity2_label:
+                        entity_connections[convergence_node].add(entity2_label)
 
             # 일반 경로에서도 중간 노드 추출
             entities_in_path = raw_data.get("entities", [])
@@ -453,15 +471,39 @@ def _detect_entity_match_type(raw_data: dict, query_entities: list, thread_type:
 
 
 def extract_outgoing_relations(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None, selected_properties: list = None) -> list:
-    """엔티티에서 나가는 모든 관계 추출 (엔티티 → ?)"""
+    """이미 검색된 결과(bindings)에서 엔티티의 나가는 관계 경로 추출 (엔티티 → ?)
+    
+    주의: 이 함수는 새로운 지식 검색을 수행하지 않습니다.
+    parallel_knowledge_retrieval_node에서 이미 검색된 결과를 후처리하는 함수입니다.
+    
+    초기 프로퍼티 의도를 통해 선택된 그룹의 predicate만 사용합니다.
+    selected_properties가 제공되면 해당 목록에 포함된 predicate만 추출합니다.
+    
+    주의: BFS 경로(method: "bidirectional_bfs")는 predicate 필터링을 건너뜁니다.
+    
+    필터링이 필요한 이유:
+    1. Fallback 쿼리: generate_fallback_sparql은 selected_properties를 받지 않아 필터링 안 됨
+    2. 방어적 프로그래밍: SPARQL 쿼리에서 필터링이 누락된 경우를 대비
+    3. 일관성: 모든 경로에 동일한 필터링 로직 적용
+    """
     paths = []
     seen = set()
+    
+    # selected_properties를 집합으로 변환 (빠른 검색용)
+    allowed_predicates = set(selected_properties) if selected_properties else None
 
     for binding in bindings:
         entity_label = binding.get("entityLabel", {}).get("value", "")
         predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
         obj = binding.get("object", {}).get("value", "")
         obj_label = binding.get("objectLabel", {}).get("value", "") or obj.split("#")[-1]
+
+        # BFS 경로는 predicate 필터링 건너뛰기
+        is_bfs_path = binding.get("method", {}).get("value", "") == "bidirectional_bfs"
+        
+        # predicate 필터링: selected_properties가 있으면 해당 목록에 포함된 것만 허용 (BFS 경로 제외)
+        if not is_bfs_path and allowed_predicates is not None and predicate not in allowed_predicates:
+            continue
 
         # 중복 제거
         key = f"{entity_label}-{predicate}-{obj_label}"
@@ -499,15 +541,39 @@ def extract_outgoing_relations(bindings: list, base_weight: float, query_entitie
 
 
 def extract_incoming_relations(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None, selected_properties: list = None) -> list:
-    """엔티티로 들어오는 모든 관계 추출 (? → 엔티티)"""
+    """이미 검색된 결과(bindings)에서 엔티티로 들어오는 관계 경로 추출 (? → 엔티티)
+    
+    주의: 이 함수는 새로운 지식 검색을 수행하지 않습니다.
+    parallel_knowledge_retrieval_node에서 이미 검색된 결과를 후처리하는 함수입니다.
+    
+    초기 프로퍼티 의도를 통해 선택된 그룹의 predicate만 사용합니다.
+    selected_properties가 제공되면 해당 목록에 포함된 predicate만 추출합니다.
+    
+    주의: BFS 경로(method: "bidirectional_bfs")는 predicate 필터링을 건너뜁니다.
+    
+    필터링이 필요한 이유:
+    1. Fallback 쿼리: generate_fallback_sparql은 selected_properties를 받지 않아 필터링 안 됨
+    2. 방어적 프로그래밍: SPARQL 쿼리에서 필터링이 누락된 경우를 대비
+    3. 일관성: 모든 경로에 동일한 필터링 로직 적용
+    """
     paths = []
     seen = set()
+    
+    # selected_properties를 집합으로 변환 (빠른 검색용)
+    allowed_predicates = set(selected_properties) if selected_properties else None
 
     for binding in bindings:
         subject = binding.get("subject", {}).get("value", "")
         subject_label = binding.get("subjectLabel", {}).get("value", "") or subject.split("#")[-1]
         predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
         entity_label = binding.get("entityLabel", {}).get("value", "")
+
+        # BFS 경로는 predicate 필터링 건너뛰기
+        is_bfs_path = binding.get("method", {}).get("value", "") == "bidirectional_bfs"
+        
+        # predicate 필터링: selected_properties가 있으면 해당 목록에 포함된 것만 허용 (BFS 경로 제외)
+        if not is_bfs_path and allowed_predicates is not None and predicate not in allowed_predicates:
+            continue
 
         # 중복 제거
         key = f"{subject_label}-{predicate}-{entity_label}"
@@ -594,21 +660,48 @@ def extract_entity_properties(bindings: list, base_weight: float, query_entities
 
 def extract_connected_entities(bindings: list, base_weight: float, query_entities: list = None, entity_boost_mode: str = None, selected_properties: list = None) -> list:
     """
-    연결된 엔티티들 간의 관계 추출 (2-hop)
+    연결된 엔티티들 간의 관계 추출 (최대 3-hop)
+    
+    parallel_knowledge_retrieval_node에서 BFS는 max_depth=3으로 탐색하므로,
+    최대 3-hop까지의 경로를 포함합니다.
+    
+    주의: BFS 경로(method: "bidirectional_bfs")는 predicate 필터링을 건너뜁니다.
     """
     paths = []
     seen = set()
+    
+    # selected_properties를 집합으로 변환 (빠른 검색용)
+    allowed_predicates = set(selected_properties) if selected_properties else None
 
     for binding in bindings:
         entity1 = binding.get("label1", {}).get("value", "")
-        predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
+        predicate = binding.get("predicate", {}).get("value", "").split("#")[-1] if binding.get("predicate") else ""
         entity2 = binding.get("label2", {}).get("value", "")
+        
+        # BFS 경로 확인
+        is_bfs_path = binding.get("method", {}).get("value", "") == "bidirectional_bfs"
+        
+        # BFS 경로가 아닌 경우에만 predicate 필터링 적용
+        if not is_bfs_path:
+            # predicate 필터링: selected_properties가 있으면 해당 목록에 포함된 것만 허용
+            if allowed_predicates is not None and predicate and predicate not in allowed_predicates:
+                continue
 
         # 중복 제거
-        key = f"{entity1}-{predicate}-{entity2}"
-        if key in seen or not predicate:
+        # BFS 경로는 path 정보로, 일반 경로는 predicate로 구분
+        if is_bfs_path:
+            path = binding.get("path", {}).get("value", "")
+            key = f"{entity1}-BFS-{entity2}-{path}"
+        else:
+            key = f"{entity1}-{predicate}-{entity2}"
+            
+        if key in seen:
             continue
         seen.add(key)
+        
+        # BFS 경로가 아닌 경우 predicate가 없으면 건너뛰기
+        if not is_bfs_path and not predicate:
+            continue
 
         # Relevance score 계산 (entity_boost_mode 테스트용)
         relevance_score = calculate_improved_relevance_score(binding, query_entities, "connected_entities", entity_boost_mode, selected_properties)
@@ -617,22 +710,48 @@ def extract_connected_entities(bindings: list, base_weight: float, query_entitie
         if entity_boost_mode and relevance_score == 0.0:
             continue
 
-        # 프로퍼티 이름을 읽기 좋게 변환
-        predicate_display = predicate.replace("has", "").replace("_", " ")
+        # BFS 경로와 일반 경로를 다르게 처리
+        if is_bfs_path:
+            # BFS 경로: path 정보 사용
+            path = binding.get("path", {}).get("value", "")
+            path_length = binding.get("path_length", {}).get("value", "")
+            convergence = binding.get("convergence_node", {}).get("value", "")
+            
+            description = f"{entity1} ↔ {entity2} (경로: {path})"
+            
+            paths.append({
+                "type": "connection",
+                "entity1": entity1,
+                "entity2": entity2,
+                "predicate": "",  # BFS 경로는 predicate 없음
+                "predicate_display": "BFS 경로",
+                "path": path,
+                "path_length": path_length,
+                "convergence_node": convergence,
+                "method": "bidirectional_bfs",
+                "weight": base_weight * relevance_score,
+                "relevance_score": relevance_score,
+                "description": description,
+                "raw_data": binding
+            })
+        else:
+            # 일반 경로: predicate 사용
+            # 프로퍼티 이름을 읽기 좋게 변환
+            predicate_display = predicate.replace("has", "").replace("_", " ")
 
-        description = f"{entity1} ↔ [{predicate_display}] ↔ {entity2}"
+            description = f"{entity1} ↔ [{predicate_display}] ↔ {entity2}"
 
-        paths.append({
-            "type": "connection",
-            "entity1": entity1,
-            "predicate": predicate,
-            "predicate_display": predicate_display,
-            "entity2": entity2,
-            "weight": base_weight * relevance_score,
-            "relevance_score": relevance_score,
-            "description": description,
-            "raw_data": binding
-        })
+            paths.append({
+                "type": "connection",
+                "entity1": entity1,
+                "predicate": predicate,
+                "predicate_display": predicate_display,
+                "entity2": entity2,
+                "weight": base_weight * relevance_score,
+                "relevance_score": relevance_score,
+                "description": description,
+                "raw_data": binding
+            })
 
     # weight 기준으로 정렬 (내림차순)
     paths.sort(key=lambda x: x["weight"], reverse=True)
@@ -770,7 +889,7 @@ def select_top_evidences_with_llm(
 {intent_info}질문 유형: {query_type}
 
 ## 후보 근거 목록 (총 {len(candidate_evidences)}개)
-아래 근거들은 점수 기반으로 선별된 상위 30개 후보입니다. 질문의 의도와 가장 관련성이 높은 근거를 선택하세요.
+아래 근거들은 점수 기반으로 선별된 상위 {len(candidate_evidences)}개 후보입니다. 질문의 의도와 가장 관련성이 높은 근거를 선택하세요.
 
 {evidence_text}
 
@@ -968,7 +1087,12 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
         for path in paths:
             # 수렴 노드 플래그
             raw_data = path.get("raw_data", {})
-            convergence_node = raw_data.get("convergence_node")
+            # convergence_node가 dict 형태면 value 추출
+            convergence_node_raw = raw_data.get("convergence_node")
+            if isinstance(convergence_node_raw, dict):
+                convergence_node = convergence_node_raw.get("value", "")
+            else:
+                convergence_node = convergence_node_raw
 
             # Evidence metadata 추출 (v2.0 scoring system)
             expansion_method = raw_data.get("expansion_method", "none")
@@ -1170,12 +1294,12 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
     # print(f"  │     - 최종 선택: {len(top_evidences)}개 (점수 기반, {query_type} 최적: {optimal_k}개)")
 
     # 5. 하이브리드 방식: 점수 기반 선별 → LLM 기반 최종 선택
-    # 5-1. 점수 기반으로 상위 30개 후보 선별
-    candidate_count = min(30, len(sorted_evidences))
+    # 5-1. 점수 기반으로 상위 후보 선별 (최소 30개, 최대 전체 개수)
+    candidate_count = min(max(30, len(sorted_evidences) // 2), len(sorted_evidences))
     candidate_evidences = sorted_evidences[:candidate_count]
     
     print(f"  │\n  │   [LLM 기반 근거 선택]")
-    print(f"  │     - 후보 근거: {len(candidate_evidences)}개 (점수 기반 선별)")
+    print(f"  │     - 후보 근거: {len(candidate_evidences)}개 / 전체 {len(sorted_evidences)}개 (점수 기반 선별)")
     
     # 5-2. LLM이 질문 의도에 맞는 근거 선택 (개수는 LLM이 결정)
     # ⭐ 쿼리 타입별 최적 Evidence 개수 (가이드라인으로 사용)

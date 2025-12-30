@@ -603,107 +603,8 @@ def get_ttl_labels_by_type(ttl_data: dict) -> dict:
     return labels_by_type
 
 
-def expand_keywords_with_llm(keywords: list, query: str, state=None) -> list:
-    """
-    LLM으로 키워드를 구체적인 인스턴스로 확장
-    
-    예: "궁궐" → ["경복궁", "창덕궁", "경덕궁", "창경궁"]
-    예: "환국" → ["갑술환국", "기사환국", "경신환국"]
-    
-    Args:
-        keywords: 추출된 키워드 리스트
-        query: 원본 질문 (맥락 제공)
-    
-    Returns:
-        확장된 키워드 리스트 (원본 + 확장)
-    """
-    if not keywords:
-        return []
-    
-    # 일반명사 감지 (TTL에 없는 키워드)
-    general_nouns = []
-    ttl_data = load_ttl_entities()
-    
-    for kw in keywords:
-        # TTL에 정확히 매칭되지 않는 키워드만 확장
-        if kw not in ttl_data["label_to_uri"]:
-            # 부분 매칭도 확인
-            matched = any(kw in label for label in ttl_data["label_to_uri"].keys())
-            if not matched:
-                general_nouns.append(kw)
-    
-    if not general_nouns:
-        return keywords  # 확장할 키워드 없음
-    
-    try:
-        llm = ChatOpenAI(
-            model=os.getenv("OPENAI_MODEL"),
-            temperature=0
-        )
-        
-        prompt = f"""다음 질문에서 추출된 일반명사를 구체적인 역사적 인스턴스로 확장하세요.
-
-## 질문
-{query}
-
-## 일반명사 (확장 필요)
-{', '.join(general_nouns)}
-
-## 확장 규칙
-- "궁궐" → 경복궁, 창덕궁, 경덕궁, 창경궁, 경희궁 등
-- "환국" → 갑술환국, 기사환국, 경신환국, 갑인환국 등
-- "왕" → 태조, 세종, 숙종, 정조 등 (질문 맥락에 맞는 왕들)
-- "사건" → 질문 맥락에 맞는 구체적 사건명
-- **중요: "조선", "조선시대", "조선왕조"는 확장하지 마세요. 모든 데이터가 조선 데이터이므로 의미가 없습니다.**
-
-## 출력 형식
-JSON 형식으로 출력하세요:
-{{"expanded": {{"궁궐": ["경복궁", "창덕궁"], "환국": ["갑술환국", "기사환국"]}}}}
-
-확장할 수 없으면 빈 객체로 출력하세요."""
-        
-        response = llm.invoke(prompt)
-        
-        # 토큰 사용량 추출 및 state에 누적
-        if state is not None:
-            token_update = extract_and_accumulate_tokens(state, response)
-            state.update(token_update)
-        
-        content = response.content.strip()
-        
-        # JSON 파싱
-        if "```" in content:
-            content = content.split("```")[1]
-            if content.startswith("json"):
-                content = content[4:]
-        
-        result = json.loads(content)
-        expanded_dict = result.get("expanded", {})
-        
-        # "조선" 관련 키워드는 제외 (모든 데이터가 조선 데이터이므로)
-        joseon_keywords = {'조선', '조선시대', '조선왕조', '한국', '우리나라'}
-        
-        # 확장된 키워드 추가
-        expanded_keywords = list(keywords)  # 원본 유지
-        
-        for general_noun, instances in expanded_dict.items():
-            # "조선" 관련 키워드는 확장하지 않음
-            if general_noun not in joseon_keywords:
-                # 확장된 인스턴스에서도 "조선" 관련 항목 제거
-                filtered_instances = [inst for inst in instances if inst not in joseon_keywords]
-                if filtered_instances:
-                    if general_noun in expanded_keywords:
-                        # 일반명사 제거하고 구체적 인스턴스 추가
-                        expanded_keywords.remove(general_noun)
-                    expanded_keywords.extend(filtered_instances)
-        
-        print(f"  └─ [DEBUG] 키워드 확장: {general_nouns} → {sum(len(v) for v in expanded_dict.values())}개 인스턴스")
-        return expanded_keywords
-        
-    except Exception as e:
-        print(f"  └─ [[ERROR] 키워드 확장 실패: {e}")
-        return keywords  # 실패 시 원본 반환
-
+# [REMOVED] expand_keywords_with_llm 함수 제거됨
+# Stage 1-B에서 키워드 확장을 수행하므로 Stage 2에서는 백그라운드 확장이 불필요함
 
 # [DEPRECATED] Fuseki 검색 제거됨 (TTL 매칭만 사용)
 # def search_fuseki_with_keywords(keywords: list) -> list:
@@ -833,42 +734,45 @@ def entity_expander_node(state: GraphState) -> GraphState:
     # 2. 키워드 추출 (kiwipiepy) - classify_node에서 이미 추출됨, 재사용 가능
     query_keywords = extract_keywords_from_query(query, for_vector_search=False)
 
-    # 3. 키워드 확장 처리 (비동기 방식)
-    # 사용자 선택 방향에 따라 키워드 확장 전략 결정
+    # 3. 키워드 확장 처리 (Stage 1-B 결과 사용)
+    # Stage 2부터 시작하는 경우 Stage 1-B 백그라운드 작업 완료 대기
     expanded_keywords_from_classify = state.get("expanded_keywords", [])
     expanded_keywords_dict = state.get("expanded_keywords_dict", {})
 
-    if expanded_keywords_from_classify:
-        # classify_node에서 이미 확장됨 (즉시 사용)
-        print(f"  ├─ 기존 확장 키워드 사용: {len(expanded_keywords_from_classify)}개")
-        expanded_keywords = expanded_keywords_from_classify
-        use_background_expansion = False
-    else:
-        # 백그라운드 키워드 확장 시작 (비동기)
-        print(f"  ├─ 백그라운드 키워드 확장 시작...")
-        use_background_expansion = True
-        
-        # 일단 기본 키워드로 시작 (즉시 처리)
-        expanded_keywords = query_keywords.copy()
-        
-        # 백그라운드에서 LLM 키워드 확장 (별도 스레드)
-        import threading
-        import queue
-        
-        expansion_queue = queue.Queue()
-        
-        def background_keyword_expansion():
-            try:
-                llm_expanded = expand_keywords_with_llm(query_keywords, query, state=state)
-                expansion_queue.put(("success", llm_expanded))
-            except Exception as e:
-                expansion_queue.put(("error", str(e)))
-        
-        expansion_thread = threading.Thread(target=background_keyword_expansion)
-        expansion_thread.daemon = True
-        expansion_thread.start()
+    if not expanded_keywords_from_classify:
+        # Stage 1-B 결과가 없는 경우 백그라운드 작업 확인 및 대기
+        stage1b_task_id = state.get("stage1b_task_id")
+        if stage1b_task_id:
+            print(f"  ├─ Stage 1-B 백그라운드 작업 대기 중... (task_id={stage1b_task_id})")
+            from backend.langgraph_fuseki.utils.clarification_utils import get_stage1b_result
+            stage1b_result = get_stage1b_result(stage1b_task_id, True, state, timeout=60)
+            
+            if stage1b_result.get("status") == "success":
+                expanded_keywords_from_classify = stage1b_result.get("expanded_keywords", [])
+                expanded_keywords_dict = stage1b_result.get("expanded_keywords_dict", {})
+                print(f"  ├─ Stage 1-B 백그라운드 결과 수신: {len(expanded_keywords_from_classify)}개 키워드")
+                
+                # state에 결과 저장 (다음 노드들이 사용할 수 있도록)
+                state["expanded_keywords"] = expanded_keywords_from_classify
+                state["expanded_keywords_dict"] = expanded_keywords_dict
+                if stage1b_result.get("query_type"):
+                    state["query_type"] = stage1b_result["query_type"]
+                if stage1b_result.get("selected_property_groups"):
+                    state["selected_property_groups"] = stage1b_result["selected_property_groups"]
+                    state["selected_properties"] = stage1b_result.get("selected_properties", [])
+            else:
+                print(f"  ├─ [WARN] Stage 1-B 백그라운드 실패: {stage1b_result.get('status', 'unknown')}")
 
-    # 원본 키워드와 확장된 키워드 병합 (현재 사용 가능한 것만)
+    if expanded_keywords_from_classify:
+        # Stage 1-B에서 이미 확장됨 (즉시 사용)
+        print(f"  ├─ Stage 1-B 확장 키워드 사용: {len(expanded_keywords_from_classify)}개")
+        expanded_keywords = expanded_keywords_from_classify
+    else:
+        # Stage 1-B 결과가 없는 경우 (비정상 상황)
+        print(f"  ├─ [WARN] Stage 1-B 확장 키워드 없음, 기본 키워드만 사용: {len(query_keywords)}개")
+        expanded_keywords = query_keywords.copy()
+
+    # 원본 키워드와 확장된 키워드 병합
     all_keywords = list(set(query_keywords + expanded_keywords))
 
     # query_type은 query_classifier_node에서 이미 설정됨
@@ -1080,59 +984,6 @@ def entity_expander_node(state: GraphState) -> GraphState:
 
     print(f"  │  └─ TTL 매칭: {ttl_matched}개")
 
-    # 백그라운드 키워드 확장 결과 확인 및 통합
-    if use_background_expansion:
-        try:
-            # 비블로킹으로 확장 결과 확인 (최대 2초 대기)
-            import time
-            wait_start = time.time()
-            expansion_result = None
-            
-            while time.time() - wait_start < 2.0:  # 최대 2초 대기
-                try:
-                    expansion_result = expansion_queue.get_nowait()
-                    break
-                except queue.Empty:
-                    time.sleep(0.1)
-            
-            if expansion_result:
-                status, result = expansion_result
-                if status == "success" and result:
-                    # 확장된 키워드로 추가 TTL 매칭
-                    print(f"  ├─ 백그라운드 확장 완료: {len(result)}개 키워드")
-                    
-                    additional_keywords = [kw for kw in result if kw not in all_keywords]
-                    if additional_keywords:
-                        print(f"  │  ├─ 추가 키워드로 TTL 매칭: {len(additional_keywords)}개")
-                        
-                        additional_matched = 0
-                        for keyword in additional_keywords:
-                            # 정확한 라벨 매칭
-                            if keyword in ttl_data["label_to_uri"]:
-                                uri = ttl_data["label_to_uri"][keyword]
-                                entity_type = ttl_data["uri_to_type"].get(uri, "Event")
-                                key = uri or keyword
-                                if key not in seen:
-                                    seen.add(key)
-                                    matched_entities.append({
-                                        "type": entity_type,
-                                        "name": keyword,
-                                        "uri": uri,
-                                        "matched": True,
-                                        "match_method": "exact_expanded"
-                                    })
-                                    additional_matched += 1
-                        
-                        print(f"  │  └─ 추가 매칭: {additional_matched}개")
-                        all_keywords.extend(additional_keywords)
-                else:
-                    print(f"  │  └─ 백그라운드 확장 실패: {result}")
-            else:
-                print(f"  │  └─ 백그라운드 확장 진행 중 (2초 타임아웃)")
-                
-        except Exception as e:
-            print(f"  │  └─ 백그라운드 확장 오류: {e}")
-    
     # 최종 TTL 매칭 개수 업데이트
     ttl_matched = len([e for e in matched_entities if e.get("match_method", "").startswith("exact")])
 
@@ -1382,12 +1233,51 @@ def entity_expander_node(state: GraphState) -> GraphState:
             if state.get("query_type_initial") == "causal":
                 final_query_type = "deep_analysis"
 
-    return {
-        **state,
-        "extracted_entities": matched_entities,
-        "ontology_schema": ontology_schema,
-        "ttl_data": ttl_data,
-        "query_type": final_query_type,  # 최종 확정
-        "executed_nodes": state.get("executed_nodes", []) + ["entity_expander"],
-        "node_execution_times": node_times
+    # 최종 상태 업데이트
+    state["extracted_entities"] = matched_entities
+    state["ontology_schema"] = ontology_schema
+    state["ttl_data"] = ttl_data
+    state["query_type"] = final_query_type  # 최종 확정
+    
+    # 키워드 확장 추적 정보 저장 (프론트엔드 시각화용)
+    keyword_expansion_trace = {
+        "initial_keywords": query_keywords,
+        "expanded_keywords": expanded_keywords if expanded_keywords != query_keywords else [],
+        "expansion_method": "classify_node",  # Stage 1-B에서 확장됨
+        "expansion_successful": len(expanded_keywords) > len(query_keywords)
     }
+    state["keyword_expansion_trace"] = keyword_expansion_trace
+    
+    # 엔티티별 키워드 매칭 정보 저장
+    for entity in matched_entities:
+        # 어떤 키워드에서 추출되었는지 추적
+        entity_name = entity.get("name", "")
+        matched_keyword = None
+        is_from_expansion = False
+        
+        # 기본 키워드에서 매칭 확인
+        for kw in query_keywords:
+            if kw in entity_name or entity_name in kw:
+                matched_keyword = kw
+                is_from_expansion = False
+                break
+        
+        # 확장 키워드에서 매칭 확인 (기본 키워드에서 매칭되지 않은 경우)
+        if not matched_keyword:
+            for kw in expanded_keywords:
+                if kw not in query_keywords and (kw in entity_name or entity_name in kw):
+                    matched_keyword = kw
+                    is_from_expansion = True
+                    break
+        
+        # 매칭 정보 저장
+        entity["keyword_trace"] = {
+            "matched_keyword": matched_keyword or entity.get("matched_keyword", ""),
+            "is_from_expansion": is_from_expansion,
+            "expansion_method": "llm_expansion" if is_from_expansion else "initial_extraction"
+        }
+    
+    state["executed_nodes"] = state.get("executed_nodes", []) + ["entity_expander"]
+    state["node_execution_times"] = node_times
+
+    return state
