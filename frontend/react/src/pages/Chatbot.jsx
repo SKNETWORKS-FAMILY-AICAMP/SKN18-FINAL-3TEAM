@@ -310,8 +310,13 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
       const token = localStorage.getItem("access_token");
       if (!token) {
         localStorage.clear();
-        window.location.href = "/";
-        window.location.reload();
+        // 프론트엔드 URL로 리다이렉트
+        const frontendUrl =
+          window.location.port === "8000" ||
+          window.location.hostname.includes("8000")
+            ? "http://localhost:3000/"
+            : `${window.location.origin}/`;
+        window.location.href = frontendUrl;
         return;
       }
 
@@ -330,6 +335,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
       // 실제 스트리밍 처리
       let accumulatedText = "";
       let clarificationData = null;
+      let finalHandled = false; // ★ final 이벤트 처리 완료 플래그
 
       const response = await sendQuestion(
         userMessage,
@@ -359,10 +365,18 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
               setIsThinkingComplete(true);
             }
             const messageObj = { type: "assistant", text: accumulatedText };
-            // evidences는 나중에 추가 가능
+            // ★ evidences 처리
+            if (
+              streamEvent.evidences &&
+              Array.isArray(streamEvent.evidences) &&
+              streamEvent.evidences.length > 0
+            ) {
+              messageObj.evidences = streamEvent.evidences;
+            }
             setMessages((prev) => [...prev, messageObj]);
 
             // 스트리밍 완료 처리
+            finalHandled = true; // ★ 완료 플래그 설정
             setIsSubmitting(false);
             abortControllerRef.current = null;
           } else if (streamEvent.type === "error") {
@@ -396,6 +410,11 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
           },
         ]);
         setIsSubmitting(false);
+        return;
+      }
+
+      // ★ final 이벤트가 이미 처리되었으면 fallback 건너뛰기
+      if (finalHandled) {
         return;
       }
 
@@ -530,13 +549,19 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
       const token = localStorage.getItem("access_token");
       if (!token) {
         localStorage.clear();
-        window.location.href = "/";
-        window.location.reload();
+        // 프론트엔드 URL로 리다이렉트
+        const frontendUrl =
+          window.location.port === "8000" ||
+          window.location.hostname.includes("8000")
+            ? "http://localhost:3000/"
+            : `${window.location.origin}/`;
+        window.location.href = frontendUrl;
         return;
       }
 
       // 선택한 방향을 백엔드로 전달 (direction_id와 title 함께 전송)
       let accumulatedText = "";
+      let finalHandled = false; // ★ final 이벤트 처리 완료 플래그
 
       const response = await sendQuestion(
         `__CLARIFICATION__:${directionId}:${optionTitle}`,
@@ -563,14 +588,18 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
               setIsThinkingComplete(true);
             }
             const messageObj = { type: "assistant", text: accumulatedText };
+            // ★ evidences는 streamEvent에서 가져오거나, 나중에 response에서 처리
             if (
-              response.evidences &&
-              Array.isArray(response.evidences) &&
-              response.evidences.length > 0
+              streamEvent.evidences &&
+              Array.isArray(streamEvent.evidences) &&
+              streamEvent.evidences.length > 0
             ) {
-              messageObj.evidences = response.evidences;
+              messageObj.evidences = streamEvent.evidences;
             }
             setMessages((prev) => [...prev, messageObj]);
+
+            // 스트리밍 완료 처리
+            finalHandled = true; // ★ 완료 플래그 설정
             setIsSubmitting(false);
             abortControllerRef.current = null;
           } else if (streamEvent.type === "error") {
@@ -586,6 +615,11 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
           }
         }
       );
+
+      // ★ final 이벤트가 이미 처리되었으면 fallback 건너뛰기
+      if (finalHandled) {
+        return;
+      }
 
       // 스트리밍이 완료되지 않은 경우 (fallback)
       if (accumulatedText) {

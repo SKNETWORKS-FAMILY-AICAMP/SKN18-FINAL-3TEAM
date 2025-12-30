@@ -1,510 +1,413 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { COLORS } from '../../../constants/theme';
 
 /**
- * Claude의 Thinking 모드와 유사한 AI 사고 과정 시각화 컴포넌트
+ * Claude 스타일의 단계별 접힘이 가능한 AI 사고 과정 시각화 컴포넌트
+ * - 각 단계가 개별 박스로 표시
+ * - 단계가 끝나면 해당 단계만 자동으로 접힘
+ * - 현재 진행 중인 단계는 펼쳐져서 표시
  */
-const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [visibleEvents, setVisibleEvents] = useState([]);
-  const [currentStep, setCurrentStep] = useState(0);
 
-  // 이벤트가 추가될 때마다 점진적으로 표시 (더 빠른 애니메이션)
-  useEffect(() => {
-    if (thinkingEvents.length > visibleEvents.length) {
-      const timer = setTimeout(() => {
-        setVisibleEvents(thinkingEvents.slice(0, visibleEvents.length + 1));
-        setCurrentStep(visibleEvents.length + 1);
-      }, 150); // 150ms로 더 빠르게
-      return () => clearTimeout(timer);
+// 단계 그룹 정의 (관련 이벤트들을 그룹화)
+const STAGE_GROUPS = {
+  'question_analysis': {
+    title: '질문 분석',
+    icon: '🔍',
+    events: ['history_check_started', 'history_check_completed', 'question_analysis_started', 'question_type_classified', 'keywords_extracted'],
+    color: '#3B82F6'
+  },
+  'intent_clarification': {
+    title: '의도 확인',
+    icon: '💭',
+    events: ['direction_generation_started', 'direction_generation_completed', 'intent_options_generated', 'user_selection_processing', 'intent_integration'],
+    color: '#8B5CF6'
+  },
+  'entity_expansion': {
+    title: '키워드 확장 및 엔티티 추출',
+    icon: '🧩',
+    events: ['entity_expansion_started', 'keyword_expansion_started', 'keyword_expansion_completed', 'ttl_matching_started', 'ttl_matching_completed', 'pgvector_search_started', 'pgvector_search_completed', 'sparql_scoring_started', 'entity_expansion_completed'],
+    color: '#10B981'
+  },
+  'semantic_expansion': {
+    title: '의미론적 확장',
+    icon: '🌐',
+    events: ['semantic_expansion_started', 'temporal_expansion_completed', 'causal_expansion_completed', 'pgvector_expansion_completed'],
+    color: '#F59E0B'
+  },
+  'knowledge_retrieval': {
+    title: '지식 검색',
+    icon: '🔎',
+    events: ['thread_weights_applied', 'sparql_search_completed'],
+    color: '#EC4899'
+  },
+  'answer_generation': {
+    title: '답변 생성',
+    icon: '✍️',
+    events: ['answer_generation_started'],
+    color: '#06B6D4'
+  }
+};
+
+// 이벤트를 스테이지 그룹으로 매핑
+const getStageGroup = (eventType) => {
+  for (const [groupId, group] of Object.entries(STAGE_GROUPS)) {
+    if (group.events.includes(eventType)) {
+      return { groupId, ...group };
     }
-  }, [thinkingEvents, visibleEvents]);
+  }
+  return { groupId: 'other', title: '기타 처리', icon: '📋', color: COLORS.gray };
+};
 
-  // 완료 시 자동으로 접기 (더 빠르게)
+// 개별 단계 컴포넌트
+const ThinkingStep = ({ stage, events, isActive, isComplete, onToggle }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const contentRef = useRef(null);
+  
+  // 완료되면 자동으로 접기
   useEffect(() => {
-    if (isComplete && thinkingEvents.length > 0) {
+    if (isComplete && !isActive) {
       const timer = setTimeout(() => {
         setIsExpanded(false);
-      }, 1500); // 1.5초 후 자동으로 접기
+      }, 800);
       return () => clearTimeout(timer);
     }
-  }, [isComplete, thinkingEvents.length]);
-
-  if (thinkingEvents.length === 0) {
-    return null;
-  }
-
-  const getEventIcon = (eventType) => {
-    const iconMap = {
-      keywords_extracted: '🔍',
-      classification_started: '🎯',
-      intent_options_generated: '💭',
-      user_selection_processing: '⚡',
-      intent_integration: '🔗',
-      semantic_expansion_started: '🌐',
-      temporal_expansion_completed: '⏰',
-      causal_expansion_completed: '🔄',
-      pgvector_expansion_completed: '🔍',
-      thread_weights_applied: '⚖️',
-      sparql_search_completed: '🔎',
-      answer_generation_started: '✍️'
-    };
-    return iconMap[eventType] || '📋';
-  };
-
-  const getEventColor = (eventType, status) => {
-    if (status === 'completed') return COLORS.success || '#10B981';
-    if (status === 'processing') return COLORS.primary;
-    if (status === 'error') return COLORS.error || '#EF4444';
-    return COLORS.gray;
-  };
-
-  const getProgressPercentage = (eventType) => {
-    const progressMap = {
-      keywords_extracted: 10,
-      classification_started: 20,
-      intent_options_generated: 30,
-      user_selection_processing: 40,
-      intent_integration: 50,
-      semantic_expansion_started: 60,
-      temporal_expansion_completed: 70,
-      causal_expansion_completed: 75,
-      pgvector_expansion_completed: 80,
-      thread_weights_applied: 85,
-      sparql_search_completed: 90,
-      answer_generation_started: 95
-    };
-    return progressMap[eventType] || 0;
-  };
-
-  const renderEventContent = (event) => {
-    const { event: eventType, data } = event;
-
-    switch (eventType) {
-      case 'keywords_extracted':
-        return (
-          <div>
-            <div style={{ marginBottom: '8px' }}>
-              <strong>추출된 키워드:</strong> {data.keywords?.slice(0, 8).join(', ')}
-              {data.keywords?.length > 8 && ` 외 ${data.keywords.length - 8}개`}
-            </div>
-            <div style={{ fontSize: '12px', color: COLORS.gray }}>
-              질문 유형: {data.query_type}
-            </div>
-          </div>
-        );
-
-      case 'classification_started':
-        return (
-          <div>
-            <div style={{ marginBottom: '8px' }}>
-              질문을 <strong>{data.query_type}</strong> 유형으로 분류했습니다.
-            </div>
-            <div style={{ fontSize: '12px', color: COLORS.gray }}>
-              전략: {data.strategies?.join(', ')}
-            </div>
-          </div>
-        );
-
-      case 'intent_options_generated':
-        return (
-          <div>
-            <div style={{ marginBottom: '8px' }}>
-              <strong>{data.total_count}개</strong>의 의도 선택지를 생성했습니다.
-            </div>
-            <div style={{ fontSize: '11px', color: COLORS.gray }}>
-              처리 시간: {data.processing_time?.toFixed(2)}초
-            </div>
-          </div>
-        );
-
-      case 'intent_integration':
-        return (
-          <div>
-            <div style={{ marginBottom: '8px' }}>
-              선택된 의도: <strong>{data.selected_intent?.title}</strong>
-            </div>
-            <div style={{ fontSize: '11px', color: COLORS.gray, marginBottom: '8px' }}>
-              {data.selected_intent?.description}
-            </div>
-            {data.expanded_keywords?.length > 0 && (
-              <div style={{ fontSize: '11px', color: COLORS.gray }}>
-                확장 키워드: {data.expanded_keywords.slice(0, 5).join(', ')}
-                {data.expanded_keywords.length > 5 && ` 외 ${data.expanded_keywords.length - 5}개`}
-              </div>
-            )}
-          </div>
-        );
-
-      case 'semantic_expansion_started':
-        return (
-          <div>
-            <div style={{ marginBottom: '8px' }}>
-              <strong>{data.entity_count}개</strong> 엔티티에 대한 의미론적 확장을 시작합니다.
-            </div>
-            {data.weight_matrix && (
-              <div style={{ 
-                fontSize: '11px', 
-                color: COLORS.gray, 
-                marginBottom: '8px',
-                padding: '8px',
-                backgroundColor: '#f8f9fa',
-                borderRadius: '4px',
-                border: '1px solid #e9ecef'
-              }}>
-                <div style={{ fontWeight: '600', marginBottom: '4px' }}>
-                  <span style={{ color: COLORS.primary }}>가중치 매트릭스</span> ({data.query_type})
-                </div>
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                  <span style={{ 
-                    padding: '2px 6px', 
-                    backgroundColor: '#e3f2fd', 
-                    borderRadius: '4px',
-                    fontSize: '10px',
-                    fontWeight: '500'
-                  }}>
-                    Semantic: {Math.round(data.weight_matrix.semantic_weight * 100)}%
-                  </span>
-                  <span style={{ 
-                    padding: '2px 6px', 
-                    backgroundColor: '#f3e5f5', 
-                    borderRadius: '4px',
-                    fontSize: '10px',
-                    fontWeight: '500'
-                  }}>
-                    Thread: {Math.round(data.weight_matrix.thread_weight * 100)}%
-                  </span>
-                  <span style={{ 
-                    padding: '2px 6px', 
-                    backgroundColor: '#e8f5e8', 
-                    borderRadius: '4px',
-                    fontSize: '10px',
-                    fontWeight: '500'
-                  }}>
-                    Entity: {Math.round(data.weight_matrix.entity_boost * 100)}%
-                  </span>
-                </div>
-              </div>
-            )}
-            <div style={{ fontSize: '11px', color: COLORS.gray }}>
-              활성화된 방법: {Object.entries(data.expansion_methods || {})
-                .filter(([_, method]) => method.enabled)
-                .map(([name, method]) => `${name} (${method.description})`)
-                .join(', ')}
-            </div>
-          </div>
-        );
-
-      case 'temporal_expansion_completed':
-      case 'causal_expansion_completed':
-      case 'pgvector_expansion_completed':
-        return (
-          <div>
-            <div style={{ marginBottom: '4px' }}>
-              <strong>{data.results_count}개</strong> 결과를 찾았습니다.
-            </div>
-            <div style={{ fontSize: '11px', color: COLORS.gray }}>
-              처리 시간: {data.processing_time?.toFixed(2)}초
-            </div>
-          </div>
-        );
-
-      case 'thread_weights_applied':
-        return (
-          <div>
-            <div style={{ marginBottom: '8px' }}>
-              <strong>{data.entity_count}개</strong> 엔티티에 대해 <strong>{data.active_threads?.length}개</strong> Thread로 검색합니다.
-            </div>
-            {data.weight_matrix && (
-              <div style={{ 
-                fontSize: '11px', 
-                color: COLORS.gray,
-                padding: '8px',
-                backgroundColor: '#f8f9fa',
-                borderRadius: '4px',
-                border: '1px solid #e9ecef'
-              }}>
-                <div style={{ fontWeight: '600', marginBottom: '4px' }}>
-                  <span style={{ color: COLORS.primary }}>가중치 매트릭스</span> ({data.query_type})
-                </div>
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                  <span style={{ 
-                    padding: '2px 6px', 
-                    backgroundColor: '#f3e5f5', 
-                    borderRadius: '4px',
-                    fontSize: '10px',
-                    fontWeight: '500'
-                  }}>
-                    Thread: {Math.round(data.weight_matrix.thread * 100)}%
-                  </span>
-                  <span style={{ 
-                    padding: '2px 6px', 
-                    backgroundColor: '#e3f2fd', 
-                    borderRadius: '4px',
-                    fontSize: '10px',
-                    fontWeight: '500'
-                  }}>
-                    Semantic: {Math.round(data.weight_matrix.semantic * 100)}%
-                  </span>
-                  <span style={{ 
-                    padding: '2px 6px', 
-                    backgroundColor: '#e8f5e8', 
-                    borderRadius: '4px',
-                    fontSize: '10px',
-                    fontWeight: '500'
-                  }}>
-                    Boost: {Math.round(data.weight_matrix.entity_boost * 100)}%
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-
-      case 'sparql_search_completed':
-        return (
-          <div>
-            <div style={{ marginBottom: '8px' }}>
-              SPARQL 검색 완료: <strong>{data.total_results}개</strong> 결과
-            </div>
-            {data.thread_results && (
-              <div style={{ 
-                fontSize: '11px', 
-                color: COLORS.gray,
-                marginBottom: '4px'
-              }}>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {Object.entries(data.thread_results).map(([thread, count]) => (
-                    <span key={thread} style={{ 
-                      padding: '2px 6px', 
-                      backgroundColor: '#e8f4fd', 
-                      borderRadius: '4px',
-                      fontSize: '10px',
-                      fontWeight: '500'
-                    }}>
-                      {thread}: {count}개
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div style={{ fontSize: '11px', color: COLORS.gray }}>
-              처리 시간: {data.processing_time?.toFixed(2)}초
-            </div>
-          </div>
-        );
-
-      case 'answer_generation_started':
-        return (
-          <div>
-            <div style={{ marginBottom: '8px' }}>
-              <strong>{data.evidence_count}개</strong> 근거를 바탕으로 답변을 생성합니다.
-            </div>
-            <div style={{ fontSize: '11px', color: COLORS.gray }}>
-              질문 유형: {data.query_type} | 스트리밍: {data.stream_mode ? '활성화' : '비활성화'}
-            </div>
-          </div>
-        );
-
-      default:
-        return (
-          <div style={{ fontSize: '12px', color: COLORS.gray }}>
-            {data.title || '처리 중...'}
-          </div>
-        );
+  }, [isComplete, isActive]);
+  
+  // 활성화되면 펼치기
+  useEffect(() => {
+    if (isActive) {
+      setIsExpanded(true);
     }
+  }, [isActive]);
+  
+  const toggleExpand = () => {
+    setIsExpanded(!isExpanded);
+    if (onToggle) onToggle();
   };
-
-  if (thinkingEvents.length === 0) {
-    return null;
-  }
-
-  const currentProgress = visibleEvents.length > 0 ? 
-    getProgressPercentage(visibleEvents[visibleEvents.length - 1]?.event) : 0;
 
   return (
     <div style={{
-      marginBottom: '16px',
-      border: `1px solid ${COLORS.border}`,
+      marginBottom: '12px',
+      border: `1px solid ${isActive ? stage.color : '#e5e7eb'}`,
       borderRadius: '12px',
       overflow: 'hidden',
       backgroundColor: COLORS.white,
-      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)'
+      boxShadow: isActive 
+        ? `0 2px 12px ${stage.color}20` 
+        : '0 1px 3px rgba(0, 0, 0, 0.05)',
+      transition: 'all 0.3s ease'
     }}>
       {/* 헤더 */}
       <div
         style={{
           padding: '12px 16px',
-          backgroundColor: isComplete ? '#f8f9fa' : '#e3f2fd',
-          borderBottom: `1px solid ${COLORS.border}`,
+          backgroundColor: isActive ? `${stage.color}10` : '#f9fafb',
+          borderBottom: isExpanded ? `1px solid ${isActive ? stage.color : '#e5e7eb'}` : 'none',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          transition: 'background-color 0.2s'
         }}
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={toggleExpand}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ fontSize: '16px' }}>
-            {isComplete ? '🧠' : '⚡'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* 상태 인디케이터 */}
+          <div style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '50%',
+            backgroundColor: isComplete ? `${stage.color}20` : (isActive ? stage.color : '#e5e7eb'),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '14px',
+            transition: 'all 0.3s'
+          }}>
+            {isComplete ? (
+              <span style={{ color: stage.color }}>✓</span>
+            ) : isActive ? (
+              <div style={{
+                width: '10px',
+                height: '10px',
+                border: `2px solid white`,
+                borderTop: `2px solid transparent`,
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite'
+              }} />
+            ) : (
+              <span style={{ fontSize: '12px' }}>{stage.icon}</span>
+            )}
           </div>
+          
           <span style={{ 
             fontSize: '14px', 
             fontWeight: '600',
-            color: COLORS.dark 
+            color: isActive ? stage.color : COLORS.dark
           }}>
-            {isComplete ? 'AI 사고 과정 (완료)' : 'AI 사고 과정'}
+            {stage.title}
           </span>
-          <span style={{ 
-            fontSize: '12px', 
-            color: COLORS.gray,
-            backgroundColor: 'rgba(255,255,255,0.7)',
-            padding: '2px 6px',
-            borderRadius: '10px'
-          }}>
-            {visibleEvents.length}단계
-          </span>
-          {!isComplete && (
-            <span style={{ 
-              fontSize: '11px', 
-              color: COLORS.primary,
-              backgroundColor: 'rgba(255,255,255,0.9)',
-              padding: '2px 6px',
-              borderRadius: '8px',
+          
+          {isActive && !isComplete && (
+            <span style={{
+              fontSize: '11px',
+              color: stage.color,
+              backgroundColor: `${stage.color}15`,
+              padding: '2px 8px',
+              borderRadius: '10px',
               fontWeight: '500'
             }}>
-              {currentProgress}%
+              진행 중...
+            </span>
+          )}
+          
+          {isComplete && (
+            <span style={{
+              fontSize: '11px',
+              color: '#10B981',
+              backgroundColor: '#10B98115',
+              padding: '2px 8px',
+              borderRadius: '10px',
+              fontWeight: '500'
+            }}>
+              완료
             </span>
           )}
         </div>
+        
         <div style={{
           transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
           transition: 'transform 0.2s',
-          fontSize: '12px'
+          fontSize: '12px',
+          color: COLORS.gray
         }}>
           ▼
         </div>
       </div>
 
-      {/* 진행률 바 */}
-      {!isComplete && (
+      {/* 내용 */}
+      <div
+        ref={contentRef}
+        style={{
+          maxHeight: isExpanded ? '500px' : '0',
+          overflow: 'hidden',
+          transition: 'max-height 0.3s ease-out'
+        }}
+      >
+        <div style={{ padding: '12px 16px' }}>
+          {events.map((event, index) => (
+            <EventItem key={index} event={event} stageColor={stage.color} />
+          ))}
+        </div>
+      </div>
+      
+      {/* 진행 바 */}
+      {isActive && !isComplete && (
         <div style={{
-          height: '3px',
+          height: '2px',
           backgroundColor: '#f0f0f0',
-          position: 'relative'
+          position: 'relative',
+          overflow: 'hidden'
         }}>
           <div style={{
             height: '100%',
-            backgroundColor: COLORS.primary,
-            width: `${currentProgress}%`,
-            transition: 'width 0.3s ease',
-            borderRadius: '0 3px 3px 0'
+            backgroundColor: stage.color,
+            width: '30%',
+            animation: 'progress 1.5s ease-in-out infinite'
           }} />
         </div>
       )}
+    </div>
+  );
+};
 
-      {/* 내용 */}
-      {isExpanded && (
-        <div style={{ padding: '16px' }}>
-          {visibleEvents.map((event, index) => {
-            const { event: eventType, data } = event;
-            const isLast = index === visibleEvents.length - 1;
-            const isProcessing = data.status === 'processing' && !isComplete;
+// 개별 이벤트 아이템
+const EventItem = ({ event, stageColor }) => {
+  const { event: eventType, data } = event;
+  
+  const getEventDescription = () => {
+    switch (eventType) {
+      case 'history_check_started':
+        return '역사 관련 질문인지 확인 중...';
+      case 'history_check_completed':
+        return data.is_historical 
+          ? `역사 질문 확인됨 (${data.confidence_score}% 신뢰도)`
+          : '역사 질문이 아님';
+      case 'question_analysis_started':
+        return `질문 분석 시작: "${data.query?.slice(0, 30)}..."`;
+      case 'question_type_classified':
+        return `질문 유형: ${data.query_type}`;
+      case 'keywords_extracted':
+        return `키워드 ${data.keywords?.length || 0}개 추출: ${data.keywords?.slice(0, 5).join(', ')}...`;
+      case 'direction_generation_started':
+        return '확장 방향 생성 중...';
+      case 'direction_generation_completed':
+        return `${data.directions_count || 0}개 확장 방향 생성됨`;
+      case 'keyword_expansion_started':
+        return `키워드 확장 시작: ${data.basic_keywords?.slice(0, 3).join(', ')}...`;
+      case 'keyword_expansion_completed':
+        return `${data.total_keywords || 0}개 키워드로 확장됨`;
+      case 'entity_expansion_started':
+        return '엔티티 추출 및 확장 시작';
+      case 'entity_expansion_completed':
+        return `${data.total_entities || 0}개 엔티티 추출됨`;
+      case 'ttl_matching_started':
+        return 'TTL 데이터 매칭 시작';
+      case 'ttl_matching_completed':
+        return `${data.matched_count || 0}개 엔티티 매칭됨`;
+      case 'pgvector_search_started':
+        return 'pgvector 유사도 검색 시작';
+      case 'pgvector_search_completed':
+        return `${data.results_count || 0}개 유사 엔티티 발견`;
+      case 'semantic_expansion_started':
+        return `${data.entity_count || 0}개 엔티티 의미 확장 시작`;
+      case 'temporal_expansion_completed':
+        return `시간 관계 ${data.results_count || 0}개 발견`;
+      case 'causal_expansion_completed':
+        return `인과 관계 ${data.results_count || 0}개 발견`;
+      case 'pgvector_expansion_completed':
+        return `의미적 유사 관계 ${data.results_count || 0}개 발견`;
+      case 'thread_weights_applied':
+        return `${data.active_threads?.length || 0}개 Thread 가중치 적용`;
+      case 'sparql_search_completed':
+        return `SPARQL 검색 완료: ${data.total_results || 0}개 결과`;
+      case 'answer_generation_started':
+        return `${data.evidence_count || 0}개 근거로 답변 생성 중...`;
+      default:
+        return data.title || eventType;
+    }
+  };
 
-            return (
-              <div key={index} style={{ 
-                display: 'flex', 
-                marginBottom: isLast ? '0' : '16px',
-                opacity: isProcessing && !isComplete ? 0.7 : 1,
-                transition: 'opacity 0.3s'
-              }}>
-                {/* 아이콘 */}
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  backgroundColor: getEventColor(eventType, data.status),
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '14px',
-                  marginRight: '12px',
-                  flexShrink: 0
-                }}>
-                  {getEventIcon(eventType)}
-                </div>
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: '10px',
+      marginBottom: '8px',
+      fontSize: '13px',
+      color: COLORS.dark
+    }}>
+      <div style={{
+        width: '6px',
+        height: '6px',
+        borderRadius: '50%',
+        backgroundColor: stageColor,
+        marginTop: '6px',
+        flexShrink: 0
+      }} />
+      <span>{getEventDescription()}</span>
+    </div>
+  );
+};
 
-                {/* 내용 */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: COLORS.dark,
-                    marginBottom: '4px'
-                  }}>
-                    {data.title}
-                    {isProcessing && !isComplete && (
-                      <span style={{ 
-                        marginLeft: '8px',
-                        fontSize: '11px',
-                        color: COLORS.primary 
-                      }}>
-                        처리 중...
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '12px', color: COLORS.dark }}>
-                    {renderEventContent(event)}
-                  </div>
-                </div>
+// 메인 ThinkingMode 컴포넌트
+const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
+  const [stages, setStages] = useState([]);
+  
+  // 이벤트를 단계별로 그룹화
+  useEffect(() => {
+    const stageMap = new Map();
+    
+    thinkingEvents.forEach((event) => {
+      const stageInfo = getStageGroup(event.event);
+      const groupId = stageInfo.groupId;
+      
+      if (!stageMap.has(groupId)) {
+        stageMap.set(groupId, {
+          id: groupId,
+          stage: stageInfo,
+          events: [],
+          isComplete: false
+        });
+      }
+      
+      stageMap.get(groupId).events.push(event);
+    });
+    
+    // 현재 활성 단계 결정 (마지막 이벤트가 속한 그룹)
+    const stageList = Array.from(stageMap.values());
+    if (stageList.length > 0) {
+      // 마지막 단계 외에는 모두 완료로 표시
+      stageList.forEach((stage, index) => {
+        stage.isComplete = isComplete || index < stageList.length - 1;
+        stage.isActive = !isComplete && index === stageList.length - 1;
+      });
+    }
+    
+    setStages(stageList);
+  }, [thinkingEvents, isComplete]);
 
-                {/* 연결선 */}
-                {!isLast && (
-                  <div style={{
-                    position: 'absolute',
-                    left: '31px',
-                    top: '32px',
-                    width: '2px',
-                    height: '16px',
-                    backgroundColor: COLORS.border,
-                    marginLeft: '16px'
-                  }} />
-                )}
-              </div>
-            );
-          })}
+  if (thinkingEvents.length === 0) {
+    return null;
+  }
 
-          {/* 로딩 인디케이터 */}
-          {!isComplete && visibleEvents.length > 0 && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginTop: '12px',
-              padding: '8px',
-              backgroundColor: '#f8f9fa',
-              borderRadius: '6px',
-              fontSize: '12px',
-              color: COLORS.gray
-            }}>
-              <div style={{
-                width: '12px',
-                height: '12px',
-                border: `2px solid ${COLORS.border}`,
-                borderTop: `2px solid ${COLORS.primary}`,
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite'
-              }} />
-              사고 과정 진행 중...
-            </div>
-          )}
-        </div>
-      )}
+  return (
+    <div style={{
+      marginBottom: '16px'
+    }}>
+      {/* 전체 헤더 */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        marginBottom: '12px',
+        padding: '8px 12px',
+        backgroundColor: '#f8fafc',
+        borderRadius: '8px',
+        border: '1px solid #e2e8f0'
+      }}>
+        <span style={{ fontSize: '16px' }}>🧠</span>
+        <span style={{ 
+          fontSize: '14px', 
+          fontWeight: '600',
+          color: COLORS.dark 
+        }}>
+          AI 사고 과정
+        </span>
+        <span style={{
+          fontSize: '11px',
+          color: COLORS.gray,
+          backgroundColor: COLORS.white,
+          padding: '2px 8px',
+          borderRadius: '10px',
+          border: '1px solid #e2e8f0'
+        }}>
+          {stages.length}단계
+        </span>
+        {isComplete && (
+          <span style={{
+            fontSize: '11px',
+            color: '#10B981',
+            backgroundColor: '#10B98115',
+            padding: '2px 8px',
+            borderRadius: '10px',
+            marginLeft: 'auto'
+          }}>
+            ✓ 완료
+          </span>
+        )}
+      </div>
 
-      <style jsx>{`
+      {/* 단계별 표시 */}
+      {stages.map((stageData) => (
+        <ThinkingStep
+          key={stageData.id}
+          stage={stageData.stage}
+          events={stageData.events}
+          isActive={stageData.isActive}
+          isComplete={stageData.isComplete}
+        />
+      ))}
+
+      <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
+        }
+        @keyframes progress {
+          0% { transform: translateX(-100%); }
+          50% { transform: translateX(100%); }
+          100% { transform: translateX(300%); }
         }
       `}</style>
     </div>

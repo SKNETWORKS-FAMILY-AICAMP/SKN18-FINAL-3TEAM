@@ -118,10 +118,12 @@ const App = () => {
           localStorage.clear();
           setIsLoggedIn(false);
           setUser(null);
-          // 강제 새로고침
+          // 강제 새로고침 (프론트엔드 URL로 리다이렉트)
           setTimeout(() => {
-            window.location.href = "/";
-            window.location.reload();
+            const frontendUrl = window.location.port === "8000" || window.location.hostname.includes("8000")
+              ? "http://localhost:3000/"
+              : `${window.location.origin}/`;
+            window.location.href = frontendUrl;
           }, 100);
         } else {
           // 기타 에러는 콘솔에 표시

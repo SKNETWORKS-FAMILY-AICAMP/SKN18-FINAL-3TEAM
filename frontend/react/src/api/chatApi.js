@@ -1,11 +1,54 @@
 import api from "./axios";
 
 /**
+ * 프론트엔드 URL 가져오기
+ */
+const getFrontendUrl = () => {
+  // 현재 도메인이 백엔드(8000)인 경우 프론트엔드(3000)로 변경
+  if (window.location.port === "8000" || window.location.hostname.includes("8000")) {
+    return `http://localhost:3000/`;
+  }
+  // 프론트엔드인 경우 현재 origin 사용
+  return `${window.location.origin}/`;
+};
+
+/**
+ * 토큰 검증 및 자동 로그아웃 처리
+ */
+const checkAuthToken = () => {
+  const token = localStorage.getItem("access_token");
+  if (!token) {
+    console.warn("[chatApi] No access token found. Redirecting to login...");
+    localStorage.clear();
+    window.location.href = getFrontendUrl();
+    throw new Error("Authentication required");
+  }
+  return token;
+};
+
+/**
+ * 401 에러 처리
+ */
+const handleUnauthorized = (response) => {
+  if (response && response.status === 401) {
+    console.warn(
+      "[chatApi] 401 Unauthorized. Token expired or invalid. Redirecting to login..."
+    );
+    localStorage.clear();
+    window.location.href = getFrontendUrl();
+    throw new Error("Authentication expired");
+  }
+};
+
+/**
  * 채팅 관련 API 함수들
  */
 
 // 질문 전송 및 답변 받기 (스트리밍 지원)
 export const sendQuestion = async (question, sessionId = null, thinkingMode = false, abortSignal = null, onStream = null) => {
+  // 토큰 확인 및 자동 로그아웃 처리
+  const token = checkAuthToken();
+
   const payload = {
     question: question,
     thinking_mode: thinkingMode,
@@ -17,24 +60,23 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
   
   // 스트리밍 콜백이 있으면 스트리밍 모드로 처리
   if (onStream) {
-    const token = localStorage.getItem("access_token");
     const baseURL = api.defaults.baseURL || "";
     const url = `${baseURL}/api/chat/question/`;
-    
-    console.log("[chatApi] Starting stream request to:", url);
-    console.log("[chatApi] Request payload:", payload);
     
     const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(payload),
       signal: abortSignal,
+      credentials: "include",  // ★ Django 세션 쿠키 전송 필수
     });
     
     if (!response.ok) {
+      // 401 Unauthorized 에러 처리
+      handleUnauthorized(response);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
@@ -45,12 +87,12 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
     let fullText = "";
     let clarificationData = null;
     let streamError = null; // 스트리밍 에러 플래그
+    let chunkCount = 0; // 수신한 청크 개수 카운터
     
     try {
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-          console.log("[chatApi] Stream completed normally");
           break;
         }
         
@@ -65,7 +107,7 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
               if (jsonStr.trim() === "") continue; // 빈 데이터 스킵
               
               const data = JSON.parse(jsonStr);
-              console.log("[chatApi] Received event:", data.type, data.text?.length || 0, "chars");
+              chunkCount++;
               
               if (data.type === "delta") {
                 fullText += data.text;
@@ -81,13 +123,13 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
                 };
                 onStream({ type: "clarification", ...clarificationData });
               } else if (data.type === "final") {
-                console.log("[chatApi] Received final response:", data.text?.length, "chars");
                 fullText = data.text;
-                onStream({ type: "final", text: data.text });
+                const evidencesFromStream = data.evidences || [];
+                onStream({ type: "final", text: data.text, evidences: evidencesFromStream });
                 // final 이벤트 후 즉시 종료
                 return {
                   answer: fullText,
-                  evidences: [],
+                  evidences: evidencesFromStream,
                 };
               } else if (data.type === "error") {
                 // 에러 타입은 onStream으로만 처리하고 throw하지 않음
@@ -115,10 +157,8 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
         }
       }
     } catch (error) {
-      console.error("[chatApi] Stream reading error:", error);
       // 연결이 끊어진 경우에도 지금까지 받은 데이터로 처리
       if (fullText) {
-        console.log("[chatApi] Using partial response due to connection error");
         onStream({ type: "final", text: fullText });
         return {
           answer: fullText,
@@ -129,8 +169,6 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
     } finally {
       reader.releaseLock();
     }
-    
-    console.log("[chatApi] Stream processing completed. ChunkCount:", chunkCount, "FullText length:", fullText.length);
     
     // 스트리밍 에러가 발생했으면 에러를 throw
     if (streamError) {

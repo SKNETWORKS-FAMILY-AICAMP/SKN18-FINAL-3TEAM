@@ -21,7 +21,6 @@ const ForceGraph2D = lazy(() =>
  * 키워드 → 엔티티 → 프로퍼티 연결을 그래프로 표시
  */
 const EvidencePathView = ({ evidences = [] }) => {
-  const [selectedNode, setSelectedNode] = useState(null);
   const [hoveredNode, setHoveredNode] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [isExpanded, setIsExpanded] = useState(false);
@@ -42,13 +41,14 @@ const EvidencePathView = ({ evidences = [] }) => {
     // 노드 ID 생성 헬퍼
     const getNodeId = (type, name) => `${type}:${name}`;
 
-    // 노드 추가 헬퍼
+    // 노드 추가 헬퍼 (초기 위치는 나중에 배치 로직에서 설정)
     const addNode = (id, name, type, metadata = {}) => {
       if (!nodeMap.has(id)) {
         nodes.push({
           id,
           name,
           type,
+          // 초기 위치는 배치 로직에서 설정됨
           ...metadata,
         });
         nodeMap.set(id, true);
@@ -267,6 +267,119 @@ const EvidencePathView = ({ evidences = [] }) => {
       }
     });
 
+    // 노드 배치 최적화: 중심 노드를 중앙에, 연결된 노드를 주변에, 연결되지 않은 중심 노드를 원형으로
+    if (nodes.length > 0) {
+      // 1. 각 노드의 연결 수 계산
+      const nodeConnections = new Map();
+      nodes.forEach((node) => {
+        nodeConnections.set(node.id, 0);
+      });
+
+      links.forEach((link) => {
+        const sourceId =
+          typeof link.source === "string" ? link.source : link.source.id;
+        const targetId =
+          typeof link.target === "string" ? link.target : link.target.id;
+        nodeConnections.set(sourceId, (nodeConnections.get(sourceId) || 0) + 1);
+        nodeConnections.set(targetId, (nodeConnections.get(targetId) || 0) + 1);
+      });
+
+      // 2. 노드를 연결 수로 정렬하여 중심 노드 찾기
+      const sortedNodes = [...nodes].sort((a, b) => {
+        const aConnections = nodeConnections.get(a.id) || 0;
+        const bConnections = nodeConnections.get(b.id) || 0;
+        return bConnections - aConnections;
+      });
+
+      // 3. 중심 노드와 연결된 노드 그룹 찾기 (BFS)
+      const visited = new Set();
+      const clusters = [];
+
+      sortedNodes.forEach((startNode) => {
+        if (visited.has(startNode.id)) return;
+
+        const cluster = [];
+        const queue = [startNode];
+        visited.add(startNode.id);
+
+        while (queue.length > 0) {
+          const currentNode = queue.shift();
+          cluster.push(currentNode);
+
+          // 연결된 노드 찾기
+          links.forEach((link) => {
+            const sourceId =
+              typeof link.source === "string" ? link.source : link.source.id;
+            const targetId =
+              typeof link.target === "string" ? link.target : link.target.id;
+
+            let connectedNode = null;
+            if (sourceId === currentNode.id) {
+              connectedNode = nodes.find((n) => n.id === targetId);
+            } else if (targetId === currentNode.id) {
+              connectedNode = nodes.find((n) => n.id === sourceId);
+            }
+
+            if (connectedNode && !visited.has(connectedNode.id)) {
+              visited.add(connectedNode.id);
+              queue.push(connectedNode);
+            }
+          });
+        }
+
+        clusters.push(cluster);
+      });
+
+      // 4. 가장 큰 클러스터의 중심 노드를 중앙에 배치
+      clusters.sort((a, b) => b.length - a.length);
+      const mainCluster = clusters[0] || [];
+      const mainHub = mainCluster[0] || sortedNodes[0];
+
+      if (mainHub) {
+        mainHub.x = 0;
+        mainHub.y = 0;
+        // 고정 위치는 시뮬레이션이 안정화된 후에 설정
+
+        // 5. 메인 클러스터의 연결된 노드들을 중심 노드 주변에 원형으로 배치
+        const connectedNodes = mainCluster.slice(1);
+        const linkDistance = 200; // 링크 거리
+        connectedNodes.forEach((node, index) => {
+          const angle = (index / connectedNodes.length) * 2 * Math.PI;
+          node.x = Math.cos(angle) * linkDistance;
+          node.y = Math.sin(angle) * linkDistance;
+        });
+      }
+
+      // 6. 연결되지 않은 다른 클러스터들을 큰 원의 둘레에 배치
+      const outerRadius = 400; // 외부 원 반경
+      const otherClusters = clusters.slice(1);
+      if (otherClusters.length > 0) {
+        otherClusters.forEach((cluster, clusterIndex) => {
+          if (cluster.length === 0) return;
+
+          // 원형으로 균등하게 배치
+          const clusterAngle =
+            (clusterIndex / otherClusters.length) * 2 * Math.PI;
+          const clusterCenterX = Math.cos(clusterAngle) * outerRadius;
+          const clusterCenterY = Math.sin(clusterAngle) * outerRadius;
+
+          const hub = cluster[0];
+          hub.x = clusterCenterX;
+          hub.y = clusterCenterY;
+
+          // 클러스터 내 연결된 노드들을 허브 주변에 배치
+          const clusterConnected = cluster.slice(1);
+          clusterConnected.forEach((node, nodeIndex) => {
+            const nodeAngle =
+              (nodeIndex / clusterConnected.length) * 2 * Math.PI;
+            const nodeRadius = 150; // 클러스터 내 노드 반경
+            node.x = clusterCenterX + Math.cos(nodeAngle) * nodeRadius;
+            node.y = clusterCenterY + Math.sin(nodeAngle) * nodeRadius;
+          });
+        });
+      }
+    }
+
     console.log("그래프 데이터 생성 완료:", {
       totalNodes: nodes.length,
       totalLinks: links.length,
@@ -291,62 +404,50 @@ const EvidencePathView = ({ evidences = [] }) => {
     return { nodes, links };
   }, [evidences]);
 
-  // 노드 색상 결정
-  const getNodeColor = useCallback(
-    (node) => {
-      if (selectedNode && selectedNode.id === node.id) {
-        return "#ff6b35"; // 선택된 노드
+  // 노드 색상 결정 - 범례 색상과 일치
+  const getNodeColor = useCallback((node) => {
+    // 키워드 노드 색상 체계
+    if (node.type === "keyword") {
+      if (node.isInitial) {
+        return "#FEF3C7"; // 초기 키워드: 연한 노란색
+      } else {
+        return "#F59E0B"; // LLM 확장 키워드: 진한 노란색
       }
+    }
 
-      // 키워드 노드 색상 체계 (노란색 계열)
-      if (node.type === "keyword") {
-        if (node.isInitial) {
-          return "#FEF3C7"; // 초기 키워드: 연한 노란색 (Kiwi 추출)
-        } else {
-          return "#F59E0B"; // LLM 확장 키워드: 진한 노란색
-        }
+    if (node.type === "entity") {
+      // 초기 키워드에서 추출된 엔티티 (확장이 아닌 경우)
+      if (node.evidence && !node.evidence.isFromExpansion) {
+        return "#FEF3C7"; // 연한 노란 - 범례의 초기 키워드 색상
       }
-
-      if (node.type === "entity") {
-        // 지식 확장된 키워드 (Semantic 확장): 하늘색 계열
-        if (node.evidence && node.evidence.isExpanded) {
-          return "#7DD3FC"; // 하늘색 (지식 확장된 키워드)
-        }
-        // 탐색한 키워드 (엔티티): 연한 회색
-        return "#D1D5DB"; // 연한 회색
+      // LLM 확장 키워드에서 온 엔티티
+      if (node.evidence && node.evidence.isFromExpansion) {
+        return "#F59E0B"; // 진한 노란 - 범례의 확장된 키워드 색상
       }
+      // 기본: 연한 노란
+      return "#FEF3C7";
+    }
 
-      // 속성값: 더 연한 회색
-      if (node.type === "value") {
-        return "#F3F4F6"; // 더 연한 회색
-      }
+    // 속성값: 연한 회색
+    if (node.type === "value") {
+      return "#E5E7EB";
+    }
 
-      return "#F3F4F6";
-    },
-    [selectedNode]
-  );
-
-  // 노드 크기 결정 - 크기 증가
-  const getNodeSize = useCallback(
-    (node) => {
-      if (selectedNode && selectedNode.id === node.id) {
-        return 12; // 선택된 노드 크기 증가 (8 → 12)
-      }
-      if (node.type === "keyword") {
-        return 8; // 키워드 노드 크기 증가 (5 → 8)
-      }
-      return node.type === "entity" ? 10 : 6; // 엔티티와 값 노드 크기 증가
-    },
-    [selectedNode]
-  );
-
-  // 노드 클릭 핸들러
-  const handleNodeClick = useCallback((node) => {
-    setSelectedNode(node);
+    return "#FEF3C7";
   }, []);
 
+  // 노드 크기 결정
+  const getNodeSize = useCallback((node) => {
+    if (node.type === "keyword") {
+      return 10; // 키워드 노드
+    }
+    return node.type === "entity" ? 12 : 8; // 엔티티와 값 노드
+  }, []);
+
+  // 노드 클릭 핸들러 제거 (사용하지 않음)
+
   // 노드 호버 핸들러
-  const handleNodeHover = useCallback((node, prevNode) => {
+  const handleNodeHover = useCallback((node) => {
     if (node) {
       setHoveredNode(node);
       // 노드 위치 기준으로 툴팁 위치 설정
@@ -379,18 +480,23 @@ const EvidencePathView = ({ evidences = [] }) => {
   }, [hoveredNode]);
 
   // 컨테이너 크기 상태 추가
-  const [containerSize, setContainerSize] = useState({ width: 800, height: 400 });
+  const [containerSize, setContainerSize] = useState({
+    width: 800,
+    height: 400,
+  });
 
   // 컨테이너 크기 측정
   useEffect(() => {
-    const graphContainer = containerRef.current?.querySelector('[data-graph-container]');
+    const graphContainer = containerRef.current?.querySelector(
+      "[data-graph-container]"
+    );
     if (graphContainer) {
       const resizeObserver = new ResizeObserver((entries) => {
         for (let entry of entries) {
           const { width, height } = entry.contentRect;
-          setContainerSize({ 
-            width: Math.max(width, 400), 
-            height: Math.max(height, 300) 
+          setContainerSize({
+            width: Math.max(width, 400),
+            height: Math.max(height, 300),
           });
         }
       });
@@ -399,24 +505,117 @@ const EvidencePathView = ({ evidences = [] }) => {
     }
   }, [isExpanded]);
 
-  // 확장 시 중앙 정렬 - 단순화 및 안정화
+  // 확장 시 한 번만 중앙 정렬 (초기화 시에만) - 중앙 효과 제거
+  const hasCenteredRef = useRef(false);
+
   useEffect(() => {
     if (isExpanded && graphRef.current && graphData.nodes.length > 0) {
-      // force simulation 안정화 대기 후 한 번만 중앙 정렬
+      // 창이 펼쳐질 때 시뮬레이션 재시작 및 줌 설정
+      const immediateTimer = setTimeout(() => {
+        if (graphRef.current) {
+          try {
+            // 시뮬레이션 재시작 (노드 위치 재계산)
+            graphRef.current.d3ReheatSimulation();
+
+            if (!hasCenteredRef.current) {
+              hasCenteredRef.current = true; // 한 번만 실행되도록 플래그 설정
+
+              // 모든 노드가 보이도록 자동 줌 조정
+              const nodes = graphData.nodes.filter(
+                (n) => n.x !== undefined && n.y !== undefined
+              );
+              if (nodes.length > 0) {
+                // 노드들의 위치 범위 계산
+                const xs = nodes.map((n) => n.x);
+                const ys = nodes.map((n) => n.y);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+
+                const width = maxX - minX;
+                const height = maxY - minY;
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+
+                // 컨테이너 크기 가져오기
+                const container = document.querySelector(
+                  "[data-graph-container]"
+                );
+                if (container) {
+                  const containerWidth = container.clientWidth || 800;
+                  const containerHeight = container.clientHeight || 400;
+
+                  // 여백 추가 (20% 패딩)
+                  const padding = 0.2;
+                  const scaleX =
+                    (containerWidth * (1 - padding * 2)) / Math.max(width, 100);
+                  const scaleY =
+                    (containerHeight * (1 - padding * 2)) /
+                    Math.max(height, 100);
+                  const zoom = Math.min(scaleX, scaleY, 2); // 최대 줌 2배로 제한
+
+                  // 수동으로 줌과 중심 조정
+                  // 중심점으로 이동하기 위해 pan 계산
+                  const currentZoom = graphRef.current.zoom() || 1;
+                  const panX = containerWidth / 2 - centerX * zoom;
+                  const panY = containerHeight / 2 - centerY * zoom;
+
+                  // zoom 먼저 적용
+                  graphRef.current.zoom(zoom, 400);
+
+                  // pan 적용 (centerAt 대신)
+                  if (graphRef.current.centerAt) {
+                    graphRef.current.centerAt(centerX, centerY, 400);
+                  } else if (graphRef.current.panBy) {
+                    // 현재 위치에서 pan 계산
+                    graphRef.current.panBy(panX, panY, 400);
+                  }
+                } else {
+                  // 컨테이너를 찾을 수 없으면 기본 줌
+                  graphRef.current.zoom(0.5, 400);
+                }
+              } else {
+                // 노드 위치가 없으면 기본 줌
+                graphRef.current.zoom(0.5, 400);
+              }
+            }
+          } catch (error) {
+            console.error("[EvidencePathView] simulation/zoom error:", error);
+          }
+        }
+      }, 500); // 시뮬레이션이 안정화될 때까지 대기
+
+      return () => {
+        clearTimeout(immediateTimer);
+      };
+    }
+
+    // isExpanded가 false가 되면 플래그 리셋
+    if (!isExpanded) {
+      hasCenteredRef.current = false;
+    }
+  }, [isExpanded, graphData.nodes.length, graphData]);
+
+  // 그래프 데이터가 변경될 때 시뮬레이션 재시작
+  useEffect(() => {
+    if (graphRef.current && graphData.nodes.length > 0 && isExpanded) {
       const timer = setTimeout(() => {
         if (graphRef.current) {
           try {
-            // zoomToFit으로 모든 노드가 보이도록 조정
-            graphRef.current.zoomToFit(400, 50);
+            graphRef.current.d3ReheatSimulation();
           } catch (error) {
-            console.error("[EvidencePathView] zoomToFit error:", error);
+            console.error(
+              "[EvidencePathView] simulation restart error:",
+              error
+            );
           }
         }
-      }, 1500); // simulation이 충분히 진행된 후 실행
+      }, 100);
 
       return () => clearTimeout(timer);
     }
-  }, [isExpanded, graphData.nodes.length]);
+  }, [graphData.nodes.length, graphData.links.length, isExpanded]);
 
   if (!evidences || evidences.length === 0) {
     return null;
@@ -568,6 +767,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                   height: "12px",
                   borderRadius: "50%",
                   backgroundColor: "#FEF3C7",
+                  border: "1px solid #F59E0B",
                 }}
               />
               <span style={{ fontSize: "12px", color: COLORS.dark }}>
@@ -619,7 +819,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                   width: "12px",
                   height: "12px",
                   borderRadius: "50%",
-                  backgroundColor: "#F3F4F6",
+                  backgroundColor: "#E5E7EB",
                 }}
               />
               <span style={{ fontSize: "12px", color: COLORS.dark }}>
@@ -681,9 +881,10 @@ const EvidencePathView = ({ evidences = [] }) => {
                   y1="6"
                   x2="18"
                   y2="6"
-                  stroke="#F3F4F6"
+                  stroke="#000000"
                   strokeWidth="1"
                 />
+                <polygon points="18,6 14,3 14,9" fill="#000000" />
               </svg>
               <span style={{ fontSize: "12px", color: COLORS.dark }}>
                 속성/관계 (화살표 없음)
@@ -780,25 +981,26 @@ const EvidencePathView = ({ evidences = [] }) => {
                   nodeLabel="name"
                   nodeColor={getNodeColor}
                   nodeRelSize={getNodeSize}
-                  // 노드 간격 조정 및 애니메이션 설정 - 안정적인 중앙 배치
+                  // 노드 간격 조정 및 애니메이션 설정
                   d3Force="charge"
-                  d3ForceStrength={-120} // 반발력 적절히 조정
-                  d3ForceLinkDistance={80} // 링크 거리
-                  d3ForceLinkStrength={0.5} // 링크 강도
-                  d3ForceCenterStrength={1.0} // 중심 끌림 최대화
-                  // 애니메이션 설정 - 빠른 안정화
-                  d3AlphaDecay={0.05} // 적절한 안정화 속도
-                  d3VelocityDecay={0.4} // 적절한 속도 감쇠
-                  warmupTicks={100} // 초기 시뮬레이션 틱
-                  cooldownTicks={50} // 쿨다운 틱
+                  d3ForceStrength={-300} // 반발력 (연결되지 않은 노드 간 거리 조절)
+                  d3ForceLinkDistance={200} // 링크 거리 (연결된 노드 간 거리 - 초기 배치와 일치)
+                  d3ForceLinkStrength={0.8} // 링크 강도 증가 (연결된 노드 간 거리 유지)
+                  d3ForceCenterStrength={0.05} // 중심 끌림 최소화
+                  // 애니메이션 설정 - 지속적인 움직임
+                  d3AlphaDecay={0.1} // 매우 느린 안정화 (계속 움직임)
+                  d3VelocityDecay={0.3} // 속도 감쇠 줄임 (더 오래 움직임)
+                  warmupTicks={1000} // 초기 시뮬레이션 틱
+                  cooldownTicks={0} // 쿨다운 없음
                   // 초기 뷰 설정
                   minZoom={0.3}
                   maxZoom={4}
                   nodeCanvasObject={(node, ctx, globalScale) => {
                     try {
                       const label = node.name || "";
-                      const fontSize = Math.max(10, 16 / globalScale); // 폰트 크기 증가 (8, 12 → 10, 16)
-                      ctx.font = `bold ${fontSize}px Sans-Serif`;
+                      // 폰트 크기를 줄여서 텍스트 겹침 방지
+                      const fontSize = Math.max(7, 10 / globalScale);
+                      ctx.font = `${fontSize}px Sans-Serif`;
                       ctx.textAlign = "center";
                       ctx.textBaseline = "middle";
                       ctx.fillStyle = getNodeColor(node);
@@ -845,27 +1047,23 @@ const EvidencePathView = ({ evidences = [] }) => {
                           }
                         }
 
-                        // 라벨 그리기 - 개선된 가독성
+                        // 라벨 그리기 - 볼드체로 변경
                         ctx.fillStyle = COLORS.dark;
-                        ctx.font = `bold ${fontSize}px Sans-Serif`;
+                        ctx.font = `bold ${fontSize}px Sans-Serif`; // 볼드체 적용
 
-                        // 라벨 배경 (가독성 향상)
-                        const textWidth = ctx.measureText(label).width;
-                        const padding = 4;
-                        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
-                        ctx.fillRect(
-                          node.x - textWidth / 2 - padding,
-                          node.y + getNodeSize(node) + fontSize / 2,
-                          textWidth + padding * 2,
-                          fontSize + padding
-                        );
+                        // 긴 라벨 잘라내기 (최대 8자) - 모든 노드에 적용
+                        const displayLabel =
+                          label.length > 8
+                            ? label.substring(0, 8) + "..."
+                            : label;
 
-                        // 라벨 텍스트
+                        // 라벨 텍스트 - 볼드체 (배경 없이)
                         ctx.fillStyle = COLORS.dark;
+                        ctx.font = `bold ${fontSize}px Sans-Serif`; // 볼드체 재적용
                         ctx.fillText(
-                          label,
+                          displayLabel,
                           node.x,
-                          node.y + getNodeSize(node) + fontSize + 6 // 노드에서 더 멀리 배치
+                          node.y + getNodeSize(node) + fontSize / 2 + 4
                         );
                       }
                     } catch (error) {
@@ -911,17 +1109,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                       return "#F3F4F6";
                     }
                   }}
-                  linkDirectionalParticles={(link) => {
-                    if (link.linkType === "keyword_expansion") {
-                      return 3; // 키워드 확장은 더 많은 파티클
-                    } else if (link.linkType === "entity_extraction") {
-                      return 2; // 엔티티 추출은 중간
-                    } else {
-                      return 1; // 속성/관계는 기본
-                    }
-                  }}
-                  linkDirectionalParticleWidth={2}
-                  linkDirectionalParticleSpeed={0.003}
+                  linkDirectionalParticle={0.0}
                   linkCanvasObject={(link, ctx, globalScale) => {
                     try {
                       // 링크 중간 지점 계산
@@ -934,6 +1122,11 @@ const EvidencePathView = ({ evidences = [] }) => {
                         return;
                       }
 
+                      // 링크 각도 계산
+                      const dx = link.target.x - link.source.x;
+                      const dy = link.target.y - link.source.y;
+                      const angle = Math.atan2(dy, dx);
+
                       const midX = (link.source.x + link.target.x) / 2;
                       const midY = (link.source.y + link.target.y) / 2;
 
@@ -941,44 +1134,53 @@ const EvidencePathView = ({ evidences = [] }) => {
                       const label = link.label || "";
                       if (!label) return;
 
-                      // 텍스트 스타일 설정
-                      const fontSize = Math.max(8, 11 / globalScale);
+                      // 작은 폰트 크기
+                      const fontSize = Math.max(4, 8 / globalScale);
                       ctx.font = `${fontSize}px Sans-Serif`;
                       ctx.textAlign = "center";
                       ctx.textBaseline = "middle";
 
-                      // 링크 타입별 색상 설정
-                      let textColor = COLORS.dark;
-                      let bgColor = "rgba(255, 255, 255, 0.9)";
-
-                      if (link.linkType === "keyword_expansion") {
-                        textColor = COLORS.dark;
-                        bgColor = "rgba(245, 158, 11, 0.9)"; // 진한 노란색 배경
-                      } else if (link.linkType === "entity_extraction") {
-                        textColor = COLORS.dark;
-                        bgColor = "rgba(209, 213, 219, 0.9)"; // 연한 회색 배경
-                      } else {
-                        textColor = COLORS.gray;
-                        bgColor = "rgba(243, 244, 246, 0.9)"; // 더 연한 회색 배경
-                      }
-
-                      // 배경 박스 그리기 (가독성 향상)
+                      // 텍스트 크기 측정
                       const textWidth = ctx.measureText(label).width;
                       const padding = 4 / globalScale;
                       const boxWidth = textWidth + padding * 2;
                       const boxHeight = fontSize + padding * 2;
 
-                      ctx.fillStyle = bgColor;
+                      // 선의 수직 방향 계산 (상단부로 이동하기 위해)
+                      const perpendicularAngle = angle + Math.PI / 2; // 90도 회전
+                      const offsetDistance = 12 / globalScale; // 선 위로 이동할 거리
+
+                      // 상단부 위치 계산 (수직 방향으로 위로 이동)
+                      const textX =
+                        midX + Math.cos(perpendicularAngle) * offsetDistance;
+                      const textY =
+                        midY + Math.sin(perpendicularAngle) * offsetDistance;
+
+                      // 회전 적용 (선을 따라 텍스트 배치)
+                      ctx.save();
+                      ctx.translate(textX, textY);
+
+                      // 텍스트가 거꾸로 보이지 않도록 각도 조정
+                      let rotationAngle = angle;
+                      if (Math.abs(angle) > Math.PI / 2) {
+                        rotationAngle = angle + Math.PI;
+                      }
+                      ctx.rotate(rotationAngle);
+
+                      // 선 위에 보이도록 흰색 배경 그리기 (최소한의 박스)
+                      ctx.fillStyle = "rgba(255, 255, 255, 0.9)"; // 반투명 흰색 배경
                       ctx.fillRect(
-                        midX - boxWidth / 2,
-                        midY - boxHeight / 2,
+                        -boxWidth / 2,
+                        -boxHeight / 2,
                         boxWidth,
                         boxHeight
                       );
 
                       // 텍스트 그리기
-                      ctx.fillStyle = textColor;
-                      ctx.fillText(label, midX, midY);
+                      ctx.fillStyle = "#000000"; // 검은색 텍스트
+                      ctx.fillText(label, 0, 0);
+
+                      ctx.restore();
                     } catch (error) {
                       console.error(
                         "[EvidencePathView] Error rendering link:",
@@ -987,7 +1189,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                     }
                   }}
                   linkCanvasObjectMode={() => "after"}
-                  onNodeClick={handleNodeClick}
+                  onNodeClick={() => {}} // 클릭 핸들러 제거
                   onNodeHover={handleNodeHover}
                   onNodeDragEnd={(node) => {
                     // 드래그 종료 시 호버 해제
@@ -996,23 +1198,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                     }
                   }}
                   onBackgroundClick={() => {
-                    setSelectedNode(null);
                     setHoveredNode(null);
-                  }}
-                  onEngineStop={() => {
-                    // force simulation이 완료된 후 중앙 정렬
-                    if (isExpanded && graphRef.current) {
-                      setTimeout(() => {
-                        if (graphRef.current) {
-                          try {
-                            // 모든 노드가 보이도록 줌 조정
-                            graphRef.current.zoomToFit(400, 50);
-                          } catch (error) {
-                            console.error("[EvidencePathView] onEngineStop error:", error);
-                          }
-                        }
-                      }, 100);
-                    }
                   }}
                   enableNodeDrag={true}
                   enableZoomInteraction={true}
@@ -1022,14 +1208,17 @@ const EvidencePathView = ({ evidences = [] }) => {
                     // 노드 클릭 영역 확대
                     ctx.fillStyle = color;
                     ctx.beginPath();
-                    ctx.arc(node.x, node.y, getNodeSize(node) + 2, 0, 2 * Math.PI);
+                    ctx.arc(
+                      node.x,
+                      node.y,
+                      getNodeSize(node) + 2,
+                      0,
+                      2 * Math.PI
+                    );
                     ctx.fill();
                   }}
                   // 마우스 이벤트 활성화
-                  onNodeRightClick={(node) => {
-                    // 우클릭 시 노드 선택
-                    setSelectedNode(node);
-                  }}
+                  onNodeRightClick={() => {}} // 우클릭 핸들러 제거
                 />
               </Suspense>
             ) : (
@@ -1055,21 +1244,24 @@ const EvidencePathView = ({ evidences = [] }) => {
                 position: "fixed",
                 left: `${Math.min(
                   tooltipPosition.x + 10,
-                  window.innerWidth - 400
+                  window.innerWidth - 500
                 )}px`,
                 top: `${Math.min(
                   tooltipPosition.y + 10,
-                  window.innerHeight - 300
+                  window.innerHeight - 400
                 )}px`,
                 backgroundColor: COLORS.white,
                 border: `1px solid ${COLORS.border}`,
                 borderRadius: "12px",
                 padding: "16px",
-                maxWidth: "380px",
-                minWidth: "280px",
+                maxWidth: "380px", // 최대 너비 증가
+                minWidth: "280px", // 최소 너비 증가
+                maxHeight: "80vh", // 최대 높이 설정
                 boxShadow: "0 8px 24px rgba(0, 0, 0, 0.15)",
                 zIndex: 10000,
                 pointerEvents: "none",
+                wordWrap: "break-word", // 긴 단어 줄바꿈
+                whiteSpace: "pre-wrap", // 공백과 줄바꿈 유지
               }}
             >
               {/* 노드 제목 */}
@@ -1083,7 +1275,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                   paddingBottom: "8px",
                 }}
               >
-                {hoveredNode.name}
+                <strong>{hoveredNode.name}</strong>
               </div>
 
               {/* 키워드 노드 정보 */}
@@ -1111,10 +1303,16 @@ const EvidencePathView = ({ evidences = [] }) => {
                           marginBottom: "4px",
                         }}
                       >
-                        ⭐ 초기 키워드 (Kiwi 추출)
+                        <strong>⭐ 초기 키워드 (Kiwi 추출)</strong>
                       </div>
-                      <div style={{ color: COLORS.dark, fontSize: "10px" }}>
-                        Kiwi 형태소 분석기로 추출된 명사
+                      <div
+                        style={{
+                          color: COLORS.dark,
+                          fontSize: "10px",
+                          lineHeight: "1.4",
+                        }}
+                      >
+                        <strong>Kiwi 형태소 분석기로 추출된 명사</strong>
                       </div>
                     </>
                   ) : (
@@ -1126,10 +1324,10 @@ const EvidencePathView = ({ evidences = [] }) => {
                           marginBottom: "4px",
                         }}
                       >
-                        🔗 확장된 키워드 (LLM 확장)
+                        <strong>🔗 확장된 키워드 (LLM 확장)</strong>
                       </div>
                       <div style={{ color: COLORS.dark, fontSize: "10px" }}>
-                        LLM으로 의미적 확장된 키워드
+                        <strong>LLM으로 의미적 확장된 키워드</strong>
                       </div>
                     </>
                   )}
@@ -1170,10 +1368,12 @@ const EvidencePathView = ({ evidences = [] }) => {
                       }}
                     >
                       <span style={{ fontWeight: "600", color: COLORS.dark }}>
-                        타입:
+                        <strong>타입:</strong>
                       </span>
                       <span style={{ color: COLORS.gray }}>
-                        {hoveredNode.evidence.entityType || "Unknown"}
+                        <strong>
+                          {hoveredNode.evidence.entityType || "Unknown"}
+                        </strong>
                       </span>
                     </div>
                     {hoveredNode.evidence.year && (
@@ -1185,10 +1385,10 @@ const EvidencePathView = ({ evidences = [] }) => {
                         }}
                       >
                         <span style={{ fontWeight: "600", color: COLORS.dark }}>
-                          연도:
+                          <strong>연도:</strong>
                         </span>
                         <span style={{ color: COLORS.gray }}>
-                          {hoveredNode.evidence.year}
+                          <strong>{hoveredNode.evidence.year}</strong>
                         </span>
                       </div>
                     )}
@@ -1200,10 +1400,10 @@ const EvidencePathView = ({ evidences = [] }) => {
                         }}
                       >
                         <span style={{ fontWeight: "600", color: COLORS.dark }}>
-                          Thread:
+                          <strong>Thread:</strong>
                         </span>
                         <span style={{ color: COLORS.gray, fontSize: "10px" }}>
-                          {hoveredNode.evidence.threadType}
+                          <strong>{hoveredNode.evidence.threadType}</strong>
                         </span>
                       </div>
                     )}
@@ -1237,17 +1437,17 @@ const EvidencePathView = ({ evidences = [] }) => {
                       }}
                     >
                       {hoveredNode.evidence.isExpanded
-                        ? "🔗 지식 확장된 키워드"
-                        : "📌 초기 추출 키워드"}
+                        ? "<strong>🔗 지식 확장된 키워드</strong>"
+                        : "<strong>📌 초기 추출 키워드</strong>"}
                     </div>
 
                     {hoveredNode.evidence.matchedKeyword && (
                       <div style={{ marginBottom: "4px" }}>
                         <span style={{ fontWeight: "600", color: COLORS.dark }}>
-                          매칭 키워드:{" "}
+                          <strong>매칭 키워드: </strong>
                         </span>
                         <span style={{ color: COLORS.gray }}>
-                          {hoveredNode.evidence.matchedKeyword}
+                          <strong>{hoveredNode.evidence.matchedKeyword}</strong>
                         </span>
                       </div>
                     )}
@@ -1258,10 +1458,12 @@ const EvidencePathView = ({ evidences = [] }) => {
                           <span
                             style={{ fontWeight: "600", color: COLORS.dark }}
                           >
-                            확장 방법:{" "}
+                            <strong>확장 방법: </strong>
                           </span>
                           <span style={{ color: COLORS.gray }}>
-                            {hoveredNode.evidence.expansionMethod}
+                            <strong>
+                              {hoveredNode.evidence.expansionMethod}
+                            </strong>
                           </span>
                         </div>
                       )}
@@ -1269,10 +1471,10 @@ const EvidencePathView = ({ evidences = [] }) => {
                     {hoveredNode.evidence.matchMethod && (
                       <div>
                         <span style={{ fontWeight: "600", color: COLORS.dark }}>
-                          매칭 방법:{" "}
+                          <strong>매칭 방법: </strong>
                         </span>
                         <span style={{ color: COLORS.gray, fontSize: "10px" }}>
-                          {hoveredNode.evidence.matchMethod}
+                          <strong>{hoveredNode.evidence.matchMethod}</strong>
                         </span>
                       </div>
                     )}
@@ -1297,10 +1499,10 @@ const EvidencePathView = ({ evidences = [] }) => {
                           marginBottom: "4px",
                         }}
                       >
-                        요약:
+                        <strong>요약:</strong>
                       </div>
                       <div style={{ color: COLORS.gray }}>
-                        {hoveredNode.evidence.summary}
+                        <strong>{hoveredNode.evidence.summary}</strong>
                       </div>
                     </div>
                   )}
@@ -1325,10 +1527,10 @@ const EvidencePathView = ({ evidences = [] }) => {
                             marginBottom: "4px",
                           }}
                         >
-                          설명:
+                          <strong>설명:</strong>
                         </div>
                         <div style={{ color: COLORS.gray }}>
-                          {hoveredNode.evidence.description}
+                          <strong>{hoveredNode.evidence.description}</strong>
                         </div>
                       </div>
                     )}
@@ -1354,7 +1556,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                       marginBottom: "6px",
                     }}
                   >
-                    📋 속성/관계 정보
+                    <strong>📋 속성/관계 정보</strong>
                   </div>
                   {hoveredNode.evidence.predicate && (
                     <div
@@ -1365,7 +1567,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                       }}
                     >
                       <strong>Predicate:</strong>{" "}
-                      {hoveredNode.evidence.predicate}
+                      <strong>{hoveredNode.evidence.predicate}</strong>
                     </div>
                   )}
                   {hoveredNode.evidence.threadType && (
@@ -1376,7 +1578,8 @@ const EvidencePathView = ({ evidences = [] }) => {
                         marginBottom: "4px",
                       }}
                     >
-                      <strong>타입:</strong> {hoveredNode.evidence.threadType}
+                      <strong>타입:</strong>{" "}
+                      <strong>{hoveredNode.evidence.threadType}</strong>
                     </div>
                   )}
                   {hoveredNode.evidence.value && (
@@ -1390,200 +1593,19 @@ const EvidencePathView = ({ evidences = [] }) => {
                         borderRadius: "4px",
                       }}
                     >
-                      <strong>값:</strong> {hoveredNode.evidence.value}
-                    </div>
-                  )}
-                  {hoveredNode.evidence.description && (
-                    <div
-                      style={{
-                        fontSize: "10px",
-                        color: COLORS.gray,
-                        marginTop: "6px",
-                        fontStyle: "italic",
-                      }}
-                    >
-                      {hoveredNode.evidence.description}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 엔티티 노드의 type_and_summary 정보 표시 */}
-              {hoveredNode.type === "entity" &&
-                hoveredNode.evidence &&
-                hoveredNode.evidence.threadType === "type_and_summary" && (
-                  <>
-                    {hoveredNode.evidence.entityType && (
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          color: COLORS.gray,
-                          marginBottom: "4px",
-                        }}
-                      >
-                        <strong>타입:</strong> {hoveredNode.evidence.entityType}
-                      </div>
-                    )}
-                    {hoveredNode.evidence.year && (
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          color: COLORS.gray,
-                          marginBottom: "4px",
-                        }}
-                      >
-                        <strong>연도:</strong> {hoveredNode.evidence.year}
-                      </div>
-                    )}
-                    {hoveredNode.evidence.category && (
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          color: COLORS.gray,
-                          marginBottom: "4px",
-                        }}
-                      >
-                        <strong>분류:</strong> {hoveredNode.evidence.category}
-                      </div>
-                    )}
-                    {hoveredNode.evidence.summary && (
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          color: COLORS.dark,
-                          marginTop: "8px",
-                          lineHeight: "1.5",
-                        }}
-                      >
-                        {hoveredNode.evidence.summary}
-                      </div>
-                    )}
-                  </>
-                )}
-
-              {/* 엔티티 노드의 entity_properties 정보 표시 */}
-              {hoveredNode.type === "entity" &&
-                hoveredNode.evidence &&
-                hoveredNode.evidence.threadType === "entity_properties" && (
-                  <>
-                    {hoveredNode.evidence.predicate && (
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          color: COLORS.gray,
-                          marginBottom: "4px",
-                        }}
-                      >
-                        <strong>속성:</strong> {hoveredNode.evidence.predicate}
-                      </div>
-                    )}
-                    {hoveredNode.evidence.value && (
-                      <div style={{ fontSize: "12px", color: COLORS.dark }}>
-                        <strong>값:</strong> {hoveredNode.evidence.value}
-                      </div>
-                    )}
-                  </>
-                )}
-
-              {/* 기타 정보 */}
-              {hoveredNode.type === "entity" &&
-                hoveredNode.evidence &&
-                hoveredNode.evidence.description &&
-                hoveredNode.evidence.threadType !== "type_and_summary" &&
-                hoveredNode.evidence.threadType !== "entity_properties" && (
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: COLORS.dark,
-                      marginTop: "4px",
-                    }}
-                  >
-                    {hoveredNode.evidence.description}
-                  </div>
-                )}
-            </div>
-          )}
-
-          {/* 선택된 노드 정보 */}
-          {selectedNode && (
-            <div
-              style={{
-                marginTop: "12px",
-                padding: "12px",
-                backgroundColor: COLORS.white,
-                borderRadius: "8px",
-                border: `1px solid ${COLORS.border}`,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "13px",
-                  fontWeight: "600",
-                  color: COLORS.dark,
-                  marginBottom: "6px",
-                }}
-              >
-                {selectedNode.name}
-              </div>
-              <div style={{ fontSize: "12px", color: COLORS.gray }}>
-                타입:{" "}
-                {selectedNode.type === "keyword"
-                  ? selectedNode.isInitial
-                    ? "초기 키워드"
-                    : "확장된 키워드"
-                  : selectedNode.type === "entity"
-                  ? "탐색한 키워드"
-                  : "속성값"}
-                {selectedNode.entityType && ` (${selectedNode.entityType})`}
-                {selectedNode.predicate && ` - ${selectedNode.predicate}`}
-              </div>
-              {selectedNode.type === "keyword" && selectedNode.evidence && (
-                <div
-                  style={{
-                    fontSize: "12px",
-                    color: COLORS.gray,
-                    marginTop: "4px",
-                  }}
-                >
-                  추출 방법:{" "}
-                  {selectedNode.evidence.extractionMethod || "알 수 없음"}
-                </div>
-              )}
-              {selectedNode.expansionMethod &&
-                selectedNode.expansionMethod !== "none" && (
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: COLORS.gray,
-                      marginTop: "4px",
-                    }}
-                  >
-                    확장 방식: {selectedNode.expansionMethod}
-                  </div>
-                )}
-              {selectedNode.evidence && selectedNode.type !== "keyword" && (
-                <div
-                  style={{
-                    fontSize: "12px",
-                    color: COLORS.gray,
-                    marginTop: "8px",
-                    paddingTop: "8px",
-                    borderTop: `1px solid ${COLORS.border}`,
-                  }}
-                >
-                  <div>
-                    <strong>Thread 타입:</strong>{" "}
-                    {selectedNode.evidence.threadType}
-                  </div>
-                  {selectedNode.evidence.summary && (
-                    <div style={{ marginTop: "4px" }}>
-                      {selectedNode.evidence.summary}
+                      <strong>값:</strong>
+                      <br />
+                      <span style={{ color: COLORS.gray }}>
+                        <strong>{hoveredNode.evidence.description}</strong>
+                      </span>
                     </div>
                   )}
                 </div>
               )}
             </div>
           )}
+
+          {/* 클릭 상세 정보 제거됨 - 호버 효과만 사용 */}
         </div>
       )}
     </div>

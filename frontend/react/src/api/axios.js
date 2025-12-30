@@ -27,6 +27,18 @@ api.interceptors.request.use(
 );
 
 // ============================================
+// 프론트엔드 URL 가져오기
+// ============================================
+const getFrontendUrl = () => {
+  // 현재 도메인이 백엔드(8000)인 경우 프론트엔드(3000)로 변경
+  if (window.location.port === "8000" || window.location.hostname.includes("8000")) {
+    return `http://localhost:3000/`;
+  }
+  // 프론트엔드인 경우 현재 origin 사용
+  return `${window.location.origin}/`;
+};
+
+// ============================================
 // 로그아웃 처리 함수 (인터셉터 정의 전에 선언)
 // ============================================
 const handleLogout = () => {
@@ -35,8 +47,7 @@ const handleLogout = () => {
 
   // 강제 새로고침하여 상태 초기화 (비동기로 처리하여 진행 중인 요청이 완료될 시간 제공)
   setTimeout(() => {
-    window.location.href = "/";
-    window.location.reload();
+    window.location.href = getFrontendUrl();
   }, 100);
 };
 
