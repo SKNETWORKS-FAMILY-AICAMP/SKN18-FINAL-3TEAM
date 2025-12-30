@@ -1194,22 +1194,14 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
                     "uri": raw_data.get("subject", {}).get("value", "") or
                           raw_data.get("entity1", {}).get("value", "")
                 },
-                "expansion_method": expansion_method,
-                "expansion_details": {
-                    "hop_count": hop_count,
-                    "year_distance": year_distance,
-                    "pgvector_similarity": pgvector_similarity
-                },
                 "thread": thread_type,
                 "predicate": raw_data.get("predicate", {}).get("value", "").split("#")[-1] if raw_data.get("predicate") else "",
                 "predicate_display": path.get("predicate_display", ""),
-                "entity_match_type": entity_match_type,
-                # 키워드 추적 정보 추가
+                # 키워드 추적 정보 (핵심만)
                 "matched_keyword": keyword_trace_info.get("matched_keyword", ""),
                 "is_from_expansion": keyword_trace_info.get("is_from_expansion", False),
-                "keyword_expansion_method": keyword_trace_info.get("expansion_method", ""),
-                # 키워드 확장 추적 정보
-                "keyword_expansion_trace": state.get("keyword_expansion_trace", {})
+                "entity_match_type": entity_match_type,
+                "expansion_method": expansion_method
             }
 
             evidence = {

@@ -1239,11 +1239,11 @@ def entity_expander_node(state: GraphState) -> GraphState:
     state["ttl_data"] = ttl_data
     state["query_type"] = final_query_type  # 최종 확정
     
-    # 키워드 확장 추적 정보 저장 (프론트엔드 시각화용)
+    # 키워드 확장 추적 정보 저장 (state 레벨에서만 관리)
     keyword_expansion_trace = {
         "initial_keywords": query_keywords,
         "expanded_keywords": expanded_keywords if expanded_keywords != query_keywords else [],
-        "expansion_method": "classify_node",  # Stage 1-B에서 확장됨
+        "expansion_method": "classify_node",
         "expansion_successful": len(expanded_keywords) > len(query_keywords)
     }
     state["keyword_expansion_trace"] = keyword_expansion_trace

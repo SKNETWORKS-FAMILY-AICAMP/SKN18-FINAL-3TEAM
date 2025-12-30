@@ -460,9 +460,14 @@ def story_generator_node(state: GraphState) -> GraphState:
                 selected_direction_detail = direction
                 break
 
+    # 스트리밍 모드 확인 (state에서 전달)
+    stream_mode = state.get("stream_mode", False)
+    stream_callback = state.get("stream_callback", None)
+    
     llm = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL"),
-        temperature=0.7  # 스토리 생성은 창의성 필요
+        temperature=0.7,  # 스토리 생성은 창의성 필요
+        streaming=stream_mode  # 스트리밍 모드 활성화
     )
 
     print(f"\n{'='*70}")
@@ -682,14 +687,32 @@ def story_generator_node(state: GraphState) -> GraphState:
 **1897년 국호 변경**이 조선에서 대한제국으로의 전환을 완성한 결정적 사건이었습니다."""
 
     try:
-        response = llm.invoke(story_prompt)
+        if stream_mode and stream_callback:
+            # 스트리밍 모드: 청크 단위로 스트리밍
+            llm_answer = ""
+            for chunk in llm.stream(story_prompt):
+                if hasattr(chunk, 'content') and chunk.content:
+                    chunk_text = chunk.content
+                    llm_answer += chunk_text
+                    # 스트리밍 콜백 호출 (프론트엔드로 전송)
+                    if callable(stream_callback):
+                        try:
+                            stream_callback(chunk_text)
+                        except Exception as e:
+                            print(f"[stream] Callback error: {e}")
+            
+            # 스트리밍 완료 후 최종 응답 생성
+            response = type('Response', (), {'content': llm_answer})()
+        else:
+            # 일반 모드: 전체 응답 한 번에 받기
+            response = llm.invoke(story_prompt)
+            llm_answer = response.content.strip()
         
-        # 토큰 사용량 추출 및 state에 누적
-        from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
-        token_update = extract_and_accumulate_tokens(state, response)
-        state.update(token_update)
-        
-        llm_answer = response.content.strip()
+        # 토큰 사용량 추출 및 state에 누적 (스트리밍 모드에서는 추정값 사용)
+        if not stream_mode:
+            from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
+            token_update = extract_and_accumulate_tokens(state, response)
+            state.update(token_update)
 
         # LLM이 핵심 답변과 상세 설명을 생성하므로 그대로 사용
         final_answer = llm_answer

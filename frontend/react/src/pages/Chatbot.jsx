@@ -333,21 +333,35 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
         setChatHistory(history || []);
       }
 
+      // 실제 스트리밍 처리
+      let accumulatedText = "";
+      let clarificationData = null;
+
       const response = await sendQuestion(
         userMessage,
         sessionId,
         isThinkingMode,
-        abortControllerRef.current.signal
+        abortControllerRef.current.signal,
+        (streamEvent) => {
+          // 스트리밍 이벤트 처리
+          if (streamEvent.type === "delta") {
+            // 실시간으로 텍스트 업데이트
+            accumulatedText =
+              streamEvent.fullText || accumulatedText + streamEvent.text;
+            setStreamingText(accumulatedText);
+          } else if (streamEvent.type === "clarification") {
+            // 재질문 데이터 저장
+            clarificationData = streamEvent;
+          } else if (streamEvent.type === "final") {
+            // 최종 답변 완료
+            accumulatedText = streamEvent.text;
+            setStreamingText("");
+            const messageObj = { type: "assistant", text: accumulatedText };
+            // evidences는 나중에 추가 가능
+            setMessages((prev) => [...prev, messageObj]);
+          }
+        }
       );
-
-      // 디버깅: 응답 확인
-      console.log("[Chatbot] Response:", {
-        needs_clarification: response.needs_clarification,
-        has_expansion_directions: !!response.expansion_directions,
-        expansion_directions_count: response.expansion_directions?.length || 0,
-        clarification_question: response.clarification_question,
-        thinking_mode: isThinkingMode,
-      });
 
       // 재질문이 있는 경우
       if (
@@ -360,6 +374,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
           response.expansion_directions.length,
           "options"
         );
+        setStreamingText(""); // 스트리밍 텍스트 초기화
         setMessages((prev) => [
           ...prev,
           {
@@ -373,9 +388,25 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
         return;
       }
 
-      if (response.answer) {
-        simulateStreamingResponse(response.answer);
+      // 스트리밍이 완료되지 않은 경우 (fallback)
+      if (accumulatedText) {
+        setStreamingText("");
+        const messageObj = { type: "assistant", text: accumulatedText };
+        setMessages((prev) => [...prev, messageObj]);
+      } else if (response.answer) {
+        // 일반 응답 (스트리밍이 아닌 경우)
+        setStreamingText("");
+        const messageObj = { type: "assistant", text: response.answer };
+        if (
+          response.evidences &&
+          Array.isArray(response.evidences) &&
+          response.evidences.length > 0
+        ) {
+          messageObj.evidences = response.evidences;
+        }
+        setMessages((prev) => [...prev, messageObj]);
       } else {
+        setStreamingText("");
         simulateStreamingResponse("답변을 받을 수 없습니다.");
       }
     } catch (error) {
@@ -481,16 +512,60 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
       }
 
       // 선택한 방향을 백엔드로 전달 (direction_id와 title 함께 전송)
+      let accumulatedText = "";
+
       const response = await sendQuestion(
         `__CLARIFICATION__:${directionId}:${optionTitle}`,
         selectedSessionId,
         isThinkingMode,
-        abortControllerRef.current.signal
+        abortControllerRef.current.signal,
+        (streamEvent) => {
+          // 스트리밍 이벤트 처리
+          if (streamEvent.type === "delta") {
+            accumulatedText =
+              streamEvent.fullText || accumulatedText + streamEvent.text;
+            setStreamingText(accumulatedText);
+          } else if (streamEvent.type === "final") {
+            accumulatedText = streamEvent.text;
+            setStreamingText("");
+            const messageObj = { type: "assistant", text: accumulatedText };
+            if (
+              response.evidences &&
+              Array.isArray(response.evidences) &&
+              response.evidences.length > 0
+            ) {
+              messageObj.evidences = response.evidences;
+            }
+            setMessages((prev) => [...prev, messageObj]);
+          }
+        }
       );
 
-      if (response.answer) {
-        simulateStreamingResponse(response.answer, response.evidences || []);
+      // 스트리밍이 완료되지 않은 경우 (fallback)
+      if (accumulatedText) {
+        setStreamingText("");
+        const messageObj = { type: "assistant", text: accumulatedText };
+        if (
+          response.evidences &&
+          Array.isArray(response.evidences) &&
+          response.evidences.length > 0
+        ) {
+          messageObj.evidences = response.evidences;
+        }
+        setMessages((prev) => [...prev, messageObj]);
+      } else if (response.answer) {
+        setStreamingText("");
+        const messageObj = { type: "assistant", text: response.answer };
+        if (
+          response.evidences &&
+          Array.isArray(response.evidences) &&
+          response.evidences.length > 0
+        ) {
+          messageObj.evidences = response.evidences;
+        }
+        setMessages((prev) => [...prev, messageObj]);
       } else {
+        setStreamingText("");
         simulateStreamingResponse("답변을 받을 수 없습니다.");
       }
     } catch (error) {
