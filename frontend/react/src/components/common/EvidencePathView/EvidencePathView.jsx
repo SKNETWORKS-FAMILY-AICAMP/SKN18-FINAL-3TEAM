@@ -140,37 +140,9 @@ const EvidencePathView = ({ evidences = [] }) => {
       if (!trace) return;
 
       const sourceEntity = trace.source_entity;
-      // URI 대신 라벨 사용 - 우선순위: label > name > URI의 마지막 부분
-      let entityName = "Unknown";
-      if (sourceEntity) {
-        // 1순위: label 필드 사용
-        if (sourceEntity.label) {
-          entityName = sourceEntity.label;
-        }
-        // 2순위: name이 URI가 아닌 경우 사용
-        else if (sourceEntity.name && !sourceEntity.name.includes('_') && !sourceEntity.name.startsWith('http')) {
-          entityName = sourceEntity.name;
-        }
-        // 3순위: URI에서 의미있는 부분 추출
-        else if (sourceEntity.name) {
-          // URI에서 마지막 부분 추출 (예: "Nation_f4326a53" -> "Nation")
-          const uriParts = sourceEntity.name.split('_');
-          if (uriParts.length > 1) {
-            entityName = uriParts[0]; // 첫 번째 부분 사용
-          } else {
-            entityName = sourceEntity.name;
-          }
-        }
-      }
-      
+      const entityName = sourceEntity?.name || "Unknown";
       const entityType = sourceEntity?.type || "Entity";
       const predicate = trace.predicate_display || trace.predicate || "";
-      // predicate도 라벨 형태로 변환
-      let predicateLabel = predicate;
-      if (predicate && predicate.includes('_')) {
-        // "has_nationality" -> "has nationality" 형태로 변환
-        predicateLabel = predicate.replace(/_/g, ' ');
-      }
       const threadType = trace.thread || "";
       const expansionMethod = trace.expansion_method || "none";
 
@@ -235,7 +207,7 @@ const EvidencePathView = ({ evidences = [] }) => {
         }
       }
 
-      // 6. 프로퍼티/관계 노드 추가 (라벨 우선 사용)
+      // 6. 프로퍼티/관계 노드 추가 (기존 로직)
       const description = evidence.description || "";
       let targetName = "";
 
@@ -251,32 +223,6 @@ const EvidencePathView = ({ evidences = [] }) => {
         const parts = description.split(":");
         if (parts.length > 1) {
           targetName = parts[1].trim().substring(0, 50);
-        }
-      }
-
-      // URI 형태의 targetName을 라벨로 변환
-      if (targetName) {
-        // URI 패턴 감지 및 변환
-        if (targetName.includes('_') && targetName.match(/^[A-Za-z]+_[a-f0-9]+$/)) {
-          // "Nation_f4326a53" 형태의 URI에서 "Nation" 추출
-          const uriParts = targetName.split('_');
-          if (uriParts.length > 1) {
-            targetName = uriParts[0];
-          }
-        }
-        
-        // raw_data에서 더 나은 라벨 찾기
-        if (evidence.raw_data) {
-          // label, name, title 등의 필드에서 라벨 찾기
-          const possibleLabels = [
-            evidence.raw_data.label?.value || evidence.raw_data.label,
-            evidence.raw_data.name?.value || evidence.raw_data.name,
-            evidence.raw_data.title?.value || evidence.raw_data.title,
-          ].filter(Boolean);
-          
-          if (possibleLabels.length > 0) {
-            targetName = possibleLabels[0];
-          }
         }
       }
 
@@ -399,8 +345,7 @@ const EvidencePathView = ({ evidences = [] }) => {
     setSelectedNode(node);
   }, []);
 
-  // 노드 호버 핸들러
-  const handleNodeHover = useCallback((node, prevNode) => {
+  const handleNodeHover = useCallback((node) => {
     if (node) {
       setHoveredNode(node);
       // 노드 위치 기준으로 툴팁 위치 설정
@@ -432,38 +377,45 @@ const EvidencePathView = ({ evidences = [] }) => {
     }
   }, [hoveredNode]);
 
-  // 그래프 확장 시 (0,0) 중심으로 이동 (중복 실행 방지)
-  useEffect(() => {
-    if (isExpanded && graphRef.current && graphData.nodes.length > 0) {
-      const timer = setTimeout(() => {
-        if (graphRef.current && !graphRef.current._userCentered) {
-          graphRef.current._userCentered = true; // 중복 실행 방지
-          try {
-            // (0,0) 중심으로 이동
-            graphRef.current.centerAt(0, 0, 500);
-            
-            setTimeout(() => {
-              if (graphRef.current) {
-                graphRef.current.zoomToFit(400, 50);
-              }
-            }, 600);
-          } catch (error) {
-            console.error("[EvidencePathView] center error:", error);
-          }
-        }
-      }, 800); // 시뮬레이션이 어느 정도 안정된 후
+  // 컨테이너 크기 상태 추가
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 400 });
 
-      return () => clearTimeout(timer);
+  // 컨테이너 크기 측정
+  useEffect(() => {
+    const graphContainer = containerRef.current?.querySelector('[data-graph-container]');
+    if (graphContainer) {
+      const resizeObserver = new ResizeObserver((entries) => {
+        for (let entry of entries) {
+          const { width, height } = entry.contentRect;
+          setContainerSize({ 
+            width: Math.max(width, 400), 
+            height: Math.max(height, 300) 
+          });
+        }
+      });
+      resizeObserver.observe(graphContainer);
+      return () => resizeObserver.disconnect();
     }
   }, [isExpanded]);
 
-  // 그래프 데이터 변경 시 플래그 리셋
+  // 확장 시 중앙 정렬 - 단순화 및 안정화
   useEffect(() => {
-    if (graphRef.current) {
-      graphRef.current._centered = false;
-      graphRef.current._userCentered = false;
+    if (isExpanded && graphRef.current && graphData.nodes.length > 0) {
+      // force simulation 안정화 대기 후 한 번만 중앙 정렬
+      const timer = setTimeout(() => {
+        if (graphRef.current) {
+          try {
+            // zoomToFit으로 모든 노드가 보이도록 조정
+            graphRef.current.zoomToFit(400, 50);
+          } catch (error) {
+            console.error("[EvidencePathView] zoomToFit error:", error);
+          }
+        }
+      }, 1500); // simulation이 충분히 진행된 후 실행
+
+      return () => clearTimeout(timer);
     }
-  }, [graphData]);
+  }, [isExpanded, graphData.nodes.length]);
 
   if (!evidences || evidences.length === 0) {
     return null;
@@ -498,7 +450,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                 scrollableParent.scrollTop +
                 containerRect.top -
                 parentRect.top -
-                0; 
+                0; // 여백 증가 (50px → 150px) - 더 많이 스크롤
               scrollableParent.scrollTo({
                 top: scrollTop,
                 behavior: "smooth",
@@ -508,7 +460,7 @@ const EvidencePathView = ({ evidences = [] }) => {
           }
           scrollableParent = scrollableParent.parentElement;
         }
-      }, 30); // 딜레이를 더 단축 (50ms → 30ms)
+      }, 50); // 딜레이를 50ms로 단축
       return () => clearTimeout(timer);
     }
   }, [isExpanded]);
@@ -744,14 +696,17 @@ const EvidencePathView = ({ evidences = [] }) => {
             style={{
               width: "100%",
               maxWidth: "100%",
-              height: isExpanded ? "350px" : "250px", // 높이 더 감소 (400px → 350px, 기본 250px)
+              height: "400px", // 높이 감소 (600px → 400px)
               backgroundColor: COLORS.white,
               borderRadius: "8px",
               border: `1px solid ${COLORS.border}`,
-              overflow: "hidden", // overflow를 hidden으로 변경
+              overflow: "visible", // overflow 변경으로 상호작용 활성화
               position: "relative",
               boxSizing: "border-box",
               minWidth: 0,
+              display: "flex", // flex 추가
+              alignItems: "center", // 세로 중앙 정렬
+              justifyContent: "center", // 가로 중앙 정렬
               cursor: "grab", // 드래그 가능 커서
               userSelect: "none", // 텍스트 선택 방지
             }}
@@ -768,115 +723,6 @@ const EvidencePathView = ({ evidences = [] }) => {
               e.currentTarget.style.cursor = "grab";
             }}
           >
-            {/* 줌 컨트롤 버튼 */}
-            <div
-              style={{
-                position: "absolute",
-                top: "10px",
-                right: "10px",
-                zIndex: 1000,
-                display: "flex",
-                flexDirection: "column",
-                gap: "4px",
-              }}
-            >
-              <button
-                onClick={() => {
-                  if (graphRef.current) {
-                    try {
-                      const currentZoom = graphRef.current.zoom();
-                      const newZoom = Math.min(currentZoom * 1.5, 5);
-                      graphRef.current.zoom(newZoom, 300);
-                    } catch (error) {
-                      console.error("Zoom in error:", error);
-                    }
-                  }
-                }}
-                style={{
-                  width: "32px",
-                  height: "32px",
-                  backgroundColor: COLORS.white,
-                  border: `1px solid ${COLORS.border}`,
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "16px",
-                  fontWeight: "bold",
-                  color: COLORS.dark,
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                }}
-                title="확대"
-              >
-                +
-              </button>
-              <button
-                onClick={() => {
-                  if (graphRef.current) {
-                    try {
-                      const currentZoom = graphRef.current.zoom();
-                      const newZoom = Math.max(currentZoom / 1.5, 0.2);
-                      graphRef.current.zoom(newZoom, 300);
-                    } catch (error) {
-                      console.error("Zoom out error:", error);
-                    }
-                  }
-                }}
-                style={{
-                  width: "32px",
-                  height: "32px",
-                  backgroundColor: COLORS.white,
-                  border: `1px solid ${COLORS.border}`,
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "16px",
-                  fontWeight: "bold",
-                  color: COLORS.dark,
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                }}
-                title="축소"
-              >
-                −
-              </button>
-              <button
-                onClick={() => {
-                  if (graphRef.current) {
-                    try {
-                      // 전체 보기: (0,0) 중심으로 조정
-                      graphRef.current.zoomToFit(400, 50);
-                      setTimeout(() => {
-                        if (graphRef.current) {
-                          graphRef.current.centerAt(0, 0, 300);
-                        }
-                      }, 200);
-                    } catch (error) {
-                      console.error("Fit to view error:", error);
-                    }
-                  }
-                }}
-                style={{
-                  width: "32px",
-                  height: "32px",
-                  backgroundColor: COLORS.white,
-                  border: `1px solid ${COLORS.border}`,
-                  borderRadius: "4px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "12px",
-                  color: COLORS.dark,
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                }}
-                title="전체 보기"
-              >
-                ⌂
-              </button>
-            </div>
             {graphError ? (
               <div
                 style={{
@@ -928,46 +774,29 @@ const EvidencePathView = ({ evidences = [] }) => {
                 <ForceGraph2D
                   ref={graphRef}
                   graphData={graphData}
-                  width={800} // 컨테이너 너비와 일치
-                  height={isExpanded ? 350 : 250} // 컨테이너 높이와 일치
+                  width={containerSize.width}
+                  height={containerSize.height}
                   nodeLabel="name"
                   nodeColor={getNodeColor}
                   nodeRelSize={getNodeSize}
-                  // D3 force 설정 - (0,0) 중심 강력 고정
+                  // 노드 간격 조정 및 애니메이션 설정 - 안정적인 중앙 배치
                   d3Force="charge"
-                  d3ForceStrength={-120} // 반발력 적당히
-                  d3ForceLinkDistance={55} // 링크 거리 적당히
-                  d3ForceLinkStrength={0.6} // 링크 강도 적당히
-                  d3ForceCenterStrength={1.0} // 중심 끌림 최대화 (0.7 → 1.0)
+                  d3ForceStrength={-120} // 반발력 적절히 조정
+                  d3ForceLinkDistance={80} // 링크 거리
+                  d3ForceLinkStrength={0.5} // 링크 강도
+                  d3ForceCenterStrength={1.0} // 중심 끌림 최대화
                   // 애니메이션 설정 - 빠른 안정화
-                  d3AlphaDecay={0.05} // 안정화 속도 빠르게 (0.08 → 0.05)
-                  d3VelocityDecay={0.8} // 속도 감쇠 강화 (0.7 → 0.8)
-                  warmupTicks={100} // 초기 시뮬레이션 틱 증가 (80 → 100)
-                  cooldownTicks={50} // 쿨다운 틱 증가 (30 → 50)
-                  // 초기 뷰 설정 - 개선된 줌 및 상호작용
-                  zoom={1.0} // 줌 레벨 조정 (1.2 → 1.0)
-                  minZoom={0.2} // 최소 줌 확대 (0.3 → 0.2)
-                  maxZoom={5} // 최대 줌 확대 (4 → 5)
-                  // 노드 초기 위치 설정 - (0,0) 중심으로 배치
-                  nodeVal={(node) => {
-                    // (0,0) 중심 근처에 배치
-                    if (!node.x) node.x = (Math.random() - 0.5) * 80;
-                    if (!node.y) node.y = (Math.random() - 0.5) * 80;
-                    return 1;
-                  }}
-                  // 그래프 로드 완료 시 중앙 정렬 (단순화)
-                  onRenderFramePost={null}
+                  d3AlphaDecay={0.05} // 적절한 안정화 속도
+                  d3VelocityDecay={0.4} // 적절한 속도 감쇠
+                  warmupTicks={100} // 초기 시뮬레이션 틱
+                  cooldownTicks={50} // 쿨다운 틱
+                  // 초기 뷰 설정
+                  minZoom={0.3}
+                  maxZoom={4}
                   nodeCanvasObject={(node, ctx, globalScale) => {
                     try {
                       const label = node.name || "";
-                      // 개선된 폰트 크기 계산 - 줌에 따른 적응적 크기 조정
-                      const baseFontSize = 12;
-                      const minFontSize = 8;
-                      const maxFontSize = 16;
-                      const fontSize = Math.max(
-                        minFontSize, 
-                        Math.min(maxFontSize, baseFontSize / Math.max(0.5, globalScale))
-                      );
+                      const fontSize = Math.max(10, 16 / globalScale); // 폰트 크기 증가 (8, 12 → 10, 16)
                       ctx.font = `bold ${fontSize}px Sans-Serif`;
                       ctx.textAlign = "center";
                       ctx.textBaseline = "middle";
@@ -1111,14 +940,8 @@ const EvidencePathView = ({ evidences = [] }) => {
                       const label = link.label || "";
                       if (!label) return;
 
-                      // 개선된 링크 라벨 폰트 크기 계산
-                      const baseLinkFontSize = 10;
-                      const minLinkFontSize = 6;
-                      const maxLinkFontSize = 12;
-                      const fontSize = Math.max(
-                        minLinkFontSize, 
-                        Math.min(maxLinkFontSize, baseLinkFontSize / Math.max(0.5, globalScale))
-                      );
+                      // 텍스트 스타일 설정
+                      const fontSize = Math.max(8, 11 / globalScale);
                       ctx.font = `${fontSize}px Sans-Serif`;
                       ctx.textAlign = "center";
                       ctx.textBaseline = "middle";
@@ -1176,41 +999,30 @@ const EvidencePathView = ({ evidences = [] }) => {
                     setHoveredNode(null);
                   }}
                   onEngineStop={() => {
-                    // 시뮬레이션 완료 후 (0,0) 중심으로 한 번만 이동
-                    if (graphRef.current && !graphRef.current._centered) {
-                      graphRef.current._centered = true; // 중복 실행 방지
-                      try {
-                        // (0,0) 중심으로 이동
-                        graphRef.current.centerAt(0, 0, 300);
-                        
-                        // 줌 조정
-                        setTimeout(() => {
-                          if (graphRef.current) {
+                    // force simulation이 완료된 후 중앙 정렬
+                    if (isExpanded && graphRef.current) {
+                      setTimeout(() => {
+                        if (graphRef.current) {
+                          try {
+                            // 모든 노드가 보이도록 줌 조정
                             graphRef.current.zoomToFit(400, 50);
+                          } catch (error) {
+                            console.error("[EvidencePathView] onEngineStop error:", error);
                           }
-                        }, 400);
-                      } catch (error) {
-                        console.error("[EvidencePathView] onEngineStop error:", error);
-                      }
+                        }
+                      }, 100);
                     }
                   }}
                   enableNodeDrag={true}
                   enableZoomInteraction={true}
                   enablePanInteraction={true}
-                  // 개선된 상호작용 설정
+                  // 상호작용 강화 설정
                   nodePointerAreaPaint={(node, color, ctx) => {
-                    // 노드 클릭 영역 확대 (더 쉬운 클릭)
+                    // 노드 클릭 영역 확대
                     ctx.fillStyle = color;
                     ctx.beginPath();
-                    ctx.arc(node.x, node.y, getNodeSize(node) + 5, 0, 2 * Math.PI);
+                    ctx.arc(node.x, node.y, getNodeSize(node) + 2, 0, 2 * Math.PI);
                     ctx.fill();
-                  }}
-                  // 줌 제어 개선
-                  onZoom={(transform) => {
-                    // 줌 레벨에 따른 추가 처리 (필요시)
-                    if (transform && transform.k) {
-                      // 극단적인 줌에서 텍스트 숨기기 등의 처리 가능
-                    }
                   }}
                   // 마우스 이벤트 활성화
                   onNodeRightClick={(node) => {

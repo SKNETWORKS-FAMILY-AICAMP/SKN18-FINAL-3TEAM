@@ -6,6 +6,7 @@ import {
   ThinkingIcon,
   CloseIcon,
   ChatIcon,
+  TrashIcon,
 } from "../components/common/Icons";
 import {
   sendQuestion,
@@ -79,20 +80,27 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
       /* 세션 삭제 버튼 스타일 */
       .session-delete-btn {
         opacity: 0.8 !important; /* 항상 보이도록 변경 */
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        transition: opacity 0.2s ease, color 0.2s ease, transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
       }
       .session-delete-btn:hover {
         opacity: 1 !important;
-        background: rgba(239, 68, 68, 0.15) !important;
+        background: transparent !important;
+        background-color: transparent !important;
         transform: scale(1.1) !important;
       }
       
       .session-item:hover .session-delete-btn {
         opacity: 1 !important;
+        background: transparent !important;
+        background-color: transparent !important;
       }
       
       .session-delete-btn:hover {
         color: #EF4444 !important;
+        background: transparent !important;
+        background-color: transparent !important;
       }
     `;
     // 기존 스타일이 있으면 제거 후 추가
@@ -117,6 +125,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [chatHistory, setChatHistory] = useState([]);
   const [selectedSessionId, setSelectedSessionId] = useState(null);
+  const [hoveredDeleteBtn, setHoveredDeleteBtn] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [isThinkingMode, setIsThinkingMode] = useState(false); // Thinking 모드 상태 추가
   const messagesEndRef = useRef(null);
@@ -831,7 +840,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
               style={{
                 flex: 1,
                 overflowY: "auto",
-                padding: "0",
+                padding: "8px 0 0 0",
                 // 커스텀 스크롤바
                 scrollbarWidth: "thin",
                 scrollbarColor: `${COLORS.border} transparent`,
@@ -1024,8 +1033,9 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                         width: "24px",
                         height: "24px",
                         border: "none",
-                        background: "rgba(0, 0, 0, 0.08)", // 약간 더 진한 배경
-                        color: "#999999",
+                        background: "transparent",
+                        backgroundColor: "transparent",
+                        color: "#666666",
                         cursor: "pointer",
                         opacity: 0.8, // 더 잘 보이도록 조정
                         transition: "opacity 0.2s ease, color 0.2s ease",
@@ -1036,30 +1046,30 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                         pointerEvents: "auto",
                       }}
                       onMouseEnter={(e) => {
+                        e.stopPropagation();
+                        setHoveredDeleteBtn(session.id);
                         e.currentTarget.style.color = "#EF4444";
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.backgroundColor = "transparent";
                         e.currentTarget.style.opacity = "1";
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.color = "#999999";
+                        e.stopPropagation();
+                        setHoveredDeleteBtn(null);
+                        e.currentTarget.style.color = "#666666";
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.backgroundColor = "transparent";
                         e.currentTarget.style.opacity = "0.8";
                       }}
                     >
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M3 6h18"></path>
-                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                        <line x1="10" y1="11" x2="10" y2="17"></line>
-                        <line x1="14" y1="11" x2="14" y2="17"></line>
-                      </svg>
+                      <TrashIcon
+                        size={18}
+                        color={
+                          hoveredDeleteBtn === session.id
+                            ? "#EF4444"
+                            : "#666666"
+                        }
+                      />
                     </button>
                   </div>
                 ))
@@ -1277,17 +1287,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                                 // 컨테이너 최대 너비 제한 해제
                                 width: "100%",
                                 maxWidth: "none",
-                                // 스크롤바 스타일링 (Webkit 기반 브라우저)
-                                "&::-webkit-scrollbar": {
-                                  height: "6px",
-                                },
-                                "&::-webkit-scrollbar-track": {
-                                  backgroundColor: "transparent",
-                                },
-                                "&::-webkit-scrollbar-thumb": {
-                                  backgroundColor: "rgba(0,0,0,0.2)",
-                                  borderRadius: "3px",
-                                },
+                                // 스크롤바 스타일링은 CSS 클래스(.clarification-cards-scroll)에서 처리됨
                               }}
                             >
                               {msg.options?.map((option, idx) => {

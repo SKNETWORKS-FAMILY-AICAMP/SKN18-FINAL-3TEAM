@@ -14,3 +14,4 @@ export { default as EditIcon } from './EditIcon';
 export { default as ChatIcon } from './ChatIcon';
 export { default as ThinkingIcon } from './ThinkingIcon';
 export { default as MenuIcon } from './MenuIcon';
+export { default as TrashIcon } from './TrashIcon';
