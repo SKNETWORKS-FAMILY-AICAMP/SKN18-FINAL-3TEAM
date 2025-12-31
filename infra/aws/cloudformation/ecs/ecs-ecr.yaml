@@ -1,0 +1,131 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Base compute stack: ECR repos, ECS cluster, task roles, shared log group.
+
+Parameters:
+  NamePrefix:
+    Type: String
+    Default: skn18-3-dev
+    Description: "Name prefix for all resources"
+  LogRetentionDays:
+    Type: Number
+    Default: 14
+    AllowedValues: [1,3,5,7,14,30,60,90,180,365,400,545,731,1827,3653]
+    Description: "CloudWatch Logs retention period (days)"
+
+Resources:
+  WebRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${NamePrefix}-web"
+      ImageScanningConfiguration: { ScanOnPush: true }
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {"rulePriority":1,"description":"keep last 20","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":20},"action":{"type":"expire"}}
+            ]
+          }
+
+  PostgresRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${NamePrefix}-postgres"
+      ImageScanningConfiguration: { ScanOnPush: true }
+
+  Neo4jRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${NamePrefix}-neo4j"
+      ImageScanningConfiguration: { ScanOnPush: true }
+
+  FusekiRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${NamePrefix}-fuseki"
+      ImageScanningConfiguration: { ScanOnPush: true }
+
+  EcsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${NamePrefix}"
+      RetentionInDays: !Ref LogRetentionDays
+
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${NamePrefix}-cluster"
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Tags:
+        - Key: Name
+          Value: !Sub "${NamePrefix}-ecs-execution-role"
+        - Key: Project
+          Value: !Sub "${NamePrefix}"
+        - Key: Env
+          Value: dev
+          
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Tags:
+        - Key: Name
+          Value: !Sub "${NamePrefix}-ecs-task-role"
+        - Key: Project
+          Value: !Sub "${NamePrefix}"
+        - Key: Env
+          Value: dev
+
+Outputs:
+  EcsClusterArn:
+    Value: !Ref EcsCluster
+    Export:
+      Name: !Sub "${NamePrefix}-ecs-cluster-arn"
+  LogGroupName:
+    Value: !Ref EcsLogGroup
+    Export:
+      Name: !Sub "${NamePrefix}-ecs-log-group"
+  WebRepositoryUri:
+    Value: !GetAtt WebRepository.RepositoryUri
+    Export:
+      Name: !Sub "${NamePrefix}-web-repo-uri"
+  PostgresRepositoryUri:
+    Value: !GetAtt PostgresRepository.RepositoryUri
+    Export:
+      Name: !Sub "${NamePrefix}-postgres-repo-uri"
+  Neo4jRepositoryUri:
+    Value: !GetAtt Neo4jRepository.RepositoryUri
+    Export:
+      Name: !Sub "${NamePrefix}-neo4j-repo-uri"
+  FusekiRepositoryUri:
+    Value: !GetAtt FusekiRepository.RepositoryUri
+    Export:
+      Name: !Sub "${NamePrefix}-fuseki-repo-uri"
+  TaskExecutionRoleArn:
+    Value: !GetAtt TaskExecutionRole.Arn
+    Export:
+      Name: !Sub "${NamePrefix}-ecs-execution-role-arn"
+  TaskRoleArn:
+    Value: !GetAtt TaskRole.Arn
+    Export:
+      Name: !Sub "${NamePrefix}-ecs-task-role-arn"
