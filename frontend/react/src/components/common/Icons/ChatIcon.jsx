@@ -17,3 +17,4 @@ const ChatIcon = ({ size = 24, color = '#333' }) => {
 
 export default ChatIcon;
 
+

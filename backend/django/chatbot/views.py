@@ -2,6 +2,7 @@ import asyncio
 import logging
 import json
 import uuid
+import time
 import threading
 import queue
 
@@ -14,6 +15,8 @@ from django.db.models import Count
 
 from .models import ChatMessage, ChatSession
 from backend.langgraph_structure1.graph import create_graph_flow
+from backend.langgraph_fuseki.graph import create_graph_flow as create_ontology_graph
+from backend.langgraph_fuseki.nodes.user_intent_clarification_node import UserClarificationRequired
 
 logger = logging.getLogger("chatbot")
 
@@ -44,12 +47,19 @@ def _get_or_create_session_for_user(request, *, create=True):
     return chat_session
 
 
-def _store_message(request, role, content, chat_session=None):
+def _store_message(request, role, content, chat_session=None, evidences=None):
     """
     모든 사용자의 채팅 메시지를 세션에만 적재합니다.
+    evidences가 제공되면 함께 저장합니다.
     """
     history = request.session.get('chat_history', [])
-    history.append({'role': role, 'content': content})
+    msg_data = {'role': role, 'content': content}
+
+    # evidences가 있으면 함께 저장
+    if evidences is not None and role == 'assistant':
+        msg_data['evidences'] = evidences
+
+    history.append(msg_data)
     request.session['chat_history'] = history
     request.session.modified = True
     logger.info("[chat] store_message role=%s, history_len=%s, session_key=%s", role, len(history), request.session.session_key)
@@ -61,10 +71,21 @@ def _store_message(request, role, content, chat_session=None):
             logger.warning("[chat] cannot persist message: chat_session missing.")
             return
 
+    # DB에 저장할 때 evidences를 JSON으로 인코딩하여 content에 포함
+    db_content = content
+    if evidences is not None and role == 'assistant':
+        import json
+        # evidences를 메타데이터로 저장
+        metadata = {
+            "content": content,
+            "evidences": evidences
+        }
+        db_content = f"__EVIDENCE_METADATA__:{json.dumps(metadata, ensure_ascii=False)}"
+
     ChatMessage.objects.create(
         session=chat_session,
         role=role,
-        content=content,
+        content=db_content,
     )
     chat_session.save(update_fields=['updated_at'])
 
@@ -119,15 +140,59 @@ def _handle_question(request, chat_session=None):
     error = None
     ai_response = ""
     fallback_answer = "어,어랏? 그게 뭐야아? 그거 조선말 맞아?"
+    
+    # ========== 재질문 관련 변수 초기화 (수정됨) ==========
+    needs_clarification = False
+    expansion_directions = []
+    clarification_question = ""
 
     _hydrate_summary_from_db(request)
     query = (request.data.get("query") or request.data.get("question") or "").strip()
     if not query:
         return Response({"error": "query is required"}, status=400)
 
+    # Thinking mode 파라미터 확인
+    thinking_mode = request.data.get("thinking_mode", False)
+
+    # 사용자 선택 확인 (재질문에 대한 응답)
+    user_selected_direction = None
+    user_selected_title = None
+    pending_expansion_directions = []  # 세션에서 복원할 확장 방향
+    pending_basic_keywords = []  # 세션에서 복원할 기본 키워드
+    
+    if query.startswith("__CLARIFICATION__:"):
+        parts = query.split(":", 2)  # "__CLARIFICATION__", direction_id, title
+        if len(parts) >= 2:
+            user_selected_direction = parts[1]
+        if len(parts) >= 3:
+            user_selected_title = parts[2]
+
+        # 세션 키 확인 (디버깅용)
+        logger.info("[chat][session] Session key: %s", request.session.session_key)
+        logger.info("[chat][session] Session keys available: %s", list(request.session.keys()))
+
+        # 원본 질문 및 확장 방향을 세션에서 복원
+        query = request.session.get("pending_clarification_query", query)
+        pending_expansion_directions = request.session.get("pending_expansion_directions", [])
+        pending_basic_keywords = request.session.get("pending_basic_keywords", [])
+        
+        logger.info("[chat] User selected direction: %s (%s) for query: %s",
+                   user_selected_direction, user_selected_title, query)
+        logger.info("[chat] Restored expansion_directions: %d, basic_keywords: %d",
+                   len(pending_expansion_directions), len(pending_basic_keywords))
+        logger.info("[chat] Restored basic_keywords content: %s", pending_basic_keywords)
+
+        # 사용자가 선택한 옵션을 사용자 메시지로 저장
+        if user_selected_title:
+            _store_message(request, ChatMessage.Role.USER, user_selected_title, chat_session=chat_session)
+
     try:
-        logger.info("[chat] POST question='%s'", query)
-        _store_message(request, ChatMessage.Role.USER, query, chat_session=chat_session)
+        logger.info("[chat] POST question='%s' thinking_mode=%s", query, thinking_mode)
+
+        # 재질문 응답이 아닌 경우에만 사용자 메시지 저장
+        if not user_selected_direction:
+            _store_message(request, ChatMessage.Role.USER, query, chat_session=chat_session)
+
         question_for_ai = query
 
         memory_summary = request.session.get("chat_memory_summary")
@@ -139,42 +204,173 @@ def _handle_question(request, chat_session=None):
             len(memory_summary) if memory_summary else 0,
         )
 
-        app = create_graph_flow()
-        response_state = asyncio.run(
-            app.ainvoke(
-                {
-                    "query": question_for_ai,
-                    "tag": "chat",
+        # LangGraph 호출 시 사용자 선택 포함 (먼저 정의)
+        invoke_params = {
+            "query": question_for_ai,
+            "tag": "chat",  # Django API 모드 표시
+            "session_id": str(chat_session.id) if chat_session else "",
+        }
+
+        # Thinking 모드일 때만 ontology LangGraph 호출
+        if thinking_mode:
+            logger.info("[chat] Using ontology LangGraph (Thinking mode)")
+            app = create_ontology_graph()
+            
+            # 🧠 Thinking 콜백 설정 (비스트리밍 모드)
+            def thinking_callback(event_type: str, data: dict):
+                """비스트리밍 모드에서 thinking 이벤트를 세션에 저장"""
+                thinking_event = {
+                    "type": "thinking",
+                    "event": event_type,
+                    "data": data,
+                    "timestamp": time.time()
                 }
-            )
-        )
+                if 'pending_thinking_events' not in request.session:
+                    request.session['pending_thinking_events'] = []
+                request.session['pending_thinking_events'].append(thinking_event)
+                request.session.modified = True
+                logger.info(f"[chat][thinking] Stored thinking event: {event_type}")
+            
+            invoke_params["thinking_callback"] = thinking_callback
+        else:
+            logger.info("[chat] Using standard LangGraph")
+            app = create_graph_flow()
+
+        # 사용자 선택이 있으면 skip_clarification 활성화
+        if user_selected_direction:
+            invoke_params["user_selected_direction"] = user_selected_direction
+            if user_selected_title:
+                invoke_params["user_selected_title"] = user_selected_title
+            invoke_params["skip_clarification"] = True  # 이미 선택했으므로 재질문 스킵
+            
+            # 세션에서 복원한 expansion_directions와 basic_keywords 전달
+            if pending_expansion_directions:
+                invoke_params["expansion_directions"] = pending_expansion_directions
+            if pending_basic_keywords:
+                invoke_params["basic_keywords"] = pending_basic_keywords
+            
+            logger.info("[chat] User direction selected: %s (%s), skip_clarification=True", 
+                       user_selected_direction, user_selected_title or "no title")
+            logger.info("[chat] invoke_params에 전달: basic_keywords=%d개, expansion_directions=%d개",
+                       len(pending_basic_keywords), len(pending_expansion_directions))
+            logger.info("[chat] basic_keywords 내용: %s", pending_basic_keywords)
+        else:
+            # 첫 호출에서는 재질문을 위해 중단할 수 있도록 설정
+            invoke_params["skip_clarification"] = False
+            logger.info("[chat] First call, skip_clarification=False, expecting clarification")
+
+        response_state = asyncio.run(app.ainvoke(invoke_params))
         ai_response = response_state.get("final_answer") or fallback_answer
         logger.info("[chat] AI response len=%s", len(ai_response))
 
+        # 노드별 실행 시간 로그 출력
+        node_times = response_state.get("node_execution_times", {})
+        if node_times:
+            total_time = sum(node_times.values())
+            logger.info("[chat] 총 실행 시간: %.2f초", total_time)
+
+        # Evidences 정보 추출 (경로 시각화용)
+        evidences = response_state.get("evidences", [])
+        logger.info("[chat] Evidences count=%s", len(evidences))
+
+        # 재질문 데이터 추출
+        needs_clarification = response_state.get("needs_clarification", False)
+        expansion_directions = response_state.get("expansion_directions", [])
+        clarification_question = response_state.get("clarification_question", "")
+
+        # 재질문이 필요한 경우 AI 응답을 저장하지 않음 (사용자 선택 대기)
+        if not needs_clarification:
+            _store_message(
+                request,
+                ChatMessage.Role.ASSISTANT,
+                ai_response,
+                chat_session=chat_session,
+                evidences=evidences,  # evidences 포함
+            )
+
+            new_summary = response_state.get("summary")
+            if new_summary:
+                    _store_summary_entry(request, new_summary, chat_session=chat_session)
+
+    except UserClarificationRequired as e:
+        # 사용자 재질문이 필요한 경우 (LangGraph가 중단됨)
+        logger.info("[chat] User clarification required, returning options to frontend")
+
+        # 예외에 포함된 state에서 재질문 데이터 추출
+        response_state = e.state
+        needs_clarification = response_state.get("needs_clarification", True)
+        expansion_directions = response_state.get("expansion_directions", [])
+        clarification_question = response_state.get("clarification_question", "")
+        basic_keywords = response_state.get("basic_keywords", [])  # 기본 키워드도 추출
+
+        # 재질문을 AI 메시지로 저장 (대화 기록에 포함)
+        # JSON 메타데이터를 메시지 앞에 추가 (프론트엔드 복원용)
+        import json
+        clarification_metadata = {
+            "type": "clarification",
+            "question": clarification_question,
+            "options": expansion_directions
+        }
+        message_with_metadata = f"__CLARIFICATION_METADATA__:{json.dumps(clarification_metadata, ensure_ascii=False)}"
         _store_message(
             request,
             ChatMessage.Role.ASSISTANT,
-            ai_response,
+            message_with_metadata,
             chat_session=chat_session,
         )
 
-        new_summary = response_state.get("summary")
-        if new_summary:
-                _store_summary_entry(request, new_summary, chat_session=chat_session)
+        # 원본 질문과 확장 방향을 세션에 저장 (사용자 선택 시 복원용)
+        request.session["pending_clarification_query"] = query
+        request.session["pending_expansion_directions"] = expansion_directions
+        request.session["pending_basic_keywords"] = basic_keywords
+        request.session.modified = True
+        # 중요: 명시적으로 세션 저장
+        request.session.save()
+        
+        logger.info("[chat] Saved to session: expansion_directions=%d, basic_keywords=%d",
+                   len(expansion_directions), len(basic_keywords))
+        logger.info("[chat] basic_keywords content: %s", basic_keywords)
+
+        # ai_response는 비워둠 (재질문만 반환)
+        ai_response = ""
+
     except Exception:
         logger.exception("[chat] langgraph failed")
         error = "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+        # 일반 오류 시에도 변수 초기화
+        needs_clarification = False
+        expansion_directions = []
+        clarification_question = ""
 
     chat_history = request.session.get("chat_history", [])
     active_session = _get_or_create_session_for_user(request, create=False)
-    return Response(
-        {
-            "chat_history": chat_history,
-            "error": error,
-            "active_session_id": active_session.id if active_session else None,
-            "answer": ai_response,
-        }
-    )
+
+    response_data = {
+        "chat_history": chat_history,
+        "error": error,
+        "active_session_id": active_session.id if active_session else None,
+        "answer": ai_response,
+        "evidences": evidences if 'evidences' in locals() else [],  # evidences 포함 (Thinking 모드일 때만 존재)
+    }
+
+    # Thinking 모드에서 재질문이 있는 경우 추가 정보 전달
+    # 수정: thinking_mode 조건 제거 - 항상 재질문 데이터 반환
+    if needs_clarification and expansion_directions:
+        response_data["needs_clarification"] = True
+        response_data["clarification_question"] = clarification_question
+        response_data["expansion_directions"] = expansion_directions
+        logger.info("[chat] Returning clarification to frontend: %d options", len(expansion_directions))
+    else:
+        # 재질문이 완료되었거나 없으면 세션 정리
+        if not (needs_clarification and expansion_directions):
+            # 🧠 정상 완료 시 세션 정리
+            request.session.pop('pending_thinking_events', None)
+            request.session.pop("pending_clarification_query", None)
+            request.session.pop("pending_expansion_directions", None) 
+            request.session.pop("pending_basic_keywords", None) 
+            request.session.modified = True
+
+    return Response(response_data)
 
 
 class ChatQuestionView(APIView):
@@ -182,14 +378,22 @@ class ChatQuestionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # 세션 지정 (없으면 현재 세션 키 기준으로 생성)
-        session_id = request.data.get("session_id")
-        if session_id:
-            chat_session = ChatSession.objects.filter(id=session_id, user=request.user).first()
-            if not chat_session:
-                return Response({"error": "invalid session"}, status=400)
-        else:
-            chat_session = _get_or_create_session_for_user(request)
+        # 변수 초기화 (try 블록 밖에서)
+        chat_session = None
+        stream_flag = False
+        
+        try:
+            # 세션 지정 (없으면 현재 세션 키 기준으로 생성)
+            session_id = request.data.get("session_id")
+            if session_id:
+                chat_session = ChatSession.objects.filter(id=session_id, user=request.user).first()
+                if not chat_session:
+                    return Response({"error": "invalid session"}, status=400)
+            else:
+                chat_session = _get_or_create_session_for_user(request)
+        except Exception as e:
+            logger.error(f"[ChatQuestionView] Error in initial processing: {str(e)}", exc_info=True)
+            return Response({"error": f"Server error: {str(e)}"}, status=500)
 
         # 스트리밍 요청 여부 (query string 또는 body)
         stream_flag = (
@@ -198,7 +402,9 @@ class ChatQuestionView(APIView):
         )
 
         if stream_flag:
-            error_text = None
+            error = None
+            ai_response = ""
+            fallback_answer = "죄송합니다. 답변을 생성하지 못했습니다. 다시 시도해주세요."
 
             _hydrate_summary_from_db(request)
             query = (
@@ -209,70 +415,374 @@ class ChatQuestionView(APIView):
             if not query:
                 return Response({"error": "query is required"}, status=400)
 
-            logger.info("[chat][stream] POST question='%s'", query)
-            _store_message(request, ChatMessage.Role.USER, query, chat_session=chat_session)
-            question_for_ai = query
+            # Thinking mode 파라미터 확인
+            thinking_mode = request.data.get("thinking_mode", False)
 
-            memory_summary = request.session.get("chat_memory_summary")
-            if not memory_summary:
-                memory_summary = _hydrate_summary_from_db(request)
+            # 사용자 선택 확인 (재질문에 대한 응답)
+            user_selected_direction = None
+            user_selected_title = None
+            pending_expansion_directions = []  # 세션에서 복원할 확장 방향
+            pending_basic_keywords = []  # 세션에서 복원할 기본 키워드
+            
+            if query.startswith("__CLARIFICATION__:"):
+                parts = query.split(":", 2)  # "__CLARIFICATION__", direction_id, title
+                if len(parts) >= 2:
+                    user_selected_direction = parts[1]
+                if len(parts) >= 3:
+                    user_selected_title = parts[2]
 
-            app = create_graph_flow()
+                # 세션 키 확인 (디버깅용)
+                logger.info("[chat][stream][session] Session key: %s", request.session.session_key)
+                logger.info("[chat][stream][session] Session keys available: %s", list(request.session.keys()))
+                
+                # 원본 질문 및 확장 방향을 세션에서 복원
+                query = request.session.get("pending_clarification_query", query)
+                pending_expansion_directions = request.session.get("pending_expansion_directions", [])
+                pending_basic_keywords = request.session.get("pending_basic_keywords", [])
+                
+                logger.info("[chat][stream] User selected direction: %s (%s) for query: %s",
+                           user_selected_direction, user_selected_title, query)
+                logger.info("[chat][stream] Restored expansion_directions: %d, basic_keywords: %d",
+                           len(pending_expansion_directions), len(pending_basic_keywords))
+                logger.info("[chat][stream] Restored basic_keywords content: %s", pending_basic_keywords)
 
-            # SSE 형태로 LangGraph 스트림 중계
-            def sse_stream():
-                q: "queue.Queue[dict | None]" = queue.Queue()
+                # 사용자가 선택한 옵션을 사용자 메시지로 저장
+                if user_selected_title:
+                    _store_message(request, ChatMessage.Role.USER, user_selected_title, chat_session=chat_session)
+            
+            # 재질문 응답이 아닌 경우에만 사용자 메시지 저장 (동기 방식)
+            if not user_selected_direction:
+                _store_message(request, ChatMessage.Role.USER, query, chat_session=chat_session)
 
-                def stream_callback(delta: str):
-                    # LangGraph 노드에서 토큰 단위로 호출
-                    q.put({"type": "delta", "text": delta})
+            # SSE 형태로 스트리밍 응답 (실제 OpenAI 스트리밍)
+            async def sse_stream_async():
+                nonlocal error, ai_response
+                
+                try:
+                    logger.info("[chat][stream] POST question='%s' thinking_mode=%s", query, thinking_mode)
+                    question_for_ai = query
 
-                def run_graph():
+                    # 비동기 컨텍스트에서 DB 접근을 위해 sync_to_async 사용
+                    from asgiref.sync import sync_to_async
+                    
+                    # 동기 함수를 비동기로 래핑
+                    async_hydrate_summary = sync_to_async(_hydrate_summary_from_db, thread_sensitive=True)
+                    async_store_message = sync_to_async(_store_message, thread_sensitive=True)
+                    async_store_summary = sync_to_async(_store_summary_entry, thread_sensitive=True)
+                    
+                    memory_summary = request.session.get("chat_memory_summary")
+                    if not memory_summary:
+                        memory_summary = await async_hydrate_summary(request)
+
+                    # Thinking 모드일 때만 ontology LangGraph 호출
+                    if thinking_mode:
+                        logger.info("[chat][stream] Using ontology LangGraph (Thinking mode)")
+                        app = create_ontology_graph()
+                    else:
+                        logger.info("[chat][stream] Using standard LangGraph")
+                        app = create_ontology_graph()
+
+                    # LangGraph 호출 시 사용자 선택 포함
+                    invoke_params = {
+                        "query": question_for_ai,
+                        "tag": "chat",
+                        "session_id": str(chat_session.id) if chat_session else "",
+                        "stream_mode": True,  # 스트리밍 모드 활성화
+                    }
+
+                    # 사용자 선택이 있으면 skip_clarification 활성화
+                    if user_selected_direction:
+                        invoke_params["user_selected_direction"] = user_selected_direction
+                        if user_selected_title:
+                            invoke_params["user_selected_title"] = user_selected_title
+                        invoke_params["skip_clarification"] = True
+                        
+                        # 세션에서 복원한 expansion_directions와 basic_keywords 전달
+                        if pending_expansion_directions:
+                            invoke_params["expansion_directions"] = pending_expansion_directions
+                        if pending_basic_keywords:
+                            invoke_params["basic_keywords"] = pending_basic_keywords
+                        
+                        logger.info("[chat][stream] invoke_params에 전달: basic_keywords=%d개, expansion_directions=%d개",
+                                   len(pending_basic_keywords), len(pending_expansion_directions))
+                        logger.info("[chat][stream] basic_keywords 내용: %s", pending_basic_keywords)
+                    else:
+                        invoke_params["skip_clarification"] = False
+
+                    # 스트리밍을 위한 큐 (asyncio.Queue 사용)
+                    import asyncio
+                    stream_queue = asyncio.Queue()
                     try:
-                        response_state = asyncio.run(
-                            app.ainvoke(
-                                {
-                                    "query": question_for_ai,
-                                    "tag": "chat",
-                                    "stream_callback": stream_callback,
+                        loop = asyncio.get_running_loop()
+                    except RuntimeError:
+                        loop = asyncio.get_event_loop()
+                    
+                    # 🧠 이전 thinking 이벤트들을 스트리밍 큐에 먼저 전송
+                    pending_events = request.session.get('pending_thinking_events', [])
+                    if pending_events:
+                        logger.info(f"[chat][thinking] Restoring {len(pending_events)} pending thinking events")
+                        for event in pending_events:
+                            await stream_queue.put(event)
+                        # 복원 후 세션에서 제거
+                        request.session.pop('pending_thinking_events', None)
+                        request.session.modified = True
+                    
+                    # 스트리밍 콜백 함수 (각 청크를 큐에 저장)
+                    def stream_callback(chunk_text: str):
+                        """스트리밍 청크를 큐에 저장 (비동기 큐에 추가)"""
+                        try:
+                            logger.info(f"[chat][stream] Callback received chunk: {len(chunk_text)} chars")
+                            # 동기 함수에서 비동기 큐에 추가
+                            # LangGraph는 동기 컨텍스트에서 실행되므로 다른 스레드에서 호출될 수 있음
+                            if loop.is_running():
+                                # 실행 중인 루프가 있으면 run_coroutine_threadsafe 사용
+                                future = asyncio.run_coroutine_threadsafe(
+                                    stream_queue.put(chunk_text), loop
+                                )
+                                logger.info(f"[chat][stream] Chunk queued via run_coroutine_threadsafe")
+                                # 결과를 기다리지 않음 (non-blocking)
+                            else:
+                                # 루프가 실행 중이 아니면 직접 추가 시도
+                                try:
+                                    stream_queue.put_nowait(chunk_text)
+                                    logger.info(f"[chat][stream] Chunk queued via put_nowait")
+                                except asyncio.QueueFull:
+                                    logger.warn(f"[chat][stream] Queue full, dropping chunk")
+                        except Exception as e:
+                            logger.error(f"[chat][stream] Callback error: {e}", exc_info=True)
+                    
+                    # Thinking 모드 진행 상황 콜백 함수
+                    def thinking_callback(event_type: str, data: dict):
+                        """Thinking 모드 진행 상황을 큐에 저장 + 세션에 저장"""
+                        try:
+                            thinking_event = {
+                                "type": "thinking",
+                                "event": event_type,
+                                "data": data,
+                                "timestamp": time.time()
+                            }
+                            logger.info(f"[chat][thinking] Sending thinking event: {event_type}")
+                            
+                            # 세션에 thinking 이벤트 저장 (재질문 시 복원용)
+                            if 'pending_thinking_events' not in request.session:
+                                request.session['pending_thinking_events'] = []
+                            request.session['pending_thinking_events'].append(thinking_event)
+                            request.session.modified = True
+                            
+                            # 즉시 큐에 추가하여 스트리밍 전송
+                            if loop.is_running():
+                                asyncio.run_coroutine_threadsafe(
+                                    stream_queue.put(thinking_event), loop
+                                )
+                            else:
+                                try:
+                                    stream_queue.put_nowait(thinking_event)
+                                except asyncio.QueueFull:
+                                    logger.warn(f"[chat][stream] Queue full, dropping thinking event")
+                        except Exception as e:
+                            logger.error(f"[chat][stream] Thinking callback error: {e}", exc_info=True)
+                    
+                    # 스트리밍 콜백을 state에 추가
+                    invoke_params["stream_callback"] = stream_callback
+                    if thinking_mode:
+                        invoke_params["thinking_callback"] = thinking_callback
+                    
+                    # 비동기로 LangGraph 실행 (별도 태스크)
+                    async def run_langgraph():
+                        nonlocal ai_response
+                        try:
+                            logger.info("[chat][stream] Starting LangGraph execution")
+                            
+                            # 동기 모드로 실행하여 예외 처리 개선
+                            try:
+                                final_state = await asyncio.get_event_loop().run_in_executor(
+                                    None, app.invoke, invoke_params
+                                )
+                                
+                                ai_response = final_state.get("final_answer", "") or fallback_answer
+                                logger.info(f"[chat][stream] Final answer length: {len(ai_response)}")
+                                
+                                # 재질문 데이터 확인
+                                needs_clarification = final_state.get("needs_clarification", False)
+                                expansion_directions = final_state.get("expansion_directions", [])
+                                clarification_question = final_state.get("clarification_question", "")
+                                
+                                if needs_clarification and expansion_directions:
+                                    await stream_queue.put(("clarification", clarification_question, expansion_directions))
+                                    return
+                                
+                                # 최종 답변 저장 (비동기 컨텍스트에서 DB 접근)
+                                evidences = final_state.get("evidences", [])
+                                
+                                await async_store_message(
+                                    request,
+                                    ChatMessage.Role.ASSISTANT,
+                                    ai_response,
+                                    chat_session=chat_session,
+                                    evidences=evidences,
+                                )
+                                
+                                new_summary = final_state.get("summary")
+                                if new_summary:
+                                    await async_store_summary(request, new_summary, chat_session=chat_session)
+                                
+                                logger.info(f"[chat][stream] Sending final response: {len(ai_response)} chars")
+                                await stream_queue.put(("final", ai_response, evidences))
+                                
+                                # 🧠 정상 완료 시 세션 정리
+                                request.session.pop('pending_thinking_events', None)
+                                request.session.pop("pending_clarification_query", None)
+                                request.session.pop("pending_expansion_directions", None)
+                                request.session.pop("pending_basic_keywords", None) 
+                                request.session.modified = True
+                                
+                            except UserClarificationRequired as e:
+                                # 사용자 재질문이 필요한 경우
+                                response_state = e.state
+                                needs_clarification = response_state.get("needs_clarification", True)
+                                expansion_directions = response_state.get("expansion_directions", [])
+                                clarification_question = response_state.get("clarification_question", "")
+                                basic_keywords = response_state.get("basic_keywords", [])  # 기본 키워드도 추출
+                                
+                                logger.info(f"[chat][stream][clarification] Extracted from state: expansion_directions={len(expansion_directions)}, basic_keywords={len(basic_keywords)}")
+                                logger.info(f"[chat][stream][clarification] basic_keywords content: {basic_keywords}")
+                                
+                                # 재질문을 AI 메시지로 저장 (비동기 컨텍스트에서 DB 접근)
+                                import json as json_module
+                                clarification_metadata = {
+                                    "type": "clarification",
+                                    "question": clarification_question,
+                                    "options": expansion_directions
                                 }
-                            )
-                        )
-                        q.put({"type": "final_state", "state": response_state})
-                    except Exception:
-                        logger.exception("[chat][stream] langgraph failed")
-                        q.put({"type": "error", "text": "오류가 발생했습니다. 잠시 후 다시 시도해주세요."})
-                    finally:
-                        q.put(None)  # 종료 신호
+                                message_with_metadata = f"__CLARIFICATION_METADATA__:{json_module.dumps(clarification_metadata, ensure_ascii=False)}"
+                                
+                                await async_store_message(
+                                    request,
+                                    ChatMessage.Role.ASSISTANT,
+                                    message_with_metadata,
+                                    chat_session=chat_session,
+                                )
+                                
+                                # 원본 질문과 확장 방향을 세션에 저장 (사용자 선택 시 복원용)
+                                # 중요: sync_to_async를 사용하여 세션 저장을 명시적으로 수행
+                                def save_clarification_to_session():
+                                    """동기 컨텍스트에서 세션에 재질문 데이터 저장"""
+                                    request.session["pending_clarification_query"] = query
+                                    request.session["pending_expansion_directions"] = expansion_directions
+                                    request.session["pending_basic_keywords"] = basic_keywords
+                                    request.session.modified = True
+                                    # 중요: 명시적으로 세션 저장 (스트리밍 응답에서는 미들웨어가 저장하지 않을 수 있음)
+                                    request.session.save()
+                                    logger.info(f"[chat][stream][session] Session saved explicitly: pending_basic_keywords={len(basic_keywords)}, pending_expansion_directions={len(expansion_directions)}")
+                                
+                                async_save_session = sync_to_async(save_clarification_to_session, thread_sensitive=True)
+                                await async_save_session()
+                                
+                                # 🧠 재질문 발생 시 thinking 이벤트는 세션에 보관 (사용자 응답 시 복원)
+                                logger.info(f"[chat][stream][thinking] Clarification required, saved expansion_directions={len(expansion_directions)}, basic_keywords={len(basic_keywords)}")
+                                
+                                await stream_queue.put(("clarification", clarification_question, expansion_directions))
+                                
+                        except Exception as e:
+                            logger.exception("[chat][stream] langgraph failed")
+                            await stream_queue.put(("error", "오류가 발생했습니다. 잠시 후 다시 시도해주세요."))
+                    
+                    # LangGraph 실행 태스크 시작
+                    langgraph_task = asyncio.create_task(run_langgraph())
+                    
+                    # 스트리밍 청크 전송
+                    logger.info("[chat][stream] Starting stream processing")
+                    chunk_sent = 0
+                    while True:
+                        try:
+                            # 큐에서 항목 가져오기 (타임아웃 0.1초)
+                            try:
+                                item = await asyncio.wait_for(stream_queue.get(), timeout=0.1)
+                                logger.info(f"[chat][stream] Got item from queue: {type(item)}")
+                                
+                                if isinstance(item, tuple):
+                                    if item[0] == "clarification":
+                                        yield f"data: {json.dumps({'type': 'clarification', 'question': item[1], 'options': item[2]})}\n\n"
+                                        break
+                                    elif item[0] == "final":
+                                        logger.info(f"[chat][stream] Yielding final response: {len(item[1])} chars")
+                                        # evidences도 함께 전송 (item[2]가 있으면)
+                                        evidences_data = item[2] if len(item) > 2 else []
+                                        yield f"data: {json.dumps({'type': 'final', 'text': item[1], 'evidences': evidences_data})}\n\n"
+                                        break
+                                    elif item[0] == "error":
+                                        yield f"data: {json.dumps({'type': 'error', 'text': item[1]})}\n\n"
+                                        break
+                                elif isinstance(item, dict) and item.get("type") == "thinking":
+                                    # Thinking 모드 이벤트 전송
+                                    logger.info(f"[chat][stream] Sending thinking event: {item.get('event')}")
+                                    yield f"data: {json.dumps(item)}\n\n"
+                                else:
+                                    # 일반 텍스트 청크
+                                    logger.info(f"[chat][stream] Yielding delta chunk: {len(item)} chars")
+                                    yield f"data: {json.dumps({'type': 'delta', 'text': item})}\n\n"
+                                    chunk_sent += 1
+                            except asyncio.TimeoutError:
+                                # 큐가 비어있으면 계속 대기
+                                if langgraph_task.done():
+                                    # 태스크가 완료되었는데 큐가 비어있으면 종료
+                                    logger.info(f"[chat][stream] LangGraph task completed, chunks sent: {chunk_sent}")
+                                    break
+                                continue
+                        except Exception as e:
+                            logger.error(f"[chat][stream] Stream error: {e}")
+                            break
+                    
+                    # 태스크 완료 대기
+                    await langgraph_task
+                    logger.info(f"[chat][stream] Stream processing completed, total chunks: {chunk_sent}")
+                            
+                except Exception as e:
+                    logger.exception("[chat][stream] sse_stream failed")
+                    error = "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+                    yield f"data: {json.dumps({'type': 'error', 'text': error})}\n\n"
+            
+            # 동기 제너레이터로 변환
+            def sse_stream():
+                async_gen = sse_stream_async()
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    while True:
+                        try:
+                            chunk = loop.run_until_complete(async_gen.__anext__())
+                            yield chunk
+                        except StopAsyncIteration:
+                            break
+                        except Exception as e:
+                            # 제너레이터 내부 예외 처리
+                            logger.exception(f"[chat][stream] Generator error: {e}")
+                            error_msg = "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+                            yield f"data: {json.dumps({'type': 'error', 'text': error_msg})}\n\n"
+                            break
+                except Exception as e:
+                    # 최상위 예외 처리
+                    logger.exception(f"[chat][stream] Stream generator failed: {e}")
+                    error_msg = "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+                    yield f"data: {json.dumps({'type': 'error', 'text': error_msg})}\n\n"
+                finally:
+                    try:
+                        loop.close()
+                    except Exception as e:
+                        logger.error(f"[chat][stream] Error closing event loop: {e}")
 
-                threading.Thread(target=run_graph, daemon=True).start()
-
-                while True:
-                    item = q.get()
-                    if item is None:
-                        break
-                    if item["type"] == "delta":
-                        yield f"data: {json.dumps({'type': 'delta', 'text': item['text']})}\n\n"
-                    elif item["type"] == "error":
-                        yield f"data: {json.dumps({'type': 'error', 'text': item['text']})}\n\n"
-                    elif item["type"] == "final_state":
-                        state = item["state"]
-                        ai_response = state.get("final_answer") or fallback_answer
-                        _store_message(
-                            request,
-                            ChatMessage.Role.ASSISTANT,
-                            ai_response,
-                            chat_session=chat_session,
-                        )
-                        new_summary = state.get("summary")
-                        if new_summary:
-                            _store_summary_entry(request, new_summary, chat_session=chat_session)
-                        yield f"data: {json.dumps({'type': 'final', 'text': ai_response})}\n\n"
-
-            return StreamingHttpResponse(
-                sse_stream(),
-                content_type="text/event-stream",
-            )
+            try:
+                return StreamingHttpResponse(
+                    sse_stream(),
+                    content_type="text/event-stream",
+                )
+            except Exception as e:
+                logger.exception(f"[chat][stream] Failed to create StreamingHttpResponse: {e}")
+                # 스트리밍 응답 생성 실패 시 일반 에러 응답 반환
+                return Response(
+                    {"error": "스트리밍 응답 생성에 실패했습니다. 잠시 후 다시 시도해주세요."},
+                    status=500
+                )
 
         return _handle_question(request, chat_session=chat_session)
 
@@ -299,14 +809,34 @@ class ChatSessionView(APIView):
         session = ChatSession.objects.filter(id=session_id, user=request.user).first()
         if session is None:
             return Response({"error": "session not found"}, status=404)
-        messages = [
-            {
+
+        messages = []
+        for msg in ChatMessage.objects.filter(session=session).order_by("created_at"):
+            actual_content = msg.content  # DB에서 가져온 원본 content
+            evidences = None
+
+            # evidences 메타데이터 복원
+            if msg.role == 'assistant' and actual_content.startswith("__EVIDENCE_METADATA__:"):
+                try:
+                    import json
+                    json_str = actual_content[len("__EVIDENCE_METADATA__:"):]
+                    metadata = json.loads(json_str)
+                    actual_content = metadata.get("content", actual_content)  # 실제 답변 텍스트
+                    evidences = metadata.get("evidences", [])
+                except Exception as e:
+                    logger.error("[chat] Failed to parse evidence metadata: %s", e)
+
+            msg_data = {
                 "role": msg.role,
-                "content": msg.content,
+                "content": actual_content,
                 "created_at": msg.created_at,
             }
-            for msg in ChatMessage.objects.filter(session=session).order_by("created_at")
-        ]
+
+            if evidences is not None:
+                msg_data["evidences"] = evidences
+
+            messages.append(msg_data)
+
         return Response(
             {
                 "session": _build_session_payload(session),

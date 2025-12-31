@@ -1,29 +1,28 @@
 """
-Query Classifier Node
+Query Classifier Node (Stage 1) - 동기 병렬 처리 버전
 
-전제 조건: 0단계에서 역사 관련 질문으로 확인된 경우에만 실행
-
-사용자 질문을 분석하여:
-1. 질문 유형 분류 (causal/deep_analysis)
-2. 관련 프로퍼티 그룹 선택 (TTL 기반)
-3. 핵심 의도(관계) 파악
-
-프로퍼티 그룹: property_groups.json에서 로드
+질문 분류 및 사용자 의도 확인을 위한 노드
+- LLM 기반 query_type 분류
+- ThreadPoolExecutor를 사용한 동기 병렬 처리
+- 비동기 처리 완전 제거
 """
 
 import os
-import sys
 import json
+import time
 import re
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
+import concurrent.futures
 from langchain_openai import ChatOpenAI
 
 from backend.langgraph_fuseki.state import GraphState
 from backend.langgraph_fuseki.config import PROPERTY_GROUPS_PATH
 from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
+from backend.langgraph_fuseki.nodes.intent_clarification_templates import (
+    generate_expansion_directions,
+    generate_clarification_question
+)
 
-# 한국어 형태소 분석기 (키워드 추출용)
+# 한국어 형태소 분석기
 try:
     from kiwipiepy import Kiwi
     _kiwi = Kiwi()
@@ -32,8 +31,9 @@ except ImportError:
     _kiwi = None
     USE_KIWI = False
 
-# 프로퍼티 그룹 로드 (1회)
+# 프로퍼티 그룹 캐시
 _PROPERTY_GROUPS = None
+
 
 def load_property_groups() -> dict:
     """프로퍼티 그룹 로드 (캐싱)"""
@@ -47,7 +47,7 @@ def load_property_groups() -> dict:
             data = json.load(f)
             _PROPERTY_GROUPS = data.get("groups", {})
     else:
-        # 기본 그룹 (파일 없을 경우)
+        # 기본 그룹
         _PROPERTY_GROUPS = {
             "건설": ["built", "builtBy", "construct"],
             "설립": ["founded", "establish", "create"],
@@ -64,460 +64,283 @@ def load_property_groups() -> dict:
     return _PROPERTY_GROUPS
 
 
-def get_group_list() -> str:
-    """LLM에 제공할 그룹 목록 생성 (명확한 행위 그룹만)"""
-    groups = load_property_groups()
+def classify_query_type_by_rules(query: str) -> str:
+    """규칙 기반 질문 유형 분류 (fallback용)"""
+    query_lower = query.lower()
     
-    # ★ 항상 포함해야 할 핵심 그룹 (인과관계, 시기, 연결관계)
-    always_include = {"인과관계", "시기", "연결관계"}
+    # 인과관계 질문
+    causal_keywords = ["왜", "이유", "원인", "결과", "영향", "때문", "인해", "으로 인해", "패턴"]
+    if any(kw in query_lower for kw in causal_keywords):
+        return "causal"
     
-    # 모든 그룹이 의미 있는 관계 추출 가능하므로 제외 그룹 없음
-    # 적절한 크기의 그룹만 선택 (1개 이상, 100개 이하)
-    main_groups = [
-        name for name, props in groups.items() 
-        if (name in always_include) or (  # 핵심 그룹은 항상 포함
-            1 <= len(props) <= 100  # 모든 그룹 포함 (1개 이상)
-        )
-    ]
+    # 심화 분석 질문
+    deep_keywords = ["진짜", "실제", "숨은", "이면", "배경", "의도", "목적"]
+    if any(kw in query_lower for kw in deep_keywords):
+        return "deep_analysis"
     
-    return ", ".join(sorted(main_groups))
-
-
-def detect_korean_content(text: str) -> bool:
-    """
-    텍스트에 한국어가 포함되어 있는지 확인
+    # 비교 질문
+    comparative_keywords = ["차이", "비교", "다른", "같은", "유사", "대비"]
+    if any(kw in query_lower for kw in comparative_keywords):
+        return "comparative"
     
-    Args:
-        text: 확인할 텍스트
-    
-    Returns:
-        한국어 포함 여부
-    """
-    # 한글 유니코드 범위: AC00-D7A3
-    for char in text:
-        if '\uAC00' <= char <= '\uD7A3':
-            return True
-    return False
+    # 기본값: 사실 질문
+    return "factual"
 
 
-def translate_english_query_to_korean(query: str, llm: ChatOpenAI) -> str:
-    """
-    영어 질문을 한글로 번역 (TTL 데이터에 맞는 단어 선택)
-    
-    Args:
-        query: 영어 질문
-        llm: LLM 인스턴스
-    
-    Returns:
-        번역된 한글 질문
-    """
-    translation_prompt = f"""당신은 조선시대 한국 역사 데이터에 특화된 번역 전문가입니다.
-
-## 영어 질문
-{query}
-
-## 번역 규칙 (반드시 준수)
-
-### 1. 역사 데이터에 맞는 전문 용어 사용
-- "kill" → "살해" (절대 "살인" 사용 금지)
-- "murder" → "살해" 또는 "시해" (맥락에 따라)
-- "assassinate" → "시해"
-- "timeline" → "연대기"가 아니라 "연대순으로" 또는 "시기별로" 등 자연스러운 표현
-- "show me" → "보여주세요"가 아니라 "알려주세요" 또는 "설명해주세요" 등 자연스러운 표현
-- "who" → "누가"
-- "what" → "무엇" 또는 "어떤"
-- "when" → "언제"
-- "where" → "어디"
-- "why" → "왜"
-- "how" → "어떻게"
-
-### 2. 조선시대 역사 데이터에 맞는 어투
-- 현대적 표현보다는 역사적 맥락에 맞는 표현 사용
-- 예: "Who killed the king?" → "누가 왕을 살해하였나?" (절대 "살인" 사용 금지)
-- 예: "Show me the timeline" → "연대순으로 알려주세요" 또는 "시기별로 설명해주세요"
-- 예: "What happened in 1592?" → "1592년에 무슨 일이 일어났나?"
-
-### 3. 자연스러운 한국어 표현
-- 직역보다는 자연스러운 한국어로 번역
-- 질문의 의도와 맥락을 정확히 전달
-- 조선시대 역사 데이터에 적합한 어투 사용
-
-## 출력 형식
-번역된 한글 질문만 출력하세요. 다른 설명이나 주석은 포함하지 마세요.
-
-번역 결과:"""
-    
+def classify_query_type_with_llm(query: str) -> str:
+    """LLM 기반 질문 유형 분류 (동기 방식) - 실패 시 규칙 기반으로 폴백"""
     try:
-        response = llm.invoke(translation_prompt)
-        translated = response.content.strip()
+        # 다른 노드들과 동일한 방식으로 LLM 초기화 (timeout, max_tokens 제거)
+        llm = ChatOpenAI(
+            model=os.getenv("OPENAI_MODEL"),
+            temperature=0.1
+        )
         
-        # 마크다운 코드 블록 제거
-        if "```" in translated:
-            translated = translated.split("```")[1]
-            if translated.startswith("한국어") or translated.startswith("korean"):
-                translated = translated.split("\n", 1)[1] if "\n" in translated else translated
+        prompt = f"""질문을 4가지 유형 중 하나로 분류: factual, causal, comparative, deep_analysis
+
+질문: {query}
+
+JSON만 응답: {{"query_type": "factual"}}
+"""
         
-        return translated.strip()
+        response = llm.invoke(prompt)
+        content = response.content.strip() if response.content else ""
+        
+        # 응답이 비어있는 경우 즉시 폴백
+        if not content:
+            print(f"  ⚠️ LLM 응답이 비어있음, 규칙 기반 분류로 폴백")
+            return classify_query_type_by_rules(query)
+        
+        # 1단계: 정규식으로 query_type 값 직접 추출 (가장 빠름)
+        match = re.search(r'"query_type"\s*:\s*"(\w+)"', content)
+        if match:
+            query_type = match.group(1)
+        else:
+            # 2단계: 코드 블록 제거 후 JSON 파싱
+            content_clean = re.sub(r'```json\s*|\s*```', '', content).strip()
+            if not content_clean:
+                print(f"  ⚠️ LLM 응답 파싱 실패 (빈 응답), 규칙 기반 분류로 폴백")
+                return classify_query_type_by_rules(query)
+            
+            # 중괄호로 시작하는 JSON 객체 찾기 (중첩 중괄호 처리)
+            brace_start = content_clean.find('{')
+            if brace_start == -1:
+                print(f"  ⚠️ LLM 응답에서 JSON 객체를 찾을 수 없음, 규칙 기반 분류로 폴백")
+                return classify_query_type_by_rules(query)
+            
+            # 중괄호 매칭으로 완전한 JSON 객체 추출
+            brace_count = 0
+            brace_end = -1
+            for i in range(brace_start, len(content_clean)):
+                if content_clean[i] == '{':
+                    brace_count += 1
+                elif content_clean[i] == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        brace_end = i + 1
+                        break
+            
+            if brace_end == -1:
+                print(f"  ⚠️ LLM 응답에서 완전한 JSON 객체를 찾을 수 없음, 규칙 기반 분류로 폴백")
+                return classify_query_type_by_rules(query)
+            
+            try:
+                json_str = content_clean[brace_start:brace_end]
+                result = json.loads(json_str)
+                query_type = result.get("query_type", "")
+                
+                if not query_type:
+                    print(f"  ⚠️ query_type 필드가 비어있음, 규칙 기반 분류로 폴백")
+                    return classify_query_type_by_rules(query)
+            except json.JSONDecodeError as e:
+                print(f"  ⚠️ JSON 파싱 실패: {e}, 규칙 기반 분류로 폴백")
+                return classify_query_type_by_rules(query)
+        
+        # 4가지 유형 중 하나인지 확인
+        valid_types = ["factual", "causal", "comparative", "deep_analysis"]
+        if query_type not in valid_types:
+            print(f"  ⚠️ 유효하지 않은 query_type: {query_type}, 규칙 기반 분류로 폴백")
+            return classify_query_type_by_rules(query)
+        
+        return query_type
+        
     except Exception as e:
-        print(f"    번역 실패: {e}")
-        return query  # 번역 실패 시 원본 반환
+        # 모든 예외 발생 시 규칙 기반 분류로 폴백
+        print(f"  ⚠️ LLM 분류 중 예외 발생: {type(e).__name__}: {e}")
+        print(f"  ⚠️ 규칙 기반 분류로 폴백")
+        return classify_query_type_by_rules(query)
 
 
 def extract_keywords_with_kiwi(query: str) -> list:
     """kiwipiepy로 키워드 추출"""
     if not USE_KIWI or _kiwi is None:
-        # fallback: 정규식으로 한글 단어 추출
-        return re.findall(r'[가-힣]{2,}', query)
+        # fallback: 간단한 한글 단어 추출
+        import re
+        words = re.findall(r'[가-힣]{2,}', query)
+        return [w for w in words if w not in {'무엇', '누구', '어디', '언제', '어떤', '왜'}]
     
     try:
         tokens = _kiwi.tokenize(query)
-        # 명사만 추출 (NNG: 일반명사, NNP: 고유명사)
-        # 1글자 명사도 포함 (왕, 신, 법 등 중요한 키워드)
-        nouns = [t.form for t in tokens if t.tag in ('NNG', 'NNP') and len(t.form) >= 1]
-        return nouns
+        keywords = []
+        
+        for token in tokens:
+            if token.tag in ('NNG', 'NNP') and len(token.form) >= 2:
+                # 불용어 제거
+                if token.form not in {'무엇', '누구', '어디', '언제', '어떤', '왜', '조선', '조선시대'}:
+                    keywords.append(token.form)
+        
+        return keywords
     except Exception as e:
-        print(f"    kiwipiepy 키워드 추출 실패: {e}")
-        return re.findall(r'[가-힣]{2,}', query)
+        print(f"키워드 추출 실패: {e}")
+        return []
+
+
 
 
 def query_classifier_node(state: GraphState) -> GraphState:
     """
-    질문 분석 통합 노드 (README 플로우 준수)
-
-    순서:
-    1. 의도 파악 (사용자 질문만 사용)
-    2. kiwipiepy로 키워드 추출: ["궁궐", "건축", "왕"]
-    3. LLM 1회 호출 (추출된 키워드 사용):
-       - 프로퍼티 그룹 선택 (의도 기반)
-       - 키워드 확장: {"궁궐": ["경복궁", "창덕궁"], "왕": ["태조", "세종"]}
+    Stage 1: Query Classifier - 질문 분류 및 사용자 의도 확인 준비
+    
+    작업:
+    1. LLM 기반 질문 분류 (병렬 처리)
+    2. 키워드 추출 (kiwipiepy, 병렬 처리)
+    3. LLM 기반 확장 방향 생성
+    4. 재질문 텍스트 생성
     """
-
-    import time
     node_start = time.time()
 
     query = state.get("query", "")
+    thinking_callback = state.get("thinking_callback")
+    
+    print(f"\n{'='*70}")
+    print(f"[Stage 1] Query Classifier")
+    print(f"  질문: {query}")
 
-    # LLM 초기화
-    llm = ChatOpenAI(
-        model=os.getenv("OPENAI_MODEL"),
-        temperature=0
+    # 🎯 Thinking 이벤트: 질문 분석 시작
+    if thinking_callback:
+        thinking_callback("question_analysis_started", {
+            "title": "질문 분석 시작",
+            "query": query,
+            "stage": "Stage 1: Query Classifier"
+        })
+
+    # 1. LLM 기반 분류 + 키워드 추출 (동기 병렬 처리)
+    print(f"  LLM 쿼리 타입 분류 및 키워드 추출 중 (ThreadPoolExecutor 사용)...")
+    parallel_start = time.time()
+    
+    try:
+        # ThreadPoolExecutor로 병렬 처리 (완전 동기 방식)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            future_query_type = executor.submit(classify_query_type_with_llm, query)
+            future_keywords = executor.submit(extract_keywords_with_kiwi, query)
+            
+            # 두 작업 결과 수집 (타임아웃 설정)
+            query_type_initial = future_query_type.result(timeout=20)
+            basic_keywords = future_keywords.result(timeout=20)
+    except concurrent.futures.TimeoutError as e:
+        print(f"  ⚠️ 병렬 처리 타임아웃, 순차 처리로 대체: {e}")
+        # 타임아웃 발생 시 순차 처리로 대체
+        query_type_initial = classify_query_type_with_llm(query)
+        basic_keywords = extract_keywords_with_kiwi(query)
+    except Exception as e:
+        print(f"  ⚠️ 병렬 처리 실패 ({type(e).__name__}), 순차 처리로 대체: {e}")
+        # 병렬 처리 실패 시 순차 처리로 대체
+        query_type_initial = classify_query_type_with_llm(query)
+        basic_keywords = extract_keywords_with_kiwi(query)
+    
+    # 쿼리 타입이 4가지 중 하나인지 확인
+    valid_types = ["factual", "causal", "comparative", "deep_analysis"]
+    if query_type_initial not in valid_types:
+        raise ValueError(f"Invalid query_type: {query_type_initial}. Must be one of {valid_types}")
+    
+    parallel_elapsed = time.time() - parallel_start
+    print(f"  ✓ 병렬 처리 완료 ({parallel_elapsed:.2f}초)")
+    print(f"  LLM 기반 분류: {query_type_initial}")
+    print(f"  추출된 키워드: {basic_keywords} ({len(basic_keywords)}개)")
+
+    # 🎯 Thinking 이벤트: 질문 유형 분류 완료
+    if thinking_callback:
+        thinking_callback("question_type_classified", {
+            "title": "질문 유형 분류 완료",
+            "query_type": query_type_initial,
+            "classification_method": "LLM 기반"
+        })
+
+    # 🎯 Thinking 이벤트: 키워드 추출 완료
+    if thinking_callback:
+        thinking_callback("keywords_extracted", {
+            "title": "키워드 추출 완료",
+            "keywords": basic_keywords,
+            "keyword_count": len(basic_keywords),
+            "extraction_method": "kiwipiepy 형태소 분석"
+        })
+
+    # 🎯 Thinking 이벤트: 키워드 추출 완료
+    if thinking_callback:
+        thinking_callback("keywords_extracted", {
+            "title": "키워드 추출 완료",
+            "keywords": basic_keywords,
+            "keyword_count": len(basic_keywords),
+            "extraction_method": "kiwipiepy 형태소 분석"
+        })
+
+    # 🎯 Thinking 이벤트: 확장 방향 생성 시작
+    if thinking_callback:
+        thinking_callback("direction_generation_started", {
+            "title": "확장 방향 생성 시작",
+            "input_keywords": basic_keywords[:5],
+            "query_type": query_type_initial
+        })
+
+    # 3. LLM 기반 확장 방향 생성
+    strategy, expansion_directions = generate_expansion_directions(
+        query_type=query_type_initial,
+        query=query,
+        keywords=basic_keywords[:5]
     )
 
-    # ========== 0단계: 영어 질문 번역 (가장 먼저 진행) ==========
-    original_query = query
-    is_english = not detect_korean_content(query)
-    
-    if is_english:
-        # 번역 전에 임시로 response를 받아서 토큰 추출
-        translation_prompt = f"""당신은 조선시대 한국 역사 데이터에 특화된 번역 전문가입니다.
+    # 🎯 Thinking 이벤트: 확장 방향 생성 완료
+    if thinking_callback:
+        direction_titles = [d.get("title", "") for d in expansion_directions]
+        thinking_callback("direction_generation_completed", {
+            "title": "확장 방향 생성 완료",
+            "direction_count": len(expansion_directions),
+            "directions": direction_titles,
+            "generation_method": "LLM 기반 동적 생성"
+        })
 
-## 영어 질문
-{query}
+    # 4. 재질문 텍스트 생성
+    clarification_question = generate_clarification_question(
+        strategy=strategy,
+        directions=expansion_directions,
+        query=query,
+        use_llm=False
+    )
 
-## 번역 규칙 (반드시 준수)
+    # 🎯 Thinking 이벤트: Stage 1 완료
+    if thinking_callback:
+        thinking_callback("stage1_completed", {
+            "title": "Stage 1 완료 - 사용자 선택 대기",
+            "ready_for_user_selection": True,
+            "available_directions": len(expansion_directions)
+        })
 
-### 1. 역사 데이터에 맞는 전문 용어 사용
-- "kill" → "살해" (절대 "살인" 사용 금지)
-- "murder" → "살해" 또는 "시해" (맥락에 따라)
-- "assassinate" → "시해"
-- "timeline" → "연대기"가 아니라 "연대순으로" 또는 "시기별로" 등 자연스러운 표현
-- "show me" → "보여주세요"가 아니라 "알려주세요" 또는 "설명해주세요" 등 자연스러운 표현
-- "who" → "누가"
-- "what" → "무엇" 또는 "어떤"
-- "when" → "언제"
-- "where" → "어디"
-- "why" → "왜"
-- "how" → "어떻게"
-
-### 2. 조선시대 역사 데이터에 맞는 어투
-- 현대적 표현보다는 역사적 맥락에 맞는 표현 사용
-- 예: "Who killed the king?" → "누가 왕을 살해하였나?" (절대 "살인" 사용 금지)
-- 예: "Show me the timeline" → "연대순으로 알려주세요" 또는 "시기별로 설명해주세요"
-- 예: "What happened in 1592?" → "1592년에 무슨 일이 일어났나?"
-
-### 3. 자연스러운 한국어 표현
-- 직역보다는 자연스러운 한국어로 번역
-- 질문의 의도와 맥락을 정확히 전달
-- 조선시대 역사 데이터에 적합한 어투 사용
-
-## 출력 형식
-번역된 한글 질문만 출력하세요. 다른 설명이나 주석은 포함하지 마세요.
-
-번역 결과:"""
-        response = llm.invoke(translation_prompt)
-        # 토큰 사용량 추출 및 state에 누적
-        token_update = extract_and_accumulate_tokens(state, response)
-        state.update(token_update)
-        
-        translated_query = response.content.strip()
-        # 마크다운 코드 블록 제거
-        if "```" in translated_query:
-            translated_query = translated_query.split("```")[1]
-            if translated_query.startswith("한국어") or translated_query.startswith("korean"):
-                translated_query = translated_query.split("\n", 1)[1] if "\n" in translated_query else translated_query
-        query = translated_query.strip()
-        print(f"\n{'='*70}")
-        print(f"[0/6] 질문 번역 (Query Translation)")
-        print(f"{'='*70}")
-        print(f"  ├─ 원문: {original_query}")
-        print(f"  └─ 번역: {query}")
-        print()
-
-    # ========== 1단계: 의도 파악 (사용자 질문만 사용) ==========
-    # ========== 2단계: kiwipiepy로 키워드 추출 ==========
-    keywords = extract_keywords_with_kiwi(query)
-
-    # 불용어 제거
-    # 모든 데이터가 조선 데이터이므로 "조선" 관련 키워드는 제외
-    stopwords = {
-        '무엇', '누구', '어디', '언제', '무슨', '어떤', '것', '수', '등', '때', '중', '후', '전',
-        '조선', '조선시대', '조선왕조', '한국', '우리나라'  # 모든 데이터가 조선 데이터이므로 제외
-    }
-    keywords = [kw for kw in keywords if kw not in stopwords]
-
-    keywords_text = ", ".join(keywords) if keywords else "없음"
-
-    # 프로퍼티 그룹 목록
-    group_list = get_group_list()
-
-    # ========== 3단계: LLM 2개 병렬 호출 (시간 단축) ==========
-    # Thread 1: 의도 분석 + 프로퍼티 그룹 선택
-    def analyze_intent_and_properties():
-        """의도 분석 + 프로퍼티 그룹 선택 (병렬 실행 Thread 1)"""
-        intent_prompt = f"""당신은 역사 질문을 분석하는 전문가입니다.
-
-## 질문
-{query}
-
-## 분석 항목
-
-### 1. 질문 유형 (query_type)
-
-**causal (인과관계)**: 직접적인 원인-결과 관계를 묻는 질문
-- 특징: 사실 기반, 시간순서, 객관적 설명
-- 키워드: "원인은?", "결과는?", "영향은?", "발생한 사건은?", "이로 인해", "왜?"
-- 예시:
-  - "명성황후 시해사건의 원인과 이로 인해 발발된 사건을 알려줘" → causal
-  - "임진왜란이 조선에 미친 영향은?" → causal
-  - "을미사변의 원인은?" → causal
-  - "갑술환국이 발생한 배경은?" → causal
-
-**deep_analysis (심화 분석)**: 숨은 동기, 이면의 의도, 심층적 배경을 묻는 질문
-- 특징: 해석적, 분석적, 주관적 관점 포함
-- 키워드: "진짜 이유는?", "숨은 의도는?", "이면에는?", "배경은?", "왜 그랬을까?", "실제 목적은?"
-- 예시:
-  - "을미사변의 진짜 이유는 무엇인가?" → deep_analysis
-  - "갑술환국 이면의 숨은 의도는?" → deep_analysis
-  - "명성황후 시해의 배경과 진실은?" → deep_analysis
-  - "당쟁의 실제 목적은 무엇이었나?" → deep_analysis
-
-**구분 기준**:
-- causal: "무엇이 원인인가?" (사실, 객관적)
-- deep_analysis: "왜 그랬을까?" (동기, 의도, 해석)
-
-### 2. 핵심 의도 (intent)
-질문의 핵심 의도를 한 문장으로 설명하세요.
-
-예시:
-- "궁궐을 지은 왕은?" → "궁궐을 건설한 왕 찾기"
-- "을미사변의 원인은?" → "을미사변이 발생한 원인과 배경 분석"
-
-### 3. 관련 프로퍼티 그룹 (property_groups)
-아래 목록에서 질문과 관련된 그룹을 **최대 5개** 선택하세요.
-
-사용 가능한 그룹:
-{group_list}
-
-예시:
-- "궁궐을 지은 왕" → ["건설", "설립", "통치"]
-- "을미사변에서 죽은 사람" → ["사망", "참여", "원인"]
-- "세종이 만든 정책" → ["설립", "창제", "시행"]
-
-## 출력 형식 (JSON만)
-{{
-  "query_type": "causal",
-  "intent": "궁궐을 건설한 왕 찾기",
-  "property_groups": ["건설", "설립", "통치"]
-}}
-"""
-        response = llm.invoke(intent_prompt)
-        content = response.content.strip()
-
-        # JSON 파싱
-        if "```" in content:
-            content = content.split("```")[1]
-            if content.startswith("json"):
-                content = content[4:]
-
-        return response, json.loads(content)  # response도 함께 반환
-
-    # Thread 2: 키워드 확장
-    def expand_keywords():
-        """키워드 확장 (병렬 실행 Thread 2)"""
-        expansion_prompt = f"""당신은 역사 키워드를 확장하는 전문가입니다.
-
-## 질문
-{query}
-
-## 추출된 키워드 (kiwipiepy)
-{keywords_text}
-
-## 작업
-**질문의 맥락을 파악하여** 추출된 키워드와 관련된 구체적인 역사적 인스턴스를 확장하세요.
-
-**확장 규칙:**
-- 추출된 키워드 중 일반명사나 추상적 개념이 있으면 구체적인 인스턴스로 확장
-- 질문의 의도와 맥락을 고려하여 관련성 높은 인스턴스 선택
-- 최대 5-10개의 구체적 인스턴스로 확장
-- 집합 개념의 경우, 관련 인물과 사건을 모두 포함
-- **중요: "조선", "조선시대", "조선왕조"는 확장하지 마세요. 모든 데이터가 조선 데이터이므로 의미가 없습니다.**
-
-**키워드 확장 예시 (참고용):**
-- "궁궐" → ["경복궁", "창덕궁", "경덕궁", "창경궁", "경희궁"]
-- "환국" → ["갑술환국", "기사환국", "경신환국", "갑인환국"]
-- "남인" → ["윤선도", "채제공", "기사환국", "남인 집권", "남인 분열"]
-- "서인" → ["송시열", "이이", "갑술환국", "서인 재집권", "1575년 동인과 서인으로 분열"]
-- "왕" → 질문 맥락에 맞는 구체적 왕명 (예: ["태조", "세종", "숙종"])
-- "사건" → 질문 맥락에 맞는 구체적 사건명 (예: ["갑자사화", "임진왜란"])
-- "정치" → 정치 관련 사건/제도 (예: ["환국", "사화", "당쟁"])
-- "제도" → 구체적 제도명 (예: ["의금부", "비변사", "경국대전"])
-
-**중요:** 
-- 위 예시는 참고용이며, 실제로는 질문의 맥락에 맞는 키워드만 확장하세요.
-- "연관", "주요" 같은 추상적 단어는 확장하지 마세요.예시이며, 실제로는 질문의 맥락에 맞는 키워드만 확장하세요.
-확장할 키워드가 없으면 빈 객체를 출력하세요.
-
-## 출력 형식 (JSON만)
-{{
-  "expanded_keywords": {{"궁궐": ["경복궁", "창덕궁"], "왕": ["태조", "세종"]}}
-}}
-
-또는 확장 없는 경우:
-{{
-  "expanded_keywords": {{}}
-}}
-"""
-        response = llm.invoke(expansion_prompt)
-        content = response.content.strip()
-
-        # JSON 파싱
-        if "```" in content:
-            content = content.split("```")[1]
-            if content.startswith("json"):
-                content = content[4:]
-
-        return response, json.loads(content)  # response도 함께 반환
-
-    # ========== 병렬 실행 ==========
-    try:
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            future1 = executor.submit(analyze_intent_and_properties)
-            future2 = executor.submit(expand_keywords)
-
-            response1, result1 = future1.result()
-            response2, result2 = future2.result()
-            
-            # 토큰 사용량 추출 및 state에 누적
-            token_update1 = extract_and_accumulate_tokens(state, response1)
-            token_update2 = extract_and_accumulate_tokens(state, response2)
-            # 두 응답의 토큰을 합산
-            state.update({
-                "total_tokens": token_update1["total_tokens"] + token_update2["total_tokens"],
-                "prompt_tokens": token_update1["prompt_tokens"] + token_update2["prompt_tokens"],
-                "completion_tokens": token_update1["completion_tokens"] + token_update2["completion_tokens"]
-            })
-
-        # ========== 결과 병합 ==========
-        # Thread 1 결과 (의도 분석 + 프로퍼티 그룹)
-        query_type = result1.get("query_type", "causal")
-        selected_groups = result1.get("property_groups", [])
-        intent = result1.get("intent", "")
-
-        # Thread 2 결과 (키워드 확장)
-        expanded_keywords_dict = result2.get("expanded_keywords", {})
-        
-        # 검증
-        if query_type not in ["causal", "deep_analysis"]:
-            query_type = "causal"
-        
-        # 선택된 그룹에서 실제 프로퍼티 목록 추출
-        all_groups = load_property_groups()
-        selected_properties = []
-        for group_name in selected_groups:
-            if group_name in all_groups:
-                selected_properties.extend(all_groups[group_name][:10])  # 그룹당 최대 10개
-        
-        # 키워드 확장 결과 처리
-        # "조선" 관련 키워드는 제외 (모든 데이터가 조선 데이터이므로)
-        joseon_keywords = {'조선', '조선시대', '조선왕조', '한국', '우리나라'}
-        expanded_keywords = []
-        filtered_expanded_keywords_dict = {}
-        
-        for general_noun, instances in expanded_keywords_dict.items():
-            # "조선" 관련 키워드는 확장하지 않음
-            if general_noun not in joseon_keywords:
-                # 확장된 인스턴스에서도 "조선" 관련 항목 제거
-                filtered_instances = [inst for inst in instances if inst not in joseon_keywords]
-                if filtered_instances:
-                    filtered_expanded_keywords_dict[general_noun] = filtered_instances
-                    expanded_keywords.extend(filtered_instances)
-        
-        # 필터링된 결과로 업데이트
-        expanded_keywords_dict = filtered_expanded_keywords_dict
-        
-        if expanded_keywords:
-            print(f"    확장된 키워드: {expanded_keywords_dict}")
-
-    except Exception as e:
-        print(f"    질문 분석 실패: {e}")
-        # 분석 실패 시 기본값으로 진행 (안전하게)
-        query_type = "causal"
-        selected_groups = []
-        selected_properties = []
-        intent = ""
-        expanded_keywords = []
-        expanded_keywords_dict = {}
-
-    node_elapsed = time.time() - node_start
-
-    print(f"\n{'='*70}")
-    print(f"[1/6] 질문 분석 (Query Classifier)")
-    print(f"{'='*70}")
-    print(f"  ├─ 질문 유형: {query_type}")
-    print(f"  ├─ 핵심 의도: {intent}")
-    print(f"  ├─ 추출 키워드: {keywords_text}")
-    if selected_groups:
-        print(f"  ├─ 프로퍼티 그룹: {', '.join(selected_groups[:3])}{'...' if len(selected_groups) > 3 else ''} ({len(selected_groups)}개)")
-    if expanded_keywords:
-        # 확장된 키워드를 간결하게 표시 (최대 3개 그룹)
-        sample_expansions = list(expanded_keywords_dict.items())[:3]
-        expansion_summary = ', '.join([f"{k}→{len(v)}개" for k, v in sample_expansions])
-        print(f"  └─ 확장 키워드: {expansion_summary}{'...' if len(expanded_keywords_dict) > 3 else ''} ({node_elapsed:.2f}초)")
-    else:
-        print(f"  └─ 완료 ({node_elapsed:.2f}초)")
-    print()
-
-    # 노드 실행 시간 기록
+    # 실행 시간 계산
+    node_end = time.time()
+    execution_time = node_end - node_start
     node_times = state.get("node_execution_times", {})
-    node_times["query_classifier"] = node_elapsed
+    node_times["query_classifier"] = execution_time
 
-    # 번역된 query를 state에 반영
-    updated_state = {
+    print(f"  확장 방향 수: {len(expansion_directions)}")
+    print(f"  실행 시간: {execution_time:.2f}초")
+
+    return {
         **state,
-        "is_historical": True,  # 역사 관련 질문임을 명시
-        "query_type": query_type,
-        "query_intent": intent,
-        "selected_property_groups": selected_groups,
-        "selected_properties": selected_properties,
-        "expanded_keywords": expanded_keywords,  # 확장된 키워드 리스트
-        "expanded_keywords_dict": expanded_keywords_dict,  # 원본 매핑 (디버깅용)
+        "query_type_initial": query_type_initial,
+        "basic_keywords": basic_keywords,
+        "needs_clarification": True,
+        "expansion_directions": expansion_directions,
+        "clarification_question": clarification_question,
         "executed_nodes": state.get("executed_nodes", []) + ["query_classifier"],
         "node_execution_times": node_times
     }
-    
-    # 영어 질문이 번역된 경우, 번역된 query를 state에 반영
-    if is_english and query != original_query:
-        updated_state["query"] = query
-        updated_state["original_query"] = original_query
-    
-    return updated_state

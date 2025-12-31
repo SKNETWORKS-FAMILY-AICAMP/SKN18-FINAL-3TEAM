@@ -11,15 +11,14 @@ Story Generator Node
 import os
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
 # 상위 디렉토리를 경로에 추가
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# .env 파일 로드 (프로젝트 루트에서)
-env_path = Path(__file__).parent.parent.parent.parent / ".env"
-load_dotenv(env_path, override=True)
+# config.py를 import하면 자동으로 환경변수가 로드됨
+# (config.py에서 load_dotenv가 실행됨)
+from backend.langgraph_fuseki.config import PROJECT_ROOT
 
 from backend.langgraph_fuseki.state import GraphState
 
@@ -102,6 +101,51 @@ def deduplicate_and_select_top_evidences(evidences: list, top_k: int = 5) -> lis
     
     # 상위 top_k개 선택
     return sorted_evidences[:top_k]
+
+
+def format_convergence_nodes(convergence_nodes: list) -> str:
+    """
+    수렴 노드 정보를 포맷팅하여 프롬프트에 추가
+
+    Args:
+        convergence_nodes: 수렴 노드 리스트
+
+    Returns:
+        포맷팅된 수렴 노드 정보 문자열
+    """
+    if not convergence_nodes:
+        return ""
+
+    formatted = []
+    for i, node in enumerate(convergence_nodes[:5], 1):  # 최대 5개만
+        label = node.get("label", "")
+        node_type = node.get("type", "")
+        connected = ", ".join(node.get("connected_entities", []))
+        properties = node.get("properties", {})
+        relations = node.get("relations", [])
+
+        # 기본 정보
+        node_desc = f"[수렴노드 {i}] {label}"
+        if node_type:
+            node_desc += f" ({node_type})"
+        node_desc += f" - 연결된 엔티티: {connected}"
+
+        # 주요 속성 추가
+        prop_parts = []
+        for key, value in list(properties.items())[:3]:  # 최대 3개 속성
+            key_clean = key.replace("has", "").replace("_", " ")
+            prop_parts.append(f"{key_clean}: {value}")
+        if prop_parts:
+            node_desc += f", 속성: {', '.join(prop_parts)}"
+
+        # 주요 관계 추가
+        if relations:
+            rel_parts = [f"{r['predicate']} → {r['related']}" for r in relations[:3]]
+            node_desc += f", 관계: {', '.join(rel_parts)}"
+
+        formatted.append(node_desc)
+
+    return "\n".join(formatted)
 
 
 def format_evidence_for_prompt(evidences: list, query: str = "") -> tuple:
@@ -404,15 +448,44 @@ def story_generator_node(state: GraphState) -> GraphState:
     evidences = state.get("evidences", [])
     causal_chains = state.get("causal_chains", [])
     extracted_entities = state.get("extracted_entities", [])
+    convergence_nodes = state.get("convergence_nodes", [])  # 수렴 노드
 
+    # 사용자가 선택한 의도 방향
+    user_selected_direction = state.get("user_selected_direction")
+    expansion_directions = state.get("expansion_directions", [])
+    selected_direction_detail = None
+    if user_selected_direction and expansion_directions:
+        for direction in expansion_directions:
+            if direction["direction_id"] == user_selected_direction:
+                selected_direction_detail = direction
+                break
+
+    # 스트리밍 모드 확인 (state에서 전달)
+    stream_mode = state.get("stream_mode", False)
+    stream_callback = state.get("stream_callback", None)
+    thinking_callback = state.get("thinking_callback", None)
+    
+    # 🎯 Thinking 이벤트: 답변 생성 시작
+    if thinking_callback:
+        thinking_callback("answer_generation_started", {
+            "title": "답변 생성 시작",
+            "evidence_count": len(evidences),
+            "query_type": query_type,
+            "stream_mode": stream_mode,
+            "status": "processing"
+        })
+    
     llm = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL"),
-        temperature=0.7  # 스토리 생성은 창의성 필요
+        temperature=0.7,  # 스토리 생성은 창의성 필요
+        streaming=stream_mode  # 스트리밍 모드 활성화
     )
 
     print(f"\n{'='*70}")
-    print(f"[5/6] 스토리 생성 (Story Generator)")
+    print(f"[Stage 6/6] 스토리 생성 (Story Generator)")
     print(f"{'='*70}")
+    if convergence_nodes:
+        print(f"  ├─ 수렴 노드: {len(convergence_nodes)}개 (핵심 연결 노드 사용)")
 
     # 근거가 없는 경우 처리
     if not evidences or len(evidences) == 0:
@@ -490,23 +563,51 @@ def story_generator_node(state: GraphState) -> GraphState:
     # 전체 근거 포맷팅 (중복 제거된 것)
     evidence_list_all, _ = format_evidence_for_prompt(deduplicated_evidences, query)
 
-    # 의도 정보 추가
+    # 의도 정보 추가 (초기 의도 + 사용자 선택 방향)
     intent_info = ""
     if query_intent:
         intent_info = f"\n## 질문의 핵심 의도\n{query_intent}"
         if relation_keywords:
             intent_info += f"\n관련 키워드: {', '.join(relation_keywords)}"
+
+    # 사용자가 선택한 구체적 방향 추가
+    if selected_direction_detail:
+        intent_info += f"\n\n## 사용자가 선택한 답변 방향\n"
+        intent_info += f"**{selected_direction_detail['title']}**\n"
+        intent_info += f"{selected_direction_detail['description']}\n"
+        intent_info += "\n→ 초기 질문에 답하되, 위에서 선택한 방향을 중심으로 답변을 구성하세요.\n"
+    elif query_intent:
         intent_info += "\n→ 근거에서 이 의도와 관련된 정보를 우선적으로 사용하세요.\n"
 
-    story_prompt = f"""당신은 조선시대 역사를 전문적으로 설명하는 역사가입니다.
+    # 수렴 노드 정보 추가
+    convergence_info = ""
+    if convergence_nodes:
+        convergence_formatted = format_convergence_nodes(convergence_nodes)
+        convergence_info = f"\n## 핵심 연결 노드 (수렴 노드)\n다음은 여러 엔티티를 연결하는 중요한 노드들입니다. 이 노드들을 답변에서 명시적으로 언급하고 설명하세요.\n\n{convergence_formatted}\n\n→ 이 수렴 노드들은 여러 인물/사건을 연결하는 중심 역할을 하므로, 답변에서 이들의 역할과 관계를 반드시 설명하세요.\n"
 
-## 질문 (반드시 이 질문에 직접 답변하세요)
+    story_prompt = f"""당신은 조선시대 역사를 전문적으로 설명하는 역사가입니다.
+사용자와 자연스럽게 대화하듯 답변하되, 필요한 경우에만 구조화된 마크다운 형식을 사용하세요.
+
+## 질문
 {query}
 
 {entity_info_text}
 {intent_info}
 
 **중요: 위 질문에 대한 명확하고 직접적인 답변을 반드시 제공하세요.**
+## 참고 근거 (전체 {len(deduplicated_evidences)}개)
+{evidence_list_all}
+
+## 응답 스타일 가이드
+
+### 기본 원칙
+1. **질문에 대한 답을 첫 문장에서 바로 제시**하세요
+2. 그 다음 맥락과 배경을 설명하세요
+3. 형식보다 가독성과 자연스러움을 우선하세요
+4. 언어: 한국어만 사용
+   - 반드시 한국어로만 작성하세요. 영어 단어나 영어 문장을 절대 사용하지 마세요.
+   - 영어가 필요한 경우에도 한글로 번역하여 작성하세요.
+   - 예: "affiliatedWith" → "관련된", "participatesIn" → "참여한"
 
 ### 다중 질문 처리 (매우 중요!)
 - 질문에 여러 개의 하위 질문이 포함된 경우 (예: "원인과 결과를 알려줘", "A와 B를 설명해줘"), **모든 하위 질문에 대해 각각 답변**하세요.
@@ -515,114 +616,119 @@ def story_generator_node(state: GraphState) -> GraphState:
 - 각 하위 질문에 대한 답변을 명확히 구분하여 제공하세요.
 - 하나의 질문만 답변하고 나머지를 누락하지 마세요.
 
-### 단일 질문 처리
-- 질문이 비교를 요구하는 경우 (예: "어느나라가 더 많이", "누가 더", "어느 것이 더"), 명확한 비교 결과를 제시하세요.
-- 질문이 횟수를 묻는 경우 (예: "몇 번", "몇 차례"), 구체적인 숫자와 함께 답변하세요.
-- 질문에 대한 답변을 회피하거나 모호하게 표현하지 마세요.
+### 답변 길이 지시
+**중요: 사용자의 질문에 주어진 답변 길이 내에 충분한 답을 제시하세요.**
 
-## 참고 근거 (전체 {len(deduplicated_evidences)}개)
-아래 근거들을 모두 참고하여 답변을 작성하세요.
+- **사실 기반 질문**: 핵심 답변 + 배경 설명 (약 400-600자)
+- **인과관계 질문**: 원인과 결과를 충분히 설명 (약 600-800자)
+- **비교 질문**: 비교 대상의 차이점을 명확히 설명 (약 600-800자)
+- **심층 분석 질문**: 다양한 관점과 영향 분석 (약 800-1000자)
 
-{evidence_list_all}
+**답변 완성도 체크리스트:**
+- 질문에 대한 직접적인 답변이 포함되어 있는가?
+- 핵심 내용이 모두 설명되었는가?
 
-## 작성 지침
-{instruction}
+### 쿼리 타입별 스타일
+
+**[사실 기반 질문]** (예: "~은 언제/누가/무엇인가요?")
+- 답을 먼저 말하고, 1-2문단으로 배경 설명
+- 글머리 기호 사용 최소화, 서술형으로 작성
+
+**[인과관계 질문]** (예: "~의 원인/결과는?", "왜 ~했나요?")
+- 원인과 결과를 명확히 구분하여 설명
+- 시간 순서대로 자연스럽게 서술
+- 필요시 표, 글머리등을 활용하여 사건의 흐름 파악이 용이하도록 함
+
+**[비교 질문]** (예: "A와 B의 차이는?", "어느 것이 더~?")
+- 결론(어느 쪽이 더/차이점)을 먼저 제시
+- 비교 대상의 열거 항목이 3개 이상일 때만 표 형식 고려
+
+**[심층 분석 질문]** (예: "~의 의의/영향/평가는?")
+- 핵심 평가를 먼저 제시
+- 다양한 관점이나 시대별 영향을 문단으로 나눠 서술
+- 필요시 소제목(### ) 사용 가능
+
+### 마크다운 사용 규칙
+- **굵은 글씨**: 인물명, 사건명, 연도, 핵심 키워드에만 사용
+- 글머리 기호(-): 3개 이상 항목을 나열할 때만 사용, 그 외에는 "A, B, C가 있습니다" 형태로
+- 소제목(###): 답변이 길어질 때(400자 이상) 가독성을 위해 사용
+- 표: 3개 이상 대상의 여러 항목 비교 시에만 사용
+
+### 말투: "-입니다" 체로 작성
+   - 반드시 존댓말 "-입니다", "-습니다", "-됩니다" 체로 작성
+   - 글머리 기호를 활용하여 내용 나열시에는 간결한 명사형 문장으로 작성
+
+### 피해야 할 것
+- 모든 답변을 동일한 구조로 작성하는 것
+- 짧은 답변에 불필요한 소제목 넣기
+- 한두 개 항목을 글머리 기호로 나열하기
+- "핵심 답변", "상세 설명", "요약" 같은 메타 라벨
 
 ## 필수 규칙
+- 한국어 "-입니다" 체 사용
+- 연도, 인물명, 사건명 명시
+- 영어/기술 용어/각주 번호 사용 금지
+- 되묻지 않고 주어진 근거로 최선의 답변 제공
+- **답변을 반드시 완전히 완성하세요**: 중간에 끊기거나 미완성 상태로 끝나지 않도록 주의하세요. 마지막 문장은 완전한 문장으로 자연스럽게 마무리하세요.
 
-### 1. 언어: 한국어만 사용
-   - 반드시 한국어로만 작성하세요. 영어 단어나 영어 문장을 절대 사용하지 마세요.
-   - 영어가 필요한 경우에도 한글로 번역하여 작성하세요.
-   - 예: "affiliatedWith" → "관련된", "participatesIn" → "참여한"
+## 좋은 응답 예시
 
-### 2. 말투: "-입니다" 체로 작성
-   - 반드시 존댓말 "-입니다", "-습니다", "-됩니다" 체로 작성하세요.
+**사실 기반 질문 예시:**
+> 훈민정음은 **1443년 세종대왕**이 창제하고 **1446년**에 반포하였습니다. 
+> 
+> 당시 백성들이 한자를 몰라 자신의 뜻을 표현하지 못하는 것을 안타깝게 여긴 세종은 누구나 쉽게 배울 수 있는 문자를 만들고자 했습니다. 집현전 학자들과 함께 연구를 진행하여 자음 17자, 모음 11자로 구성된 28자의 문자 체계를 완성하였습니다.
 
-### 3. 질문에 직접 답변하기 (매우 중요!)
-   - 사용자의 질문에 반드시 직접적이고 명확한 답변을 제공하세요.
-   - 비교 질문인 경우: "A가 더 많습니다" 또는 "B가 더 많습니다" 또는 "비슷합니다" 등 명확한 결론을 제시하세요.
-   - 횟수 질문인 경우: "총 N번" 또는 "A는 N번, B는 M번" 등 구체적인 숫자를 제시하세요.
-   - 답변을 회피하거나 "어렵다", "비교하기 어렵다"고만 말하지 마세요. 주어진 근거로 최선의 답변을 제공하세요.
+**인과관계 질문 예시:**
+> **임진왜란**이 발발한 가장 직접적인 원인은 **도요토미 히데요시**의 대륙 진출 야욕이었습니다.
+>
+> 일본 내 전국시대를 통일한 히데요시는 휘하 무사들의 불만을 외부로 돌리고 자신의 권위를 높이기 위해 명나라 정복을 계획했습니다. 조선에 길을 빌려달라는 '정명가도' 요청이 거부되자, **1592년** 20만 대군을 이끌고 조선을 침략하였습니다.
+>
+> 이 전쟁으로 조선은 국토가 황폐해지고 인구가 급감했으며, 이후 **광해군** 대에 이르러서야 점차 회복되기 시작했습니다.
 
-### 3-1. 되묻지 않기
-   - 추가 정보를 요청하거나 질문을 되묻지 마세요.
-   - 주어진 근거만으로 최선의 답변을 작성하세요.
+**비교 질문 예시:**
+> **경신환국**과 **기사환국**의 가장 큰 차이는 정권을 잡은 세력입니다. 경신환국에서는 서인이, 기사환국에서는 남인이 집권하였습니다.
+>
+> **경신환국(1680년)**은 숙종이 남인의 전횡에 불만을 품고 서인을 등용하면서 일어났습니다. 반면 **기사환국(1689년)**은 장희빈 소생의 원자 책봉 문제로 서인이 반대하자 숙종이 서인을 내치고 다시 남인을 등용한 사건입니다. 두 환국 모두 숙종의 왕권 강화 의지가 반영된 것으로 평가됩니다.
 
-### 4. 명확한 근거 제시 (중요!)
-   - 반드시 **연도, 사건명, 인물명, 문헌명**을 명시하세요.
-   - 나쁜 예: "궁궐이 지어졌습니다."
-   - 좋은 예: "1395년 태조 이성계가 경복궁을 창건하였습니다."
-   - 나쁜 예: "왕이 정책을 시행했습니다."
-   - 좋은 예: "세종대왕이 1446년 훈민정음을 반포하였습니다."
+**복합 분석 질문 예시 (마크다운 필수):**
+> **조선시대 반란의 원인**은 시기별로 다르지만, 핵심적으로는 **권력 다툼과 파벌 갈등**, 지방 관리의 권력 남용과 재정 문제로 인한 민심 이반, 그리고 외부 침략에 대한 방어 동원으로 인한 저항으로 요약됩니다.
+>
+> 이 맥락은 주어진 자료들에서도 확인됩니다. 예를 들어 **1402년**의 왕지에서 **성석린**에게 영의정부사 겸 판개성유후사사를 제수한 사실은 왕권 강화와 중앙 집권의 흐름을 보여 주며, 이는 파벌 간의 견제와 갈등의 토대를 제공합니다. **정묘호란**이 발발하자 **김장생**의 휘하에서 의병으로 활동하며 군사 및 군량미를 모집한 기록은 외부 침략에 대한 방어 차원에서의 지역 의병 동원을 보여 주고, 이는 외부 위협에 대한 대응이 내부 반란으로 연결될 수 있음을 시사합니다.
 
-### 4-1. 추출된 엔티티 우선 사용
-   - 질문에서 추출된 핵심 엔티티(예: 갑술환국, 기사환국, 경신환국)를 반드시 언급하세요.
-   - 추출된 엔티티가 근거에 없으면, 해당 엔티티에 대한 정보를 명시적으로 설명하세요.
+**❌ 잘못된 예시 (마크다운 미사용):**
+> 반란의 원인은 시기별로 다르지만, 핵심적으로는 권력 다툼과 파벌 갈등으로 요약됩니다. 1402년의 왕지에서 성석린에게 영의정부사를 제수한 사실은...
 
-### 5. 정규화된 ID 사용 금지
-   - "Institution_d4c9663e" 같은 코드 절대 사용 금지
-   - 실제 이름을 모르면 "관련 기관" 등으로 대체
-
-### 6. 각주 번호 사용 금지
-   - 문장 끝에 [1][2][3] 같은 각주 번호를 절대 사용하지 마세요.
-   - 근거는 자연스럽게 문장 안에 포함하여 설명하세요.
-   - 나쁜 예: "경복궁은 1395년에 창건되었습니다.[1][3]"
-   - 좋은 예: "1395년 태조 이성계가 경복궁을 창건하였습니다."
-
-### 7. 추측 표시
-   - 확실하지 않은 내용은 "~로 추정됩니다", "~했을 것으로 보입니다"로 표현
-
-## 출력 형식 (반드시 준수)
-
-**1단계: 핵심 답변 (제일 먼저 제시)**
-- 사용자 질문에 대한 직접적이고 명확한 답변을 먼저 제시하세요.
-- **다중 질문인 경우**: 각 하위 질문에 대한 핵심 답변을 모두 포함하세요.
-  예: "명성황후 시해사건의 원인은...이며, 이로 인해 발발된 사건은...입니다."
-- 비교 질문인 경우: "A가 더 많습니다" 또는 "B가 더 많습니다" 등 명확한 결론을 제시하세요.
-- 횟수 질문인 경우: "총 N번" 또는 "A는 N번, B는 M번" 등 구체적인 숫자를 제시하세요.
-- "-입니다" 체로 작성하세요.
-
-**2단계: 상세 설명 (핵심 답변 아래에 확장)**
-- 핵심 답변을 바탕으로 2-3문단으로 자연스럽게 상세 설명을 제공하세요 (200-400자).
-- **다중 질문인 경우**: 각 하위 질문에 대한 상세 설명을 모두 포함하세요.
-  예: 첫 번째 문단에서 원인을 상세히 설명하고, 두 번째 문단에서 발발된 사건을 상세히 설명하세요.
-- 연도, 사건명, 인물명을 명확히 언급하세요.
-- "-입니다" 체로 작성하세요.
-- 영어 단어나 영어 문장 절대 사용 금지
-- 전체 근거 목록을 참고하여 답변을 작성하세요.
-
-**작성 순서:**
-1. 먼저 핵심 답변을 한 문장으로 제시
-2. 그 다음 줄바꿈 후 상세 설명을 2-3문단으로 작성
-
-**중요: 제목이나 섹션명 출력 금지**
-- "상세 설명", "핵심 답변", "본문" 같은 제목이나 섹션명을 절대 출력하지 마세요.
-- 바로 내용만 작성하세요.
-- 나쁜 예: 
-  핵심 답변
-  [답변 내용]
-  
-  상세 설명
-  [상세 내용]
-- 좋은 예:
-  [핵심 답변 내용]
-  
-  [상세 설명 내용]
-
-**예시 구조:**
-[핵심 답변 한 문장]
-
-[상세 설명 2-3문단]"""
+**✅ 올바른 예시 (마크다운 사용):**
+> **반란의 원인**은 시기별로 다르지만, 핵심적으로는 **권력 다툼과 파벌 갈등**으로 요약됩니다. **1402년**의 왕지에서 **성석린**에게 영의정부사를 제수한 사실은...
+"""
 
     try:
-        response = llm.invoke(story_prompt)
+        if stream_mode and stream_callback:
+            # 스트리밍 모드: 청크 단위로 스트리밍
+            llm_answer = ""
+            for chunk in llm.stream(story_prompt):
+                if hasattr(chunk, 'content') and chunk.content:
+                    chunk_text = chunk.content
+                    llm_answer += chunk_text
+                    # 스트리밍 콜백 호출 (프론트엔드로 전송)
+                    if callable(stream_callback):
+                        try:
+                            stream_callback(chunk_text)
+                        except Exception:
+                            pass
+            
+            # 스트리밍 완료 후 최종 응답 생성
+            response = type('Response', (), {'content': llm_answer})()
+        else:
+            # 일반 모드: 전체 응답 한 번에 받기
+            response = llm.invoke(story_prompt)
+            llm_answer = response.content.strip()
         
-        # 토큰 사용량 추출 및 state에 누적
-        from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
-        token_update = extract_and_accumulate_tokens(state, response)
-        state.update(token_update)
-        
-        llm_answer = response.content.strip()
+        # 토큰 사용량 추출 및 state에 누적 (스트리밍 모드에서는 추정값 사용)
+        if not stream_mode:
+            from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
+            token_update = extract_and_accumulate_tokens(state, response)
+            state.update(token_update)
 
         # LLM이 핵심 답변과 상세 설명을 생성하므로 그대로 사용
         final_answer = llm_answer
@@ -639,7 +745,6 @@ def story_generator_node(state: GraphState) -> GraphState:
         }
 
     except Exception as e:
-        print(f"오류: 스토리 생성 실패: {e}")
         final_answer = f"죄송합니다. 질문 '{query}'에 대한 답변을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요."
         answer_with_sources = {"story": final_answer, "sources": [], "error": str(e)}
 
