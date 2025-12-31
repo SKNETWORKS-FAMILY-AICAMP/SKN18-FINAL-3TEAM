@@ -350,12 +350,19 @@ def extract_outgoing_relations(bindings: list, base_weight: float, query_entitie
             continue
         seen.add(key)
 
-        # 개선된 Relevance score 계산
-        relevance_score = calculate_improved_relevance_score(binding, query_entities, "outgoing_relations", entity_boost_mode, selected_properties)
+        # Entity 매칭 타입 감지 (테스트 모드용)
+        entity_match_type = detect_entity_match_type(binding, query_entities, "outgoing_relations")
 
-        # 0점 경로는 필터링 (entity_boost_mode 테스트 시)
-        if entity_boost_mode and relevance_score == 0.0:
-            continue
+        # 테스트 모드 필터링
+        if entity_boost_mode:
+            if entity_boost_mode == "exact_match" and entity_match_type != "exact":
+                continue
+            elif entity_boost_mode == "partial_match" and entity_match_type != "partial":
+                continue
+            elif entity_boost_mode == "normalized_match" and entity_match_type != "normalized":
+                continue
+            elif entity_boost_mode == "penalty_match" and entity_match_type != "none":
+                continue
 
         # 프로퍼티 이름을 읽기 좋게 변환
         predicate_display = predicate.replace("has", "").replace("_", " ")
@@ -368,8 +375,8 @@ def extract_outgoing_relations(bindings: list, base_weight: float, query_entitie
             "predicate": predicate,
             "predicate_display": predicate_display,
             "object": obj_label,
-            "weight": base_weight * relevance_score,
-            "relevance_score": relevance_score,
+            "weight": base_weight,  # 단순 가중치 (최종 점수는 evidence_scoring.py에서 계산)
+            "entity_match_type": entity_match_type,  # ⭐ 점수 계산용
             "description": description,
             "raw_data": binding
         })
@@ -420,12 +427,19 @@ def extract_incoming_relations(bindings: list, base_weight: float, query_entitie
             continue
         seen.add(key)
 
-        # 개선된 Relevance score 계산
-        relevance_score = calculate_improved_relevance_score(binding, query_entities, "incoming_relations", entity_boost_mode, selected_properties)
+        # Entity 매칭 타입 감지 (테스트 모드용)
+        entity_match_type = detect_entity_match_type(binding, query_entities, "incoming_relations")
 
-        # 0점 경로는 필터링 (entity_boost_mode 테스트 시)
-        if entity_boost_mode and relevance_score == 0.0:
-            continue
+        # 테스트 모드 필터링
+        if entity_boost_mode:
+            if entity_boost_mode == "exact_match" and entity_match_type != "exact":
+                continue
+            elif entity_boost_mode == "partial_match" and entity_match_type != "partial":
+                continue
+            elif entity_boost_mode == "normalized_match" and entity_match_type != "normalized":
+                continue
+            elif entity_boost_mode == "penalty_match" and entity_match_type != "none":
+                continue
 
         # 프로퍼티 이름을 읽기 좋게 변환
         predicate_display = predicate.replace("has", "").replace("_", " ")
@@ -438,8 +452,8 @@ def extract_incoming_relations(bindings: list, base_weight: float, query_entitie
             "predicate": predicate,
             "predicate_display": predicate_display,
             "object": entity_label,
-            "weight": base_weight * relevance_score,
-            "relevance_score": relevance_score,
+            "weight": base_weight,  # 단순 가중치
+            "entity_match_type": entity_match_type,  # ⭐ 점수 계산용
             "description": description,
             "raw_data": binding
         })
@@ -465,12 +479,19 @@ def extract_entity_properties(bindings: list, base_weight: float, query_entities
             continue
         seen.add(key)
 
-        # 개선된 Relevance score 계산
-        relevance_score = calculate_improved_relevance_score(binding, query_entities, "entity_properties", entity_boost_mode, selected_properties)
+        # Entity 매칭 타입 감지 (테스트 모드용)
+        entity_match_type = detect_entity_match_type(binding, query_entities, "entity_properties")
 
-        # 0점 경로는 필터링 (entity_boost_mode 테스트 시)
-        if entity_boost_mode and relevance_score == 0.0:
-            continue
+        # 테스트 모드 필터링
+        if entity_boost_mode:
+            if entity_boost_mode == "exact_match" and entity_match_type != "exact":
+                continue
+            elif entity_boost_mode == "partial_match" and entity_match_type != "partial":
+                continue
+            elif entity_boost_mode == "normalized_match" and entity_match_type != "normalized":
+                continue
+            elif entity_boost_mode == "penalty_match" and entity_match_type != "none":
+                continue
 
         # 값 정리 (너무 길면 자르기)
         value_display = value[:100] + "..." if len(value) > 100 else value
@@ -486,8 +507,8 @@ def extract_entity_properties(bindings: list, base_weight: float, query_entities
             "predicate": predicate,
             "predicate_display": predicate_display,
             "value": value_display,
-            "weight": base_weight * relevance_score,
-            "relevance_score": relevance_score,
+            "weight": base_weight,  # 단순 가중치
+            "entity_match_type": entity_match_type,  # ⭐ 점수 계산용
             "description": description,
             "raw_data": binding
         })
@@ -542,12 +563,19 @@ def extract_connected_entities(bindings: list, base_weight: float, query_entitie
         if not is_bfs_path and not predicate:
             continue
 
-        # Relevance score 계산 (entity_boost_mode 테스트용)
-        relevance_score = calculate_improved_relevance_score(binding, query_entities, "connected_entities", entity_boost_mode, selected_properties)
+        # Entity 매칭 타입 감지 (테스트 모드용)
+        entity_match_type = detect_entity_match_type(binding, query_entities, "connected_entities")
 
-        # 0점 경로는 필터링
-        if entity_boost_mode and relevance_score == 0.0:
-            continue
+        # 테스트 모드 필터링
+        if entity_boost_mode:
+            if entity_boost_mode == "exact_match" and entity_match_type != "exact":
+                continue
+            elif entity_boost_mode == "partial_match" and entity_match_type != "partial":
+                continue
+            elif entity_boost_mode == "normalized_match" and entity_match_type != "normalized":
+                continue
+            elif entity_boost_mode == "penalty_match" and entity_match_type != "none":
+                continue
 
         # BFS 경로와 일반 경로를 다르게 처리
         if is_bfs_path:
@@ -568,8 +596,8 @@ def extract_connected_entities(bindings: list, base_weight: float, query_entitie
                 "path_length": path_length,
                 "convergence_node": convergence,
                 "method": "bidirectional_bfs",
-                "weight": base_weight * relevance_score,
-                "relevance_score": relevance_score,
+                "weight": base_weight,  # 단순 가중치
+                "entity_match_type": entity_match_type,  # ⭐ 점수 계산용
                 "description": description,
                 "raw_data": binding
             })
@@ -586,8 +614,8 @@ def extract_connected_entities(bindings: list, base_weight: float, query_entitie
                 "predicate": predicate,
                 "predicate_display": predicate_display,
                 "entity2": entity2,
-                "weight": base_weight * relevance_score,
-                "relevance_score": relevance_score,
+                "weight": base_weight,  # 단순 가중치
+                "entity_match_type": entity_match_type,  # ⭐ 점수 계산용
                 "description": description,
                 "raw_data": binding
             })
@@ -615,12 +643,19 @@ def extract_type_and_summary(bindings: list, base_weight: float, query_entities:
             continue
         seen.add(key)
 
-        # Relevance score 계산 (entity_boost_mode 테스트용)
-        relevance_score = calculate_improved_relevance_score(binding, query_entities, "type_and_summary", entity_boost_mode, selected_properties)
+        # Entity 매칭 타입 감지 (테스트 모드용)
+        entity_match_type = detect_entity_match_type(binding, query_entities, "type_and_summary")
 
-        # 0점 경로는 필터링
-        if entity_boost_mode and relevance_score == 0.0:
-            continue
+        # 테스트 모드 필터링
+        if entity_boost_mode:
+            if entity_boost_mode == "exact_match" and entity_match_type != "exact":
+                continue
+            elif entity_boost_mode == "partial_match" and entity_match_type != "partial":
+                continue
+            elif entity_boost_mode == "normalized_match" and entity_match_type != "normalized":
+                continue
+            elif entity_boost_mode == "penalty_match" and entity_match_type != "none":
+                continue
         
         # 설명 생성
         parts = []
@@ -642,8 +677,8 @@ def extract_type_and_summary(bindings: list, base_weight: float, query_entities:
             "summary": summary,
             "category": category,
             "year": year,
-            "weight": base_weight * relevance_score,
-            "relevance_score": relevance_score,
+            "weight": base_weight,  # 단순 가중치
+            "entity_match_type": entity_match_type,  # ⭐ 점수 계산용
             "description": description,
             "raw_data": binding
         })
@@ -942,7 +977,6 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
             hop_count = raw_data.get("hop_count")
             year_distance = raw_data.get("year_distance")
             pgvector_similarity = raw_data.get("pgvector_similarity") or raw_data.get("similarity")
-            relevance_score = path.get("relevance_score") or path.get("relevance_score")
 
             # 2. expanded_entities에서 확장 정보 찾기 (raw_data에 없을 경우)
             if expanded_entities and (hop_count is None or year_distance is None or pgvector_similarity is None):
@@ -977,10 +1011,6 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
                         elif expansion_method == "pgvector" and pgvector_similarity is None:
                             pgvector_similarity = expanded_entity.get("pgvector_similarity") or expanded_entity.get("similarity")
                         
-                        # relevance_score가 없으면 계산된 값 사용
-                        if relevance_score is None:
-                            relevance_score = expanded_entity.get("relevance_score")
-                        
                         break  # 첫 번째 매칭에서 중단
 
             # ⭐ 새로운 점수 계산 (v2.0 scoring system + 세부 점수 반영)
@@ -1005,13 +1035,12 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
                 "expansion_method": expansion_method,
                 "thread_type": thread_type,
                 "entity_match_type": entity_match_type,
-                "predicate": predicate_name,  # ⭐ predicate 정보 추가
+                "predicate": predicate_name,  # predicate 정보 추가
                 "connected_keyword_count": 0,  # TODO: SPARQL 분석 결과 추가 가능
                 # 확장 방법 내 세부 정보
                 "hop_count": hop_count,
                 "year_distance": year_distance,
-                "pgvector_similarity": pgvector_similarity,
-                "relevance_score": relevance_score
+                "pgvector_similarity": pgvector_similarity
             }
 
             # Baseline vs v3.0 구분: test_config에서 확인
