@@ -283,7 +283,7 @@ const EvidencePathView = ({ evidences = [] }) => {
             });
           }
 
-          // 수렴 노드 추가 (연한 회색)
+          // 수렴 노드 추가 (같은 엔티티면 통합)
           if (convergenceNode) {
             // 백엔드에서 전달된 라벨 우선 사용 (SPARQL로 조회한 실제 라벨)
             let convergenceLabel =
@@ -311,24 +311,46 @@ const EvidencePathView = ({ evidences = [] }) => {
               }
             }
 
-            const convergenceId = getNodeId(
-              "entity",
-              `convergence_${convergenceLabel}`
-            );
-            addNode(convergenceId, convergenceLabel, "entity", {
-              entityType: "Convergence",
-              expansionMethod: "none",
-              evidenceIndex: index,
-              isConvergence: true,
-              evidence: {
-                threadType: "connected_entities",
-                description: `수렴 노드: ${convergenceLabel}`,
-                rawData: rawData,
-                convergenceNode: convergenceNode,
-                connectedEntities: [entity1, entity2],
-                path: path,
-              },
-            });
+            // 수렴 노드도 같은 라벨의 엔티티와 통합 (중복 노드 방지)
+            // 기존: `convergence_${convergenceLabel}` → 변경: convergenceLabel만 사용
+            const convergenceId = getNodeId("entity", convergenceLabel);
+
+            // 이미 같은 이름의 노드가 있으면 isConvergence 플래그만 추가
+            if (nodeMap.has(convergenceId)) {
+              // 기존 노드에 수렴 정보 추가 (노드 배열에서 찾아서 업데이트)
+              const existingNode = nodes.find((n) => n.id === convergenceId);
+              if (existingNode) {
+                existingNode.isConvergence = true;
+                if (!existingNode.evidence.connectedEntities) {
+                  existingNode.evidence.connectedEntities = [];
+                }
+                if (
+                  !existingNode.evidence.connectedEntities.includes(entity1)
+                ) {
+                  existingNode.evidence.connectedEntities.push(entity1);
+                }
+                if (
+                  !existingNode.evidence.connectedEntities.includes(entity2)
+                ) {
+                  existingNode.evidence.connectedEntities.push(entity2);
+                }
+              }
+            } else {
+              addNode(convergenceId, convergenceLabel, "entity", {
+                entityType: "Convergence",
+                expansionMethod: "none",
+                evidenceIndex: index,
+                isConvergence: true,
+                evidence: {
+                  threadType: "connected_entities",
+                  description: `수렴 노드: ${convergenceLabel}`,
+                  rawData: rawData,
+                  convergenceNode: convergenceNode,
+                  connectedEntities: [entity1, entity2],
+                  path: path,
+                },
+              });
+            }
 
             // BFS 경로에서 predicate 추출
             // predicates 정보가 있으면 사용, 없으면 path에서 추출 시도
@@ -366,41 +388,62 @@ const EvidencePathView = ({ evidences = [] }) => {
             }
 
             // entity1 → 수렴 노드 (화살표)
+            // 수렴 노드로 가는 방향을 명확히 표시
             if (entity1 !== entityName) {
               links.push({
                 source: entity1Id,
                 target: convergenceId,
-                label: bfsPredicate,
+                label: bfsPredicate || "BFS 경로",
                 linkType: "bfs_path",
                 direction: "exploration",
                 isBFS: true,
                 path: path,
+                convergenceInfo: {
+                  from: entity1,
+                  to: convergenceLabel,
+                  via: bfsPredicate || "BFS",
+                },
               });
             }
 
             // entity2 → 수렴 노드 (화살표)
+            // 수렴 노드로 가는 방향을 명확히 표시
             if (entity2 !== entityName) {
               links.push({
                 source: entity2Id,
+                target: convergenceId,
+                label: bfsPredicate || "BFS 경로",
+                linkType: "bfs_path",
+                direction: "exploration",
+                isBFS: true,
+                path: path,
+                convergenceInfo: {
+                  from: entity2,
+                  to: convergenceLabel,
+                  via: bfsPredicate || "BFS",
+                },
+              });
+            }
+
+            // 메인 엔티티와 수렴 노드 연결 (메인 엔티티 → 수렴 노드)
+            // entity1과 entity2가 모두 수렴 노드로 연결되므로, 메인 엔티티도 수렴 노드로 연결
+            // 하지만 메인 엔티티가 entity1 또는 entity2와 같을 수 있으므로 중복 방지
+            if (entityName !== entity1 && entityName !== entity2) {
+              links.push({
+                source: entityId,
                 target: convergenceId,
                 label: bfsPredicate,
                 linkType: "bfs_path",
                 direction: "exploration",
                 isBFS: true,
                 path: path,
+                convergenceInfo: {
+                  entity1: entity1,
+                  entity2: entity2,
+                  convergenceNode: convergenceLabel,
+                },
               });
             }
-
-            // 메인 엔티티와 수렴 노드 연결
-            links.push({
-              source: entityId,
-              target: convergenceId,
-              label: bfsPredicate,
-              linkType: "bfs_path",
-              direction: "exploration",
-              isBFS: true,
-              path: path,
-            });
           } else {
             // 수렴 노드가 없으면 entity1 ↔ entity2 직접 연결 (화살표)
             if (entity1 !== entityName && entity2 !== entityName) {
@@ -470,11 +513,22 @@ const EvidencePathView = ({ evidences = [] }) => {
         }
 
         if (targetName) {
+          // Summary 같은 predicate의 경우 "엔티티명의 Summary" 형식으로 라벨 표시
+          // 실제 값은 호버창에서 표시
+          let nodeLabel = targetName;
+          if (predicate && predicate.toLowerCase().includes("summary")) {
+            // Summary는 "엔티티명의 Summary" 형식으로 표시
+            nodeLabel = `${entityName}의 ${predicate}`;
+          } else if (predicate) {
+            // 다른 predicate도 "엔티티명의 Predicate" 형식으로 표시
+            nodeLabel = `${entityName}의 ${predicate}`;
+          }
+
           const targetId = getNodeId(
             "value",
             `${entityName}_${predicate}_${index}`
           );
-          addNode(targetId, targetName, "value", {
+          addNode(targetId, nodeLabel, "value", {
             predicate,
             threadType,
             evidenceIndex: index,
@@ -482,7 +536,8 @@ const EvidencePathView = ({ evidences = [] }) => {
               threadType,
               description: evidence.description || "",
               predicate: predicate,
-              value: targetName,
+              value: targetName, // 실제 값은 evidence에 저장
+              entityName: entityName, // 어떤 엔티티의 값인지 저장
               rawData: evidence.raw_data || {},
             },
           });
@@ -719,7 +774,10 @@ const EvidencePathView = ({ evidences = [] }) => {
     if (node.type === "keyword") {
       return 10; // 키워드 노드
     }
-    return node.type === "entity" ? 12 : 8; // 엔티티와 값 노드
+    if (node.type === "entity") {
+      return 12; // 엔티티 노드 (가장 큼)
+    }
+    return 6; // 속성값 노드 (가장 작음)
   }, []);
 
   // 노드 클릭 핸들러 제거 (사용하지 않음)
@@ -786,6 +844,30 @@ const EvidencePathView = ({ evidences = [] }) => {
   // 확장 시 한 번만 중앙 정렬 (초기화 시에만) - 중앙 효과 제거
   const hasCenteredRef = useRef(false);
 
+  // d3 force 직접 설정 (원형 배치 + 적정 거리)
+  useEffect(() => {
+    if (isExpanded && graphRef.current && graphData.nodes.length > 0) {
+      const fg = graphRef.current;
+
+      // d3 force 직접 설정
+      try {
+        // 링크 거리 설정 (적정 거리)
+        fg.d3Force("link")?.distance(80).strength(0.3);
+
+        // 반발력 설정 (원형 배치를 위해 적당히)
+        fg.d3Force("charge")?.strength(-400).distanceMax(300);
+
+        // 중심 끌림 (클러스터가 화면 중앙에 모이도록)
+        fg.d3Force("center")?.strength(0.1);
+
+        // 시뮬레이션 재시작
+        fg.d3ReheatSimulation();
+      } catch (e) {
+        console.log("d3 force 설정 오류:", e);
+      }
+    }
+  }, [isExpanded, graphData.nodes.length]);
+
   useEffect(() => {
     if (isExpanded && graphRef.current && graphData.nodes.length > 0) {
       // 창이 펼쳐질 때 시뮬레이션 재시작 및 줌 설정
@@ -795,74 +877,24 @@ const EvidencePathView = ({ evidences = [] }) => {
             // 시뮬레이션 재시작 (노드 위치 재계산)
             graphRef.current.d3ReheatSimulation();
 
+            // 시뮬레이션 안정화 후 줌 조정
+            setTimeout(() => {
+              if (graphRef.current) {
+                // 초기 줌을 0.8로 설정하여 전체가 보이도록
+                graphRef.current.zoom(0.8, 300);
+                // 중앙으로 이동
+                graphRef.current.centerAt(0, 0, 300);
+              }
+            }, 500);
+
             if (!hasCenteredRef.current) {
               hasCenteredRef.current = true; // 한 번만 실행되도록 플래그 설정
-
-              // 모든 노드가 보이도록 자동 줌 조정
-              const nodes = graphData.nodes.filter(
-                (n) => n.x !== undefined && n.y !== undefined
-              );
-              if (nodes.length > 0) {
-                // 노드들의 위치 범위 계산
-                const xs = nodes.map((n) => n.x);
-                const ys = nodes.map((n) => n.y);
-                const minX = Math.min(...xs);
-                const maxX = Math.max(...xs);
-                const minY = Math.min(...ys);
-                const maxY = Math.max(...ys);
-
-                const width = maxX - minX;
-                const height = maxY - minY;
-                const centerX = (minX + maxX) / 2;
-                const centerY = (minY + maxY) / 2;
-
-                // 컨테이너 크기 가져오기
-                const container = document.querySelector(
-                  "[data-graph-container]"
-                );
-                if (container) {
-                  const containerWidth = container.clientWidth || 800;
-                  const containerHeight = container.clientHeight || 400;
-
-                  // 여백 추가 (20% 패딩)
-                  const padding = 0.2;
-                  const scaleX =
-                    (containerWidth * (1 - padding * 2)) / Math.max(width, 100);
-                  const scaleY =
-                    (containerHeight * (1 - padding * 2)) /
-                    Math.max(height, 100);
-                  const zoom = Math.min(scaleX, scaleY, 2); // 최대 줌 2배로 제한
-
-                  // 수동으로 줌과 중심 조정
-                  // 중심점으로 이동하기 위해 pan 계산
-                  const currentZoom = graphRef.current.zoom() || 1;
-                  const panX = containerWidth / 2 - centerX * zoom;
-                  const panY = containerHeight / 2 - centerY * zoom;
-
-                  // zoom 먼저 적용
-                  graphRef.current.zoom(zoom, 400);
-
-                  // pan 적용 (centerAt 대신)
-                  if (graphRef.current.centerAt) {
-                    graphRef.current.centerAt(centerX, centerY, 400);
-                  } else if (graphRef.current.panBy) {
-                    // 현재 위치에서 pan 계산
-                    graphRef.current.panBy(panX, panY, 400);
-                  }
-                } else {
-                  // 컨테이너를 찾을 수 없으면 기본 줌
-                  graphRef.current.zoom(0.5, 400);
-                }
-              } else {
-                // 노드 위치가 없으면 기본 줌
-                graphRef.current.zoom(0.5, 400);
-              }
             }
           } catch (error) {
             console.error("[EvidencePathView] simulation/zoom error:", error);
           }
         }
-      }, 500); // 시뮬레이션이 안정화될 때까지 대기
+      }, 300); // 시뮬레이션이 안정화될 때까지 대기
 
       return () => {
         clearTimeout(immediateTimer);
@@ -1259,19 +1291,19 @@ const EvidencePathView = ({ evidences = [] }) => {
                   nodeLabel="name"
                   nodeColor={getNodeColor}
                   nodeRelSize={getNodeSize}
-                  // 노드 간격 조정 및 애니메이션 설정
+                  // 노드 간격 조정 및 애니메이션 설정 (원형 배치)
                   d3Force="charge"
-                  d3ForceStrength={-300} // 반발력 (연결되지 않은 노드 간 거리 조절)
-                  d3ForceLinkDistance={200} // 링크 거리 (연결된 노드 간 거리 - 초기 배치와 일치)
-                  d3ForceLinkStrength={0.8} // 링크 강도 증가 (연결된 노드 간 거리 유지)
-                  d3ForceCenterStrength={0.05} // 중심 끌림 최소화
-                  // 애니메이션 설정 - 지속적인 움직임
-                  d3AlphaDecay={0.1} // 매우 느린 안정화 (계속 움직임)
-                  d3VelocityDecay={0.3} // 속도 감쇠 줄임 (더 오래 움직임)
-                  warmupTicks={1000} // 초기 시뮬레이션 틱
-                  cooldownTicks={0} // 쿨다운 없음
+                  d3ForceStrength={-400} // 적당한 반발력 (원형 배치)
+                  d3ForceLinkDistance={80} // 적당한 링크 거리
+                  d3ForceLinkStrength={0.3} // 링크 강도
+                  d3ForceCenterStrength={0.1} // 중심 끌림
+                  // 애니메이션 설정 - 안정화 후 정지
+                  d3AlphaDecay={0.02} // 느린 안정화
+                  d3VelocityDecay={0.4} // 속도 감쇠
+                  warmupTicks={100} // 초기 시뮬레이션 틱
+                  cooldownTicks={200} // 쿨다운 후 정지
                   // 초기 뷰 설정
-                  minZoom={0.3}
+                  minZoom={0.2}
                   maxZoom={4}
                   nodeCanvasObject={(node, ctx, globalScale) => {
                     try {
@@ -1382,7 +1414,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                   linkDirectionalArrowLength={(link) => {
                     // 수렴 노드(BFS 경로): 화살표 필수
                     if (link.linkType === "bfs_path") {
-                      return 6;
+                      return 12; // 화살표 크기 증가
                     }
                     // outgoing/incoming 관계: 화살표 필수
                     if (
@@ -1390,16 +1422,16 @@ const EvidencePathView = ({ evidences = [] }) => {
                       (link.threadType === "outgoing_relations" ||
                         link.threadType === "incoming_relations")
                     ) {
-                      return 6;
+                      return 12; // 화살표 크기 증가
                     }
                     // 속성/관계: hasArrow가 false면 화살표 없음, true면 화살표 표시
                     if (link.linkType === "property_relation") {
-                      return link.hasArrow ? 6 : 0;
+                      return link.hasArrow ? 12 : 0;
                     }
                     // 키워드 확장, 추출은 화살표 표시
-                    return 6;
+                    return 12; // 화살표 크기 증가
                   }}
-                  linkDirectionalArrowRelPos={1}
+                  linkDirectionalArrowRelPos={0.95}
                   linkDirectionalArrowColor={(link) => {
                     if (link.linkType === "keyword_expansion") {
                       return "#F59E0B";
@@ -1840,6 +1872,7 @@ const EvidencePathView = ({ evidences = [] }) => {
               )}
 
               {/* 속성/관계 노드 (value 타입) 정보 표시 */}
+              {/* 속성값 노드 정보 */}
               {hoveredNode.type === "value" && hoveredNode.evidence && (
                 <div
                   style={{
@@ -1860,6 +1893,18 @@ const EvidencePathView = ({ evidences = [] }) => {
                   >
                     <strong>📋 속성/관계 정보</strong>
                   </div>
+                  {hoveredNode.evidence.entityName && (
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color: COLORS.dark,
+                        marginBottom: "4px",
+                      }}
+                    >
+                      <strong>엔티티:</strong>{" "}
+                      <strong>{hoveredNode.evidence.entityName}</strong>
+                    </div>
+                  )}
                   {hoveredNode.evidence.predicate && (
                     <div
                       style={{

@@ -500,6 +500,63 @@ def execute_unified_thread(
     return result
 
 
+def get_uri_labels_batch(uris: list) -> dict:
+    """
+    여러 URI의 라벨을 한 번의 SPARQL 쿼리로 조회
+    
+    Args:
+        uris: URI 리스트
+    
+    Returns:
+        {uri: label} 딕셔너리
+    """
+    if not uris:
+        return {}
+    
+    uri_to_label = {}
+    
+    try:
+        # VALUES 절로 여러 URI 한 번에 조회
+        uri_values = []
+        for uri in uris:
+            if uri.startswith("hist:"):
+                uri_values.append(uri)
+            elif uri.startswith("http://"):
+                uri_values.append(f"<{uri}>")
+            elif uri.startswith("<"):
+                uri_values.append(uri)
+            else:
+                uri_values.append(f"hist:{uri}" if ":" not in uri else uri)
+        
+        values_clause = " ".join(uri_values)
+        
+        sparql_query = f"""
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            
+            SELECT ?entity ?label WHERE {{
+                VALUES ?entity {{ {values_clause} }}
+                ?entity rdfs:label ?label .
+            }}
+        """
+        
+        result = execute_sparql_query(FUSEKI_URL, sparql_query, timeout=3)
+        if result and "results" in result and "bindings" in result["results"]:
+            for binding in result["results"]["bindings"]:
+                entity_uri = binding.get("entity", {}).get("value", "")
+                label = binding.get("label", {}).get("value", "")
+                if entity_uri and label:
+                    uri_to_label[entity_uri] = label
+                    # hist: prefix 형태도 매핑
+                    if "#" in entity_uri:
+                        short_uri = "hist:" + entity_uri.split("#")[-1]
+                        uri_to_label[short_uri] = label
+    except Exception as e:
+        pass
+    
+    return uri_to_label
+
+
 def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> list:
     """
     여러 엔티티 쌍에 대해 양방향 BFS 경로 탐색 실행
@@ -527,6 +584,10 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
     pairs_tried = 0
     paths_found = 0
     
+    # 모든 경로에서 발견된 URI 수집 (라벨 일괄 조회용)
+    all_path_uris = set()
+    all_paths_info = []  # (entity_a, entity_b, paths) 저장
+    
     for i in range(len(entities_with_uri)):
         for j in range(i + 1, len(entities_with_uri)):
             if pairs_tried >= max_pairs:
@@ -550,72 +611,134 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
             if paths:
                 paths_found += len(paths)
                 print(f"    │ │  ├─ [{name_a} ↔ {name_b}]: {len(paths)}개 경로 발견")
-
-            # 경로를 Fuseki binding 형식으로 변환
-            for path_info in paths:
-                path_uris = path_info.get("path", [])
-                predicates = path_info.get("predicates", [])
-                convergence = path_info.get("convergence_node", "")
-
-                if len(path_uris) >= 2:
-                    # 경로 정보를 binding으로 변환
-                    # URI에서 네임스페이스 제거 (hist:Person_xxx 형식 유지)
-                    path_labels = []
-                    for uri in path_uris:
-                        if "#" in uri:
-                            path_labels.append(uri.split("#")[-1])
-                        elif ":" in uri:
-                            path_labels.append(uri.split(":")[-1])
-                        else:
-                            path_labels.append(uri)
-                    
-                    path_str = " → ".join(path_labels)
-                    
-                    # predicates를 읽기 좋게 변환 (URI에서 네임스페이스 제거)
-                    predicate_labels = []
-                    for pred_uri in predicates:
-                        if "#" in pred_uri:
-                            pred_label = pred_uri.split("#")[-1]
-                        elif ":" in pred_uri:
-                            pred_label = pred_uri.split(":")[-1]
-                        else:
-                            pred_label = pred_uri
-                        # predicate 이름을 읽기 좋게 변환
-                        pred_label = pred_label.replace("has", "").replace("_", " ")
-                        predicate_labels.append(pred_label)
-                    
-                    predicates_str = " → ".join(predicate_labels) if predicate_labels else ""
-                    
-                    # 수렴 노드의 실제 라벨 조회
-                    convergence_node_uri = convergence.split("#")[-1] if convergence and "#" in convergence else (convergence.split(":")[-1] if convergence and ":" in convergence else convergence)
-                    convergence_node_label = get_convergence_node_label(convergence)
-                    # 라벨이 없으면 URI에서 추출 (하위 호환성)
-                    if not convergence_node_label:
-                        # Place_5fbcb94e 형식에서 Place 다음 부분 추출 시도
-                        if "_" in convergence_node_uri:
-                            # URI에서 언더스코어 다음 부분이 실제 라벨일 수 있지만, 
-                            # 일반적으로는 SPARQL에서 조회한 라벨을 사용해야 함
-                            convergence_node_label = convergence_node_uri.split("_")[0]
-                        else:
-                            convergence_node_label = convergence_node_uri
-
-                    bindings.append({
-                        "entity1": {"value": uri_a},
-                        "label1": {"value": name_a},
-                        "entity2": {"value": uri_b},
-                        "label2": {"value": name_b},
-                        "path": {"value": path_str},
-                        "predicates": {"value": predicates_str},  # predicates 정보 추가
-                        "path_length": {"value": str(len(path_uris))},
-                        "convergence_node": {"value": convergence_node_uri},
-                        "convergence_node_label": {"value": convergence_node_label},  # 실제 라벨 추가
-                        "method": {"value": "bidirectional_bfs"}
-                    })
+                
+                # 경로의 모든 URI 수집
+                for path_info in paths:
+                    path_uris = path_info.get("path", [])
+                    all_path_uris.update(path_uris)
+                    convergence = path_info.get("convergence_node", "")
+                    if convergence:
+                        all_path_uris.add(convergence)
+                
+                all_paths_info.append((entity_a, entity_b, paths))
 
             pairs_tried += 1
 
         if pairs_tried >= max_pairs:
             break
+
+    # 모든 URI의 라벨을 한 번에 조회
+    uri_labels = get_uri_labels_batch(list(all_path_uris))
+    
+    # 경로를 Fuseki binding 형식으로 변환 (라벨 사용)
+    for entity_a, entity_b, paths in all_paths_info:
+        uri_a = entity_a.get("uri")
+        uri_b = entity_b.get("uri")
+        name_a = entity_a.get("name", "")
+        name_b = entity_b.get("name", "")
+        
+        for path_info in paths:
+            path_uris = path_info.get("path", [])
+            predicates = path_info.get("predicates", [])
+            convergence = path_info.get("convergence_node", "")
+
+            if len(path_uris) >= 2:
+                # 경로의 각 URI에 대해 라벨 조회 (없으면 URI에서 추출)
+                path_labels = []
+                for uri in path_uris:
+                    # 먼저 조회된 라벨 사용
+                    label = uri_labels.get(uri, "")
+                    if not label:
+                        # full URI로도 시도
+                        if uri.startswith("hist:"):
+                            full_uri = f"http://www.example.org/korean-history#{uri.split(':')[-1]}"
+                            label = uri_labels.get(full_uri, "")
+                    
+                    # 라벨이 없으면 URI에서 추출 (하위 호환성)
+                    if not label:
+                        if "#" in uri:
+                            uri_part = uri.split("#")[-1]
+                        elif ":" in uri:
+                            uri_part = uri.split(":")[-1]
+                        else:
+                            uri_part = uri
+                        
+                        # Type_ID 형식이면 Type만 추출 (예: Person_abc123 → Person)
+                        if "_" in uri_part and len(uri_part.split("_")) > 1:
+                            parts = uri_part.split("_")
+                            # ID가 긴 해시값인 경우 Type만 사용
+                            if len(parts[1]) > 6:
+                                label = parts[0]
+                            else:
+                                label = uri_part
+                        else:
+                            label = uri_part
+                    
+                    path_labels.append(label)
+                
+                path_str = " → ".join(path_labels)
+                
+                # predicates를 읽기 좋게 변환 (URI에서 네임스페이스 제거)
+                predicate_labels = []
+                for pred_uri in predicates:
+                    if "#" in pred_uri:
+                        pred_label = pred_uri.split("#")[-1]
+                    elif ":" in pred_uri:
+                        pred_label = pred_uri.split(":")[-1]
+                    else:
+                        pred_label = pred_uri
+                    # predicate 이름을 읽기 좋게 변환
+                    pred_label = pred_label.replace("has", "").replace("_", " ")
+                    predicate_labels.append(pred_label)
+                
+                predicates_str = " → ".join(predicate_labels) if predicate_labels else ""
+                
+                # 수렴 노드의 실제 라벨 조회
+                convergence_node_label = ""
+                if convergence:
+                    # 먼저 일괄 조회 결과에서 찾기
+                    convergence_node_label = uri_labels.get(convergence, "")
+                    if not convergence_node_label:
+                        # full URI로도 시도
+                        if convergence.startswith("hist:"):
+                            full_uri = f"http://www.example.org/korean-history#{convergence.split(':')[-1]}"
+                            convergence_node_label = uri_labels.get(full_uri, "")
+                    
+                    # 없으면 개별 조회
+                    if not convergence_node_label:
+                        convergence_node_label = get_convergence_node_label(convergence)
+                
+                # URI에서 짧은 형태 추출
+                if "#" in convergence:
+                    convergence_node_uri = convergence.split("#")[-1]
+                elif ":" in convergence:
+                    convergence_node_uri = convergence.split(":")[-1]
+                else:
+                    convergence_node_uri = convergence
+                
+                # 라벨이 없으면 URI에서 추출 (하위 호환성)
+                if not convergence_node_label:
+                    if "_" in convergence_node_uri:
+                        parts = convergence_node_uri.split("_")
+                        if len(parts[1]) > 6:
+                            convergence_node_label = parts[0]
+                        else:
+                            convergence_node_label = convergence_node_uri
+                    else:
+                        convergence_node_label = convergence_node_uri
+
+                bindings.append({
+                    "entity1": {"value": uri_a},
+                    "label1": {"value": name_a},
+                    "entity2": {"value": uri_b},
+                    "label2": {"value": name_b},
+                    "path": {"value": path_str},
+                    "predicates": {"value": predicates_str},
+                    "path_length": {"value": str(len(path_uris))},
+                    "convergence_node": {"value": convergence_node_uri},
+                    "convergence_node_label": {"value": convergence_node_label},
+                    "method": {"value": "bidirectional_bfs"}
+                })
 
     print(f"      └─ 총 {pairs_tried}개 쌍 탐색, {paths_found}개 경로 발견")
     return bindings
