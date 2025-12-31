@@ -3,6 +3,7 @@ import axios from "axios";
 const api = axios.create({
   baseURL: "http://localhost:8000",
   withCredentials: true,
+  timeout: 200000, // 2000초 (LangGraph 실행 시간 고려)
 });
 
 // ============================================
@@ -30,6 +31,31 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+
+// ============================================
+// 프론트엔드 URL 가져오기
+// ============================================
+const getFrontendUrl = () => {
+  // 현재 도메인이 백엔드(8000)인 경우 프론트엔드(3000)로 변경
+  if (window.location.port === "8000" || window.location.hostname.includes("8000")) {
+    return `http://localhost:3000/`;
+  }
+  // 프론트엔드인 경우 현재 origin 사용
+  return `${window.location.origin}/`;
+};
+
+// ============================================
+// 로그아웃 처리 함수 (인터셉터 정의 전에 선언)
+// ============================================
+const handleLogout = () => {
+  // 모든 토큰 및 사용자 데이터 삭제
+  localStorage.clear();
+
+  // 강제 새로고침하여 상태 초기화 (비동기로 처리하여 진행 중인 요청이 완료될 시간 제공)
+  setTimeout(() => {
+    window.location.href = getFrontendUrl();
+  }, 100);
+};
 
 // ============================================
 // 응답 인터셉터: 토큰 만료 시 자동으로 리프레시
@@ -87,7 +113,7 @@ api.interceptors.response.use(
         } catch (refreshError) {
           // Refresh 토큰도 만료된 경우
           console.error("❌ Refresh 토큰 만료! 로그아웃 처리...");
-
+          handleLogout();
           // 토큰 삭제
           localStorage.removeItem("access_token");
           localStorage.removeItem("refresh_token");
