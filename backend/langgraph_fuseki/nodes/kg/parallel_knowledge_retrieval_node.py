@@ -570,6 +570,34 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
                             path_labels.append(uri)
                     
                     path_str = " → ".join(path_labels)
+                    
+                    # predicates를 읽기 좋게 변환 (URI에서 네임스페이스 제거)
+                    predicate_labels = []
+                    for pred_uri in predicates:
+                        if "#" in pred_uri:
+                            pred_label = pred_uri.split("#")[-1]
+                        elif ":" in pred_uri:
+                            pred_label = pred_uri.split(":")[-1]
+                        else:
+                            pred_label = pred_uri
+                        # predicate 이름을 읽기 좋게 변환
+                        pred_label = pred_label.replace("has", "").replace("_", " ")
+                        predicate_labels.append(pred_label)
+                    
+                    predicates_str = " → ".join(predicate_labels) if predicate_labels else ""
+                    
+                    # 수렴 노드의 실제 라벨 조회
+                    convergence_node_uri = convergence.split("#")[-1] if convergence and "#" in convergence else (convergence.split(":")[-1] if convergence and ":" in convergence else convergence)
+                    convergence_node_label = get_convergence_node_label(convergence)
+                    # 라벨이 없으면 URI에서 추출 (하위 호환성)
+                    if not convergence_node_label:
+                        # Place_5fbcb94e 형식에서 Place 다음 부분 추출 시도
+                        if "_" in convergence_node_uri:
+                            # URI에서 언더스코어 다음 부분이 실제 라벨일 수 있지만, 
+                            # 일반적으로는 SPARQL에서 조회한 라벨을 사용해야 함
+                            convergence_node_label = convergence_node_uri.split("_")[0]
+                        else:
+                            convergence_node_label = convergence_node_uri
 
                     bindings.append({
                         "entity1": {"value": uri_a},
@@ -577,8 +605,10 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
                         "entity2": {"value": uri_b},
                         "label2": {"value": name_b},
                         "path": {"value": path_str},
+                        "predicates": {"value": predicates_str},  # predicates 정보 추가
                         "path_length": {"value": str(len(path_uris))},
-                        "convergence_node": {"value": convergence.split("#")[-1] if convergence and "#" in convergence else (convergence.split(":")[-1] if convergence and ":" in convergence else convergence)},
+                        "convergence_node": {"value": convergence_node_uri},
+                        "convergence_node_label": {"value": convergence_node_label},  # 실제 라벨 추가
                         "method": {"value": "bidirectional_bfs"}
                     })
 
@@ -689,6 +719,55 @@ def find_bidirectional_paths(entity_a_uri: str, entity_b_uri: str, max_depth: in
     # 최단 경로 우선 정렬
     found_paths.sort(key=lambda x: x["length"])
     return found_paths[:5]  # 상위 5개 경로만
+
+
+def get_convergence_node_label(convergence_uri: str) -> str:
+    """
+    수렴 노드의 실제 라벨을 SPARQL로 조회
+    
+    Args:
+        convergence_uri: 수렴 노드 URI (예: hist:Place_5fbcb94e)
+    
+    Returns:
+        실제 라벨 (예: "경복궁"), 없으면 빈 문자열
+    """
+    if not convergence_uri:
+        return ""
+    
+    try:
+        # URI 형식 처리
+        if convergence_uri.startswith("hist:"):
+            uri_sparql = convergence_uri
+        elif convergence_uri.startswith("http://"):
+            uri_sparql = f"<{convergence_uri}>"
+        elif convergence_uri.startswith("<"):
+            uri_sparql = convergence_uri
+        else:
+            uri_sparql = f"hist:{convergence_uri}" if ":" not in convergence_uri else convergence_uri
+        
+        # SPARQL 쿼리: 수렴 노드의 라벨 조회
+        sparql_query = f"""
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            
+            SELECT ?label WHERE {{
+                {uri_sparql} rdfs:label ?label .
+            }} LIMIT 1
+        """
+        
+        result = execute_sparql_query(FUSEKI_URL, sparql_query, timeout=2)
+        if result and "results" in result and "bindings" in result["results"]:
+            bindings = result["results"]["bindings"]
+            if bindings and len(bindings) > 0:
+                label = bindings[0].get("label", {}).get("value", "")
+                if label:
+                    return label
+        
+    except Exception as e:
+        # 실패 시 빈 문자열 반환
+        pass
+    
+    return ""
 
 
 def get_1hop_neighbors(entity_uri: str, timeout: int = 2) -> list:

@@ -19,7 +19,7 @@ import MarkdownRenderer from "../components/common/MarkdownRenderer";
 import EvidencePathView from "../components/common/EvidencePathView";
 import ThinkingMode from "../components/common/ThinkingMode/ThinkingMode";
 
-const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
+const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
   // 스크롤바 스타일 및 드래그 색상을 위한 CSS 추가
   useEffect(() => {
     const style = document.createElement("style");
@@ -206,9 +206,22 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
         const raw = await getChatHistory();
         const history = Array.isArray(raw) ? raw : raw?.sessions || [];
         setChatHistory(history || []);
-        // 세션 자동 로드는 하지 않음. 사용자가 히스토리에서 선택할 때만 불러온다.
-        setSelectedSessionId(null);
-        setMessages([]);
+        
+        // URL에서 세션 ID가 있으면 해당 세션 로드
+        if (initialSessionId) {
+          setSelectedSessionId(initialSessionId);
+          try {
+            const sessionData = await getChatSession(initialSessionId);
+            hydrateMessages(sessionData?.messages || []);
+          } catch (error) {
+            console.error("세션 불러오기 실패:", error);
+            setSelectedSessionId(null);
+            setMessages([]);
+          }
+        } else {
+          setSelectedSessionId(null);
+          setMessages([]);
+        }
       } catch (error) {
         if (error.response?.status === 404) {
           setChatHistory([]);
@@ -219,7 +232,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
       }
     };
     loadChatHistory();
-  }, []);
+  }, [initialSessionId]);
 
   useEffect(() => {
     const startNewSession = async () => {
@@ -233,6 +246,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
         const newSession = await createChatSession();
         setSelectedSessionId(newSession.id);
         setMessages([]);
+        // URL 업데이트
+        window.location.hash = `question/session/${newSession.id}`;
         const raw = await getChatHistory();
         const history = Array.isArray(raw) ? raw : raw?.sessions || [];
         setChatHistory(history || []);
@@ -860,6 +875,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                     setSelectedSessionId(newSession.id);
                     setMessages([]);
                     setShowHistory(false); // 사이드바 자동 접기
+                    // URL 업데이트
+                    window.location.hash = `question/session/${newSession.id}`;
                     const raw = await getChatHistory();
                     const history = Array.isArray(raw)
                       ? raw
@@ -977,6 +994,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                       setSelectedSessionId(session.id);
                       setMessages([]);
                       setShowHistory(false); // 사이드바 자동 접기
+                      // URL 업데이트
+                      window.location.hash = `question/session/${session.id}`;
                       try {
                         const sessionData = await getChatSession(session.id);
                         hydrateMessages(sessionData?.messages || []);
@@ -1098,6 +1117,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger }) => {
                           if (selectedSessionId === session.id) {
                             setSelectedSessionId(null);
                             setMessages([]);
+                            // URL 업데이트 (세션 ID 제거)
+                            window.location.hash = "question";
                           }
                         } catch (error) {
                           console.error("세션 삭제 실패:", error);

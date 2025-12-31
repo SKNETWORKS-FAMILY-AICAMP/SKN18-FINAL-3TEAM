@@ -150,6 +150,22 @@ const EvidencePathView = ({ evidences = [] }) => {
       const entityId = getNodeId("entity", entityName);
 
       // 노드에 evidence 정보 저장 (호버 시 표시용)
+      // 노드 출처 구분: initial_keyword, llm_expansion, semantic_expansion
+      // trace.keyword_source가 있으면 우선 사용, 없으면 expansion_method로 판단
+      let keywordSource = trace.keyword_source;
+      if (!keywordSource) {
+        // expansion_method가 있으면 semantic_expansion
+        if (trace.expansion_method && trace.expansion_method !== "none") {
+          keywordSource = "semantic_expansion";
+        } else {
+          // expansion_method가 없으면 is_from_expansion으로 판단
+          keywordSource = trace.is_from_expansion
+            ? "llm_expansion"
+            : "initial_keyword";
+        }
+      }
+      const isSemanticExpansion = keywordSource === "semantic_expansion";
+
       const nodeEvidence = {
         threadType,
         description: evidence.description || "",
@@ -168,8 +184,14 @@ const EvidencePathView = ({ evidences = [] }) => {
         expansionMethod: trace.expansion_method || "",
         isFromExpansion: trace.is_from_expansion || false,
         keywordExpansionMethod: trace.keyword_expansion_method || "",
+        // 노드 출처 구분
+        keywordSource: isSemanticExpansion
+          ? "semantic_expansion"
+          : keywordSource,
         // 확장 경로 추적
-        isInitialKeyword: !trace.is_from_expansion && !!trace.matched_keyword,
+        isInitialKeyword: keywordSource === "initial_keyword",
+        isLLMExpansion: keywordSource === "llm_expansion",
+        isSemanticExpansion: isSemanticExpansion,
         isExpanded:
           trace.is_from_expansion ||
           (!!trace.expansion_method && trace.expansion_method !== "none"),
@@ -196,10 +218,12 @@ const EvidencePathView = ({ evidences = [] }) => {
 
         // 키워드 노드가 존재하는지 확인 후 링크 추가
         if (nodeMap.has(keywordId)) {
+          // predicate가 있으면 사용, 없으면 빈 문자열
+          const linkLabel = predicate || "";
           links.push({
             source: keywordId,
             target: entityId,
-            label: "추출",
+            label: linkLabel,
             linkType: "entity_extraction",
             direction: "extraction",
             extractionMethod: trace.is_from_expansion ? "expanded" : "initial",
@@ -207,63 +231,286 @@ const EvidencePathView = ({ evidences = [] }) => {
         }
       }
 
-      // 6. 프로퍼티/관계 노드 추가 (기존 로직)
-      const description = evidence.description || "";
-      let targetName = "";
+      // 6. connected_entities 타입 처리 (BFS 경로)
+      if (threadType === "connected_entities") {
+        const rawData = evidence.raw_data || {};
+        const entity1 =
+          trace.entity1 || rawData.label1?.value || rawData.label1 || "";
+        const entity2 =
+          trace.entity2 || rawData.label2?.value || rawData.label2 || "";
+        const convergenceNode =
+          trace.convergence_node ||
+          rawData.convergence_node?.value ||
+          rawData.convergence_node ||
+          "";
+        const path = trace.path || rawData.path?.value || rawData.path || "";
+        const isBFS =
+          trace.method === "bidirectional_bfs" ||
+          rawData.method?.value === "bidirectional_bfs";
 
-      // description에서 타겟 추출
-      if (description.includes("→")) {
-        const parts = description.split("→");
-        if (threadType === "incoming_relations" && parts.length > 0) {
-          targetName = parts[0].trim();
-        } else if (parts.length > 2) {
-          targetName = parts[2].trim();
-        }
-      } else if (description.includes(":")) {
-        const parts = description.split(":");
-        if (parts.length > 1) {
-          targetName = parts[1].trim().substring(0, 50);
-        }
-      }
+        // entity1과 entity2가 모두 있는 경우
+        if (entity1 && entity2) {
+          const entity1Id = getNodeId("entity", entity1);
+          const entity2Id = getNodeId("entity", entity2);
 
-      if (targetName) {
-        const targetId = getNodeId(
-          "value",
-          `${entityName}_${predicate}_${index}`
-        );
-        addNode(targetId, targetName, "value", {
-          predicate,
-          threadType,
-          evidenceIndex: index,
-          evidence: {
+          // entity1 노드 추가 (탐색한 키워드로 표시)
+          if (entity1 !== entityName) {
+            addNode(entity1Id, entity1, "entity", {
+              entityType: "Entity",
+              expansionMethod: "none",
+              evidenceIndex: index,
+              evidence: {
+                threadType: "connected_entities",
+                description: evidence.description || "",
+                rawData: rawData,
+                isExplored: true, // 탐색한 노드 표시
+              },
+            });
+          }
+
+          // entity2 노드 추가 (탐색한 키워드로 표시)
+          if (entity2 !== entityName) {
+            addNode(entity2Id, entity2, "entity", {
+              entityType: "Entity",
+              expansionMethod: "none",
+              evidenceIndex: index,
+              evidence: {
+                threadType: "connected_entities",
+                description: evidence.description || "",
+                rawData: rawData,
+                isExplored: true, // 탐색한 노드 표시
+              },
+            });
+          }
+
+          // 수렴 노드 추가 (연한 회색)
+          if (convergenceNode) {
+            // 백엔드에서 전달된 라벨 우선 사용 (SPARQL로 조회한 실제 라벨)
+            let convergenceLabel =
+              trace.convergence_node_label ||
+              rawData.convergence_node_label?.value ||
+              rawData.convergence_node_label;
+
+            // 백엔드에서 전달된 라벨이 없으면 URI에서 추출 시도 (하위 호환성)
+            if (!convergenceLabel) {
+              // URI에서 라벨 추출
+              const uriParts =
+                convergenceNode.split("#").pop() ||
+                convergenceNode.split("/").pop() ||
+                convergenceNode;
+
+              // Place_5fbcb94e 형식인 경우, Place 다음 부분이 실제 라벨일 수 있지만
+              // 일반적으로는 SPARQL에서 조회한 라벨을 사용해야 함
+              // 여기서는 일단 URI에서 추출 (하위 호환성)
+              if (uriParts.includes("_")) {
+                // 언더스코어로 분리: Place_5fbcb94e → Place만 추출 (임시)
+                // 실제로는 백엔드에서 라벨을 조회해서 전달해야 함
+                convergenceLabel = uriParts.split("_")[0];
+              } else {
+                convergenceLabel = uriParts;
+              }
+            }
+
+            const convergenceId = getNodeId(
+              "entity",
+              `convergence_${convergenceLabel}`
+            );
+            addNode(convergenceId, convergenceLabel, "entity", {
+              entityType: "Convergence",
+              expansionMethod: "none",
+              evidenceIndex: index,
+              isConvergence: true,
+              evidence: {
+                threadType: "connected_entities",
+                description: `수렴 노드: ${convergenceLabel}`,
+                rawData: rawData,
+                convergenceNode: convergenceNode,
+                connectedEntities: [entity1, entity2],
+                path: path,
+              },
+            });
+
+            // BFS 경로에서 predicate 추출
+            // predicates 정보가 있으면 사용, 없으면 path에서 추출 시도
+            let bfsPredicate = "";
+            if (trace.predicates) {
+              // predicates 형식: "predicate1 → predicate2 → ..."
+              const predicateParts = trace.predicates
+                .split("→")
+                .map((p) => p.trim());
+              // 첫 번째 predicate 사용
+              if (predicateParts.length > 0) {
+                bfsPredicate = predicateParts[0] || "";
+              }
+            }
+            // predicates가 없으면 path에서 추출 시도 (하위 호환성)
+            if (!bfsPredicate && path && path.includes("→")) {
+              const pathParts = path.split("→").map((p) => p.trim());
+              // path 형식: "Entity1 → Entity2 → Entity3"이므로 predicate는 없을 수 있음
+              // 하지만 시도해봄
+              if (pathParts.length > 1) {
+                // URI가 아닌 부분을 predicate로 간주 (실제로는 작동하지 않을 수 있음)
+                const possiblePredicate = pathParts[1];
+                // URI 패턴이 아닌 경우에만 사용 (간단한 체크)
+                if (
+                  !possiblePredicate.includes("_") ||
+                  !possiblePredicate.match(/^[A-Z][a-z]+_[a-f0-9]+$/)
+                ) {
+                  bfsPredicate = possiblePredicate;
+                }
+              }
+            }
+            // predicate가 없으면 predicate_display 사용
+            if (!bfsPredicate) {
+              bfsPredicate = trace.predicate_display || trace.predicate || "";
+            }
+
+            // entity1 → 수렴 노드 (화살표)
+            if (entity1 !== entityName) {
+              links.push({
+                source: entity1Id,
+                target: convergenceId,
+                label: bfsPredicate,
+                linkType: "bfs_path",
+                direction: "exploration",
+                isBFS: true,
+                path: path,
+              });
+            }
+
+            // entity2 → 수렴 노드 (화살표)
+            if (entity2 !== entityName) {
+              links.push({
+                source: entity2Id,
+                target: convergenceId,
+                label: bfsPredicate,
+                linkType: "bfs_path",
+                direction: "exploration",
+                isBFS: true,
+                path: path,
+              });
+            }
+
+            // 메인 엔티티와 수렴 노드 연결
+            links.push({
+              source: entityId,
+              target: convergenceId,
+              label: bfsPredicate,
+              linkType: "bfs_path",
+              direction: "exploration",
+              isBFS: true,
+              path: path,
+            });
+          } else {
+            // 수렴 노드가 없으면 entity1 ↔ entity2 직접 연결 (화살표)
+            if (entity1 !== entityName && entity2 !== entityName) {
+              // BFS 경로에서 predicate 추출
+              let bfsPredicate = "";
+              if (trace.predicates) {
+                // predicates 형식: "predicate1 → predicate2 → ..."
+                const predicateParts = trace.predicates
+                  .split("→")
+                  .map((p) => p.trim());
+                if (predicateParts.length > 0) {
+                  bfsPredicate = predicateParts[0] || "";
+                }
+              }
+              // predicates가 없으면 path에서 추출 시도 (하위 호환성)
+              if (!bfsPredicate && path && path.includes("→")) {
+                const pathParts = path.split("→").map((p) => p.trim());
+                if (pathParts.length > 1) {
+                  const possiblePredicate = pathParts[1];
+                  // URI 패턴이 아닌 경우에만 사용
+                  if (
+                    !possiblePredicate.includes("_") ||
+                    !possiblePredicate.match(/^[A-Z][a-z]+_[a-f0-9]+$/)
+                  ) {
+                    bfsPredicate = possiblePredicate;
+                  }
+                }
+              }
+              if (!bfsPredicate) {
+                bfsPredicate = trace.predicate_display || trace.predicate || "";
+              }
+
+              links.push({
+                source: entity1Id,
+                target: entity2Id,
+                label: bfsPredicate,
+                linkType: "bfs_path",
+                direction: "exploration",
+                isBFS: true,
+                path: path,
+              });
+            }
+          }
+        }
+      } else {
+        // 7. 프로퍼티/관계 노드 추가 (기존 로직)
+        const description = evidence.description || "";
+        let targetName = "";
+
+        // description에서 타겟 추출
+        if (description.includes("→")) {
+          const parts = description.split("→");
+          if (threadType === "incoming_relations" && parts.length > 0) {
+            targetName = parts[0].trim();
+          } else if (parts.length > 2) {
+            targetName = parts[2].trim();
+          }
+        } else if (description.includes(":")) {
+          const parts = description.split(":");
+          if (parts.length > 1) {
+            targetName = parts[1].trim().substring(0, 50);
+          }
+        } else if (threadType === "entity_properties") {
+          // entity_properties 타입의 경우 value 필드에서 추출
+          const rawData = evidence.raw_data || {};
+          targetName = rawData.value?.value || rawData.value || "";
+        }
+
+        if (targetName) {
+          const targetId = getNodeId(
+            "value",
+            `${entityName}_${predicate}_${index}`
+          );
+          addNode(targetId, targetName, "value", {
+            predicate,
             threadType,
-            description: evidence.description || "",
-            predicate: predicate,
-            value: targetName,
-            rawData: evidence.raw_data || {},
-          },
-        });
+            evidenceIndex: index,
+            evidence: {
+              threadType,
+              description: evidence.description || "",
+              predicate: predicate,
+              value: targetName,
+              rawData: evidence.raw_data || {},
+            },
+          });
 
-        // 7. 엔티티 → 속성/관계 링크 추가
-        let linkSource, linkTarget;
-        if (threadType === "incoming_relations") {
-          linkSource = targetId;
-          linkTarget = entityId;
-        } else {
-          linkSource = entityId;
-          linkTarget = targetId;
+          // 8. 엔티티 → 속성/관계 링크 추가 (화살표 없음)
+          let linkSource, linkTarget;
+          if (threadType === "incoming_relations") {
+            linkSource = targetId;
+            linkTarget = entityId;
+          } else {
+            linkSource = entityId;
+            linkTarget = targetId;
+          }
+
+          links.push({
+            source: linkSource,
+            target: linkTarget,
+            label: predicate,
+            linkType: "property_relation",
+            threadType,
+            evidenceIndex: index,
+            direction:
+              threadType === "incoming_relations" ? "incoming" : "outgoing",
+            hasArrow:
+              threadType === "outgoing_relations" ||
+              threadType === "incoming_relations", // outgoing/incoming은 화살표 표시
+          });
         }
-
-        links.push({
-          source: linkSource,
-          target: linkTarget,
-          label: predicate,
-          linkType: "property_relation",
-          threadType,
-          evidenceIndex: index,
-          direction:
-            threadType === "incoming_relations" ? "incoming" : "outgoing",
-        });
       }
     });
 
@@ -416,13 +663,44 @@ const EvidencePathView = ({ evidences = [] }) => {
     }
 
     if (node.type === "entity") {
-      // 초기 키워드에서 추출된 엔티티 (확장이 아닌 경우)
-      if (node.evidence && !node.evidence.isFromExpansion) {
-        return "#FEF3C7"; // 연한 노란 - 범례의 초기 키워드 색상
+      // BFS 수렴 노드: 진한 회색 (탐색된 노드)
+      if (node.isConvergence) {
+        return "#D1D5DB"; // 진한 회색 (탐색된 노드)
       }
-      // LLM 확장 키워드에서 온 엔티티
-      if (node.evidence && node.evidence.isFromExpansion) {
-        return "#F59E0B"; // 진한 노란 - 범례의 확장된 키워드 색상
+      // 탐색한 노드: 진한 회색
+      if (node.evidence && node.evidence.isExplored) {
+        return "#D1D5DB"; // 진한 회색
+      }
+      // 노드 출처에 따른 색상 구분
+      if (node.evidence) {
+        // 지식 확장된 키워드 (Semantic Expander): 연한 파란색 (범례와 일치)
+        if (
+          node.evidence.isSemanticExpansion ||
+          node.evidence.keywordSource === "semantic_expansion"
+        ) {
+          return "#7DD3FC"; // 연한 파란색 (지식 확장) - 범례와 일치
+        }
+        // LLM 확장 키워드: 진한 노란색
+        if (
+          node.evidence.isLLMExpansion ||
+          node.evidence.keywordSource === "llm_expansion"
+        ) {
+          return "#F59E0B"; // 진한 노란색
+        }
+        // 초기 키워드: 연한 노란색
+        if (
+          node.evidence.isInitialKeyword ||
+          node.evidence.keywordSource === "initial_keyword"
+        ) {
+          return "#FEF3C7"; // 연한 노란색
+        }
+        // 기존 로직 (하위 호환성)
+        if (!node.evidence.isFromExpansion) {
+          return "#FEF3C7"; // 연한 노란색
+        }
+        if (node.evidence.isFromExpansion) {
+          return "#F59E0B"; // 진한 노란색
+        }
       }
       // 기본: 연한 노란
       return "#FEF3C7";
@@ -1003,7 +1281,9 @@ const EvidencePathView = ({ evidences = [] }) => {
                       ctx.font = `${fontSize}px Sans-Serif`;
                       ctx.textAlign = "center";
                       ctx.textBaseline = "middle";
-                      ctx.fillStyle = getNodeColor(node);
+                      // 노드 색상 가져오기 (범례와 일치)
+                      const nodeColor = getNodeColor(node);
+                      ctx.fillStyle = nodeColor;
 
                       // 노드 원 그리기
                       if (node.x !== undefined && node.y !== undefined) {
@@ -1019,14 +1299,12 @@ const EvidencePathView = ({ evidences = [] }) => {
 
                         // 키워드 노드 특별 표시
                         if (node.type === "keyword") {
-                          // 키워드 노드는 테두리 추가
-                          ctx.strokeStyle = node.isInitial
-                            ? "#F59E0B"
-                            : "#7DD3FC";
+                          // 초기 키워드와 확장 키워드 모두 주황색 테두리
+                          ctx.strokeStyle = "#F59E0B"; // 주황색 테두리
                           ctx.lineWidth = 2;
                           ctx.stroke();
 
-                          // 초기 키워드는 작은 별표 추가
+                          // 초기 키워드는 작은 별표 추가 (유지)
                           if (node.isInitial) {
                             ctx.fillStyle = "#F59E0B";
                             ctx.font = `bold ${fontSize * 0.8}px Sans-Serif`;
@@ -1036,7 +1314,12 @@ const EvidencePathView = ({ evidences = [] }) => {
                         // 엔티티 노드 특별 표시
                         else if (node.type === "entity") {
                           // 지식 확장된 엔티티인 경우 표시 (작은 사각형)
-                          if (node.evidence && node.evidence.isExpanded) {
+                          if (
+                            node.evidence &&
+                            (node.evidence.isSemanticExpansion ||
+                              node.evidence.keywordSource ===
+                                "semantic_expansion")
+                          ) {
                             ctx.fillStyle = "#7DD3FC";
                             ctx.fillRect(
                               node.x + getNodeSize(node) - 3,
@@ -1079,6 +1362,8 @@ const EvidencePathView = ({ evidences = [] }) => {
                       return "#F59E0B"; // 키워드 확장: 진한 노란색
                     } else if (link.linkType === "entity_extraction") {
                       return "#D1D5DB"; // 키워드 추출: 연한 회색
+                    } else if (link.linkType === "bfs_path") {
+                      return "#9CA3AF"; // BFS 경로: 중간 회색
                     } else {
                       return "#F3F4F6"; // 속성/관계: 더 연한 회색
                     }
@@ -1088,15 +1373,30 @@ const EvidencePathView = ({ evidences = [] }) => {
                       return 2; // 키워드 확장 링크는 두껍게
                     } else if (link.linkType === "entity_extraction") {
                       return 2; // 키워드 추출 링크도 두껍게
+                    } else if (link.linkType === "bfs_path") {
+                      return 2; // BFS 경로는 두껍게
                     } else {
                       return 1; // 속성/관계 링크는 기본
                     }
                   }}
                   linkDirectionalArrowLength={(link) => {
-                    // 속성/관계는 화살표 없음
-                    if (link.linkType === "property_relation") {
-                      return 0;
+                    // 수렴 노드(BFS 경로): 화살표 필수
+                    if (link.linkType === "bfs_path") {
+                      return 6;
                     }
+                    // outgoing/incoming 관계: 화살표 필수
+                    if (
+                      link.linkType === "property_relation" &&
+                      (link.threadType === "outgoing_relations" ||
+                        link.threadType === "incoming_relations")
+                    ) {
+                      return 6;
+                    }
+                    // 속성/관계: hasArrow가 false면 화살표 없음, true면 화살표 표시
+                    if (link.linkType === "property_relation") {
+                      return link.hasArrow ? 6 : 0;
+                    }
+                    // 키워드 확장, 추출은 화살표 표시
                     return 6;
                   }}
                   linkDirectionalArrowRelPos={1}
@@ -1105,6 +1405,8 @@ const EvidencePathView = ({ evidences = [] }) => {
                       return "#F59E0B";
                     } else if (link.linkType === "entity_extraction") {
                       return "#D1D5DB";
+                    } else if (link.linkType === "bfs_path") {
+                      return "#9CA3AF"; // BFS 경로 화살표 색상
                     } else {
                       return "#F3F4F6";
                     }
@@ -1437,8 +1739,8 @@ const EvidencePathView = ({ evidences = [] }) => {
                       }}
                     >
                       {hoveredNode.evidence.isExpanded
-                        ? "<strong>🔗 지식 확장된 키워드</strong>"
-                        : "<strong>📌 초기 추출 키워드</strong>"}
+                        ? "🔗 지식 확장된 키워드"
+                        : "📌 초기 추출 키워드"}
                     </div>
 
                     {hoveredNode.evidence.matchedKeyword && (

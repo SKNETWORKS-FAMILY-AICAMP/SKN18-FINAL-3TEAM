@@ -578,7 +578,13 @@ def entity_expander_node(state: GraphState) -> GraphState:
     
     # TTL 정확 매칭
     ttl_matched = 0
+    # 초기 키워드와 확장 키워드 구분
+    initial_keywords_set = set(basic_keywords)
+    
     for keyword in all_keywords:
+        # 키워드 출처 확인: 초기 키워드인지 LLM 확장 키워드인지
+        is_from_expansion = keyword not in initial_keywords_set
+        
         # 정확한 라벨 매칭
         if keyword in ttl_data.get("label_to_uri", {}):
             uri = ttl_data["label_to_uri"][keyword]
@@ -590,7 +596,15 @@ def entity_expander_node(state: GraphState) -> GraphState:
                     "name": keyword,
                     "type": entity_type,
                     "match_method": "exact",
-                    "relevance_score": 1.0
+                    "relevance_score": 1.0,
+                    "matched_keyword": keyword,
+                    # 키워드 추적 정보 추가
+                    "keyword_trace": {
+                        "matched_keyword": keyword,
+                        "is_from_expansion": is_from_expansion,
+                        "expansion_method": "none",  # entity_expander 단계에서는 지식 확장 없음
+                        "source": "llm_expansion" if is_from_expansion else "initial_keyword"
+                    }
                 })
                 ttl_matched += 1
         
@@ -601,13 +615,23 @@ def entity_expander_node(state: GraphState) -> GraphState:
                 if keyword in label and uri not in seen_uris:
                     seen_uris.add(uri)
                     entity_type = ttl_data["uri_to_type"].get(uri, "Event")
+                    # 키워드 출처 확인
+                    is_from_expansion = keyword not in initial_keywords_set
+                    
                     matched_entities.append({
                         "uri": uri,
                         "name": label,
                         "type": entity_type,
                         "match_method": "partial",
                         "relevance_score": 0.7,
-                        "matched_keyword": keyword
+                        "matched_keyword": keyword,
+                        # 키워드 추적 정보 추가
+                        "keyword_trace": {
+                            "matched_keyword": keyword,
+                            "is_from_expansion": is_from_expansion,
+                            "expansion_method": "none",
+                            "source": "llm_expansion" if is_from_expansion else "initial_keyword"
+                        }
                     })
                     ttl_matched += 1
                     partial_count += 1
@@ -646,6 +670,15 @@ def entity_expander_node(state: GraphState) -> GraphState:
                 if uri and uri not in seen_uris:
                     seen_uris.add(uri)
                     result["match_method"] = "pgvector"
+                    # 키워드 추적 정보 추가 (pgvector는 확장 키워드에서 주로 나옴)
+                    matched_keyword = result.get("matched_keyword", "")
+                    is_from_expansion = matched_keyword not in initial_keywords_set if matched_keyword else True
+                    result["keyword_trace"] = {
+                        "matched_keyword": matched_keyword,
+                        "is_from_expansion": is_from_expansion,
+                        "expansion_method": "none",
+                        "source": "llm_expansion" if is_from_expansion else "initial_keyword"
+                    }
                     matched_entities.append(result)
                     pgvector_added += 1
             

@@ -27,6 +27,47 @@ from backend.langgraph_fuseki.utils.evidence_scoring import calculate_final_evid
 from langchain_openai import ChatOpenAI
 
 
+def extract_meaningful_label(uri_or_label: str) -> str:
+    """
+    URI나 라벨에서 의미있는 이름 추출
+    
+    Args:
+        uri_or_label: URI 또는 라벨 문자열
+        
+    Returns:
+        의미있는 라벨 문자열
+        
+    Examples:
+        >>> extract_meaningful_label("Person_7c2da48e")
+        "Person"
+        >>> extract_meaningful_label("Event_77966007") 
+        "Event"
+        >>> extract_meaningful_label("세종대왕")
+        "세종대왕"
+    """
+    if not uri_or_label:
+        return ""
+    
+    # URI에서 마지막 부분 추출
+    if "#" in uri_or_label:
+        name_part = uri_or_label.split("#")[-1]
+    elif "/" in uri_or_label:
+        name_part = uri_or_label.split("/")[-1]
+    else:
+        name_part = uri_or_label
+    
+    # URI 식별자 패턴 정리 (Type_ID 형태)
+    if "_" in name_part and len(name_part.split("_")) > 1:
+        parts = name_part.split("_")
+        # 첫 번째 부분이 타입이고, 두 번째가 ID인 경우
+        if len(parts[1]) > 6:  # ID가 긴 경우 (해시값 등)
+            return parts[0]  # 타입만 반환
+        else:
+            return name_part  # 전체 반환
+    
+    return name_part
+
+
 def detect_entity_match_type(path_data: dict, query_entities: list, thread_type: str) -> str:
     """
     Entity 매칭 타입만 감지 (부스트 없음)
@@ -335,7 +376,11 @@ def extract_outgoing_relations(bindings: list, base_weight: float, query_entitie
         entity_label = binding.get("entityLabel", {}).get("value", "")
         predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
         obj = binding.get("object", {}).get("value", "")
-        obj_label = binding.get("objectLabel", {}).get("value", "") or obj.split("#")[-1]
+        
+        # ⭐ 라벨 우선, 없으면 URI에서 의미있는 이름 추출
+        obj_label = binding.get("objectLabel", {}).get("value", "")
+        if not obj_label and obj:
+            obj_label = extract_meaningful_label(obj)
 
         # BFS 경로는 predicate 필터링 건너뛰기
         is_bfs_path = binding.get("method", {}).get("value", "") == "bidirectional_bfs"
@@ -410,9 +455,13 @@ def extract_incoming_relations(bindings: list, base_weight: float, query_entitie
 
     for binding in bindings:
         subject = binding.get("subject", {}).get("value", "")
-        subject_label = binding.get("subjectLabel", {}).get("value", "") or subject.split("#")[-1]
         predicate = binding.get("predicate", {}).get("value", "").split("#")[-1]
         entity_label = binding.get("entityLabel", {}).get("value", "")
+        
+        # ⭐ 라벨 우선, 없으면 URI에서 의미있는 이름 추출
+        subject_label = binding.get("subjectLabel", {}).get("value", "")
+        if not subject_label and subject:
+            subject_label = extract_meaningful_label(subject)
 
         # BFS 경로는 predicate 필터링 건너뛰기
         is_bfs_path = binding.get("method", {}).get("value", "") == "bidirectional_bfs"
@@ -534,9 +583,14 @@ def extract_connected_entities(bindings: list, base_weight: float, query_entitie
     allowed_predicates = set(selected_properties) if selected_properties else None
 
     for binding in bindings:
-        entity1 = binding.get("label1", {}).get("value", "")
+        # ⭐ 라벨 우선, 없으면 URI에서 의미있는 이름 추출
+        entity1_raw = binding.get("label1", {}).get("value", "")
+        entity2_raw = binding.get("label2", {}).get("value", "")
+        
+        entity1 = extract_meaningful_label(entity1_raw)
+        entity2 = extract_meaningful_label(entity2_raw)
+        
         predicate = binding.get("predicate", {}).get("value", "").split("#")[-1] if binding.get("predicate") else ""
-        entity2 = binding.get("label2", {}).get("value", "")
         
         # BFS 경로 확인
         is_bfs_path = binding.get("method", {}).get("value", "") == "bidirectional_bfs"
@@ -581,6 +635,7 @@ def extract_connected_entities(bindings: list, base_weight: float, query_entitie
         if is_bfs_path:
             # BFS 경로: path 정보 사용
             path = binding.get("path", {}).get("value", "")
+            predicates_str = binding.get("predicates", {}).get("value", "")  # predicates 정보 추가
             path_length = binding.get("path_length", {}).get("value", "")
             convergence = binding.get("convergence_node", {}).get("value", "")
             
@@ -593,6 +648,7 @@ def extract_connected_entities(bindings: list, base_weight: float, query_entitie
                 "predicate": "",  # BFS 경로는 predicate 없음
                 "predicate_display": "BFS 경로",
                 "path": path,
+                "predicates": predicates_str,  # predicates 정보 추가
                 "path_length": path_length,
                 "convergence_node": convergence,
                 "method": "bidirectional_bfs",
@@ -718,7 +774,7 @@ def select_top_evidences_with_llm(
     
     try:
         llm = ChatOpenAI(
-            model=os.getenv("OPENAI_MODEL"),
+            model="gpt-5-mini",
             temperature=0  # 일관성을 위해 temperature=0
         )
         
@@ -753,7 +809,8 @@ def select_top_evidences_with_llm(
         else:
             # top_k가 None인 경우: LLM이 개수 결정
             count_instruction = f"""**개수 결정**: 질문 유형({query_type})에 따라 권장 개수는 약 {recommended_count}개입니다. 
-질문에 답변하기에 충분한 개수를 스스로 판단하여 선택하세요. 
+질문에 답변하기에 충분한 개수를 스스로 판단하여 선택하세요.
+답변에 사용할 근거들을 충분히 뽑았다면, 제시한 권장 개수를 충족하지 않아도 됩니다. 
 너무 적으면 정보가 부족하고, 너무 많으면 불필요한 정보가 포함될 수 있습니다."""
         
         prompt = f"""당신은 역사 질문에 가장 적합한 근거를 선택하는 전문가입니다.
@@ -764,6 +821,7 @@ def select_top_evidences_with_llm(
 
 ## 후보 근거 목록 (총 {len(candidate_evidences)}개)
 아래 근거들은 점수 기반으로 선별된 상위 {len(candidate_evidences)}개 후보입니다. 질문의 의도와 가장 관련성이 높은 근거를 선택하세요.
+
 
 {evidence_text}
 
@@ -1087,8 +1145,34 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
                 "matched_keyword": keyword_trace_info.get("matched_keyword", ""),
                 "is_from_expansion": keyword_trace_info.get("is_from_expansion", False),
                 "entity_match_type": entity_match_type,
-                "expansion_method": expansion_method
+                "expansion_method": expansion_method,
+                # ⭐ 노드 출처 구분: initial_keyword, llm_expansion, semantic_expansion
+                "keyword_source": keyword_trace_info.get("source", "initial_keyword" if not keyword_trace_info.get("is_from_expansion") else "llm_expansion")
             }
+            
+            # connected_entities 타입의 경우 추가 정보 포함
+            if thread_type == "connected_entities":
+                trace_info["entity1"] = path.get("entity1", "")
+                trace_info["entity2"] = path.get("entity2", "")
+                convergence_node_uri = path.get("convergence_node", "")
+                trace_info["convergence_node"] = convergence_node_uri
+                # 수렴 노드 라벨 추출 (백엔드에서 전달된 라벨 우선 사용)
+                raw_data = path.get("raw_data", {})
+                convergence_node_label = None
+                if isinstance(raw_data, dict):
+                    convergence_node_label = raw_data.get("convergence_node_label", {}).get("value", "")
+                # 백엔드에서 전달된 라벨이 없으면 URI에서 추출 (하위 호환성)
+                if not convergence_node_label:
+                    if convergence_node_uri:
+                        convergence_node_label = extract_meaningful_label(convergence_node_uri)
+                if convergence_node_label:
+                    trace_info["convergence_node_label"] = convergence_node_label
+                trace_info["path"] = path.get("path", "")
+                trace_info["method"] = path.get("method", "")
+                # predicates 정보 추가 (BFS 경로의 predicate 표시용)
+                predicates_value = raw_data.get("predicates", {}).get("value", "") if isinstance(raw_data, dict) else ""
+                if predicates_value:
+                    trace_info["predicates"] = predicates_value
 
             evidence = {
                 "type": thread_type,
