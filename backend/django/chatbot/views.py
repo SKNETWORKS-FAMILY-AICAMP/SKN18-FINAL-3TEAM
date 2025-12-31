@@ -139,7 +139,7 @@ def _handle_question(request, chat_session=None):
     """LangGraph 호출."""
     error = None
     ai_response = ""
-    fallback_answer = "죄송합니다. 답변을 생성하지 못했습니다. 다시 시도해주세요."
+    fallback_answer = "어,어랏? 그게 뭐야아? 그거 조선말 맞아?"
     
     # ========== 재질문 관련 변수 초기화 (수정됨) ==========
     needs_clarification = False
@@ -404,7 +404,7 @@ class ChatQuestionView(APIView):
         if stream_flag:
             error = None
             ai_response = ""
-            fallback_answer = "어,어랏? 그게 뭐야아? 그거 조선말 맞아?"
+            fallback_answer = "죄송합니다. 답변을 생성하지 못했습니다. 다시 시도해주세요."
 
             _hydrate_summary_from_db(request)
             query = (

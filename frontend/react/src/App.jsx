@@ -54,6 +54,16 @@ const App = () => {
         };
       }
 
+      // 챗봇 세션 페이지 (#question/session/123)
+      if (page === "question" && param === "session" && subPage) {
+        return {
+          page: "question",
+          videoId: null,
+          searchQuery: "",
+          sessionId: parseInt(subPage),
+        };
+      }
+
       return {
         page: page || "main",
         videoId: null,
@@ -67,6 +77,7 @@ const App = () => {
   const [currentPage, setCurrentPage] = useState(initial.page);
   const [selectedVideoId, setSelectedVideoId] = useState(initial.videoId);
   const [searchQuery, setSearchQuery] = useState(initial.searchQuery || "");
+  const [initialSessionId, setInitialSessionId] = useState(initial.sessionId || null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -81,6 +92,7 @@ const App = () => {
       setCurrentPage(initial.page);
       setSelectedVideoId(initial.videoId);
       setSearchQuery(initial.searchQuery || "");
+      setInitialSessionId(initial.sessionId || null);
     };
 
     window.addEventListener("hashchange", handleHashChange);
@@ -364,6 +376,7 @@ const App = () => {
                 onNavigate={handleNavigate}
                 user={user}
                 newChatTrigger={newChatTrigger}
+                initialSessionId={initialSessionId}
               />
             </div>
           )}
