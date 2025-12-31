@@ -7,6 +7,7 @@ def get_query_embedding(text: str):
     embed = get_embedding()
     return embed.embed_query(text)
 
+
 def cosine_sim(a, b):
     if not a or not b:
         return 0.0
