@@ -1123,13 +1123,22 @@ def path_evidence_aggregator_node(state: GraphState) -> GraphState:
                          raw_data.get("subjectLabel", {}).get("value", "") or \
                          raw_data.get("label1", {}).get("value", "")
             
-            # extracted_entities에서 해당 엔티티의 키워드 추적 정보 찾기
+            # extracted_entities와 expanded_entities 모두에서 해당 엔티티의 키워드 추적 정보 찾기
             keyword_trace_info = {}
             extracted_entities = state.get("extracted_entities", [])
+            
+            # 1. 먼저 extracted_entities에서 찾기
             for entity in extracted_entities:
                 if entity.get("name") == entity_name:
                     keyword_trace_info = entity.get("keyword_trace", {})
                     break
+            
+            # 2. 없으면 expanded_entities에서 찾기
+            if not keyword_trace_info:
+                for entity in expanded_entities:
+                    if entity.get("name") == entity_name:
+                        keyword_trace_info = entity.get("keyword_trace", {})
+                        break
             
             trace_info = {
                 "source_entity": {
