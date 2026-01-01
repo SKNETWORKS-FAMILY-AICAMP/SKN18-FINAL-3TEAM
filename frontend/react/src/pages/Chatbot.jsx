@@ -299,11 +299,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
     const userMessage = message.trim();
     setMessage("");
 
-    // Thinking 모드 초기화
-    if (isThinkingMode) {
-      setThinkingEvents([]);
-      setIsThinkingComplete(false);
-    }
+    // Thinking 모드는 이벤트를 초기화하지 않음 (재질문 후 이벤트 누적)
 
     setMessages((prev) => [...prev, { type: "user", text: userMessage }]);
 
@@ -550,11 +546,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
 
     setIsSubmitting(true);
 
-    // Thinking 모드 초기화
-    if (isThinkingMode) {
-      setThinkingEvents([]);
-      setIsThinkingComplete(false);
-    }
+    // Thinking 모드는 이벤트를 초기화하지 않음 (재질문 후 이벤트 누적)
 
     // AbortController 생성
     abortControllerRef.current = new AbortController();
