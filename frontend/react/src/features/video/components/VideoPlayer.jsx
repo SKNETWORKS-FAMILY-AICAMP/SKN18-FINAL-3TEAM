@@ -67,7 +67,7 @@ const FullscreenExitIcon = ({ size = 24, color = "#fff" }) => (
   </svg>
 );
 
-const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
+const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4", onPlay }) => {
   const [playing, setPlaying] = useState(false);
   const [played, setPlayed] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -78,6 +78,7 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
   const playerRef = useRef(null);
   const containerRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
+  const hasPlayedRef = useRef(false); // 재생 이벤트 중복 방지
 
   // videoUrl이 변경되면 에러 상태 초기화
   useEffect(() => {
@@ -85,6 +86,7 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
     setPlaying(false); // 재생 중단
     setPlayed(0);
     setDuration(0);
+    hasPlayedRef.current = false; // 재생 플래그 초기화
   }, [videoUrl]);
 
   // playing 상태에 따라 video 재생/일시정지
@@ -97,10 +99,16 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
         console.error("재생 실패:", err);
         setPlaying(false);
       });
+
+      // 최초 재생 시 onPlay 콜백 호출 (한 번만)
+      if (!hasPlayedRef.current && onPlay) {
+        hasPlayedRef.current = true;
+        onPlay();
+      }
     } else {
       video.pause();
     }
-  }, [playing]);
+  }, [playing, onPlay]);
 
   const handlePlayPause = () => {
     // 에러가 있으면 재생하지 않음
