@@ -17,6 +17,7 @@ from langchain_openai import ChatOpenAI
 from backend.langgraph_fuseki.state import GraphState
 from backend.langgraph_fuseki.config import PROPERTY_GROUPS_PATH
 from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
+from backend.langgraph_fuseki.utils.thinking_events import send_thinking_event, get_stage_info
 from backend.langgraph_fuseki.nodes.intent_clarification_templates import (
     generate_expansion_directions,
     generate_clarification_question
@@ -211,18 +212,22 @@ def query_classifier_node(state: GraphState) -> GraphState:
 
     query = state.get("query", "")
     thinking_callback = state.get("thinking_callback")
-    
+    stage_info = get_stage_info("query_classifier")
+
     print(f"\n{'='*70}")
     print(f"[Stage 1] Query Classifier")
     print(f"  질문: {query}")
 
-    # 🎯 Thinking 이벤트: 질문 분석 시작
-    if thinking_callback:
-        thinking_callback("question_analysis_started", {
-            "title": "질문 분석 시작",
-            "query": query,
-            "stage": "Stage 1: Query Classifier"
-        })
+    # Thinking 이벤트: 질문 분석 시작
+    send_thinking_event(
+        callback=thinking_callback,
+        event_type="question_analysis_started",
+        title="질문 분석 시작",
+        stage_number=stage_info["number"],
+        stage_name=stage_info["name"],
+        data={"query": query},
+        is_pre_clarification=True
+    )
 
     # 1. LLM 기반 분류 + 키워드 추출 (동기 병렬 처리)
     print(f"  LLM 쿼리 타입 분류 및 키워드 추출 중 (ThreadPoolExecutor 사용)...")
@@ -258,39 +263,48 @@ def query_classifier_node(state: GraphState) -> GraphState:
     print(f"  LLM 기반 분류: {query_type_initial}")
     print(f"  추출된 키워드: {basic_keywords} ({len(basic_keywords)}개)")
 
-    # 🎯 Thinking 이벤트: 질문 유형 분류 완료
-    if thinking_callback:
-        thinking_callback("question_type_classified", {
-            "title": "질문 유형 분류 완료",
+    # Thinking 이벤트: 질문 유형 분류 완료
+    send_thinking_event(
+        callback=thinking_callback,
+        event_type="question_type_classified",
+        title="질문 유형 분류 완료",
+        stage_number=stage_info["number"],
+        stage_name=stage_info["name"],
+        data={
             "query_type": query_type_initial,
             "classification_method": "LLM 기반"
-        })
+        },
+        is_pre_clarification=True
+    )
 
-    # 🎯 Thinking 이벤트: 키워드 추출 완료
-    if thinking_callback:
-        thinking_callback("keywords_extracted", {
-            "title": "키워드 추출 완료",
+    # Thinking 이벤트: 키워드 추출 완료
+    send_thinking_event(
+        callback=thinking_callback,
+        event_type="keywords_extracted",
+        title="키워드 추출 완료",
+        stage_number=stage_info["number"],
+        stage_name=stage_info["name"],
+        data={
             "keywords": basic_keywords,
             "keyword_count": len(basic_keywords),
             "extraction_method": "kiwipiepy 형태소 분석"
-        })
+        },
+        is_pre_clarification=True
+    )
 
-    # 🎯 Thinking 이벤트: 키워드 추출 완료
-    if thinking_callback:
-        thinking_callback("keywords_extracted", {
-            "title": "키워드 추출 완료",
-            "keywords": basic_keywords,
-            "keyword_count": len(basic_keywords),
-            "extraction_method": "kiwipiepy 형태소 분석"
-        })
-
-    # 🎯 Thinking 이벤트: 확장 방향 생성 시작
-    if thinking_callback:
-        thinking_callback("direction_generation_started", {
-            "title": "확장 방향 생성 시작",
+    # Thinking 이벤트: 확장 방향 생성 시작
+    send_thinking_event(
+        callback=thinking_callback,
+        event_type="direction_generation_started",
+        title="확장 방향 생성 시작",
+        stage_number=stage_info["number"],
+        stage_name=stage_info["name"],
+        data={
             "input_keywords": basic_keywords[:5],
             "query_type": query_type_initial
-        })
+        },
+        is_pre_clarification=True
+    )
 
     # 3. LLM 기반 확장 방향 생성
     strategy, expansion_directions = generate_expansion_directions(
@@ -299,15 +313,21 @@ def query_classifier_node(state: GraphState) -> GraphState:
         keywords=basic_keywords[:5]
     )
 
-    # 🎯 Thinking 이벤트: 확장 방향 생성 완료
-    if thinking_callback:
-        direction_titles = [d.get("title", "") for d in expansion_directions]
-        thinking_callback("direction_generation_completed", {
-            "title": "확장 방향 생성 완료",
+    # Thinking 이벤트: 확장 방향 생성 완료
+    direction_titles = [d.get("title", "") for d in expansion_directions]
+    send_thinking_event(
+        callback=thinking_callback,
+        event_type="direction_generation_completed",
+        title="확장 방향 생성 완료",
+        stage_number=stage_info["number"],
+        stage_name=stage_info["name"],
+        data={
             "direction_count": len(expansion_directions),
             "directions": direction_titles,
             "generation_method": "LLM 기반 동적 생성"
-        })
+        },
+        is_pre_clarification=True
+    )
 
     # 4. 재질문 텍스트 생성
     clarification_question = generate_clarification_question(
@@ -317,13 +337,19 @@ def query_classifier_node(state: GraphState) -> GraphState:
         use_llm=False
     )
 
-    # 🎯 Thinking 이벤트: Stage 1 완료
-    if thinking_callback:
-        thinking_callback("stage1_completed", {
-            "title": "Stage 1 완료 - 사용자 선택 대기",
+    # Thinking 이벤트: Stage 1 완료
+    send_thinking_event(
+        callback=thinking_callback,
+        event_type="stage1_completed",
+        title="Stage 1 완료 - 사용자 선택 대기",
+        stage_number=stage_info["number"],
+        stage_name=stage_info["name"],
+        data={
             "ready_for_user_selection": True,
             "available_directions": len(expansion_directions)
-        })
+        },
+        is_pre_clarification=True
+    )
 
     # 실행 시간 계산
     node_end = time.time()

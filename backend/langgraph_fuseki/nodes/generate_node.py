@@ -477,8 +477,7 @@ def story_generator_node(state: GraphState) -> GraphState:
     
     llm = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL"),
-        temperature=0.7,  # 스토리 생성은 창의성 필요
-        streaming=stream_mode  # 스트리밍 모드 활성화
+        temperature=0.7
     )
 
     print(f"\n{'='*70}")
