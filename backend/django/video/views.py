@@ -209,6 +209,18 @@ async def create_video_from_langgraph(request):
         print(f"[Video Save Error] {e}")
         return JsonResponse({"error": "Failed to save video"}, status=500)
 
+    # ========== 영상 키워드 생성 Task 등록 (Celery) ==========
+    # DB 저장 완료 후 비동기로 키워드 생성
+    from backend.langgraph_recommendation.tasks import generate_video_keywords_task
+
+    try:
+        # Celery Task 등록 (비동기 실행, 즉시 반환)
+        task = generate_video_keywords_task.delay(video.id, title)
+        print(f"✓ 키워드 생성 Task 등록 완료: video_id={video.id}, task_id={task.id}")
+    except Exception as e:
+        # Celery 실패해도 영상 생성은 성공 처리
+        print(f"⚠️ Celery Task 등록 실패 (영상은 정상 저장됨): {e}")
+
     serialized = await sync_to_async(lambda: VideoSerializer(video).data)()
 
     return JsonResponse(
