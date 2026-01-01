@@ -138,25 +138,20 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
     fetchData();
   }, [actualVideoId, isLoggedIn]);
 
-  // 시청 기록 저장 (영상 로드 후 한 번만)
-  useEffect(() => {
-    const saveWatchHistory = async () => {
-      if (!watchHistorySaved.current && isLoggedIn && video && actualVideoId) {
-        try {
-          await createWatchHistory(actualVideoId, 0, video.tags || []);
-          watchHistorySaved.current = true;
-        } catch (error) {
-          // 403 에러는 권한 문제이므로 조용히 처리
-          // 백엔드에서 시청 기록 저장 API가 특정 권한을 요구하거나
-          // 인증 토큰이 만료되었을 수 있음
-          // 에러가 발생해도 watchHistorySaved를 true로 설정하여 재시도 방지
-          watchHistorySaved.current = true;
-        }
+  // 영상 재생 시 시청 기록 저장 (한 번만)
+  const handleVideoPlay = async () => {
+    if (!watchHistorySaved.current && isLoggedIn && video && actualVideoId) {
+      try {
+        await createWatchHistory(actualVideoId, 0, video.tags || []);
+        watchHistorySaved.current = true;
+        console.log("✓ 시청 기록 저장 완료:", actualVideoId);
+      } catch (error) {
+        // 에러 발생해도 재시도 방지
+        watchHistorySaved.current = true;
+        console.warn("⚠️ 시청 기록 저장 실패:", error);
       }
-    };
-
-    saveWatchHistory();
-  }, [video, actualVideoId, isLoggedIn]);
+    }
+  };
 
   const handleLikeClick = async () => {
     if (!isLoggedIn) {
@@ -219,6 +214,7 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
               ? getVideoUrl(video.video_url)
               : "/videos/selected_scene_1_video.mp4"
           }
+          onPlay={handleVideoPlay}
         />
         <VideoInfo
           tags={video?.tags ? video.tags.map((t) => `#${t}`).join(" ") : ""}
