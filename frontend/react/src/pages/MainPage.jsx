@@ -23,7 +23,7 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
           const formattedVideos = response.data.map((video) => ({
             id: video.id,
             title: video.title,
-            tags: video.tags ? video.tags.map((t) => `#${t}`).join(" ") : "",
+            tags: video.tags || [],
             likes_count: video.likes_count,
             comments_count: video.comments_count,
             thumbnail_url: video.thumbnail_url,

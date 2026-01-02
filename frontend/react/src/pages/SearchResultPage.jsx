@@ -32,7 +32,7 @@ const SearchResultPage = ({ query, onVideoClick, isLoggedIn }) => {
         const formattedVideos = response.data.results.map((video) => ({
           id: video.id,
           title: video.title,
-          tags: video.tags ? video.tags.map((t) => `#${t}`).join(" ") : "",
+          tags: video.tags || [],
           likes_count: video.likes_count,
           comments_count: video.comments_count,
           thumbnail_url: video.thumbnail_url,
@@ -75,7 +75,7 @@ const SearchResultPage = ({ query, onVideoClick, isLoggedIn }) => {
       const formattedVideos = response.data.results.map((video) => ({
         id: video.id,
         title: video.title,
-        tags: video.tags ? video.tags.map((t) => `#${t}`).join(" ") : "",
+        tags: video.tags || [],
         likes_count: video.likes_count,
         comments_count: video.comments_count,
         thumbnail_url: video.thumbnail_url,
