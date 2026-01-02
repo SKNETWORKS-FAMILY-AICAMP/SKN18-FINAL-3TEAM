@@ -217,7 +217,7 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
           onPlay={handleVideoPlay}
         />
         <VideoInfo
-          tags={video?.tags ? video.tags.map((t) => `#${t}`).join(" ") : ""}
+          tags={video?.tags || []}
           title={video?.title || "제목 없음"}
           date={formatKoreanDate(video?.upload_date)}
           isLiked={isLiked}

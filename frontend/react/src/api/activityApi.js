@@ -41,3 +41,13 @@ export const createSearchHistory = async (searchQuery) => {
   });
   return response.data;
 };
+
+// ============================================
+// 추천 키워드 API
+// ============================================
+
+// 시청 기록 기반 추천 키워드 조회
+export const getRecommendedKeyword = async () => {
+  const response = await api.get('/api/activity/recommended-keyword/');
+  return response.data;
+};

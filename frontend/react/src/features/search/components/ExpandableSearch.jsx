@@ -4,15 +4,23 @@ import {
   SearchIcon,
   CloseIcon,
   LogoIcon,
+  TagIcon,
 } from "../../../components/common/Icons";
 import {
   getSearchHistory,
   createSearchHistory,
+  getRecommendedKeyword,
 } from "../../../api/activityApi";
-import { getPopularTags, getPopularVideos } from "../../../api/videoApi";
+import { getPopularVideos } from "../../../api/videoApi";
 import { getThumbnailUrl } from "../../../utils/imageUtils";
 
-const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVideoClick }) => {
+const ExpandableSearch = ({
+  isOpen,
+  onClose,
+  isLoggedIn = false,
+  onSearch,
+  onVideoClick,
+}) => {
   const [searchValue, setSearchValue] = useState("");
   const [phase, setPhase] = useState(0); // 0: closed, 1: expanding width, 2: expanding height, 3: content visible
   const [hasBeenOpened, setHasBeenOpened] = useState(false); // 한 번이라도 열렸는지 추적
@@ -23,17 +31,39 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
 
   // API에서 가져온 데이터
   const [searchHistory, setSearchHistory] = useState([]);
-  const [tags, setTags] = useState([]);
+  const [recommendedTags, setRecommendedTags] = useState([]); // 태그 (아이콘으로 표시)
+  const [recommendedKeywords, setRecommendedKeywords] = useState([]); // 키워드 (#으로 표시)
   const [suggestedVideos, setSuggestedVideos] = useState([]);
 
   // API에서 데이터 로드
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 인기 태그 로드
-        const tagsResponse = await getPopularTags();
-        if (tagsResponse?.data) {
-          setTags(tagsResponse.data.map((t) => `# ${t.tag}`));
+        // 로그인한 경우 추천 태그/키워드 로드
+        if (isLoggedIn) {
+          try {
+            const recommendedResponse = await getRecommendedKeyword();
+            if (recommendedResponse?.data) {
+              // 태그는 아이콘으로 표시할 배열
+              setRecommendedTags(recommendedResponse.data.tag || []);
+              // 키워드는 #으로 표시할 배열 (video_keyword + recommend_keyword 합치기)
+              const allKeywords = [
+                ...(recommendedResponse.data.video_keyword || []),
+                ...(recommendedResponse.data.recommend_keyword || []),
+              ];
+              setRecommendedKeywords(allKeywords);
+            }
+          } catch (error) {
+            console.error("추천 키워드 로드 실패:", error);
+            setRecommendedTags([]);
+            setRecommendedKeywords([]);
+          }
+
+          // 검색 기록 로드
+          const historyResponse = await getSearchHistory();
+          if (historyResponse?.data) {
+            setSearchHistory(historyResponse.data.map((h) => h.search_query));
+          }
         }
 
         // 인기 영상 로드
@@ -43,18 +73,10 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
             videosResponse.data.map((v) => ({
               id: v.id,
               title: v.title,
-              tags: v.tags ? v.tags.map((t) => `#${t}`).join(" ") : "",
+              tags: v.tags || [],
               thumbnail_url: v.thumbnail_url || null,
             }))
           );
-        }
-
-        // 로그인한 경우 검색 기록 로드
-        if (isLoggedIn) {
-          const historyResponse = await getSearchHistory();
-          if (historyResponse?.data) {
-            setSearchHistory(historyResponse.data.map((h) => h.search_query));
-          }
         }
       } catch (error) {
         console.error("검색 데이터 로드 실패:", error);
@@ -77,10 +99,7 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
         await createSearchHistory(searchQuery);
         // 검색 기록 업데이트 (최대 10개)
         setSearchHistory((prev) =>
-          [
-            searchQuery,
-            ...prev.filter((h) => h !== searchQuery),
-          ].slice(0, 10)
+          [searchQuery, ...prev.filter((h) => h !== searchQuery)].slice(0, 10)
         );
       }
       // 검색 페이지로 이동
@@ -161,7 +180,9 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
         }
 
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: ${isScrolling ? 'rgba(0, 0, 0, 0.2)' : 'transparent'};
+          background-color: ${
+            isScrolling ? "rgba(0, 0, 0, 0.2)" : "transparent"
+          };
           border-radius: 3px;
           transition: background-color 0.3s ease;
         }
@@ -172,7 +193,9 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
 
         .custom-scrollbar {
           scrollbar-width: thin;
-          scrollbar-color: ${isScrolling ? 'rgba(0, 0, 0, 0.2)' : 'transparent'} transparent;
+          scrollbar-color: ${
+            isScrolling ? "rgba(0, 0, 0, 0.2)" : "transparent"
+          } transparent;
         }
       `}</style>
       <div
@@ -186,232 +209,349 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
           pointerEvents: phase >= 1 ? "auto" : "none",
         }}
       >
-      {/* 어두운 배경 오버레이 */}
-      <div
-        onClick={handleClose}
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          opacity: phase >= 1 ? 1 : 0,
-          transition: "opacity 0.3s ease",
-        }}
-      />
+        {/* 어두운 배경 오버레이 */}
+        <div
+          onClick={handleClose}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            opacity: phase >= 1 ? 1 : 0,
+            transition: "opacity 0.3s ease",
+          }}
+        />
 
-      {/* 검색 패널 컨테이너 */}
-      <div
-        style={{
-          position: "absolute",
-          top: "50px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: phase >= 1 ? "calc(100% - 48px)" : "600px",
-          maxWidth: "1400px",
-          transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        }}
-      >
-        {/* 검색창 + 드롭다운 패널 */}
+        {/* 검색 패널 컨테이너 */}
         <div
           style={{
-            backgroundColor: COLORS.white,
-            borderRadius: "16px",
-            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-            overflow: "hidden",
-            maxHeight: phase >= 2 ? "520px" : "56px",
-            transition: "max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+            position: "absolute",
+            top: "50px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: phase >= 1 ? "calc(100% - 48px)" : "600px",
+            maxWidth: "1400px",
+            transition: "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
           }}
         >
-          {/* 상단 검색바 */}
+          {/* 검색창 + 드롭다운 패널 */}
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              padding: "0 24px",
-              height: "56px",
-              borderBottom: phase >= 2 ? "1px solid #eee" : "none",
+              backgroundColor: COLORS.white,
+              borderRadius: "16px",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+              overflow: "hidden",
+              maxHeight: phase >= 2 ? "520px" : "56px",
+              transition: "max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
             }}
           >
-            <span
+            {/* 상단 검색바 */}
+            <div
               style={{
-                fontSize: "15px",
-                fontWeight: "600",
-                color: COLORS.dark,
-                marginRight: "16px",
-                whiteSpace: "nowrap",
-              }}
-            >
-              검색
-            </span>
-
-            <SearchIcon color="#999" />
-
-            <input
-              ref={inputRef}
-              type="text"
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              placeholder="검색어를 입력하세요"
-              style={{
-                flex: 1,
-                border: "none",
-                outline: "none",
-                fontSize: "15px",
-                backgroundColor: "transparent",
-                color: COLORS.dark,
-                marginLeft: "12px",
-              }}
-            />
-
-            <button
-              onClick={() => setSearchValue("")}
-              style={{
-                background: "none",
-                border: "none",
-                fontSize: "13px",
-                color: COLORS.gray,
-                cursor: "pointer",
-                padding: "8px 12px",
-                whiteSpace: "nowrap",
-              }}
-            >
-              초기화
-            </button>
-
-            <button
-              onClick={handleClose}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: "8px",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                marginLeft: "8px",
+                padding: "0 24px",
+                height: "56px",
+                borderBottom: phase >= 2 ? "1px solid #eee" : "none",
               }}
             >
-              <CloseIcon size={20} color="#666" />
-            </button>
-          </div>
-
-          {/* 드롭다운 콘텐츠 영역 */}
-          <div
-            style={{
-              display: "flex",
-              padding: "28px 32px",
-              gap: "48px",
-              opacity: phase >= 3 ? 1 : 0,
-              transform: phase >= 3 ? "translateY(0)" : "translateY(-10px)",
-              transition: "all 0.3s ease 0.1s",
-            }}
-          >
-            {/* 좌측: 검색 기록 & 태그 (로그인한 경우만 표시) */}
-            {isLoggedIn && (
-              <div
+              <span
                 style={{
-                  flex: "0 0 320px",
+                  fontSize: "15px",
+                  fontWeight: "600",
+                  color: COLORS.dark,
+                  marginRight: "16px",
+                  whiteSpace: "nowrap",
                 }}
               >
-                {/* 검색 기록 */}
-                <div style={{ marginBottom: "28px" }}>
-                  <h3
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: "700",
-                      color: COLORS.dark,
-                      marginBottom: "16px",
-                    }}
-                  >
-                    검색 기록
-                  </h3>
+                검색
+              </span>
 
-                  <div
-                    onScroll={handleScroll}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      maxHeight: "135px",
-                      overflowY: "auto",
-                      paddingRight: "8px",
-                    }}
-                    className="custom-scrollbar"
-                  >
-                    {searchHistory.length === 0 ? (
-                      <p style={{ fontSize: "13px", color: COLORS.gray }}>
-                        검색 기록이 없습니다.
-                      </p>
-                    ) : (
-                      searchHistory.map((item, idx) => (
-                        <div
-                          key={idx}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "10px 0",
-                            borderBottom: "1px solid #f0f0f0",
-                            opacity: phase >= 3 ? 1 : 0,
-                            transform:
-                              phase >= 3
-                                ? "translateX(0)"
-                                : "translateX(-15px)",
-                            transition: `all 0.3s ease ${0.15 + idx * 0.05}s`,
-                          }}
-                        >
-                          <span
+              <SearchIcon color="#999" />
+
+              <input
+                ref={inputRef}
+                type="text"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                placeholder="검색어를 입력하세요"
+                style={{
+                  flex: 1,
+                  border: "none",
+                  outline: "none",
+                  fontSize: "15px",
+                  backgroundColor: "transparent",
+                  color: COLORS.dark,
+                  marginLeft: "12px",
+                }}
+              />
+
+              <button
+                onClick={() => setSearchValue("")}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "13px",
+                  color: COLORS.gray,
+                  cursor: "pointer",
+                  padding: "8px 12px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                초기화
+              </button>
+
+              <button
+                onClick={handleClose}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginLeft: "8px",
+                }}
+              >
+                <CloseIcon size={20} color="#666" />
+              </button>
+            </div>
+
+            {/* 드롭다운 콘텐츠 영역 */}
+            <div
+              style={{
+                display: "flex",
+                padding: "28px 32px",
+                gap: "48px",
+                opacity: phase >= 3 ? 1 : 0,
+                transform: phase >= 3 ? "translateY(0)" : "translateY(-10px)",
+                transition: "all 0.3s ease 0.1s",
+              }}
+            >
+              {/* 좌측: 검색 기록 & 태그 (로그인한 경우만 표시) */}
+              {isLoggedIn && (
+                <div
+                  style={{
+                    flex: "0 0 320px",
+                  }}
+                >
+                  {/* 검색 기록 */}
+                  <div style={{ marginBottom: "28px" }}>
+                    <h3
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: "700",
+                        color: COLORS.dark,
+                        marginBottom: "16px",
+                      }}
+                    >
+                      검색 기록
+                    </h3>
+
+                    <div
+                      onScroll={handleScroll}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        maxHeight: "135px",
+                        overflowY: "auto",
+                        paddingRight: "8px",
+                      }}
+                      className="custom-scrollbar"
+                    >
+                      {searchHistory.length === 0 ? (
+                        <p style={{ fontSize: "13px", color: COLORS.gray }}>
+                          검색 기록이 없습니다.
+                        </p>
+                      ) : (
+                        searchHistory.map((item, idx) => (
+                          <div
+                            key={idx}
                             style={{
-                              fontSize: "13px",
-                              color: COLORS.gray,
-                              cursor: "pointer",
-                              flex: 1,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "10px 0",
+                              borderBottom: "1px solid #f0f0f0",
+                              opacity: phase >= 3 ? 1 : 0,
+                              transform:
+                                phase >= 3
+                                  ? "translateX(0)"
+                                  : "translateX(-15px)",
+                              transition: `all 0.3s ease ${0.15 + idx * 0.05}s`,
                             }}
-                            onClick={() => {
-                              setSearchValue(item);
-                              if (onSearch) {
-                                onSearch(item);
+                          >
+                            <span
+                              style={{
+                                fontSize: "13px",
+                                color: COLORS.gray,
+                                cursor: "pointer",
+                                flex: 1,
+                              }}
+                              onClick={() => {
+                                setSearchValue(item);
+                                if (onSearch) {
+                                  onSearch(item);
+                                }
+                                setSearchValue("");
+                                onClose();
+                              }}
+                            >
+                              {item}
+                            </span>
+                            <button
+                              style={{
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                padding: "2px",
+                                opacity: 0.4,
+                                transition: "opacity 0.2s",
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSearchHistory((prev) =>
+                                  prev.filter((h) => h !== item)
+                                );
+                              }}
+                              onMouseEnter={(e) =>
+                                (e.currentTarget.style.opacity = 1)
                               }
-                              setSearchValue("");
-                              onClose();
-                            }}
-                          >
-                            {item}
-                          </span>
-                          <button
-                            style={{
-                              background: "none",
-                              border: "none",
-                              cursor: "pointer",
-                              padding: "2px",
-                              opacity: 0.4,
-                              transition: "opacity 0.2s",
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSearchHistory((prev) =>
-                                prev.filter((h) => h !== item)
-                              );
-                            }}
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.opacity = 1)
-                            }
-                            onMouseLeave={(e) =>
-                              (e.currentTarget.style.opacity = 0.4)
-                            }
-                          >
-                            <CloseIcon size={12} color="#999" />
-                          </button>
-                        </div>
-                      ))
-                    )}
+                              onMouseLeave={(e) =>
+                                (e.currentTarget.style.opacity = 0.4)
+                              }
+                            >
+                              <CloseIcon size={12} color="#999" />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 추천 태그 */}
+                  <div>
+                    <h3
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: "700",
+                        color: COLORS.dark,
+                        marginBottom: "16px",
+                      }}
+                    >
+                      추천 태그
+                    </h3>
+
+                    <div
+                      style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}
+                    >
+                      {recommendedTags.length === 0 &&
+                      recommendedKeywords.length === 0 ? (
+                        <p style={{ fontSize: "13px", color: COLORS.gray }}>
+                          추천 태그가 없습니다.
+                        </p>
+                      ) : (
+                        <>
+                          {/* 태그 (아이콘 옆에 텍스트) */}
+                          {recommendedTags.map((tag, idx) => (
+                            <button
+                              key={`tag-${idx}`}
+                              onClick={() => {
+                                setSearchValue(tag);
+                                if (onSearch) {
+                                  onSearch(tag);
+                                }
+                                onClose();
+                              }}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                padding: "8px 16px",
+                                backgroundColor: "transparent",
+                                border: `1.5px solid ${COLORS.tag}`,
+                                borderRadius: "20px",
+                                color: COLORS.tag,
+                                fontSize: "12px",
+                                fontWeight: "500",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                opacity: phase >= 3 ? 1 : 0,
+                                transform:
+                                  phase >= 3
+                                    ? "translateY(0)"
+                                    : "translateY(8px)",
+                                transitionDelay: `${0.2 + idx * 0.025}s`,
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = COLORS.sky;
+                                e.target.style.color = COLORS.dark;
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = "transparent";
+                                e.target.style.color = COLORS.tag;
+                              }}
+                            >
+                              <TagIcon size={14} color="currentColor" />
+                              <span>{tag}</span>
+                            </button>
+                          ))}
+                          {/* 키워드 (#으로 표시) */}
+                          {recommendedKeywords.map((keyword, idx) => (
+                            <button
+                              key={`keyword-${idx}`}
+                              onClick={() => {
+                                setSearchValue(keyword);
+                                if (onSearch) {
+                                  onSearch(keyword);
+                                }
+                                onClose();
+                              }}
+                              style={{
+                                padding: "8px 16px",
+                                backgroundColor: "transparent",
+                                border: `1.5px solid ${COLORS.tag}`,
+                                borderRadius: "20px",
+                                color: COLORS.tag,
+                                fontSize: "12px",
+                                fontWeight: "500",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                opacity: phase >= 3 ? 1 : 0,
+                                transform:
+                                  phase >= 3
+                                    ? "translateY(0)"
+                                    : "translateY(8px)",
+                                transitionDelay: `${
+                                  0.2 + (recommendedTags.length + idx) * 0.025
+                                }s`,
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = COLORS.sky;
+                                e.target.style.color = COLORS.dark;
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = "transparent";
+                                e.target.style.color = COLORS.tag;
+                              }}
+                            >
+                              #{keyword}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
+              )}
 
-                {/* 인기 태그 */}
-                <div>
+              {/* 우측: 추천 영상 (로그인한 경우만 표시) */}
+              {isLoggedIn && (
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <h3
                     style={{
                       fontSize: "14px",
@@ -420,195 +560,149 @@ const ExpandableSearch = ({ isOpen, onClose, isLoggedIn = false, onSearch, onVid
                       marginBottom: "16px",
                     }}
                   >
-                    인기 태그
+                    {searchValue ? `"${searchValue}" 관련 영상` : "추천 영상"}
                   </h3>
 
                   <div
-                    style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}
+                    style={{
+                      display: "flex",
+                      gap: "16px",
+                      overflowX: "auto",
+                      paddingBottom: "8px",
+                    }}
                   >
-                    {tags.length === 0 ? (
+                    {suggestedVideos.length === 0 ? (
                       <p style={{ fontSize: "13px", color: COLORS.gray }}>
-                        태그가 없습니다.
+                        추천 영상이 없습니다.
                       </p>
                     ) : (
-                      tags.map((tag, idx) => (
-                        <button
-                          key={idx}
+                      suggestedVideos.map((video, idx) => (
+                        <div
+                          key={video.id}
                           onClick={() => {
-                            const tagValue = tag.replace("# ", "");
-                            setSearchValue(tagValue);
-                            if (onSearch) {
-                              onSearch(tagValue);
+                            if (onVideoClick) {
+                              onVideoClick(video);
                             }
                             onClose();
                           }}
                           style={{
-                            padding: "8px 16px",
-                            backgroundColor: "transparent",
-                            border: `1.5px solid ${COLORS.tag}`,
-                            borderRadius: "20px",
-                            color: COLORS.tag,
-                            fontSize: "12px",
-                            fontWeight: "500",
+                            minWidth: "140px",
                             cursor: "pointer",
-                            transition: "all 0.2s ease",
                             opacity: phase >= 3 ? 1 : 0,
                             transform:
-                              phase >= 3 ? "translateY(0)" : "translateY(8px)",
-                            transitionDelay: `${0.2 + idx * 0.025}s`,
-                          }}
-                          onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = COLORS.sky;
-                            e.target.style.color = COLORS.dark;
-                          }}
-                          onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = "transparent";
-                            e.target.style.color = COLORS.tag;
+                              phase >= 3 ? "translateY(0)" : "translateY(15px)",
+                            transition: `all 0.3s ease ${0.2 + idx * 0.04}s`,
                           }}
                         >
-                          {tag}
-                        </button>
+                          <div
+                            style={{
+                              width: "140px",
+                              height: "180px",
+                              borderRadius: "8px",
+                              marginBottom: "10px",
+                              overflow: "hidden",
+                              transition:
+                                "transform 0.25s ease, box-shadow 0.25s ease",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              ...(video.thumbnail_url
+                                ? {
+                                    backgroundImage: `url(${getThumbnailUrl(
+                                      video.thumbnail_url
+                                    )})`,
+                                    backgroundSize: "cover",
+                                    backgroundPosition: "center",
+                                  }
+                                : {
+                                    background: `linear-gradient(135deg, hsl(${
+                                      idx * 25 + 200
+                                    }, 15%, 92%) 0%, hsl(${
+                                      idx * 25 + 220
+                                    }, 20%, 88%) 100%)`,
+                                  }),
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = "scale(1.04)";
+                              e.currentTarget.style.boxShadow =
+                                "0 8px 20px rgba(0,0,0,0.12)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = "scale(1)";
+                              e.currentTarget.style.boxShadow = "none";
+                            }}
+                          >
+                            {!video.thumbnail_url && (
+                              <svg
+                                width="32"
+                                height="32"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                              >
+                                <polygon points="5,3 19,12 5,21" fill="#ccc" />
+                              </svg>
+                            )}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "13px",
+                              fontWeight: "600",
+                              color: COLORS.dark,
+                              marginBottom: "3px",
+                              lineHeight: "1.3",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {video.title}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "11px",
+                              color: COLORS.gray,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            {video.tags && video.tags.length > 0
+                              ? video.tags.map((tag, tagIdx) => (
+                                  <span
+                                    key={tagIdx}
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "3px",
+                                    }}
+                                  >
+                                    <TagIcon size={10} color={COLORS.gray} />
+                                    <span>{tag}</span>
+                                  </span>
+                                ))
+                              : null}
+                          </div>
+                        </div>
                       ))
                     )}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* 우측: 추천 영상 (로그인한 경우만 표시) */}
-            {isLoggedIn && (
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h3
-                  style={{
-                    fontSize: "14px",
-                    fontWeight: "700",
-                    color: COLORS.dark,
-                    marginBottom: "16px",
-                  }}
-                >
-                  {searchValue ? `"${searchValue}" 관련 영상` : "추천 영상"}
-                </h3>
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "16px",
-                    overflowX: "auto",
-                    paddingBottom: "8px",
-                  }}
-                >
-                  {suggestedVideos.length === 0 ? (
-                    <p style={{ fontSize: "13px", color: COLORS.gray }}>
-                      추천 영상이 없습니다.
-                    </p>
-                  ) : (
-                    suggestedVideos.map((video, idx) => (
-                      <div
-                        key={video.id}
-                        onClick={() => {
-                          if (onVideoClick) {
-                            onVideoClick(video);
-                          }
-                          onClose();
-                        }}
-                        style={{
-                          minWidth: "140px",
-                          cursor: "pointer",
-                          opacity: phase >= 3 ? 1 : 0,
-                          transform:
-                            phase >= 3 ? "translateY(0)" : "translateY(15px)",
-                          transition: `all 0.3s ease ${0.2 + idx * 0.04}s`,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "140px",
-                            height: "180px",
-                            borderRadius: "8px",
-                            marginBottom: "10px",
-                            overflow: "hidden",
-                            transition:
-                              "transform 0.25s ease, box-shadow 0.25s ease",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            ...(video.thumbnail_url
-                              ? {
-                                  backgroundImage: `url(${getThumbnailUrl(video.thumbnail_url)})`,
-                                  backgroundSize: "cover",
-                                  backgroundPosition: "center",
-                                }
-                              : {
-                                  background: `linear-gradient(135deg, hsl(${
-                                    idx * 25 + 200
-                                  }, 15%, 92%) 0%, hsl(${
-                                    idx * 25 + 220
-                                  }, 20%, 88%) 100%)`,
-                                }),
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = "scale(1.04)";
-                            e.currentTarget.style.boxShadow =
-                              "0 8px 20px rgba(0,0,0,0.12)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = "scale(1)";
-                            e.currentTarget.style.boxShadow = "none";
-                          }}
-                        >
-                          {!video.thumbnail_url && (
-                            <svg
-                              width="32"
-                              height="32"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                            >
-                              <polygon points="5,3 19,12 5,21" fill="#ccc" />
-                            </svg>
-                          )}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "13px",
-                            fontWeight: "600",
-                            color: COLORS.dark,
-                            marginBottom: "3px",
-                            lineHeight: "1.3",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {video.title}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "11px",
-                            color: COLORS.gray,
-                          }}
-                        >
-                          {video.tags}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 하단 로고 */}
-          <div
-            style={{
-              padding: "0 32px 20px",
-              opacity: phase >= 3 ? 0.5 : 0,
-              transition: "opacity 0.3s ease 0.3s",
-            }}
-          >
-            <LogoIcon />
+            {/* 하단 로고 */}
+            <div
+              style={{
+                padding: "0 32px 20px",
+                opacity: phase >= 3 ? 0.5 : 0,
+                transition: "opacity 0.3s ease 0.3s",
+              }}
+            >
+              <LogoIcon />
+            </div>
           </div>
         </div>
-      </div>
       </div>
     </>
   );

@@ -47,19 +47,15 @@ def generate_video_keywords_task(self, video_id: int, video_title: str):
         print(f"  video_keywords: {video_keywords}")
         print(f"  recommend_keywords: {recommend_keywords}")
 
-        # 2. DB 업데이트
-        # ⚠️ TODO: DB 컬럼명이 확정되면 아래 필드명 수정 필요
-        # 현재 가정: video_keywords, recommend_keywords 컬럼 추가 예정
+        # 2. DB 업데이트 (컬럼명 확정: video_keyword, recommend_keyword)
         from backend.django.video.models import Video
 
         Video.objects.filter(id=video_id).update(
-            # ⚠️ 주의: 아래 컬럼명은 DB 테이블에 컬럼 추가 후 수정 필요!
-            # video_keywords=video_keywords,
-            # recommend_keywords=recommend_keywords
+            video_keyword=video_keywords,
+            recommend_keyword=recommend_keywords
         )
 
-        print(f"[Celery Task] DB 업데이트 완료 (video_id={video_id})")
-        print(f"⚠️ 주의: DB 컬럼 추가 후 tasks.py의 Video.objects.filter().update() 주석 해제 필요!\n")
+        print(f"[Celery Task] DB 업데이트 완료 (video_id={video_id})\n")
 
         return {
             "status": "success",
@@ -82,9 +78,8 @@ def generate_video_keywords_task(self, video_id: int, video_title: str):
             from backend.django.video.models import Video
 
             Video.objects.filter(id=video_id).update(
-                # ⚠️ 주의: 아래 컬럼명은 DB 테이블에 컬럼 추가 후 수정 필요!
-                # video_keywords="",
-                # recommend_keywords=""
+                video_keyword="",
+                recommend_keyword=""
             )
 
             return {
