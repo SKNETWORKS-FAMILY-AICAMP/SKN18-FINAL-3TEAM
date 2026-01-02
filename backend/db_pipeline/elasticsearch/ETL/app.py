@@ -1,8 +1,8 @@
 import time
 import json
 
-from db.db_connetion import create_connection
-from db.vector_store import create_vectorstore
+from backend.db_pipeline.elasticsearch.services.db_connetion import create_connection
+from backend.db_pipeline.elasticsearch.services.vector_store import create_vectorstore
 from backend.db_pipeline.common.embedding_model import get_embedding
 
 INDEX_NAME = "rag_embeddings"  # 인덱스 이름 한 곳에서 관리

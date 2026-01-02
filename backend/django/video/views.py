@@ -1,7 +1,11 @@
 import json
 import os
+from pydoc import text
 import time
 import glob
+from deep_translator import GoogleTranslator
+
+# Django 임포트
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -172,14 +176,20 @@ async def create_video_from_langgraph(request):
         print(f"[LangGraph Error] {e}")
         return JsonResponse({"error": "Failed to generate video script"}, status=500)
 
+    # 무조건 scene에서 뽑고 영어를 한국어로 번역
     script_json = result_state.get("scene_script") or {}
     title = (
-        script_json.get("title_ko")
-        or script_json.get("title")
+        script_json.get("title")
         or (description[:50] or "Untitled Video")
     )
-    if title and not any("가" <= ch <= "힣" for ch in title):
-        title = description[:50] or title
+
+    # 번역 로직 추가
+    if title:
+        try:
+            title = GoogleTranslator(source="en", target="ko").translate(title)
+        except Exception as e:
+            print(f"[WARN] 번역 실패, 원문 사용: {e}")
+
     tags = result_state.get("video_tags") or []
     
     if isinstance(tags, str):
@@ -196,7 +206,8 @@ async def create_video_from_langgraph(request):
 
     payload = {
         "title": title,
-        "video_url": video_url,
+        # 임시 하드코딩 URL
+        "video_url": "https://skn18-3-dev-temp.s3.amazonaws.com/background_scene_1_video.mp4",
         "tags": tags,
         "thumbnail_url": thumbnail_url,
     }
