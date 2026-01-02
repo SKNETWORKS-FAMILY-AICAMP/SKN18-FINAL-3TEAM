@@ -86,16 +86,17 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
         // 비디오 정보 로드
         try {
           const videoResponse = await getVideo(actualVideoId);
-          if (videoResponse?.data) {
-            const processedUrl = videoResponse.data.video_url
-              ? getVideoUrl(videoResponse.data.video_url)
+          const videoData = videoResponse?.data ?? videoResponse;
+          if (videoData) {
+            const processedUrl = videoData.video_url
+              ? getVideoUrl(videoData.video_url)
               : "/videos/selected_scene_1_video.mp4";
-            setVideo(videoResponse.data);
-            setLikesCount(videoResponse.data.likes_count || 0);
+            setVideo(videoData);
+            setLikesCount(videoData.likes_count || 0);
 
             // 백엔드에서 받은 좋아요 상태 설정
             if (isLoggedIn) {
-              setIsLiked(videoResponse.data.is_liked || false);
+              setIsLiked(videoData.is_liked || false);
             }
           } else {
             console.warn("비디오 데이터가 없습니다.");
