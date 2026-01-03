@@ -46,10 +46,10 @@ const ExpandableSearch = ({
             if (recommendedResponse?.data) {
               // 태그는 아이콘으로 표시할 배열
               setRecommendedTags(recommendedResponse.data.tag || []);
-              // 키워드는 #으로 표시할 배열 (video_keyword + recommend_keyword 합치기)
+              // 키워드는 #으로 표시할 배열 (video_keyword + recommended_keyword 합치기)
               const allKeywords = [
                 ...(recommendedResponse.data.video_keyword || []),
-                ...(recommendedResponse.data.recommend_keyword || []),
+                ...(recommendedResponse.data.recommended_keyword || []),
               ];
               setRecommendedKeywords(allKeywords);
             }

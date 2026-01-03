@@ -438,7 +438,7 @@ JSON 형식으로만 응답:
         return list(valid_candidates)[:3]
 
 
-def recommend_keyword_node(state: RecommendationState) -> RecommendationState:
+def recommended_keyword_node(state: RecommendationState) -> RecommendationState:
     """
     Stage 2: 추천 키워드 생성
 
@@ -463,9 +463,9 @@ def recommend_keyword_node(state: RecommendationState) -> RecommendationState:
         print(f"  ⚠️ basic_keywords가 비어있어 추천 생성 불가")
         return {
             **state,
-            "recommend_keywords": "",
+            "recommended_keywords": "",
             "errors": state.get("errors", []) + ["basic_keywords 없음"],
-            "executed_nodes": state.get("executed_nodes", []) + ["recommend_keyword_generation"]
+            "executed_nodes": state.get("executed_nodes", []) + ["recommended_keyword_generation"]
         }
 
     # 1. 의도파악
@@ -490,9 +490,9 @@ def recommend_keyword_node(state: RecommendationState) -> RecommendationState:
             **state,
             "intent": intent,
             "expanded_keywords": expanded_keywords,
-            "recommend_keywords": "",
+            "recommended_keywords": "",
             "errors": state.get("errors", []) + ["TTL 엔티티 없음"],
-            "executed_nodes": state.get("executed_nodes", []) + ["recommend_keyword_generation"]
+            "executed_nodes": state.get("executed_nodes", []) + ["recommended_keyword_generation"]
         }
 
     # 4. Thread 병렬 실행
@@ -520,7 +520,7 @@ def recommend_keyword_node(state: RecommendationState) -> RecommendationState:
     print(f"    검증된 추천: {verified_recommendations}")
 
     # 7. 콤마 구분 문자열로 변환
-    recommend_keywords_str = ",".join(verified_recommendations) if verified_recommendations else ""
+    recommended_keywords_str = ",".join(verified_recommendations) if verified_recommendations else ""
 
     return {
         **state,
@@ -529,6 +529,6 @@ def recommend_keyword_node(state: RecommendationState) -> RecommendationState:
         "extracted_entities": extracted_entities,
         "thread_results": thread_results,
         "final_recommendations": verified_recommendations,  # 검증된 것만 저장
-        "recommend_keywords": recommend_keywords_str,
-        "executed_nodes": state.get("executed_nodes", []) + ["recommend_keyword_generation"]
+        "recommended_keywords": recommended_keywords_str,
+        "executed_nodes": state.get("executed_nodes", []) + ["recommended_keyword_generation"]
     }

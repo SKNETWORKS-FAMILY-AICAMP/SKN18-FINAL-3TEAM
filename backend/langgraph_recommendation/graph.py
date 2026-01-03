@@ -4,18 +4,18 @@ LangGraph Recommendation - Graph Definition
 영상 키워드 및 추천 키워드 생성 그래프
 
 Flow:
-    START → video_keyword_extraction → recommend_keyword_generation → END
+    START → video_keyword_extraction → recommended_keyword_generation → END
 
 특징:
 - 단순한 순차 실행 (사용자 상호작용 없음)
 - Celery 백그라운드 Task로 실행
-- 결과: video_keywords, recommend_keywords (콤마 구분 문자열)
+- 결과: video_keywords, recommended_keywords (콤마 구분 문자열)
 """
 
 from langgraph.graph import StateGraph, END
 from backend.langgraph_recommendation.state import RecommendationState
 from backend.langgraph_recommendation.nodes.video_keyword_node import video_keyword_node
-from backend.langgraph_recommendation.nodes.recommend_keyword_node import recommend_keyword_node
+from backend.langgraph_recommendation.nodes.recommended_keyword_node import recommended_keyword_node
 
 
 def create_recommendation_graph():
@@ -29,12 +29,12 @@ def create_recommendation_graph():
 
     # 노드 등록
     workflow.add_node("video_keyword_extraction", video_keyword_node)
-    workflow.add_node("recommend_keyword_generation", recommend_keyword_node)
+    workflow.add_node("recommended_keyword_generation", recommended_keyword_node)
 
     # 플로우 정의
     workflow.set_entry_point("video_keyword_extraction")
-    workflow.add_edge("video_keyword_extraction", "recommend_keyword_generation")
-    workflow.add_edge("recommend_keyword_generation", END)
+    workflow.add_edge("video_keyword_extraction", "recommended_keyword_generation")
+    workflow.add_edge("recommended_keyword_generation", END)
 
     return workflow.compile()
 
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     print("결과:")
     print("="*70)
     print(f"video_keywords: {result.get('video_keywords')}")
-    print(f"recommend_keywords: {result.get('recommend_keywords')}")
+    print(f"recommended_keywords: {result.get('recommended_keywords')}")
     print(f"실행된 노드: {result.get('executed_nodes')}")
 
     if result.get('errors'):
