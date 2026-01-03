@@ -137,7 +137,7 @@ def get_recommended_keyword(request):
         "data": {
             "tag": ["tag1", "tag2", "tag3"],
             "video_keyword": ["keyword1", "keyword2", "keyword3"],
-            "recommend_keyword": ["rec1", "rec2", ..., "rec8"]
+            "recommended_keyword": ["rec1", "rec2", ..., "rec8"]
         },
         "message": "ok"
     }
@@ -145,7 +145,7 @@ def get_recommended_keyword(request):
     Logic:
     - tag: 최근 시청 기록에서 2-3개
     - video_keyword: 최근 시청 영상별 1개씩, 최대 3개
-    - recommend_keyword: 최근 시청 영상에서 8개
+    - recommended_keyword: 최근 시청 영상에서 8개
     """
     user = request.user
 
@@ -159,7 +159,7 @@ def get_recommended_keyword(request):
             'data': {
                 'tag': [],
                 'video_keyword': [],
-                'recommend_keyword': []
+                'recommended_keyword': []
             },
             'message': '시청 기록이 없습니다.'
         })
@@ -189,25 +189,25 @@ def get_recommended_keyword(request):
             if len(video_keyword_list) >= 3:
                 break
 
-    # 3. recommend_keyword 수집 (최대 8개)
-    recommend_keyword_list = []
+    # 3. recommended_keyword 수집 (최대 8개)
+    recommended_keyword_list = []
     for watch in recent_watches:
-        if watch.video and hasattr(watch.video, 'recommend_keyword') and watch.video.recommend_keyword:
+        if watch.video and hasattr(watch.video, 'recommended_keyword') and watch.video.recommended_keyword:
             # 쉼표로 구분된 문자열 파싱
-            keyword = [k.strip() for k in watch.video.recommend_keyword.split(',') if k.strip()]
+            keyword = [k.strip() for k in watch.video.recommended_keyword.split(',') if k.strip()]
             for kw in keyword:
-                if kw not in recommend_keyword_list:
-                    recommend_keyword_list.append(kw)
-                if len(recommend_keyword_list) >= 8:
+                if kw not in recommended_keyword_list:
+                    recommended_keyword_list.append(kw)
+                if len(recommended_keyword_list) >= 8:
                     break
-            if len(recommend_keyword_list) >= 8:
+            if len(recommended_keyword_list) >= 8:
                 break
 
     return Response({
         'data': {
             'tag': unique_tag[:3],
             'video_keyword': video_keyword_list[:3],
-            'recommend_keyword': recommend_keyword_list[:8]
+            'recommended_keyword': recommended_keyword_list[:8]
         },
         'message': 'ok'
     })

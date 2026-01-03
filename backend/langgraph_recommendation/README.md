@@ -9,8 +9,9 @@
 프론트엔드에서 영상 생성 → DB 저장 → Celery로 비동기 키워드 생성 → DB 업데이트
 
 **출력:**
+
 - `video_keywords`: "경복궁,태조,창덕궁"
-- `recommend_keywords`: "이성계,정도전,한양"
+- `recommended_keywords`: "이성계,정도전,한양"
 
 ---
 
@@ -25,7 +26,7 @@ backend/langgraph_recommendation/
 ├── tasks.py                    # Celery Task
 └── nodes/
     ├── video_keyword_node.py   # Stage 1: Kiwi + TTL 매칭
-    └── recommend_keyword_node.py # Stage 2: 의도파악 + Thread 병렬
+    └── recommended_keyword_node.py # Stage 2: 의도파악 + Thread 병렬
 ```
 
 ---
@@ -33,11 +34,13 @@ backend/langgraph_recommendation/
 ## 작동 방식
 
 ### Stage 1: video_keyword 추출
+
 1. Kiwi 형태소 분석 → 명사 추출
 2. TTL 데이터 매칭
 3. 결과: "키워드1,키워드2"
 
-### Stage 2: recommend_keyword 추출
+### Stage 2: recommended_keyword 추출
+
 1. LLM 의도파악 (자동)
 2. LLM 키워드 확장
 3. TTL 엔티티 추출
@@ -52,16 +55,18 @@ backend/langgraph_recommendation/
 ### 1. DB 컬럼 추가 (필수)
 
 `infra/init.sql` 수정:
+
 ```sql
 ALTER TABLE video
 ADD COLUMN video_keywords TEXT DEFAULT '',
-ADD COLUMN recommend_keywords TEXT DEFAULT '';
+ADD COLUMN recommended_keywords TEXT DEFAULT '';
 ```
 
 `backend/django/video/models.py` 수정:
+
 ```python
 video_keywords = models.TextField(blank=True, default='')
-recommend_keywords = models.TextField(blank=True, default='')
+recommended_keywords = models.TextField(blank=True, default='')
 ```
 
 ### 2. tasks.py 주석 해제 (필수)
@@ -79,12 +84,14 @@ celery -A backend.django.config worker --loglevel=info
 ## 테스트
 
 ### 로컬 테스트
+
 ```bash
 cd backend/langgraph_recommendation
 python graph.py
 ```
 
 ### 프론트엔드 통합
+
 영상 생성 → Django 콘솔에서 "✓ 키워드 생성 Task 등록 완료" 확인 → DB 확인
 
 ---

@@ -22,7 +22,7 @@ def generate_video_keywords_task(self, video_id: int, video_title: str):
             "status": "success" | "error",
             "video_id": int,
             "video_keywords": str,  # "키워드1,키워드2"
-            "recommend_keywords": str  # "추천1,추천2,추천3"
+            "recommended_keywords": str  # "추천1,추천2,추천3"
         }
 
     에러 처리:
@@ -41,18 +41,18 @@ def generate_video_keywords_task(self, video_id: int, video_title: str):
         result = graph.invoke({"video_title": video_title})
 
         video_keywords = result.get('video_keywords', '')
-        recommend_keywords = result.get('recommend_keywords', '')
+        recommended_keywords = result.get('recommended_keywords', '')
 
         print(f"\n[Celery Task] 랭그래프 실행 완료")
         print(f"  video_keywords: {video_keywords}")
-        print(f"  recommend_keywords: {recommend_keywords}")
+        print(f"  recommended_keywords: {recommended_keywords}")
 
-        # 2. DB 업데이트 (컬럼명 확정: video_keyword, recommend_keyword)
+        # 2. DB 업데이트 (컬럼명 확정: video_keyword, recommended_keyword)
         from video.models import Video
 
         Video.objects.filter(id=video_id).update(
             video_keyword=video_keywords,
-            recommend_keyword=recommend_keywords
+            recommended_keyword=recommended_keywords
         )
 
         print(f"[Celery Task] DB 업데이트 완료 (video_id={video_id})\n")
@@ -61,7 +61,7 @@ def generate_video_keywords_task(self, video_id: int, video_title: str):
             "status": "success",
             "video_id": video_id,
             "video_keywords": video_keywords,
-            "recommend_keywords": recommend_keywords
+            "recommended_keywords": recommended_keywords
         }
 
     except Exception as exc:
@@ -79,13 +79,13 @@ def generate_video_keywords_task(self, video_id: int, video_title: str):
 
             Video.objects.filter(id=video_id).update(
                 video_keyword="",
-                recommend_keyword=""
+                recommended_keyword=""
             )
 
             return {
                 "status": "error",
                 "video_id": video_id,
                 "video_keywords": "",
-                "recommend_keywords": "",
+                "recommended_keywords": "",
                 "error": str(exc)
             }

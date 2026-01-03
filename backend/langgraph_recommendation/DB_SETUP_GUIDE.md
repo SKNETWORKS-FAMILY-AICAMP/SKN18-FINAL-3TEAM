@@ -12,7 +12,7 @@
 -- video 테이블에 컬럼 추가
 ALTER TABLE video
 ADD COLUMN video_keywords TEXT DEFAULT '',
-ADD COLUMN recommend_keywords TEXT DEFAULT '';
+ADD COLUMN recommended_keywords TEXT DEFAULT '';
 
 -- 또는 CREATE TABLE 시점에 포함:
 CREATE TABLE IF NOT EXISTS video (
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS video (
 
     -- 🆕 추가할 컬럼
     video_keywords TEXT DEFAULT '',          -- 영상 제목에서 추출한 키워드 (콤마 구분)
-    recommend_keywords TEXT DEFAULT ''       -- 추천 키워드 (콤마 구분)
+    recommended_keywords TEXT DEFAULT ''       -- 추천 키워드 (콤마 구분)
 );
 ```
 
@@ -48,7 +48,7 @@ class Video(models.Model):
         verbose_name='영상 키워드',
         help_text='영상 제목에서 추출한 키워드 (콤마 구분)'
     )
-    recommend_keywords = models.TextField(
+    recommended_keywords = models.TextField(
         blank=True,
         default='',
         verbose_name='추천 키워드',
@@ -67,7 +67,7 @@ class Video(models.Model):
 ```python
 Video.objects.filter(id=video_id).update(
     video_keywords=video_keywords,              # ⬅️ 주석 해제
-    recommend_keywords=recommend_keywords       # ⬅️ 주석 해제
+    recommended_keywords=recommended_keywords       # ⬅️ 주석 해제
 )
 ```
 
@@ -76,7 +76,7 @@ Video.objects.filter(id=video_id).update(
 ```python
 Video.objects.filter(id=video_id).update(
     video_keywords="",              # ⬅️ 주석 해제
-    recommend_keywords=""           # ⬅️ 주석 해제
+    recommended_keywords=""           # ⬅️ 주석 해제
 )
 ```
 
@@ -135,6 +135,7 @@ python graph.py
 ```
 
 예상 출력:
+
 ```
 [Stage 1] Video Keyword Extraction
   영상 제목: '경복궁을 지은 왕'
@@ -147,7 +148,7 @@ python graph.py
 
 결과:
 video_keywords: 경복궁,왕
-recommend_keywords: 태조,창덕궁,세종
+recommended_keywords: 태조,창덕궁,세종
 ```
 
 ### 프론트엔드 통합 테스트
@@ -158,18 +159,20 @@ recommend_keywords: 태조,창덕궁,세종
    ✓ 키워드 생성 Task 등록 완료: video_id=123, task_id=abc-def-ghi
    ```
 3. Celery Worker 콘솔에서 실행 로그 확인
-4. DB에서 `video_keywords`, `recommend_keywords` 컬럼 확인
+4. DB에서 `video_keywords`, `recommended_keywords` 컬럼 확인
 
 ---
 
 ## 7. 데이터 형식
 
 ### video_keywords
+
 ```
 "경복궁,태조,창덕궁"
 ```
 
-### recommend_keywords
+### recommended_keywords
+
 ```
 "이성계,정도전,한양"
 ```
@@ -182,15 +185,15 @@ const video = {
   id: 123,
   title: "경복궁을 지은 왕",
   video_keywords: "경복궁,태조,창덕궁",
-  recommend_keywords: "이성계,정도전,한양"
+  recommended_keywords: "이성계,정도전,한양",
 };
 
 // 추천 키워드를 배열로 변환
-const recommendTags = video.recommend_keywords.split(',');
+const recommendTags = video.recommended_keywords.split(",");
 // ["이성계", "정도전", "한양"]
 
 // 검색창 드롭다운에 표시
-recommendTags.forEach(tag => {
+recommendTags.forEach((tag) => {
   // 실제 DB에 해당 태그를 가진 영상이 있는지 확인 후 표시
 });
 ```
@@ -202,11 +205,13 @@ recommendTags.forEach(tag => {
 ### Celery Task가 실행되지 않음
 
 1. Redis 실행 확인:
+
    ```bash
    redis-cli ping  # PONG 응답 확인
    ```
 
 2. Celery Worker 실행 확인:
+
    ```bash
    ps aux | grep celery
    ```
@@ -230,7 +235,7 @@ recommendTags.forEach(tag => {
 
 ## 컬럼명 변경 시 수정 필요 파일
 
-만약 컬럼명을 `video_keywords` / `recommend_keywords`가 아닌 다른 이름으로 정하면:
+만약 컬럼명을 `video_keywords` / `recommended_keywords`가 아닌 다른 이름으로 정하면:
 
 1. `backend/langgraph_recommendation/tasks.py` (2곳)
 2. `backend/django/video/models.py`

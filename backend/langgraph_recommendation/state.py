@@ -18,7 +18,7 @@ class RecommendationState(TypedDict):
     video_keywords: NotRequired[str]  # TTL 매칭된 키워드 (콤마 구분 문자열)
     # 예: "경복궁,태조,창덕궁"
 
-    # ========== Stage 2: recommend_keyword 추출 ==========
+    # ========== Stage 2: recommended_keyword 추출 ==========
     intent: NotRequired[str]  # LLM이 파악한 의도
     expanded_keywords: NotRequired[List[str]]  # LLM이 확장한 키워드
     extracted_entities: NotRequired[List[Dict[str, Any]]]  # TTL에서 추출한 엔티티
@@ -33,7 +33,7 @@ class RecommendationState(TypedDict):
     # }
 
     final_recommendations: NotRequired[List[str]]  # 최종 추천 엔티티 리스트
-    recommend_keywords: NotRequired[str]  # 추천 키워드 (콤마 구분 문자열)
+    recommended_keywords: NotRequired[str]  # 추천 키워드 (콤마 구분 문자열)
     # 예: "이순신,임진왜란,선조"
 
     # ========== 메타 정보 ==========
