@@ -4,7 +4,7 @@ import VideoInfo from "../features/video/components/VideoInfo";
 import CommentSection from "../features/video/components/CommentSection";
 import { getVideo } from "../api/videoApi";
 import { getVideoComments, likeVideo, unlikeVideo } from "../api/communityApi";
-import { createWatchHistory } from "../api/activityApi";
+import { createWatchHistory, getWatchHistoryForVideo } from "../api/activityApi";
 import { getVideoUrl } from "../utils/imageUtils";
 
 const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
@@ -16,7 +16,10 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const watchHistorySaved = useRef(false);
+  const watchHistoryStarted = useRef(false);
+  const lastSavedSeconds = useRef(0);
+  const currentSeconds = useRef(0);
+  const [resumeSeconds, setResumeSeconds] = useState(0);
 
   // 한국 날짜 형식 포맷팅 함수 (YYYY. MM. DD.)
   const formatKoreanDate = (dateString) => {
@@ -68,7 +71,10 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        watchHistorySaved.current = false;
+        watchHistoryStarted.current = false;
+        lastSavedSeconds.current = 0;
+        currentSeconds.current = 0;
+        setResumeSeconds(0);
 
         // videoId가 없으면 조기 종료
         if (!actualVideoId) {
@@ -80,16 +86,17 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
         // 비디오 정보 로드
         try {
           const videoResponse = await getVideo(actualVideoId);
-          if (videoResponse?.data) {
-            const processedUrl = videoResponse.data.video_url
-              ? getVideoUrl(videoResponse.data.video_url)
+          const videoData = videoResponse?.data ?? videoResponse;
+          if (videoData) {
+            const processedUrl = videoData.video_url
+              ? getVideoUrl(videoData.video_url)
               : "/videos/selected_scene_1_video.mp4";
-            setVideo(videoResponse.data);
-            setLikesCount(videoResponse.data.likes_count || 0);
+            setVideo(videoData);
+            setLikesCount(videoData.likes_count || 0);
 
             // 백엔드에서 받은 좋아요 상태 설정
             if (isLoggedIn) {
-              setIsLiked(videoResponse.data.is_liked || false);
+              setIsLiked(videoData.is_liked || false);
             }
           } else {
             console.warn("비디오 데이터가 없습니다.");
@@ -127,6 +134,19 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
             setComments([]);
           }
         }
+
+        // 시청 위치 로드 (로그인한 경우만)
+        if (isLoggedIn) {
+          try {
+            const watchResponse = await getWatchHistoryForVideo(actualVideoId);
+            const watchedSeconds = watchResponse?.data?.watched_seconds || 0;
+            setResumeSeconds(watchedSeconds);
+            currentSeconds.current = watchedSeconds;
+            lastSavedSeconds.current = watchedSeconds;
+          } catch (error) {
+            setResumeSeconds(0);
+          }
+        }
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
         // 에러 발생 시에도 로딩 상태 해제
@@ -138,25 +158,53 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
     fetchData();
   }, [actualVideoId, isLoggedIn]);
 
-  // 시청 기록 저장 (영상 로드 후 한 번만)
-  useEffect(() => {
-    const saveWatchHistory = async () => {
-      if (!watchHistorySaved.current && isLoggedIn && video && actualVideoId) {
-        try {
-          await createWatchHistory(actualVideoId, 0, video.tags || []);
-          watchHistorySaved.current = true;
-        } catch (error) {
-          // 403 에러는 권한 문제이므로 조용히 처리
-          // 백엔드에서 시청 기록 저장 API가 특정 권한을 요구하거나
-          // 인증 토큰이 만료되었을 수 있음
-          // 에러가 발생해도 watchHistorySaved를 true로 설정하여 재시도 방지
-          watchHistorySaved.current = true;
-        }
-      }
-    };
+  const saveWatchProgress = async (seconds) => {
+    if (!isLoggedIn || !video || !actualVideoId) {
+      return;
+    }
+    if (seconds <= 0) {
+      return;
+    }
+    try {
+      await createWatchHistory(actualVideoId, seconds, video.tags || []);
+    } catch (error) {
+      // 403 에러는 권한 문제이므로 조용히 처리
+      // 백엔드에서 시청 기록 저장 API가 특정 권한을 요구하거나
+      // 인증 토큰이 만료되었을 수 있음
+    }
+  };
 
-    saveWatchHistory();
-  }, [video, actualVideoId, isLoggedIn]);
+  const handlePlayStart = async () => {
+    if (!isLoggedIn || !video || !actualVideoId) {
+      return;
+    }
+    watchHistoryStarted.current = true;
+    const seconds = Math.floor(currentSeconds.current);
+    if (seconds > lastSavedSeconds.current) {
+      lastSavedSeconds.current = seconds;
+      await saveWatchProgress(seconds);
+    }
+  };
+
+  const handleTimeUpdate = (seconds) => {
+    currentSeconds.current = seconds;
+  };
+
+  const handlePause = async () => {
+    if (!watchHistoryStarted.current) {
+      return;
+    }
+    const seconds = Math.floor(currentSeconds.current);
+    if (seconds <= lastSavedSeconds.current) {
+      return;
+    }
+    lastSavedSeconds.current = seconds;
+    await saveWatchProgress(seconds);
+  };
+
+  const handleEnded = async () => {
+    await handlePause();
+  };
 
   const handleLikeClick = async () => {
     if (!isLoggedIn) {
@@ -214,6 +262,11 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
     >
       <div style={{ flex: 1 }}>
         <VideoPlayer
+          initialTime={resumeSeconds}
+          onPlayStart={handlePlayStart}
+          onTimeUpdate={handleTimeUpdate}
+          onPause={handlePause}
+          onEnded={handleEnded}
           videoUrl={
             video?.video_url
               ? getVideoUrl(video.video_url)
