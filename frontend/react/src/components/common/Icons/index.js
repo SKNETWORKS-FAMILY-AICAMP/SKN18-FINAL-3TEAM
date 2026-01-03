@@ -16,3 +16,4 @@ export { default as ThinkingIcon } from './ThinkingIcon';
 export { default as MenuIcon } from './MenuIcon';
 export { default as TrashIcon } from './TrashIcon';
 export { default as TagIcon } from './TagIcon';
+export { default as CheckIcon } from './CheckIcon';

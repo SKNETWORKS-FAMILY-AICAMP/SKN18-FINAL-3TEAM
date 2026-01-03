@@ -135,3 +135,14 @@ export const getMyActivity = async () => {
   const response = await api.get("/api/community/me/activities/");
   return response.data;
 };
+
+
+// ============================================
+// Celery Task 상태 확인 API
+// ============================================
+
+// Celery task 상태 확인
+export const checkTaskStatus = async (taskId) => {
+  const response = await api.get(`/api/community/tasks/${taskId}/status/`);
+  return response.data;
+};

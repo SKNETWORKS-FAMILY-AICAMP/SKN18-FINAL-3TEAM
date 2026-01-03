@@ -4,6 +4,7 @@ import { SendIcon } from "../components/common/Icons";
 import { createVideo } from "../api/videoApi";
 import VideoPlayer from "../features/video/components/VideoPlayer";
 import { getVideoUrl } from "../utils/imageUtils";
+import { useBackgroundTask } from "../contexts/BackgroundTaskContext";
 
 const VideoCreatePage = ({ onNavigate, user }) => {
   const [message, setMessage] = useState("");
@@ -12,6 +13,7 @@ const VideoCreatePage = ({ onNavigate, user }) => {
   const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef(null);
   const containerRef = useRef(null);
+  const { registerTask } = useBackgroundTask();
 
   const nickname =
     user?.nickname ||
@@ -67,22 +69,49 @@ const VideoCreatePage = ({ onNavigate, user }) => {
       }, 50);
     });
 
-    try {
-      const response = await createVideo(userMessage);
+    // 백그라운드 작업으로 등록
+    const videoCreationPromise = createVideo(userMessage)
+      .then((response) => {
+        // API 응답에서 video_url을 받아서 처리
+        if (response.video_url) {
+          // video_url이 있으면 영상만 표시 (메시지 없음)
+          setMessages((prev) => [
+            ...prev,
+            {
+              type: "assistant",
+              video_url: response.video_url,
+            },
+          ]);
+          return { success: true, video_url: response.video_url };
+        } else {
+          // video_url이 없으면 에러 메시지 표시
+          let errorMessage = "영상 생성에 실패했습니다. 다시 시도해주세요.";
+          setMessages((prev) => [
+            ...prev,
+            {
+              type: "assistant",
+              error: errorMessage,
+            },
+          ]);
+          throw new Error(errorMessage);
+        }
+      })
+      .catch((error) => {
+        console.error("영상 생성 실패:", error);
 
-      // API 응답에서 video_url을 받아서 처리
-      if (response.video_url) {
-        // video_url이 있으면 영상만 표시 (메시지 없음)
-        setMessages((prev) => [
-          ...prev,
-          {
-            type: "assistant",
-            video_url: response.video_url,
-          },
-        ]);
-      } else {
-        // video_url이 없으면 에러 메시지 표시
-        let errorMessage = "영상 생성에 실패했습니다. 다시 시도해주세요.";
+        let errorMessage = "죄송합니다. 오류가 발생했습니다. 다시 시도해주세요.";
+
+        if (error.response?.status === 404) {
+          errorMessage =
+            "영상 만들기 API가 아직 구현되지 않았습니다. 백엔드 개발자에게 문의해주세요.";
+        } else if (error.response?.status === 500) {
+          errorMessage = "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+        } else if (error.response?.data?.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
         setMessages((prev) => [
           ...prev,
           {
@@ -90,34 +119,18 @@ const VideoCreatePage = ({ onNavigate, user }) => {
             error: errorMessage,
           },
         ]);
-      }
-    } catch (error) {
-      console.error("영상 생성 실패:", error);
 
-      let errorMessage = "죄송합니다. 오류가 발생했습니다. 다시 시도해주세요.";
+        throw error;
+      })
+      .finally(() => {
+        setTimeout(() => {
+          setIsSubmitting(false);
+          setIsLoading(false);
+        }, 300);
+      });
 
-      if (error.response?.status === 404) {
-        errorMessage =
-          "영상 만들기 API가 아직 구현되지 않았습니다. 백엔드 개발자에게 문의해주세요.";
-      } else if (error.response?.status === 500) {
-        errorMessage = "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
-      } else if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          type: "assistant",
-          error: errorMessage,
-        },
-      ]);
-    }
-
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsLoading(false);
-    }, 300);
+    // 백그라운드 작업으로 등록
+    registerTask("영상 생성", videoCreationPromise);
   };
 
   const handleKeyDown = (e) => {

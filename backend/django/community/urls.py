@@ -10,6 +10,7 @@ from .views import (
     CommentLikeView,
     ReplyLikeView,
     UserActivityView,
+    check_task_status,
 )
 
 # community 앱 URL 패턴
@@ -60,4 +61,10 @@ urlpatterns = [
     # ============================================
     # GET /api/community/me/activities/ - 내 커뮤니티 활동 내역
     path('me/activities/', UserActivityView.as_view(), name='user-activities'),
+
+    # ============================================
+    # Celery Task 상태 확인 API
+    # ============================================
+    # GET /api/community/tasks/<task_id>/status/ - Celery task 상태 확인
+    path('tasks/<str:task_id>/status/', check_task_status, name='task-status'),
 ]
