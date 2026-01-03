@@ -488,7 +488,7 @@ class ChatQuestionView(APIView):
                         app = create_ontology_graph()
                     else:
                         logger.info("[chat][stream] Using standard LangGraph")
-                        app = create_ontology_graph()
+                        app = create_graph_flow()
 
                     # LangGraph 호출 시 사용자 선택 포함
                     invoke_params = {
