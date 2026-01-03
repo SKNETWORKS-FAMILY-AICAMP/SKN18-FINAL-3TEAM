@@ -74,7 +74,11 @@ class WatchingHistoryListCreateView(ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return WatchingHistory.objects.filter(user=self.request.user).select_related('video').order_by('-created_at')
+        queryset = WatchingHistory.objects.filter(user=self.request.user).select_related('video').order_by('-created_at')
+        video_id = self.request.query_params.get('video_id')
+        if video_id:
+            return queryset.filter(video_id=video_id)
+        return queryset
 
     def get_serializer_class(self):
         # GET: 조회용 Serializer, POST: 생성용 Serializer
@@ -83,6 +87,15 @@ class WatchingHistoryListCreateView(ListCreateAPIView):
         return WatchingHistorySerializer
 
     def list(self, request, *args, **kwargs):
+        video_id = request.query_params.get('video_id')
+        if video_id:
+            record = self.get_queryset().order_by('-created_at').first()
+            data = WatchingHistorySerializer(record).data if record else None
+            return Response({
+                'data': data,
+                'message': 'ok'
+            })
+
         response = super().list(request, *args, **kwargs)
         return Response({
             'data': response.data,
