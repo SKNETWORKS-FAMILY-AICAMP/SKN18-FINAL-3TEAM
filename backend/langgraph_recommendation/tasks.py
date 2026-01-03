@@ -48,7 +48,7 @@ def generate_video_keywords_task(self, video_id: int, video_title: str):
         print(f"  recommend_keywords: {recommend_keywords}")
 
         # 2. DB 업데이트 (컬럼명 확정: video_keyword, recommend_keyword)
-        from backend.django.video.models import Video
+        from video.models import Video
 
         Video.objects.filter(id=video_id).update(
             video_keyword=video_keywords,
@@ -75,7 +75,7 @@ def generate_video_keywords_task(self, video_id: int, video_title: str):
         else:
             # 최종 실패 시 빈 문자열로 DB 업데이트
             print(f"  최종 실패, 빈 문자열로 DB 업데이트")
-            from backend.django.video.models import Video
+            from video.models import Video
 
             Video.objects.filter(id=video_id).update(
                 video_keyword="",
