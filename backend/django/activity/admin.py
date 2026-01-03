@@ -50,7 +50,8 @@ class WatchingHistoryAdmin(AdminPermissionMixin, admin.ModelAdmin):
     def display_tags(self, obj):
         """태그를 콤마로 구분해서 표시"""
         if obj.tags:
-            return ', '.join(obj.tags[:3])  # 처음 3개만 표시
+            tags = [t.strip() for t in obj.tags.split(',') if t.strip()]
+            return ', '.join(tags[:3])  # 처음 3개만 표시
         return '-'
     display_tags.short_description = '태그'
 
