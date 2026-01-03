@@ -9,13 +9,14 @@ from backend.langgraph_recommendation.graph import create_recommendation_graph
 
 
 @shared_task(bind=True, max_retries=3)
-def generate_video_keywords_task(self, video_id: int, video_title: str):
+def generate_video_keywords_task(self, video_id: int, video_title: str, user_query: str = ""):
     """
     영상 키워드 + 추천 키워드 생성 Celery Task
 
     Args:
         video_id: 영상 ID
         video_title: 영상 제목
+        user_query: 사용자 쿼리 (예: "대동법이 시행된 배경은?")
 
     Returns:
         {
@@ -32,13 +33,17 @@ def generate_video_keywords_task(self, video_id: int, video_title: str):
     print(f"\n{'='*70}")
     print(f"[Celery Task] 영상 키워드 생성 시작")
     print(f"  video_id: {video_id}")
+    print(f"  user_query: {user_query}")
     print(f"  video_title: {video_title}")
     print(f"{'='*70}\n")
 
     try:
         # 1. 랭그래프 실행
         graph = create_recommendation_graph()
-        result = graph.invoke({"video_title": video_title})
+        result = graph.invoke({
+            "user_query": user_query,
+            "video_title": video_title
+        })
 
         video_keywords = result.get('video_keywords', '')
         recommended_keywords = result.get('recommended_keywords', '')

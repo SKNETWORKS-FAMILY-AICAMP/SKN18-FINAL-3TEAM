@@ -30,7 +30,12 @@ const ExpandableSearch = ({
   const scrollTimerRef = useRef(null);
 
   // API에서 가져온 데이터
-  const [searchHistory, setSearchHistory] = useState([]);
+  const [searchHistory, setSearchHistory] = useState([]); // {id, search_query} 객체 배열
+  const [hiddenHistoryIds, setHiddenHistoryIds] = useState(() => {
+    // localStorage에서 숨긴 검색 기록 ID 목록 가져오기
+    const stored = localStorage.getItem('hiddenSearchHistory');
+    return stored ? JSON.parse(stored) : [];
+  });
   const [recommendedTags, setRecommendedTags] = useState([]); // 태그 (아이콘으로 표시)
   const [recommendedKeywords, setRecommendedKeywords] = useState([]); // 키워드 (#으로 표시)
   const [suggestedVideos, setSuggestedVideos] = useState([]);
@@ -62,7 +67,11 @@ const ExpandableSearch = ({
           // 검색 기록 로드
           const historyResponse = await getSearchHistory();
           if (historyResponse?.data) {
-            setSearchHistory(historyResponse.data.map((h) => h.search_query));
+            // {id, search_query} 형태로 저장
+            setSearchHistory(historyResponse.data.map((h) => ({
+              id: h.id,
+              search_query: h.search_query
+            })));
           }
         }
 
@@ -96,11 +105,14 @@ const ExpandableSearch = ({
 
     try {
       if (isLoggedIn) {
-        await createSearchHistory(searchQuery);
+        const response = await createSearchHistory(searchQuery);
         // 검색 기록 업데이트 (최대 10개)
-        setSearchHistory((prev) =>
-          [searchQuery, ...prev.filter((h) => h !== searchQuery)].slice(0, 10)
-        );
+        if (response?.data) {
+          const newHistory = { id: response.data.id, search_query: searchQuery };
+          setSearchHistory((prev) =>
+            [newHistory, ...prev.filter((h) => h.search_query !== searchQuery)].slice(0, 10)
+          );
+        }
       }
       // 검색 페이지로 이동
       if (onSearch) {
@@ -147,8 +159,22 @@ const ExpandableSearch = ({
   }, [isOpen, hasBeenOpened]);
 
   const handleClose = () => {
+    setSearchValue(""); // 검색창 닫을 때 입력값 초기화
     onClose();
   };
+
+  // 검색 기록 삭제 (UI에서만 숨김, DB는 유지)
+  const handleDeleteHistory = (historyId) => {
+    const updatedHiddenIds = [...hiddenHistoryIds, historyId];
+    setHiddenHistoryIds(updatedHiddenIds);
+    // localStorage에 저장
+    localStorage.setItem('hiddenSearchHistory', JSON.stringify(updatedHiddenIds));
+  };
+
+  // 숨기지 않은 검색 기록만 필터링
+  const visibleSearchHistory = searchHistory.filter(
+    (h) => !hiddenHistoryIds.includes(h.id)
+  );
 
   // 스크롤 이벤트 핸들러
   const handleScroll = () => {
@@ -363,14 +389,14 @@ const ExpandableSearch = ({
                       }}
                       className="custom-scrollbar"
                     >
-                      {searchHistory.length === 0 ? (
+                      {visibleSearchHistory.length === 0 ? (
                         <p style={{ fontSize: "13px", color: COLORS.gray }}>
                           검색 기록이 없습니다.
                         </p>
                       ) : (
-                        searchHistory.map((item, idx) => (
+                        visibleSearchHistory.map((item, idx) => (
                           <div
-                            key={idx}
+                            key={item.id}
                             style={{
                               display: "flex",
                               alignItems: "center",
@@ -393,15 +419,15 @@ const ExpandableSearch = ({
                                 flex: 1,
                               }}
                               onClick={() => {
-                                setSearchValue(item);
+                                setSearchValue(item.search_query);
                                 if (onSearch) {
-                                  onSearch(item);
+                                  onSearch(item.search_query);
                                 }
                                 setSearchValue("");
                                 onClose();
                               }}
                             >
-                              {item}
+                              {item.search_query}
                             </span>
                             <button
                               style={{
@@ -414,9 +440,7 @@ const ExpandableSearch = ({
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setSearchHistory((prev) =>
-                                  prev.filter((h) => h !== item)
-                                );
+                                handleDeleteHistory(item.id);
                               }}
                               onMouseEnter={(e) =>
                                 (e.currentTarget.style.opacity = 1)
@@ -456,28 +480,25 @@ const ExpandableSearch = ({
                         </p>
                       ) : (
                         <>
-                          {/* 태그 (아이콘 옆에 텍스트) */}
-                          {recommendedTags.map((tag, idx) => (
+                          {/* 키워드 (#으로 표시) - 항상 앞쪽 */}
+                          {recommendedKeywords.map((keyword, idx) => (
                             <button
-                              key={`tag-${idx}`}
+                              key={`keyword-${idx}`}
                               onClick={() => {
-                                setSearchValue(tag);
+                                // 검색기록에 저장하지 않고 바로 검색 페이지로 이동
                                 if (onSearch) {
-                                  onSearch(tag);
+                                  onSearch(keyword);
                                 }
                                 onClose();
                               }}
                               style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
                                 padding: "8px 16px",
-                                backgroundColor: "transparent",
-                                border: `1.5px solid ${COLORS.tag}`,
+                                backgroundColor: COLORS.sub_color, // 연노랑색
+                                border: `1.5px solid ${COLORS.sub_color}`,
                                 borderRadius: "20px",
-                                color: COLORS.tag,
+                                color: COLORS.dark, // 블랙
                                 fontSize: "12px",
-                                fontWeight: "500",
+                                fontWeight: "600",
                                 cursor: "pointer",
                                 transition: "all 0.2s ease",
                                 opacity: phase >= 3 ? 1 : 0,
@@ -488,37 +509,41 @@ const ExpandableSearch = ({
                                 transitionDelay: `${0.2 + idx * 0.025}s`,
                               }}
                               onMouseEnter={(e) => {
-                                e.target.style.backgroundColor = COLORS.sky;
-                                e.target.style.color = COLORS.dark;
+                                e.currentTarget.style.backgroundColor = COLORS.sky; // 하늘색
+                                e.currentTarget.style.borderColor = COLORS.sky;
+                                e.currentTarget.style.color = COLORS.dark; // 블랙 유지
                               }}
                               onMouseLeave={(e) => {
-                                e.target.style.backgroundColor = "transparent";
-                                e.target.style.color = COLORS.tag;
+                                e.currentTarget.style.backgroundColor = COLORS.sub_color; // 연노랑색
+                                e.currentTarget.style.borderColor = COLORS.sub_color;
+                                e.currentTarget.style.color = COLORS.dark; // 블랙
                               }}
                             >
-                              <TagIcon size={14} color="currentColor" />
-                              <span>{tag}</span>
+                              #{keyword}
                             </button>
                           ))}
-                          {/* 키워드 (#으로 표시) */}
-                          {recommendedKeywords.map((keyword, idx) => (
+                          {/* 태그 (아이콘 옆에 텍스트) - 항상 뒤쪽 */}
+                          {recommendedTags.map((tag, idx) => (
                             <button
-                              key={`keyword-${idx}`}
+                              key={`tag-${idx}`}
                               onClick={() => {
-                                setSearchValue(keyword);
+                                // 검색기록에 저장하지 않고 바로 검색 페이지로 이동
                                 if (onSearch) {
-                                  onSearch(keyword);
+                                  onSearch(tag);
                                 }
                                 onClose();
                               }}
                               style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
                                 padding: "8px 16px",
-                                backgroundColor: "transparent",
-                                border: `1.5px solid ${COLORS.tag}`,
+                                backgroundColor: COLORS.sub_color, // 연노랑색
+                                border: `1.5px solid ${COLORS.sub_color}`,
                                 borderRadius: "20px",
-                                color: COLORS.tag,
+                                color: COLORS.dark, // 블랙
                                 fontSize: "12px",
-                                fontWeight: "500",
+                                fontWeight: "600",
                                 cursor: "pointer",
                                 transition: "all 0.2s ease",
                                 opacity: phase >= 3 ? 1 : 0,
@@ -527,19 +552,22 @@ const ExpandableSearch = ({
                                     ? "translateY(0)"
                                     : "translateY(8px)",
                                 transitionDelay: `${
-                                  0.2 + (recommendedTags.length + idx) * 0.025
+                                  0.2 + (recommendedKeywords.length + idx) * 0.025
                                 }s`,
                               }}
                               onMouseEnter={(e) => {
-                                e.target.style.backgroundColor = COLORS.sky;
-                                e.target.style.color = COLORS.dark;
+                                e.currentTarget.style.backgroundColor = COLORS.sky; // 하늘색
+                                e.currentTarget.style.borderColor = COLORS.sky;
+                                e.currentTarget.style.color = COLORS.dark; // 블랙 유지
                               }}
                               onMouseLeave={(e) => {
-                                e.target.style.backgroundColor = "transparent";
-                                e.target.style.color = COLORS.tag;
+                                e.currentTarget.style.backgroundColor = COLORS.sub_color; // 연노랑색
+                                e.currentTarget.style.borderColor = COLORS.sub_color;
+                                e.currentTarget.style.color = COLORS.dark; // 블랙
                               }}
                             >
-                              #{keyword}
+                              <TagIcon size={14} color="currentColor" />
+                              <span>{tag}</span>
                             </button>
                           ))}
                         </>

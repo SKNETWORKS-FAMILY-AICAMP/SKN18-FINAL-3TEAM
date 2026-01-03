@@ -127,10 +127,10 @@ def extract_keywords_with_kiwi(title: str) -> List[str]:
 
 def video_keyword_node(state: RecommendationState) -> RecommendationState:
     """
-    Stage 1: video_title에서 키워드 추출
+    Stage 1: user_query + video_title에서 키워드 추출
 
     작업:
-    1. Kiwi 형태소 분석으로 명사 추출
+    1. Kiwi 형태소 분석으로 쿼리와 제목에서 명사 추출
     2. TTL 데이터와 매칭
     3. 매칭된 키워드를 콤마 구분 문자열로 반환
 
@@ -139,25 +139,34 @@ def video_keyword_node(state: RecommendationState) -> RecommendationState:
     - 모두 실패하면 빈 문자열 반환
     """
     print(f"\n{'='*70}")
-    print(f"[Stage 1] Video Keyword Extraction")
+    print(f"[Stage 1] Video Keyword Extraction (Query + Title)")
     print(f"{'='*70}")
 
+    user_query = state.get("user_query", "")
     video_title = state.get("video_title", "")
+    print(f"  사용자 쿼리: '{user_query}'")
     print(f"  영상 제목: '{video_title}'")
 
-    if not video_title:
-        print(f"  ⚠️ video_title이 비어있습니다.")
+    if not video_title and not user_query:
+        print(f"  ⚠️ video_title과 user_query가 모두 비어있습니다.")
         return {
             **state,
             "basic_keywords": [],
             "video_keywords": "",
-            "errors": state.get("errors", []) + ["video_title이 비어있음"],
+            "errors": state.get("errors", []) + ["video_title과 user_query 모두 비어있음"],
             "executed_nodes": state.get("executed_nodes", []) + ["video_keyword_extraction"]
         }
 
-    # 1. Kiwi 형태소 분석
-    basic_keywords = extract_keywords_with_kiwi(video_title)
-    print(f"  Kiwi 추출 키워드: {basic_keywords} ({len(basic_keywords)}개)")
+    # 1. Kiwi 형태소 분석 (쿼리 + 제목)
+    query_keywords = extract_keywords_with_kiwi(user_query) if user_query else []
+    title_keywords = extract_keywords_with_kiwi(video_title) if video_title else []
+
+    # 중복 제거 및 결합
+    basic_keywords = list(dict.fromkeys(query_keywords + title_keywords))
+
+    print(f"  Kiwi 추출 키워드 (쿼리): {query_keywords}")
+    print(f"  Kiwi 추출 키워드 (제목): {title_keywords}")
+    print(f"  통합 키워드: {basic_keywords} ({len(basic_keywords)}개)")
 
     if not basic_keywords:
         print(f"  ⚠️ Kiwi 키워드 추출 실패")

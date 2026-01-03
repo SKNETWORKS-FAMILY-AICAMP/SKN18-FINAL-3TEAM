@@ -375,3 +375,11 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
+
+# macOS에서 SIGSEGV 오류 방지: prefork 대신 solo 또는 threads 사용
+# torch, transformers 같은 대용량 라이브러리 사용 시 prefork 방식이 문제 발생
+import sys
+if sys.platform == "darwin":  # macOS
+    CELERY_WORKER_POOL = "solo"  # 또는 "threads"
+else:
+    CELERY_WORKER_POOL = "prefork"  # Linux에서는 prefork 사용 가능

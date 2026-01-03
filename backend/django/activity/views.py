@@ -1,3 +1,4 @@
+from django.db import models
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -165,39 +166,65 @@ def get_recommended_keyword(request):
         })
 
     # 1. tag 수집 (시청 기록의 tags 필드에서)
+    # DB에 해당 태그를 가진 영상이 있는 경우만 포함
+    from video.models import Video
+
     all_tag = []
     for watch in recent_watches:
         if watch.tags:
-            all_tag.extend(watch.tags)
+            # tags는 쉼표로 구분된 문자열이므로 split 후 extend
+            tag_list = [t.strip() for t in watch.tags.split(',') if t.strip()]
+            all_tag.extend(tag_list)
 
-    # 중복 제거 및 최대 3개
+    # 중복 제거 및 최대 3개 (DB에 영상이 있는 태그만)
     unique_tag = []
     for tag in all_tag:
         if tag not in unique_tag:
-            unique_tag.append(tag)
+            # 해당 태그를 가진 영상이 DB에 존재하는지 확인
+            if Video.objects.filter(tags__icontains=tag).exists():
+                unique_tag.append(tag)
         if len(unique_tag) >= 3:
             break
 
     # 2. video_keyword 수집 (영상별 1개씩, 최대 3개)
+    # DB에 해당 키워드를 가진 영상이 있는 경우만 포함
+    # 중복 제거를 위한 set 사용
+    video_keyword_set = set()
     video_keyword_list = []
+
     for watch in recent_watches:
-        if watch.video and hasattr(watch.video, 'video_keyword') and watch.video.video_keyword:
-            # 쉼표로 구분된 문자열에서 첫 번째 키워드만 추출
-            keyword = [k.strip() for k in watch.video.video_keyword.split(',') if k.strip()]
-            if keyword and keyword[0] not in video_keyword_list:
-                video_keyword_list.append(keyword[0])
-            if len(video_keyword_list) >= 3:
-                break
+        if watch.video_keyword:
+            # watching_history의 video_keyword 필드에서 직접 가져옴
+            keywords = [k.strip() for k in watch.video_keyword.split(',') if k.strip()]
+            for keyword in keywords:
+                if keyword not in video_keyword_set:
+                    # 해당 키워드를 가진 영상이 DB에 존재하는지 확인
+                    if Video.objects.filter(video_keyword__icontains=keyword).exists():
+                        video_keyword_set.add(keyword)
+                        video_keyword_list.append(keyword)
+                        break  # 영상별 1개만
+                if len(video_keyword_list) >= 3:
+                    break
+        if len(video_keyword_list) >= 3:
+            break
 
     # 3. recommended_keyword 수집 (최대 8개)
+    # 추천 키워드가 다른 영상의 video_keyword에만 존재하는 경우만 포함
+    # video_keyword와 중복되지 않고, recommended_keyword끼리도 중복 제거
+    recommended_keyword_set = set(video_keyword_set)  # video_keyword와 중복 방지
     recommended_keyword_list = []
+
     for watch in recent_watches:
-        if watch.video and hasattr(watch.video, 'recommended_keyword') and watch.video.recommended_keyword:
-            # 쉼표로 구분된 문자열 파싱
-            keyword = [k.strip() for k in watch.video.recommended_keyword.split(',') if k.strip()]
-            for kw in keyword:
-                if kw not in recommended_keyword_list:
-                    recommended_keyword_list.append(kw)
+        if watch.recommended_keyword:
+            # watching_history의 recommended_keyword 필드에서 직접 가져옴
+            keywords = [k.strip() for k in watch.recommended_keyword.split(',') if k.strip()]
+            for kw in keywords:
+                if kw not in recommended_keyword_set:
+                    # 해당 키워드가 다른 영상의 video_keyword에만 존재하는지 확인
+                    # (추천 키워드나 태그에만 있으면 안 됨)
+                    if Video.objects.filter(video_keyword__icontains=kw).exists():
+                        recommended_keyword_set.add(kw)
+                        recommended_keyword_list.append(kw)
                 if len(recommended_keyword_list) >= 8:
                     break
             if len(recommended_keyword_list) >= 8:
