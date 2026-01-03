@@ -10,8 +10,10 @@ import {
   getSearchHistory,
   createSearchHistory,
   getRecommendedKeyword,
+  getRecommendedVideos,
 } from "../../../api/activityApi";
 import { getPopularVideos } from "../../../api/videoApi";
+import { searchVideos } from "../../../api/searchApi";
 import { getThumbnailUrl } from "../../../utils/imageUtils";
 
 const ExpandableSearch = ({
@@ -39,8 +41,9 @@ const ExpandableSearch = ({
   const [recommendedTags, setRecommendedTags] = useState([]); // 태그 (아이콘으로 표시)
   const [recommendedKeywords, setRecommendedKeywords] = useState([]); // 키워드 (#으로 표시)
   const [suggestedVideos, setSuggestedVideos] = useState([]);
+  const [isSearching, setIsSearching] = useState(false); // 검색 중 상태
 
-  // API에서 데이터 로드
+  // API에서 데이터 로드 (모달이 열릴 때마다 최신 데이터 가져오기)
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -48,6 +51,7 @@ const ExpandableSearch = ({
         if (isLoggedIn) {
           try {
             const recommendedResponse = await getRecommendedKeyword();
+            console.log("추천 키워드 API 응답:", recommendedResponse);
             if (recommendedResponse?.data) {
               // 태그는 아이콘으로 표시할 배열
               setRecommendedTags(recommendedResponse.data.tag || []);
@@ -56,6 +60,7 @@ const ExpandableSearch = ({
                 ...(recommendedResponse.data.video_keyword || []),
                 ...(recommendedResponse.data.recommended_keyword || []),
               ];
+              console.log("설정된 추천 키워드:", allKeywords);
               setRecommendedKeywords(allKeywords);
             }
           } catch (error) {
@@ -75,11 +80,69 @@ const ExpandableSearch = ({
           }
         }
 
-        // 인기 영상 로드
-        const videosResponse = await getPopularVideos();
-        if (videosResponse?.data) {
+        // 검색어가 없을 때는 인기 영상 로드
+        if (!searchValue.trim()) {
+          const videosResponse = await getPopularVideos();
+          if (videosResponse?.data) {
+            setSuggestedVideos(
+              videosResponse.data.map((v) => ({
+                id: v.id,
+                title: v.title,
+                tags: v.tags || [],
+                thumbnail_url: v.thumbnail_url || null,
+              }))
+            );
+          }
+        }
+      } catch (error) {
+        console.error("검색 데이터 로드 실패:", error);
+      }
+    };
+
+    // 모달이 열릴 때마다 최신 데이터 가져오기
+    if (isOpen) {
+      fetchData();
+    }
+  }, [isOpen, isLoggedIn, searchValue]);
+
+  // 검색어 입력 시 실시간 검색 (디바운싱 적용)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const searchQuery = searchValue.trim();
+    
+    // 검색어가 없으면 인기 영상 로드
+    if (!searchQuery) {
+      const fetchPopular = async () => {
+        try {
+          const videosResponse = await getPopularVideos();
+          if (videosResponse?.data) {
+            setSuggestedVideos(
+              videosResponse.data.map((v) => ({
+                id: v.id,
+                title: v.title,
+                tags: v.tags || [],
+                thumbnail_url: v.thumbnail_url || null,
+              }))
+            );
+          }
+        } catch (error) {
+          console.error("인기 영상 로드 실패:", error);
+        }
+      };
+      fetchPopular();
+      return;
+    }
+
+    // 검색어가 있을 때는 디바운싱 적용
+    // 실시간 검색에서는 검색 기록을 저장하지 않음 (saveHistory=false)
+    setIsSearching(true);
+    const debounceTimer = setTimeout(async () => {
+      try {
+        const response = await searchVideos(searchQuery, "relevance", 1, 12, [], false);
+        if (response?.data?.results) {
           setSuggestedVideos(
-            videosResponse.data.map((v) => ({
+            response.data.results.map((v) => ({
               id: v.id,
               title: v.title,
               tags: v.tags || [],
@@ -88,23 +151,28 @@ const ExpandableSearch = ({
           );
         }
       } catch (error) {
-        console.error("검색 데이터 로드 실패:", error);
+        console.error("검색 실패:", error);
+        setSuggestedVideos([]);
+      } finally {
+        setIsSearching(false);
       }
-    };
+    }, 300); // 300ms 디바운싱
 
-    if (isOpen) {
-      fetchData();
-    }
-  }, [isOpen, isLoggedIn]);
+    return () => {
+      clearTimeout(debounceTimer);
+    };
+  }, [searchValue, isOpen]);
 
   // 검색 실행 시 검색 기록 저장 및 검색 페이지로 이동
+  // 로그인 여부와 관계없이 항상 검색 결과 페이지로 이동
   const handleSearch = async () => {
     if (!searchValue.trim()) return;
 
     const searchQuery = searchValue.trim();
 
-    try {
-      if (isLoggedIn) {
+    // 검색 기록 저장 (로그인한 경우만, 실패해도 계속 진행)
+    if (isLoggedIn) {
+      try {
         const response = await createSearchHistory(searchQuery);
         // 검색 기록 업데이트 (최대 10개)
         if (response?.data) {
@@ -113,17 +181,23 @@ const ExpandableSearch = ({
             [newHistory, ...prev.filter((h) => h.search_query !== searchQuery)].slice(0, 10)
           );
         }
+      } catch (error) {
+        console.error("검색 기록 저장 실패:", error);
+        // 검색 기록 저장 실패해도 검색은 계속 진행
       }
-      // 검색 페이지로 이동
-      if (onSearch) {
-        onSearch(searchQuery);
-      }
-      // 입력창 초기화
-      setSearchValue("");
-      onClose();
-    } catch (error) {
-      console.error("검색 기록 저장 실패:", error);
     }
+
+    // 검색 페이지로 이동 (로그인 여부와 관계없이 항상 실행)
+    // 로그인하지 않은 사용자도 검색 결과를 볼 수 있도록 보장
+    if (onSearch) {
+      onSearch(searchQuery);
+    } else {
+      console.warn("onSearch 콜백이 제공되지 않았습니다.");
+    }
+    
+    // 입력창 초기화 및 검색창 닫기
+    setSearchValue("");
+    onClose();
   };
 
   useEffect(() => {
@@ -577,20 +651,21 @@ const ExpandableSearch = ({
                 </div>
               )}
 
-              {/* 우측: 추천 영상 (로그인한 경우만 표시) */}
-              {isLoggedIn && (
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3
-                    style={{
-                      fontSize: "14px",
-                      fontWeight: "700",
-                      color: COLORS.dark,
-                      marginBottom: "16px",
-                    }}
-                  >
-                    {searchValue ? `"${searchValue}" 관련 영상` : "추천 영상"}
-                  </h3>
+              {/* 우측: 영상 표시 */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h3
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: "700",
+                    color: COLORS.dark,
+                    marginBottom: "16px",
+                  }}
+                >
+                  {searchValue ? `"${searchValue}" 관련 영상` : (isLoggedIn ? "인기 영상" : "")}
+                </h3>
 
+                {/* 로그인: 항상 영상 표시, 비회원: 검색시에만 표시 */}
+                {(isLoggedIn || searchValue) && (
                   <div
                     style={{
                       display: "flex",
@@ -599,9 +674,13 @@ const ExpandableSearch = ({
                       paddingBottom: "8px",
                     }}
                   >
-                    {suggestedVideos.length === 0 ? (
+                    {isSearching ? (
                       <p style={{ fontSize: "13px", color: COLORS.gray }}>
-                        추천 영상이 없습니다.
+                        검색 중...
+                      </p>
+                    ) : suggestedVideos.length === 0 ? (
+                      <p style={{ fontSize: "13px", color: COLORS.gray }}>
+                        {searchValue ? "검색 결과가 없습니다." : (isLoggedIn ? "인기 영상이 없습니다." : "")}
                       </p>
                     ) : (
                       suggestedVideos.map((video, idx) => (
@@ -715,8 +794,8 @@ const ExpandableSearch = ({
                       ))
                     )}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* 하단 로고 */}

@@ -258,10 +258,19 @@ class VideoDeleteView(DestroyAPIView):
     queryset = Video.objects.all()
     permission_classes = [IsAuthenticated, IsAdminUser]
 
-class PopularVideosView(ListAPIView):
-    serializer_class = VideoSerializer
+class PopularVideosView(APIView):
     permission_classes = [AllowAny]
-    def get_queryset(self): return Video.objects.all().order_by('-likes_count', '-comments_count')[:20]
+
+    def get(self, request):
+        """
+        인기 영상 조회 (좋아요수, 댓글수 기준)
+        """
+        videos = Video.objects.all().order_by('-likes_count', '-comments_count')[:20]
+        serializer = VideoSerializer(videos, many=True)
+        return Response({
+            'data': serializer.data,
+            'message': 'ok'
+        })
 
 class PopularTagsView(APIView):
     permission_classes = [AllowAny]

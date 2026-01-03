@@ -27,7 +27,8 @@ const SearchResultPage = ({ query, onVideoClick, isLoggedIn }) => {
       setHasMore(true);
 
       try {
-        const response = await searchVideos(query, sortBy, 1, 12, selectedTags);
+        // 검색 결과 페이지에서는 검색 기록을 저장하지 않음 (saveHistory=false)
+        const response = await searchVideos(query, sortBy, 1, 12, selectedTags, false);
 
         const formattedVideos = response.data.results.map((video) => ({
           id: video.id,
@@ -64,12 +65,14 @@ const SearchResultPage = ({ query, onVideoClick, isLoggedIn }) => {
 
     try {
       const nextPage = page + 1;
+      // 무한 스크롤 시에도 검색 기록을 저장하지 않음 (saveHistory=false)
       const response = await searchVideos(
         query,
         sortBy,
         nextPage,
         12,
-        selectedTags
+        selectedTags,
+        false
       );
 
       const formattedVideos = response.data.results.map((video) => ({
@@ -150,45 +153,78 @@ const SearchResultPage = ({ query, onVideoClick, isLoggedIn }) => {
         <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
           <button
             onClick={() => setSortBy("relevance")}
+            onMouseEnter={(e) => {
+              if (sortBy !== "relevance") {
+                e.currentTarget.style.backgroundColor = COLORS.sky;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (sortBy !== "relevance") {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }
+            }}
             style={{
               padding: "8px 16px",
               backgroundColor:
-                sortBy === "relevance" ? COLORS.accent : "transparent",
+                sortBy === "relevance" ? COLORS.sub_color : "transparent",
               color: COLORS.textPrimary,
-              border: `1px solid ${COLORS.accent}`,
-              borderRadius: "8px",
+              border: sortBy === "relevance" ? "none" : `1.5px solid ${COLORS.sub_color}`,
+              borderRadius: "20px",
               cursor: "pointer",
-              transition: "all 0.2s",
+              transition: "all 0.2s ease",
+              fontWeight: sortBy === "relevance" ? "600" : "500",
             }}
           >
             관련도순
           </button>
           <button
             onClick={() => setSortBy("latest")}
+            onMouseEnter={(e) => {
+              if (sortBy !== "latest") {
+                e.currentTarget.style.backgroundColor = COLORS.sky;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (sortBy !== "latest") {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }
+            }}
             style={{
               padding: "8px 16px",
               backgroundColor:
-                sortBy === "latest" ? COLORS.accent : "transparent",
+                sortBy === "latest" ? COLORS.sub_color : "transparent",
               color: COLORS.textPrimary,
-              border: `1px solid ${COLORS.accent}`,
-              borderRadius: "8px",
+              border: sortBy === "latest" ? "none" : `1.5px solid ${COLORS.sub_color}`,
+              borderRadius: "20px",
               cursor: "pointer",
-              transition: "all 0.2s",
+              transition: "all 0.2s ease",
+              fontWeight: sortBy === "latest" ? "600" : "500",
             }}
           >
             최신순
           </button>
           <button
             onClick={() => setSortBy("popular")}
+            onMouseEnter={(e) => {
+              if (sortBy !== "popular") {
+                e.currentTarget.style.backgroundColor = COLORS.sky;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (sortBy !== "popular") {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }
+            }}
             style={{
               padding: "8px 16px",
               backgroundColor:
-                sortBy === "popular" ? COLORS.accent : "transparent",
+                sortBy === "popular" ? COLORS.sub_color : "transparent",
               color: COLORS.textPrimary,
-              border: `1px solid ${COLORS.accent}`,
-              borderRadius: "8px",
+              border: sortBy === "popular" ? "none" : `1.5px solid ${COLORS.sub_color}`,
+              borderRadius: "20px",
               cursor: "pointer",
-              transition: "all 0.2s",
+              transition: "all 0.2s ease",
+              fontWeight: sortBy === "popular" ? "600" : "500",
             }}
           >
             인기순
@@ -212,14 +248,22 @@ const SearchResultPage = ({ query, onVideoClick, isLoggedIn }) => {
               {selectedTags.length > 0 && (
                 <button
                   onClick={clearTags}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = COLORS.sky;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
                   style={{
                     padding: "4px 12px",
                     backgroundColor: "transparent",
-                    color: COLORS.accent,
-                    border: `1px solid ${COLORS.accent}`,
-                    borderRadius: "6px",
+                    color: COLORS.textPrimary,
+                    border: `1.5px solid ${COLORS.sub_color}`,
+                    borderRadius: "16px",
                     cursor: "pointer",
                     fontSize: "12px",
+                    fontWeight: "500",
+                    transition: "all 0.2s ease",
                   }}
                 >
                   전체 해제
@@ -233,30 +277,40 @@ const SearchResultPage = ({ query, onVideoClick, isLoggedIn }) => {
                 gap: "8px",
               }}
             >
-              {availableTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => toggleTag(tag)}
-                  style={{
-                    padding: "6px 12px",
-                    backgroundColor: selectedTags.includes(tag)
-                      ? COLORS.accent
-                      : "rgba(255, 255, 255, 0.1)",
-                    color: COLORS.textPrimary,
-                    border: `1px solid ${
-                      selectedTags.includes(tag)
-                        ? COLORS.accent
-                        : "rgba(255, 255, 255, 0.2)"
-                    }`,
-                    borderRadius: "16px",
-                    cursor: "pointer",
-                    fontSize: "13px",
-                    transition: "all 0.2s",
-                  }}
-                >
-                  #{tag}
-                </button>
-              ))}
+              {availableTags.map((tag) => {
+                const isSelected = selectedTags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => toggleTag(tag)}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.backgroundColor = COLORS.sky;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }
+                    }}
+                    style={{
+                      padding: "6px 12px",
+                      backgroundColor: isSelected
+                        ? COLORS.sub_color
+                        : "transparent",
+                      color: COLORS.textPrimary,
+                      border: isSelected ? "none" : `1.5px solid ${COLORS.sub_color}`,
+                      borderRadius: "16px",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                      fontWeight: isSelected ? "600" : "500",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    #{tag}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
