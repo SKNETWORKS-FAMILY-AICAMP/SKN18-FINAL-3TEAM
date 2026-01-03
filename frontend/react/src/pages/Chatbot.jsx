@@ -206,7 +206,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
         const raw = await getChatHistory();
         const history = Array.isArray(raw) ? raw : raw?.sessions || [];
         setChatHistory(history || []);
-        
+
         // URL에서 세션 ID가 있으면 해당 세션 로드
         if (initialSessionId) {
           setSelectedSessionId(initialSessionId);
@@ -716,9 +716,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
   return (
     <div
       style={{
-        marginTop: "72px", // 96px → 72px로 줄임 (24px 절약)
-        height: "calc(100vh - 72px)", // 높이도 맞춰서 조정
-        maxHeight: "calc(100vh - 72px)",
+        height: "calc(100vh - 76px)", // 비디오 생성 페이지와 동일한 높이로 맞춤
+        maxHeight: "calc(100vh - 76px)",
         backgroundColor: COLORS.background,
         display: "flex",
         flexDirection: "row",
@@ -737,7 +736,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
             style={{
               position: "fixed",
               left: showHistory ? "280px" : "40px", // 닫혀있을 때는 사이드바보다 오른쪽에
-              top: "82px", // 96px → 82px로 조정 (헤더 높이 + 10px 여백)
+              top: "86px", // 비디오 생성 페이지와 동일한 높이로 맞춤 (76px + 10px 여백)
               width: "72px",
               height: "72px",
               backgroundColor: "transparent",
@@ -781,7 +780,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
             style={{
               position: "fixed",
               left: showHistory ? "0" : "-320px",
-              top: "72px", // 96px → 72px로 조정
+              top: "76px", // 비디오 생성 페이지와 동일한 높이로 맞춤
               width: "300px",
               backgroundColor: "rgba(255, 255, 255, 0.95)",
               backdropFilter: "blur(20px)",
@@ -795,7 +794,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
               flexDirection: "column",
               overflowY: "auto",
               overflowX: "hidden",
-              height: "calc(100vh - 72px)", // 96px → 72px로 조정
+              height: "calc(100vh - 76px)", // 비디오 생성 페이지와 동일한 높이로 맞춤
               padding: "32px 24px",
               transition: "left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               zIndex: 1000,
@@ -1256,10 +1255,10 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
                 flex: 1,
                 overflowY: "auto",
                 overflowX: "hidden",
-                paddingTop: "20px",
+                paddingTop: "40px", // 상단 패딩 증가로 위 내용이 가려지지 않도록
                 paddingRight: "16px",
                 paddingLeft: "16px",
-                paddingBottom: "180px", // 패딩 증가 (120px → 180px)
+                paddingBottom: "100px", // 마지막 대화와 입력창 사이 간격 조정
                 touchAction: "pan-y",
                 WebkitOverflowScrolling: "touch",
               }}
@@ -1287,6 +1286,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
                   flexDirection: "column",
                   justifyContent: "flex-end",
                   gap: "24px",
+                  paddingTop: "20px", // 상단 여백 추가로 첫 메시지가 가려지지 않도록
                 }}
               >
                 {messages.map((msg, index) => (

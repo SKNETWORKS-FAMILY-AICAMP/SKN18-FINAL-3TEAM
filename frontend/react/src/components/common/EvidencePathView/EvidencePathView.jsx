@@ -960,7 +960,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                 scrollableParent.scrollTop +
                 containerRect.top -
                 parentRect.top -
-                0; // 여백 증가 (50px → 150px) - 더 많이 스크롤
+                50; // 여백 증가 (50px → 150px) - 더 많이 스크롤
               scrollableParent.scrollTo({
                 top: scrollTop,
                 behavior: "smooth",
