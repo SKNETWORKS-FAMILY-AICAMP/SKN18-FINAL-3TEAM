@@ -270,6 +270,7 @@ const App = () => {
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   };
 
+  // 검색 결과 페이지로 이동 (로그인 여부와 관계없이 모든 사용자에게 허용)
   const handleSearch = (query) => {
     setSearchQuery(query);
     setCurrentPage("search");

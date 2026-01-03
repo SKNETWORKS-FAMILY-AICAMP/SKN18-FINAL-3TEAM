@@ -7,6 +7,7 @@ import api from "./axios";
  * @param {number} page - 페이지 번호
  * @param {number} pageSize - 페이지당 개수
  * @param {string[]} tags - 태그 필터 배열
+ * @param {boolean} saveHistory - 검색 기록 저장 여부 (기본값: false, 검색창 엔터 입력 시만 true)
  * @returns {Promise} 검색 결과
  */
 export const searchVideos = async (
@@ -14,7 +15,8 @@ export const searchVideos = async (
   sort = "relevance",
   page = 1,
   pageSize = 12,
-  tags = []
+  tags = [],
+  saveHistory = false
 ) => {
   try {
     const params = {
@@ -31,6 +33,11 @@ export const searchVideos = async (
     // 태그 필터가 있을 때만 추가
     if (tags && tags.length > 0) {
       params.tags = tags.join(",");
+    }
+
+    // 검색 기록 저장 여부 (검색창에서 엔터를 눌렀을 때만 true)
+    if (saveHistory) {
+      params.save_history = "true";
     }
 
     const response = await api.get("/api/search/videos/", { params });

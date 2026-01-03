@@ -64,3 +64,16 @@ export const getRecommendedKeyword = async () => {
   const response = await api.get('/api/activity/recommended-keyword/');
   return response.data;
 };
+
+// ============================================
+// 추천 영상 API
+// ============================================
+
+// 최근 시청 기록 기반 추천 영상 조회
+// filter: 'all' (전체, 기본값), 'keyword' (키워드 정확도), 'tag' (태그 정확도)
+export const getRecommendedVideos = async (filter = 'all') => {
+  const response = await api.get('/api/activity/recommended-videos/', {
+    params: { filter }
+  });
+  return response.data;
+};
