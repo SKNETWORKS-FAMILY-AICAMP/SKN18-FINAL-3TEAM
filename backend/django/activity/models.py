@@ -1,6 +1,5 @@
 from django.db import models
 from django.conf import settings
-from django.contrib.postgres.fields import ArrayField
 from django.core.validators import MinValueValidator
 
 
@@ -28,11 +27,20 @@ class WatchingHistory(models.Model):
         related_name='watch_histories',
         verbose_name='사용자'
     )
-    tags = ArrayField(
-        models.TextField(),
+    tags = models.TextField(
         blank=True,
         null=True,
         verbose_name='태그'
+    )
+    video_keyword = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='영상 키워드'
+    )
+    recommended_keyword = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='추천 키워드'
     )
     watched_seconds = models.IntegerField(
         default=0,

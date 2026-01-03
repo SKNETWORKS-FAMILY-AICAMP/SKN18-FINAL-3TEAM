@@ -14,12 +14,20 @@ export const getWatchHistory = async () => {
   return response.data;
 };
 
+export const getWatchHistoryForVideo = async (videoId) => {
+  const response = await api.get('/api/activity/watch-logs/', {
+    params: { video_id: videoId }
+  });
+  return response.data;
+};
+
 // 시청 기록 적재
 export const createWatchHistory = async (videoId, watchedSeconds, tags = []) => {
+  const tagsValue = Array.isArray(tags) ? tags.join(",") : tags || null;
   const response = await api.post('/api/activity/watch-logs/', {
     video: videoId,
     watched_seconds: watchedSeconds,
-    tags: tags
+    tags: tagsValue
   });
   return response.data;
 };
