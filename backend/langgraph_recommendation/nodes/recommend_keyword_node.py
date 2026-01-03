@@ -506,8 +506,21 @@ def recommend_keyword_node(state: RecommendationState) -> RecommendationState:
     )
     print(f"    최종 추천: {final_recommendations}")
 
-    # 6. 콤마 구분 문자열로 변환
-    recommend_keywords_str = ",".join(final_recommendations) if final_recommendations else ""
+    # 6. TTL 재검증 (안전장치)
+    print(f"  6. TTL 최종 검증...")
+    verified_recommendations = [
+        keyword for keyword in final_recommendations
+        if keyword in ttl_data.get("label_to_uri", {})
+    ]
+
+    if len(verified_recommendations) < len(final_recommendations):
+        removed = set(final_recommendations) - set(verified_recommendations)
+        print(f"    ⚠️ TTL에 없어서 제거된 키워드: {removed}")
+
+    print(f"    검증된 추천: {verified_recommendations}")
+
+    # 7. 콤마 구분 문자열로 변환
+    recommend_keywords_str = ",".join(verified_recommendations) if verified_recommendations else ""
 
     return {
         **state,
@@ -515,7 +528,7 @@ def recommend_keyword_node(state: RecommendationState) -> RecommendationState:
         "expanded_keywords": expanded_keywords,
         "extracted_entities": extracted_entities,
         "thread_results": thread_results,
-        "final_recommendations": final_recommendations,
+        "final_recommendations": verified_recommendations,  # 검증된 것만 저장
         "recommend_keywords": recommend_keywords_str,
         "executed_nodes": state.get("executed_nodes", []) + ["recommend_keyword_generation"]
     }
