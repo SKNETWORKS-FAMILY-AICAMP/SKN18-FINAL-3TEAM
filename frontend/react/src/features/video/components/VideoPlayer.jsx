@@ -109,15 +109,15 @@ const VideoPlayer = ({
         setPlaying(false);
       });
 
-      // 최초 재생 시 onPlay 콜백 호출 (한 번만)
-      if (!hasPlayedRef.current && onPlay) {
+      // 최초 재생 시 onPlayStart 콜백 호출 (한 번만)
+      if (!hasPlayedRef.current && onPlayStart) {
         hasPlayedRef.current = true;
-        onPlay();
+        onPlayStart();
       }
     } else {
       video.pause();
     }
-  }, [playing, onPlay]);
+  }, [playing, onPlayStart]);
 
   const handlePlayPause = () => {
     // 에러가 있으면 재생하지 않음

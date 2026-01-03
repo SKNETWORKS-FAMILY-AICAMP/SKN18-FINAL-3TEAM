@@ -69,10 +69,10 @@ def load_ttl_entities() -> dict:
     return result
 
 
-def analyze_intent_with_llm(video_title: str, basic_keywords: List[str]) -> str:
+def analyze_intent_with_llm(user_query: str, video_title: str, basic_keywords: List[str]) -> str:
     """
-    LLM으로 영상 제목의 의도 파악 (자동)
-    사용자 선택 제외
+    LLM으로 사용자 쿼리 + 영상 제목(답변)의 의도 파악
+    - 사용자의 질문 의도와 답변의 의도를 종합 분석
     """
     llm = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL"),
@@ -83,15 +83,21 @@ def analyze_intent_with_llm(video_title: str, basic_keywords: List[str]) -> str:
 
     prompt = f"""당신은 역사 콘텐츠 분석 전문가입니다.
 
-영상 제목: "{video_title}"
+사용자 질문: "{user_query}"
+영상 제목 (답변): "{video_title}"
 추출된 키워드: {keywords_text}
 
-위 영상의 핵심 의도를 한 문장으로 파악하세요.
+위 질문과 답변을 종합하여 사용자의 학습 의도를 한 문장으로 파악하세요.
+
+분석 기준:
+- 사용자가 무엇을 알고 싶어 하는가? (질문 의도)
+- 답변이 다루는 핵심 내용은 무엇인가? (답변 의도)
+- 두 가지를 종합한 학습 목표는?
 
 예시:
-- "경복궁을 지은 왕" → "궁궐 건설과 관련된 왕 찾기"
-- "임진왜란의 원인" → "전쟁의 발생 배경 분석"
-- "세종대왕의 업적" → "특정 인물의 역사적 공헌 탐색"
+- 질문: "대동법이 시행된 배경은?" + 답변: "광해군의 재정 개혁" → "조선 중기 세금 제도 개혁 배경 이해"
+- 질문: "경복궁을 지은 왕" + 답변: "태조 이성계" → "조선 건국과 궁궐 건설 과정 탐색"
+- 질문: "임진왜란의 원인" + 답변: "일본의 대륙 진출 야심" → "16세기 동아시아 국제 정세와 전쟁 배경 분석"
 
 JSON 형식으로만 응답:
 {{"intent": "의도 문장"}}
@@ -116,7 +122,7 @@ JSON 형식으로만 응답:
         return "역사적 맥락 탐색"
 
 
-def expand_keywords_with_llm(video_title: str, intent: str, basic_keywords: List[str]) -> List[str]:
+def expand_keywords_with_llm(user_query: str, video_title: str, intent: str, basic_keywords: List[str]) -> List[str]:
     """
     LLM으로 키워드 확장
     fuseki의 entity_expander_node 로직 간소화
@@ -130,7 +136,8 @@ def expand_keywords_with_llm(video_title: str, intent: str, basic_keywords: List
 
     prompt = f"""당신은 역사 키워드 확장 전문가입니다.
 
-영상 제목: "{video_title}"
+사용자 질문: "{user_query}"
+영상 제목 (답변): "{video_title}"
 파악된 의도: {intent}
 기본 키워드: {keywords_text}
 
@@ -355,6 +362,7 @@ def run_threads_parallel(entities: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def select_top_recommendations_with_llm(
+    user_query: str,
     video_title: str,
     intent: str,
     thread_results: Dict[str, Any],
@@ -399,18 +407,25 @@ def select_top_recommendations_with_llm(
 
     prompt = f"""당신은 역사 콘텐츠 추천 전문가입니다.
 
-영상 제목: "{video_title}"
+사용자 질문: "{user_query}"
+영상 제목 (답변): "{video_title}"
 파악된 의도: {intent}
 
 연결된 엔티티 후보들:
 {candidates_text}
 
-위 후보 중에서 영상 시청자에게 추천할 만한 **관련도가 높은** 엔티티를 **3-4개** 선택하세요.
+**중요: 위 후보 목록에서만 선택해야 합니다. 새로운 엔티티를 만들지 마세요.**
+
+위 후보 중에서 영상 시청자에게 추천할 만한 **관련도가 높은** 엔티티를 **정확히 3-4개** 선택하세요.
 
 선택 기준:
 - 영상 제목 및 의도와의 관련성
 - 역사적 중요도
 - 다양성 (인물, 사건, 장소 등 균형)
+
+**주의사항:**
+- 후보 목록에 없는 엔티티는 절대 선택하지 마세요
+- 후보 목록의 엔티티 이름을 정확히 그대로 사용하세요
 
 JSON 형식으로만 응답:
 {{"recommendations": ["엔티티1", "엔티티2", "엔티티3"]}}
@@ -428,8 +443,16 @@ JSON 형식으로만 응답:
         result = json.loads(content)
         recommendations = result.get("recommendations", [])
 
-        # 실제 TTL에 존재하는 것만 필터링
-        final_recommendations = [r for r in recommendations if r in ttl_data.get("label_to_uri", {})]
+        # 1차 필터링: valid_candidates에 있는 것만
+        filtered_recommendations = [r for r in recommendations if r in valid_candidates]
+
+        # 2차 필터링: TTL에도 실제로 존재하는지 재확인 (안전장치)
+        final_recommendations = [r for r in filtered_recommendations if r in ttl_data.get("label_to_uri", {})]
+
+        # LLM이 후보 목록 외 엔티티를 선택한 경우 경고
+        invalid_selections = set(recommendations) - set(valid_candidates)
+        if invalid_selections:
+            print(f"    ⚠️ LLM이 후보 목록에 없는 엔티티를 선택함 (제거됨): {invalid_selections}")
 
         return final_recommendations[:4]  # 최대 4개
 
@@ -443,7 +466,7 @@ def recommended_keyword_node(state: RecommendationState) -> RecommendationState:
     Stage 2: 추천 키워드 생성
 
     작업:
-    1. LLM 의도파악
+    1. LLM 의도파악 (쿼리 + 제목)
     2. LLM 키워드 확장
     3. TTL 엔티티 추출
     4. Thread 병렬 실행 (outgoing/incoming/connected)
@@ -453,9 +476,11 @@ def recommended_keyword_node(state: RecommendationState) -> RecommendationState:
     print(f"[Stage 2] Recommend Keyword Generation")
     print(f"{'='*70}")
 
+    user_query = state.get("user_query", "")
     video_title = state.get("video_title", "")
     basic_keywords = state.get("basic_keywords", [])
 
+    print(f"  사용자 쿼리: '{user_query}'")
     print(f"  영상 제목: '{video_title}'")
     print(f"  기본 키워드: {basic_keywords}")
 
@@ -468,14 +493,14 @@ def recommended_keyword_node(state: RecommendationState) -> RecommendationState:
             "executed_nodes": state.get("executed_nodes", []) + ["recommended_keyword_generation"]
         }
 
-    # 1. 의도파악
-    print(f"  1. LLM 의도파악...")
-    intent = analyze_intent_with_llm(video_title, basic_keywords)
+    # 1. 의도파악 (쿼리 + 제목)
+    print(f"  1. LLM 의도파악 (쿼리 + 제목)...")
+    intent = analyze_intent_with_llm(user_query, video_title, basic_keywords)
     print(f"    의도: {intent}")
 
     # 2. 키워드 확장
     print(f"  2. LLM 키워드 확장...")
-    expanded_keywords = expand_keywords_with_llm(video_title, intent, basic_keywords)
+    expanded_keywords = expand_keywords_with_llm(user_query, video_title, intent, basic_keywords)
     print(f"    확장 키워드: {expanded_keywords} ({len(expanded_keywords)}개)")
 
     # 3. TTL 엔티티 추출
@@ -502,7 +527,7 @@ def recommended_keyword_node(state: RecommendationState) -> RecommendationState:
     # 5. LLM이 상위 3-4개 선택
     print(f"  5. LLM 추천 키워드 선택...")
     final_recommendations = select_top_recommendations_with_llm(
-        video_title, intent, thread_results, ttl_data
+        user_query, video_title, intent, thread_results, ttl_data
     )
     print(f"    최종 추천: {final_recommendations}")
 

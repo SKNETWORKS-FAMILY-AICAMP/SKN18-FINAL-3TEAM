@@ -11,7 +11,8 @@ class RecommendationState(TypedDict):
     """영상 추천 키워드 생성용 상태"""
 
     # ========== 입력 ==========
-    video_title: str  # 영상 제목
+    user_query: NotRequired[str]  # 사용자 쿼리
+    video_title: str  # 영상 제목 (LLM 생성 답변)
 
     # ========== Stage 1: video_keyword 추출 ==========
     basic_keywords: NotRequired[List[str]]  # Kiwi 형태소 분석 결과

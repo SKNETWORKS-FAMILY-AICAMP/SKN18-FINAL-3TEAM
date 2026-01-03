@@ -169,7 +169,13 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
       return;
     }
     try {
-      await createWatchHistory(actualVideoId, seconds, video.tags || []);
+      await createWatchHistory(
+        actualVideoId,
+        seconds,
+        video.tags || [],
+        video.video_keyword || null,
+        video.recommended_keyword || null
+      );
     } catch (error) {
       // 403 에러는 권한 문제이므로 조용히 처리
       // 백엔드에서 시청 기록 저장 API가 특정 권한을 요구하거나
@@ -275,7 +281,6 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
               ? getVideoUrl(video.video_url)
               : "/videos/selected_scene_1_video.mp4"
           }
-          onPlay={handleVideoPlay}
         />
         <VideoInfo
           tags={video?.tags || []}

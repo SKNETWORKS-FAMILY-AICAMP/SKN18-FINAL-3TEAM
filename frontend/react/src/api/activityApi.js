@@ -22,12 +22,17 @@ export const getWatchHistoryForVideo = async (videoId) => {
 };
 
 // 시청 기록 적재
-export const createWatchHistory = async (videoId, watchedSeconds, tags = []) => {
+export const createWatchHistory = async (videoId, watchedSeconds, tags = [], videoKeyword = null, recommendedKeyword = null) => {
   const tagsValue = Array.isArray(tags) ? tags.join(",") : tags || null;
+  const videoKeywordValue = Array.isArray(videoKeyword) ? videoKeyword.join(",") : videoKeyword || null;
+  const recommendedKeywordValue = Array.isArray(recommendedKeyword) ? recommendedKeyword.join(",") : recommendedKeyword || null;
+
   const response = await api.post('/api/activity/watch-logs/', {
     video: videoId,
     watched_seconds: watchedSeconds,
-    tags: tagsValue
+    tags: tagsValue,
+    video_keyword: videoKeywordValue,
+    recommended_keyword: recommendedKeywordValue
   });
   return response.data;
 };

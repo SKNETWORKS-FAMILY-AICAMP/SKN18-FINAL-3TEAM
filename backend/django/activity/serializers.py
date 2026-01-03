@@ -17,6 +17,8 @@ class WatchingHistorySerializer(serializers.ModelSerializer):
             'video_title',
             'video_thumbnail',
             'user',
+            'user_email',
+            'user_nickname',
             'tags',
             'video_keyword',
             'recommended_keyword',

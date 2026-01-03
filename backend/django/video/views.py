@@ -147,22 +147,23 @@ async def create_video_from_langgraph(request):
         try: title = GoogleTranslator(source="en", target="ko").translate(title)
         except: pass
 
+    payload = {"title": title, "video_url": body.get("video_url", "https://skn18-3-dev-temp.s3.amazonaws.com/background_scene_1_video.mp4"), "tags": result_state.get("video_tags") or [], "thumbnail_url": body.get("thumbnail_url")}
+    serializer = VideoCreateSerializer(data=payload)
+    await sync_to_async(serializer.is_valid)(raise_exception=True)
+    video = await sync_to_async(serializer.save)()
+
     # ========== 영상 키워드 생성 Task 등록 (Celery) ==========
     # DB 저장 완료 후 비동기로 키워드 생성
     from backend.langgraph_recommendation.tasks import generate_video_keywords_task
 
     try:
         # Celery Task 등록 (비동기 실행, 즉시 반환)
-        task = generate_video_keywords_task.delay(video.id, title)
+        # user_query (description)와 video_title (title)을 모두 전달
+        task = generate_video_keywords_task.delay(video.id, title, description)
         print(f"✓ 키워드 생성 Task 등록 완료: video_id={video.id}, task_id={task.id}")
     except Exception as e:
         # Celery 실패해도 영상 생성은 성공 처리
         print(f"⚠️ Celery Task 등록 실패 (영상은 정상 저장됨): {e}")
-
-    payload = {"title": title, "video_url": body.get("video_url", "https://skn18-3-dev-temp.s3.amazonaws.com/background_scene_1_video.mp4"), "tags": result_state.get("video_tags") or [], "thumbnail_url": body.get("thumbnail_url")}
-    serializer = VideoCreateSerializer(data=payload)
-    await sync_to_async(serializer.is_valid)(raise_exception=True)
-    video = await sync_to_async(serializer.save)()
     serialized = await sync_to_async(lambda: VideoSerializer(video).data)()
     return JsonResponse({"data": serialized}, status=201)
 
