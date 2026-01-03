@@ -18,8 +18,20 @@ import {
 import MarkdownRenderer from "../components/common/MarkdownRenderer";
 import EvidencePathView from "../components/common/EvidencePathView";
 import ThinkingMode from "../components/common/ThinkingMode/ThinkingMode";
+import { useBackgroundTask } from "../contexts/BackgroundTaskContext";
 
 const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
+  const { showToast } = useBackgroundTask();
+  const [isOnChatbotPage, setIsOnChatbotPage] = useState(true);
+
+  // 페이지 마운트/언마운트 감지
+  useEffect(() => {
+    setIsOnChatbotPage(true);
+    return () => {
+      setIsOnChatbotPage(false);
+    };
+  }, []);
+
   // 스크롤바 스타일 및 드래그 색상을 위한 CSS 추가
   useEffect(() => {
     const style = document.createElement("style");
@@ -392,6 +404,12 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
             finalHandled = true; // ★ 완료 플래그 설정
             setIsSubmitting(false);
             abortControllerRef.current = null;
+
+            // 페이지 이탈 시에만 토스트 표시
+            if (!isOnChatbotPage) {
+              const modeText = isThinkingMode ? "Thinking 모드" : "일반 모드";
+              showToast(`챗봇 ${modeText} 답변 생성 완료`, "success");
+            }
           } else if (streamEvent.type === "error") {
             // 에러 타입 처리 - 이미 처리되었음을 표시
             streamErrorHandled = true;
@@ -423,6 +441,12 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
           },
         ]);
         setIsSubmitting(false);
+
+        // 페이지 이탈 시 재질문 완료 토스트 표시
+        if (!isOnChatbotPage) {
+          showToast("챗봇 의도 파악 완료 - 선택지 제공", "success");
+        }
+
         return;
       }
 

@@ -18,6 +18,7 @@ import {
   getGoogleLoginUrl,
   logout as apiLogout,
 } from "./api/authApi";
+import { BackgroundTaskProvider } from "./contexts/BackgroundTaskContext";
 
 const App = () => {
   // URL에서 초기 페이지 상태 읽기
@@ -279,7 +280,7 @@ const App = () => {
   };
 
   return (
-    <>
+    <BackgroundTaskProvider>
       <style>{`
         ::selection {
           background-color: #c2e0f6;
@@ -390,7 +391,7 @@ const App = () => {
         {/* 챗봇 버튼 (로그인 시에만 표시) */}
         {isLoggedIn && <ChatbotButton onNavigate={handleNavigate} />}
       </div>
-    </>
+    </BackgroundTaskProvider>
   );
 };
 
