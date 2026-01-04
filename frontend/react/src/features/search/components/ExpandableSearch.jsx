@@ -545,7 +545,16 @@ const ExpandableSearch = ({
                     </h3>
 
                     <div
-                      style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}
+                      onScroll={handleScroll}
+                      className="custom-scrollbar"
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "8px",
+                        maxHeight: "200px",
+                        overflowY: "auto",
+                        paddingRight: "8px"
+                      }}
                     >
                       {recommendedTags.length === 0 &&
                       recommendedKeywords.length === 0 ? (

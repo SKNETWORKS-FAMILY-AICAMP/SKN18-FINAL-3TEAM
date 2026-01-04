@@ -48,6 +48,7 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
             id: video.id,
             title: video.title,
             tags: video.tags || [],
+            video_keyword: video.video_keyword || null,
             likes_count: video.likes_count,
             comments_count: video.comments_count,
             thumbnail_url: video.thumbnail_url,

@@ -138,18 +138,10 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
           }
         }
 
-        // 시청 위치 로드 (로그인한 경우만)
-        if (isLoggedIn) {
-          try {
-            const watchResponse = await getWatchHistoryForVideo(actualVideoId);
-            const watchedSeconds = watchResponse?.data?.watched_seconds || 0;
-            setResumeSeconds(watchedSeconds);
-            currentSeconds.current = watchedSeconds;
-            lastSavedSeconds.current = watchedSeconds;
-          } catch (error) {
-            setResumeSeconds(0);
-          }
-        }
+        // 시청 위치는 항상 처음부터 시작 (0으로 설정)
+        setResumeSeconds(0);
+        currentSeconds.current = 0;
+        lastSavedSeconds.current = 0;
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
         // 에러 발생 시에도 로딩 상태 해제
@@ -289,6 +281,7 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
           isLiked={isLiked}
           onLikeClick={handleLikeClick}
           likesCount={likesCount}
+          video_keyword={video?.video_keyword || null}
         />
       </div>
 

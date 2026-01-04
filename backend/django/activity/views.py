@@ -165,9 +165,23 @@ def get_recommended_keyword(request):
             'message': '시청 기록이 없습니다.'
         })
 
-    # 1. tag 수집 (최근 3개 영상에서 각 1개씩, 총 3개)
-    from video.models import Video
+    # 디버깅: 시청 기록의 실제 데이터 확인
+    print(f"\n[추천 키워드 API] 시청 기록 개수: {len(recent_watches)}")
+    for i, watch in enumerate(recent_watches[:3]):
+        print(f"  [{i+1}] 영상: {watch.video.title if watch.video else 'None'}")
+        print(f"      - watch.tags: {watch.tags}")
+        print(f"      - watch.video_keyword: {watch.video_keyword}")
+        print(f"      - watch.recommended_keyword: {watch.recommended_keyword}")
+        if watch.video:
+            print(f"      - video.tags: {watch.video.tags}")
+            print(f"      - video.video_keyword: {watch.video.video_keyword}")
+            print(f"      - video.recommended_keyword: {watch.video.recommended_keyword}")
 
+    # 시청한 영상 ID 목록 (추천 키워드에서 제외하기 위함)
+    from video.models import Video
+    watched_video_ids = set(watch.video.id for watch in recent_watches if watch.video)
+
+    # 1. tag 수집 (최근 3개 영상에서 각 1개씩, 총 3개)
     unique_tag = []
     used_tags = set()
 
@@ -176,7 +190,7 @@ def get_recommended_keyword(request):
             tag_list = [t.strip() for t in watch.tags.split(',') if t.strip()]
             for tag in tag_list:
                 if tag not in used_tags:
-                    # 해당 태그를 가진 영상이 DB에 존재하는지 확인
+                    # 시청 기록의 태그가 다른 영상의 tags(ArrayField)와 매칭되는지 확인
                     if Video.objects.filter(tags__contains=[tag]).exists():
                         unique_tag.append(tag)
                         used_tags.add(tag)
@@ -191,7 +205,7 @@ def get_recommended_keyword(request):
             keywords = [k.strip() for k in watch.video_keyword.split(',') if k.strip()]
             for keyword in keywords:
                 if keyword not in used_video_keywords and keyword not in used_tags:
-                    # 해당 키워드를 가진 영상이 DB에 존재하는지 확인
+                    # 시청 기록의 video_keyword가 다른 영상의 video_keyword와 매칭되는지 확인
                     if Video.objects.filter(video_keyword__icontains=keyword).exists():
                         video_keyword_list.append(keyword)
                         used_video_keywords.add(keyword)
@@ -206,12 +220,18 @@ def get_recommended_keyword(request):
             keywords = [k.strip() for k in watch.recommended_keyword.split(',') if k.strip()]
             for kw in keywords:
                 if kw not in used_recommended_keywords:
-                    # 해당 키워드가 다른 영상의 video_keyword에만 존재하는지 확인
+                    # 시청 기록의 recommended_keyword가 다른 영상의 video_keyword와 매칭되는지 확인
                     if Video.objects.filter(video_keyword__icontains=kw).exists():
                         recommended_keyword_list.append(kw)
                         used_recommended_keywords.add(kw)
                         if len(recommended_keyword_list) >= 5:
                             break
+
+    # 디버깅: 수집된 키워드 출력
+    print(f"[추천 키워드 API] tag: {unique_tag}")
+    print(f"[추천 키워드 API] video_keyword: {video_keyword_list}")
+    print(f"[추천 키워드 API] recommended_keyword: {recommended_keyword_list}")
+    print(f"[추천 키워드 API] 총 개수: {len(unique_tag) + len(video_keyword_list) + len(recommended_keyword_list)}")
 
     return Response({
         'data': {
@@ -276,21 +296,21 @@ def get_recommended_videos(request):
     # 시청한 영상 ID 목록 (중복 제거)
     watched_video_ids = set(watch.video.id for watch in recent_watches)
 
-    # recommended_keyword 수집 (최근 시청 기록 순서대로)
+    # recommended_keyword 수집 (시청 기록의 스냅샷 값 = 사용자 취향)
     recommended_keywords = []
     for watch in recent_watches:
         if watch.recommended_keyword:
             keywords = [k.strip() for k in watch.recommended_keyword.split(',') if k.strip()]
             recommended_keywords.extend(keywords)
 
-    # video_keyword 수집 (최근 시청 기록 순서대로)
+    # video_keyword 수집 (시청 기록의 스냅샷 값 = 사용자 취향)
     video_keywords = []
     for watch in recent_watches:
         if watch.video_keyword:
             keywords = [k.strip() for k in watch.video_keyword.split(',') if k.strip()]
             video_keywords.extend(keywords)
 
-    # 태그 수집 (최근 시청 기록 순서대로)
+    # 태그 수집 (시청 기록의 스냅샷 값 = 사용자 취향)
     tags = []
     for watch in recent_watches:
         if watch.tags:
@@ -298,13 +318,14 @@ def get_recommended_videos(request):
             tags.extend(tag_list)
 
     # 정확도순 매칭 점수 계산
-    # 1순위: recommended_keyword (300-280점)
-    # 2순위: video_keyword (200-180점)
-    # 3순위: tags (100-80점)
+    # 모든 키워드(recommended_keyword, video_keyword)를 다른 영상의 video_keyword와 매칭
+    # 1순위: 시청한 영상의 recommended_keyword와 매칭 (300-280점)
+    # 2순위: 시청한 영상의 video_keyword와 매칭 (200-180점)
+    # 3순위: 시청한 영상의 tags와 매칭 (100-80점)
     recommended_keyword_whens = []
     for idx, kw in enumerate(recommended_keywords[:20]):
         recommended_keyword_whens.append(
-            When(recommended_keyword__icontains=kw, then=300 - idx)
+            When(video_keyword__icontains=kw, then=300 - idx)
         )
 
     video_keyword_whens = []
@@ -320,9 +341,11 @@ def get_recommended_videos(request):
         )
 
     # 쿼리 필터 구성
+    # - recommended_keyword, video_keyword → video_keyword와 매칭
+    # - tags → tags와 매칭
     q_filter = Q()
     for kw in recommended_keywords[:20]:
-        q_filter |= Q(recommended_keyword__icontains=kw)
+        q_filter |= Q(video_keyword__icontains=kw)
     for kw in video_keywords[:20]:
         q_filter |= Q(video_keyword__icontains=kw)
     for tag in tags[:20]:
@@ -335,6 +358,11 @@ def get_recommended_videos(request):
             'message': '추천할 영상이 없습니다.'
         })
 
+    # 디버깅: 수집된 키워드 출력
+    print(f"[추천 영상 API] recommended_keywords: {recommended_keywords[:5]}")
+    print(f"[추천 영상 API] video_keywords: {video_keywords[:5]}")
+    print(f"[추천 영상 API] tags: {tags[:5]}")
+
     # 점수 기반으로 정렬 (높은 점수 우선, 같은 점수면 최신 영상 우선)
     videos = Video.objects.filter(q_filter).exclude(
         id__in=watched_video_ids
@@ -343,6 +371,11 @@ def get_recommended_videos(request):
         video_keyword_score=Case(*video_keyword_whens, default=0, output_field=IntegerField()) if video_keyword_whens else Case(default=0, output_field=IntegerField()),
         tag_score=Case(*tag_whens, default=0, output_field=IntegerField()) if tag_whens else Case(default=0, output_field=IntegerField()),
     ).order_by('-recommended_score', '-video_keyword_score', '-tag_score', '-upload_date').distinct()[:20]
+
+    # 디버깅: 매칭된 영상의 점수 출력
+    print(f"[추천 영상 API] 매칭된 영상 수: {videos.count()}")
+    for v in videos[:5]:
+        print(f"  - {v.title}: recommended={v.recommended_score}, video_keyword={v.video_keyword_score}, tag={v.tag_score}, video_keyword필드={v.video_keyword}")
 
     serializer = VideoSerializer(videos, many=True)
 
