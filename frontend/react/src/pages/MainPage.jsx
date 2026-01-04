@@ -37,9 +37,10 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
           }
         } else {
           // 비회원: 인기 영상 또는 최신순
-          response = filter === "popular"
-            ? await getPopularVideos()
-            : await getVideos("latest");
+          response =
+            filter === "popular"
+              ? await getPopularVideos()
+              : await getVideos("latest");
         }
 
         if (response?.data) {
@@ -124,7 +125,8 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
                   padding: "8px 20px",
                   borderRadius: "20px",
                   border: "none",
-                  backgroundColor: filter === "accuracy" ? COLORS.primary : "transparent",
+                  backgroundColor:
+                    filter === "accuracy" ? COLORS.primary : "transparent",
                   color: filter === "accuracy" ? COLORS.dark : COLORS.gray,
                   fontWeight: filter === "accuracy" ? "700" : "500",
                   fontSize: "14px",
@@ -140,7 +142,8 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
                   padding: "8px 20px",
                   borderRadius: "20px",
                   border: "none",
-                  backgroundColor: filter === "latest" ? COLORS.primary : "transparent",
+                  backgroundColor:
+                    filter === "latest" ? COLORS.primary : "transparent",
                   color: filter === "latest" ? COLORS.dark : COLORS.gray,
                   fontWeight: filter === "latest" ? "700" : "500",
                   fontSize: "14px",
@@ -159,7 +162,8 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
                   padding: "8px 20px",
                   borderRadius: "20px",
                   border: "none",
-                  backgroundColor: filter === "popular" ? COLORS.primary : "transparent",
+                  backgroundColor:
+                    filter === "popular" ? COLORS.primary : "transparent",
                   color: filter === "popular" ? COLORS.dark : COLORS.gray,
                   fontWeight: filter === "popular" ? "700" : "500",
                   fontSize: "14px",
@@ -175,7 +179,8 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
                   padding: "8px 20px",
                   borderRadius: "20px",
                   border: "none",
-                  backgroundColor: filter === "latest" ? COLORS.primary : "transparent",
+                  backgroundColor:
+                    filter === "latest" ? COLORS.primary : "transparent",
                   color: filter === "latest" ? COLORS.dark : COLORS.gray,
                   fontWeight: filter === "latest" ? "700" : "500",
                   fontSize: "14px",

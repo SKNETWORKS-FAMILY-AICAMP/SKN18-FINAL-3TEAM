@@ -59,7 +59,7 @@ const VideoCard = ({ video, onClick }) => {
       >
         {video.video_keyword && (
           <>
-            {video.video_keyword.split(',').map((keyword, idx) => {
+            {video.video_keyword.split(",").map((keyword, idx) => {
               const trimmedKeyword = keyword.trim();
               if (!trimmedKeyword) return null;
               return (
