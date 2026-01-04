@@ -58,7 +58,8 @@ const EvidencePathView = ({ evidences = [] }) => {
     // 키워드 확장 추적 정보 수집 (실제 evidence 데이터에서 추출)
     const allKeywords = new Set();
     const initialKeywords = new Set();
-    const expandedKeywords = new Set();
+    const llmExpandedKeywords = new Set();
+    const semanticExpandedKeywords = new Set();
 
     // evidence들에서 키워드 정보 수집
     evidences.forEach((evidence) => {
@@ -66,21 +67,43 @@ const EvidencePathView = ({ evidences = [] }) => {
       if (trace && trace.matched_keyword) {
         allKeywords.add(trace.matched_keyword);
 
-        if (trace.is_from_expansion) {
-          expandedKeywords.add(trace.matched_keyword);
-        } else {
+        // keyword_source 우선 사용
+        let keywordSource = trace.keyword_source;
+        if (!keywordSource) {
+          // expansion_method가 있으면 semantic_expansion
+          if (trace.expansion_method && trace.expansion_method !== "none") {
+            keywordSource = "semantic_expansion";
+          } else {
+            // is_from_expansion으로 판단
+            keywordSource = trace.is_from_expansion
+              ? "llm_expansion"
+              : "initial_keyword";
+          }
+        }
+
+        if (keywordSource === "initial_keyword") {
           initialKeywords.add(trace.matched_keyword);
+        } else if (keywordSource === "llm_expansion") {
+          llmExpandedKeywords.add(trace.matched_keyword);
+        } else if (keywordSource === "semantic_expansion") {
+          semanticExpandedKeywords.add(trace.matched_keyword);
         }
       }
     });
 
     // Set을 Array로 변환
     const initialKeywordsArray = Array.from(initialKeywords);
-    const expandedKeywordsArray = Array.from(expandedKeywords);
+    const llmExpandedKeywordsArray = Array.from(llmExpandedKeywords);
+    const semanticExpandedKeywordsArray = Array.from(semanticExpandedKeywords);
+    const expandedKeywordsArray = [
+      ...llmExpandedKeywordsArray,
+      ...semanticExpandedKeywordsArray,
+    ];
 
     console.log("키워드 추출 결과:", {
       initialKeywords: initialKeywordsArray,
-      expandedKeywords: expandedKeywordsArray,
+      llmExpandedKeywords: llmExpandedKeywordsArray,
+      semanticExpandedKeywords: semanticExpandedKeywordsArray,
       totalEvidences: evidences.length,
       sampleEvidence: evidences[0]?.trace,
     });
@@ -91,23 +114,47 @@ const EvidencePathView = ({ evidences = [] }) => {
       addNode(keywordId, keyword, "keyword", {
         isInitial: true,
         keywordType: "initial",
+        keywordSource: "initial_keyword",
         evidence: {
           description: `Kiwi 형태소 분석기로 추출된 초기 키워드`,
           extractionMethod: "kiwi",
+          keywordSource: "initial_keyword",
         },
       });
     });
 
-    // 2. 확장된 키워드 노드 추가 (LLM 확장)
-    expandedKeywordsArray.forEach((keyword) => {
+    // 2. LLM 확장 키워드 노드 추가
+    llmExpandedKeywordsArray.forEach((keyword) => {
       if (!initialKeywordsArray.includes(keyword)) {
         const keywordId = getNodeId("keyword", `expanded_${keyword}`);
         addNode(keywordId, keyword, "keyword", {
           isInitial: false,
-          keywordType: "expanded",
+          keywordType: "llm_expanded",
+          keywordSource: "llm_expansion",
           evidence: {
             description: `LLM으로 확장된 키워드`,
             extractionMethod: "llm_expansion",
+            keywordSource: "llm_expansion",
+          },
+        });
+      }
+    });
+
+    // 3. 지식 확장 키워드 노드 추가 (Semantic Expander)
+    semanticExpandedKeywordsArray.forEach((keyword) => {
+      if (
+        !initialKeywordsArray.includes(keyword) &&
+        !llmExpandedKeywordsArray.includes(keyword)
+      ) {
+        const keywordId = getNodeId("keyword", `semantic_${keyword}`);
+        addNode(keywordId, keyword, "keyword", {
+          isInitial: false,
+          keywordType: "semantic_expanded",
+          keywordSource: "semantic_expansion",
+          evidence: {
+            description: `지식 그래프로 확장된 키워드`,
+            extractionMethod: "semantic_expansion",
+            keywordSource: "semantic_expansion",
           },
         });
       }
@@ -197,36 +244,123 @@ const EvidencePathView = ({ evidences = [] }) => {
           (!!trace.expansion_method && trace.expansion_method !== "none"),
       };
 
-      addNode(entityId, entityName, "entity", {
-        entityType,
-        expansionMethod,
-        evidenceIndex: index,
-        evidence: nodeEvidence,
-      });
+      // 4.5. Thread를 통해 나온 속성들은 키워드에서 직접 연결
+      const rawData = evidence.raw_data || {};
+      const attributesToShow = [];
 
-      // 5. 키워드 → 엔티티 연결 추가
+      // type_and_summary: summary, year, category 표시 (type 제외)
+      if (threadType === "type_and_summary") {
+        // Summary 속성
+        if (rawData.summary?.value || rawData.summary) {
+          const summaryValue = rawData.summary?.value || rawData.summary;
+          if (summaryValue) {
+            attributesToShow.push({
+              key: "summary",
+              label: "Summary",
+              value: summaryValue,
+            });
+          }
+        }
+
+        // Year 속성
+        if (rawData.year?.value || rawData.year) {
+          const yearValue = rawData.year?.value || rawData.year;
+          if (yearValue) {
+            attributesToShow.push({
+              key: "year",
+              label: "Year",
+              value: yearValue,
+            });
+          }
+        }
+
+        // Category 속성
+        if (rawData.category?.value || rawData.category) {
+          const categoryValue = rawData.category?.value || rawData.category;
+          if (categoryValue) {
+            attributesToShow.push({
+              key: "category",
+              label: "Category",
+              value: categoryValue,
+            });
+          }
+        }
+      }
+
+      // entity_properties: predicate_display와 value를 사용
+      if (threadType === "entity_properties") {
+        const predicateDisplay =
+          trace.predicate_display || rawData.predicate_display;
+        const propertyValue = rawData.value?.value || rawData.value;
+
+        if (predicateDisplay && propertyValue) {
+          attributesToShow.push({
+            key: predicateDisplay.toLowerCase(),
+            label: predicateDisplay,
+            value: propertyValue,
+          });
+        }
+      }
+
+      // 키워드 ID 결정
       const matchedKeyword = trace.matched_keyword;
+      let keywordId = null;
+
       if (matchedKeyword) {
-        let keywordId;
-        if (trace.is_from_expansion) {
-          // 확장된 키워드에서 추출된 엔티티
+        // keyword_source에 따라 올바른 키워드 ID 결정
+        if (keywordSource === "semantic_expansion") {
+          keywordId = getNodeId("keyword", `semantic_${matchedKeyword}`);
+        } else if (
+          keywordSource === "llm_expansion" ||
+          trace.is_from_expansion
+        ) {
           keywordId = getNodeId("keyword", `expanded_${matchedKeyword}`);
         } else {
-          // 초기 키워드에서 추출된 엔티티
           keywordId = getNodeId("keyword", `initial_${matchedKeyword}`);
         }
 
-        // 키워드 노드가 존재하는지 확인 후 링크 추가
-        if (nodeMap.has(keywordId)) {
-          // predicate가 있으면 사용, 없으면 빈 문자열
-          const linkLabel = predicate || "";
-          links.push({
-            source: keywordId,
-            target: entityId,
-            label: linkLabel,
-            linkType: "entity_extraction",
-            direction: "extraction",
-            extractionMethod: trace.is_from_expansion ? "expanded" : "initial",
+        // 키워드 노드가 존재하면 속성 노드들 생성 및 연결 (type_and_summary, entity_properties)
+        if (
+          nodeMap.has(keywordId) &&
+          (threadType === "type_and_summary" ||
+            threadType === "entity_properties")
+        ) {
+          attributesToShow.forEach((attr) => {
+            // 각 evidence마다 고유한 속성 노드 생성
+            const attrId = getNodeId(
+              "attribute",
+              `${matchedKeyword}_${attr.key}_${index}`
+            );
+
+            // 노드 이름: Summary/Category는 빈 문자열, Year는 연도 값
+            let nodeName = "";
+            if (attr.key === "year") {
+              nodeName = attr.value; // Year는 연도를 노드 이름으로
+            }
+            // Summary, Category는 빈 문자열 유지
+
+            // 속성 노드 추가 (작은 원으로 표시)
+            addNode(attrId, nodeName, "attribute", {
+              attributeKey: attr.key,
+              attributeValue: attr.value,
+              parentEntity: entityName,
+              parentKeyword: matchedKeyword,
+              evidenceIndex: index,
+              evidence: {
+                description: `${attr.label}: ${attr.value}`,
+                threadType: threadType,
+                value: attr.value,
+              },
+            });
+
+            // 키워드 → 속성 직접 연결 - 얇은 검은색
+            links.push({
+              source: keywordId,
+              target: attrId,
+              label: attr.label,
+              linkType: "keyword_to_attribute",
+              direction: "attribute",
+            });
           });
         }
       }
@@ -250,36 +384,92 @@ const EvidencePathView = ({ evidences = [] }) => {
 
         // entity1과 entity2가 모두 있는 경우
         if (entity1 && entity2) {
-          const entity1Id = getNodeId("entity", entity1);
-          const entity2Id = getNodeId("entity", entity2);
+          // entity1 처리: matched_keyword와 같으면 키워드 노드 사용, 아니면 엔티티 노드 생성
+          let entity1Id;
+          if (matchedKeyword && entity1 === matchedKeyword) {
+            // 키워드 노드 ID 사용 - keyword_source에 따라 결정
+            if (keywordSource === "semantic_expansion") {
+              entity1Id = getNodeId("keyword", `semantic_${matchedKeyword}`);
+            } else if (
+              keywordSource === "llm_expansion" ||
+              trace.is_from_expansion
+            ) {
+              entity1Id = getNodeId("keyword", `expanded_${matchedKeyword}`);
+            } else {
+              entity1Id = getNodeId("keyword", `initial_${matchedKeyword}`);
+            }
+          } else {
+            // 별도 엔티티 노드 생성
+            entity1Id = getNodeId("entity", entity1);
+            if (entity1 !== entityName) {
+              addNode(entity1Id, entity1, "entity", {
+                entityType: "Entity",
+                expansionMethod: "none",
+                evidenceIndex: index,
+                evidence: {
+                  threadType: "connected_entities",
+                  description: evidence.description || "",
+                  rawData: rawData,
+                  isExplored: true, // 탐색한 노드 표시
+                },
+              });
+            }
+          }
 
-          // entity1 노드 추가 (탐색한 키워드로 표시)
-          if (entity1 !== entityName) {
-            addNode(entity1Id, entity1, "entity", {
-              entityType: "Entity",
-              expansionMethod: "none",
-              evidenceIndex: index,
-              evidence: {
-                threadType: "connected_entities",
-                description: evidence.description || "",
-                rawData: rawData,
-                isExplored: true, // 탐색한 노드 표시
-              },
+          // entity2 처리: 키워드에 있으면 키워드 노드 사용, 아니면 엔티티 노드 생성
+          let entity2Id;
+          if (initialKeywordsArray.includes(entity2)) {
+            // entity2가 초기 키워드면 키워드 노드 재사용
+            entity2Id = getNodeId("keyword", `initial_${entity2}`);
+          } else if (llmExpandedKeywordsArray.includes(entity2)) {
+            // entity2가 LLM 확장 키워드면 키워드 노드 재사용
+            entity2Id = getNodeId("keyword", `expanded_${entity2}`);
+          } else if (semanticExpandedKeywordsArray.includes(entity2)) {
+            // entity2가 지식 확장 키워드면 키워드 노드 재사용
+            entity2Id = getNodeId("keyword", `semantic_${entity2}`);
+          } else {
+            // 키워드가 아니면 엔티티 노드 생성
+            entity2Id = getNodeId("entity", entity2);
+            if (entity2 !== entityName) {
+              addNode(entity2Id, entity2, "entity", {
+                entityType: "Entity",
+                expansionMethod: "none",
+                evidenceIndex: index,
+                evidence: {
+                  threadType: "connected_entities",
+                  description: evidence.description || "",
+                  rawData: rawData,
+                  isExplored: true, // 탐색한 노드 표시
+                },
+              });
+            }
+          }
+
+          // 키워드가 있고 entity1이 키워드와 다른 경우, 키워드에서 entity1로 연결
+          if (matchedKeyword && entity1 !== matchedKeyword && keywordId) {
+            links.push({
+              source: keywordId,
+              target: entity1Id,
+              label: "추출",
+              linkType: "entity_extraction",
+              direction: "extraction",
             });
           }
 
-          // entity2 노드 추가 (탐색한 키워드로 표시)
-          if (entity2 !== entityName) {
-            addNode(entity2Id, entity2, "entity", {
-              entityType: "Entity",
-              expansionMethod: "none",
-              evidenceIndex: index,
-              evidence: {
-                threadType: "connected_entities",
-                description: evidence.description || "",
-                rawData: rawData,
-                isExplored: true, // 탐색한 노드 표시
-              },
+          // 키워드가 있고 entity2가 키워드가 아닌 경우에만 키워드에서 entity2로 연결
+          if (
+            matchedKeyword &&
+            keywordId &&
+            !initialKeywordsArray.includes(entity2) &&
+            !llmExpandedKeywordsArray.includes(entity2) &&
+            !semanticExpandedKeywordsArray.includes(entity2)
+          ) {
+            links.push({
+              source: keywordId,
+              target: entity2Id,
+              label: "연결 엔티티",
+              linkType: "entity_extraction",
+              direction: "extraction",
             });
           }
 
@@ -334,6 +524,10 @@ const EvidencePathView = ({ evidences = [] }) => {
                 ) {
                   existingNode.evidence.connectedEntities.push(entity2);
                 }
+                // description 업데이트: 모든 연결된 엔티티 표시
+                const connectedList =
+                  existingNode.evidence.connectedEntities.join(", ");
+                existingNode.evidence.description = `${connectedList}의 수렴 노드: ${convergenceLabel}`;
               }
             } else {
               addNode(convergenceId, convergenceLabel, "entity", {
@@ -343,7 +537,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                 isConvergence: true,
                 evidence: {
                   threadType: "connected_entities",
-                  description: `수렴 노드: ${convergenceLabel}`,
+                  description: `${entity1} ↔ ${entity2}의 수렴 노드: ${convergenceLabel}`,
                   rawData: rawData,
                   convergenceNode: convergenceNode,
                   connectedEntities: [entity1, entity2],
@@ -688,6 +882,7 @@ const EvidencePathView = ({ evidences = [] }) => {
       nodesByType: {
         keyword: nodes.filter((n) => n.type === "keyword").length,
         entity: nodes.filter((n) => n.type === "entity").length,
+        attribute: nodes.filter((n) => n.type === "attribute").length,
         value: nodes.filter((n) => n.type === "value").length,
       },
       linksByType: {
@@ -697,6 +892,8 @@ const EvidencePathView = ({ evidences = [] }) => {
         entity_extraction: links.filter(
           (l) => l.linkType === "entity_extraction"
         ).length,
+        entity_attribute: links.filter((l) => l.linkType === "entity_attribute")
+          .length,
         property_relation: links.filter(
           (l) => l.linkType === "property_relation"
         ).length,
@@ -710,10 +907,14 @@ const EvidencePathView = ({ evidences = [] }) => {
   const getNodeColor = useCallback((node) => {
     // 키워드 노드 색상 체계
     if (node.type === "keyword") {
-      if (node.isInitial) {
+      if (node.keywordSource === "initial_keyword" || node.isInitial) {
         return "#FEF3C7"; // 초기 키워드: 연한 노란색
-      } else {
+      } else if (node.keywordSource === "llm_expansion") {
         return "#F59E0B"; // LLM 확장 키워드: 진한 노란색
+      } else if (node.keywordSource === "semantic_expansion") {
+        return "#7DD3FC"; // 지식 확장 키워드: 연한 파란색
+      } else {
+        return "#F59E0B"; // 기본: LLM 확장 (하위 호환성)
       }
     }
 
@@ -761,7 +962,22 @@ const EvidencePathView = ({ evidences = [] }) => {
       return "#FEF3C7";
     }
 
-    // 속성값: 연한 회색
+    // 속성 노드: 속성 타입별로 다른 색상
+    if (node.type === "attribute") {
+      const attrKey = node.attributeKey;
+      if (attrKey === "summary") {
+        return "#D1FAE5"; // 연한 초록색
+      } else if (attrKey === "type") {
+        return "#DDD6FE"; // 연한 보라색
+      } else if (attrKey === "year") {
+        return "#FED7AA"; // 연한 주황색
+      } else if (attrKey === "category") {
+        return "#FBCFE8"; // 연한 분홍색
+      }
+      return "#E5E7EB"; // 기본 회색
+    }
+
+    // 속성값: 연한 회색 (기존 value 타입)
     if (node.type === "value") {
       return "#E5E7EB";
     }
@@ -777,7 +993,10 @@ const EvidencePathView = ({ evidences = [] }) => {
     if (node.type === "entity") {
       return 12; // 엔티티 노드 (가장 큼)
     }
-    return 6; // 속성값 노드 (가장 작음)
+    if (node.type === "attribute") {
+      return 5; // 속성 노드 (작게)
+    }
+    return 6; // 기타 속성값 노드
   }, []);
 
   // 노드 클릭 핸들러 제거 (사용하지 않음)
@@ -855,10 +1074,10 @@ const EvidencePathView = ({ evidences = [] }) => {
         fg.d3Force("link")?.distance(80).strength(0.3);
 
         // 반발력 설정 (원형 배치를 위해 적당히)
-        fg.d3Force("charge")?.strength(-400).distanceMax(300);
+        fg.d3Force("charge")?.strength(-300).distanceMax(250);
 
-        // 중심 끌림 (클러스터가 화면 중앙에 모이도록)
-        fg.d3Force("center")?.strength(0.1);
+        // 중심 끌림 강화 (클러스터가 화면 중앙에 모이도록)
+        fg.d3Force("center")?.strength(0.5);
 
         // 시뮬레이션 재시작
         fg.d3ReheatSimulation();
@@ -927,16 +1146,8 @@ const EvidencePathView = ({ evidences = [] }) => {
     }
   }, [graphData.nodes.length, graphData.links.length, isExpanded]);
 
-  if (!evidences || evidences.length === 0) {
-    return null;
-  }
-
   // trace 정보가 있는 evidence만 필터링
   const evidencesWithTrace = evidences.filter((ev) => ev.trace);
-
-  if (evidencesWithTrace.length === 0) {
-    return null;
-  }
 
   // 드롭다운이 열릴 때 자동 스크롤 (더 부드럽고 신속하게)
   useEffect(() => {
@@ -974,6 +1185,11 @@ const EvidencePathView = ({ evidences = [] }) => {
       return () => clearTimeout(timer);
     }
   }, [isExpanded]);
+
+  // evidences가 없거나 trace가 없으면 렌더링하지 않음
+  if (!evidences || evidences.length === 0 || evidencesWithTrace.length === 0) {
+    return null;
+  }
 
   return (
     <div
@@ -1129,11 +1345,50 @@ const EvidencePathView = ({ evidences = [] }) => {
                   width: "12px",
                   height: "12px",
                   borderRadius: "50%",
+                  backgroundColor: "#D1FAE5",
+                }}
+              />
+              <span style={{ fontSize: "12px", color: COLORS.dark }}>
+                Summary 속성
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div
+                style={{
+                  width: "12px",
+                  height: "12px",
+                  borderRadius: "50%",
+                  backgroundColor: "#FED7AA",
+                }}
+              />
+              <span style={{ fontSize: "12px", color: COLORS.dark }}>
+                Year 속성
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div
+                style={{
+                  width: "12px",
+                  height: "12px",
+                  borderRadius: "50%",
+                  backgroundColor: "#FBCFE8",
+                }}
+              />
+              <span style={{ fontSize: "12px", color: COLORS.dark }}>
+                Category 속성
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <div
+                style={{
+                  width: "12px",
+                  height: "12px",
+                  borderRadius: "50%",
                   backgroundColor: "#E5E7EB",
                 }}
               />
               <span style={{ fontSize: "12px", color: COLORS.dark }}>
-                속성값
+                기타 속성값
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -1192,12 +1447,33 @@ const EvidencePathView = ({ evidences = [] }) => {
                   x2="18"
                   y2="6"
                   stroke="#000000"
+                  strokeWidth="0.8"
+                />
+                <polygon points="18,6 14,3 14,9" fill="#000000" />
+              </svg>
+              <span style={{ fontSize: "12px", color: COLORS.dark }}>
+                키워드 → 속성 (얇은 검은색)
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <svg
+                width="24"
+                height="12"
+                viewBox="0 0 24 12"
+                style={{ overflow: "visible" }}
+              >
+                <line
+                  x1="2"
+                  y1="6"
+                  x2="18"
+                  y2="6"
+                  stroke="#000000"
                   strokeWidth="1"
                 />
                 <polygon points="18,6 14,3 14,9" fill="#000000" />
               </svg>
               <span style={{ fontSize: "12px", color: COLORS.dark }}>
-                속성/관계 (화살표 없음)
+                속성/관계
               </span>
             </div>
           </div>
@@ -1308,8 +1584,13 @@ const EvidencePathView = ({ evidences = [] }) => {
                   nodeCanvasObject={(node, ctx, globalScale) => {
                     try {
                       const label = node.name || "";
-                      // 폰트 크기를 줄여서 텍스트 겹침 방지
-                      const fontSize = Math.max(7, 10 / globalScale);
+                      // 폰트 크기: 속성 노드는 더 작게
+                      let fontSize;
+                      if (node.type === "attribute") {
+                        fontSize = Math.max(5, 7 / globalScale); // 속성 노드는 작게
+                      } else {
+                        fontSize = Math.max(7, 10 / globalScale); // 일반 노드
+                      }
                       ctx.font = `${fontSize}px Sans-Serif`;
                       ctx.textAlign = "center";
                       ctx.textBaseline = "middle";
@@ -1396,6 +1677,10 @@ const EvidencePathView = ({ evidences = [] }) => {
                       return "#D1D5DB"; // 키워드 추출: 연한 회색
                     } else if (link.linkType === "bfs_path") {
                       return "#9CA3AF"; // BFS 경로: 중간 회색
+                    } else if (link.linkType === "keyword_to_attribute") {
+                      return "#646464"; // 키워드 → 속성: 검은색
+                    } else if (link.linkType === "entity_attribute") {
+                      return "#9CA3AF"; // 엔티티 속성: 중간 회색
                     } else {
                       return "#F3F4F6"; // 속성/관계: 더 연한 회색
                     }
@@ -1407,6 +1692,10 @@ const EvidencePathView = ({ evidences = [] }) => {
                       return 2; // 키워드 추출 링크도 두껍게
                     } else if (link.linkType === "bfs_path") {
                       return 2; // BFS 경로는 두껍게
+                    } else if (link.linkType === "keyword_to_attribute") {
+                      return 0.8; // 키워드 → 속성 링크 (얇게)
+                    } else if (link.linkType === "entity_attribute") {
+                      return 1.5; // 엔티티 속성 링크
                     } else {
                       return 1; // 속성/관계 링크는 기본
                     }
@@ -1415,6 +1704,14 @@ const EvidencePathView = ({ evidences = [] }) => {
                     // 수렴 노드(BFS 경로): 화살표 필수
                     if (link.linkType === "bfs_path") {
                       return 12; // 화살표 크기 증가
+                    }
+                    // 키워드 → 속성 연결: 화살표 표시
+                    if (link.linkType === "keyword_to_attribute") {
+                      return 10; // 화살표 크기
+                    }
+                    // 엔티티 → 속성 연결: 화살표 표시
+                    if (link.linkType === "entity_attribute") {
+                      return 10; // 화살표 크기
                     }
                     // outgoing/incoming 관계: 화살표 필수
                     if (
@@ -1439,6 +1736,10 @@ const EvidencePathView = ({ evidences = [] }) => {
                       return "#D1D5DB";
                     } else if (link.linkType === "bfs_path") {
                       return "#9CA3AF"; // BFS 경로 화살표 색상
+                    } else if (link.linkType === "keyword_to_attribute") {
+                      return "#000000"; // 키워드 → 속성 화살표 색상
+                    } else if (link.linkType === "entity_attribute") {
+                      return "#9CA3AF"; // 엔티티 속성 화살표 색상
                     } else {
                       return "#F3F4F6";
                     }
@@ -1474,12 +1775,6 @@ const EvidencePathView = ({ evidences = [] }) => {
                       ctx.textAlign = "center";
                       ctx.textBaseline = "middle";
 
-                      // 텍스트 크기 측정
-                      const textWidth = ctx.measureText(label).width;
-                      const padding = 4 / globalScale;
-                      const boxWidth = textWidth + padding * 2;
-                      const boxHeight = fontSize + padding * 2;
-
                       // 선의 수직 방향 계산 (상단부로 이동하기 위해)
                       const perpendicularAngle = angle + Math.PI / 2; // 90도 회전
                       const offsetDistance = 12 / globalScale; // 선 위로 이동할 거리
@@ -1501,16 +1796,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                       }
                       ctx.rotate(rotationAngle);
 
-                      // 선 위에 보이도록 흰색 배경 그리기 (최소한의 박스)
-                      ctx.fillStyle = "rgba(255, 255, 255, 0.9)"; // 반투명 흰색 배경
-                      ctx.fillRect(
-                        -boxWidth / 2,
-                        -boxHeight / 2,
-                        boxWidth,
-                        boxHeight
-                      );
-
-                      // 텍스트 그리기
+                      // 배경 없이 텍스트만 그리기
                       ctx.fillStyle = "#000000"; // 검은색 텍스트
                       ctx.fillText(label, 0, 0);
 
@@ -1869,6 +2155,75 @@ const EvidencePathView = ({ evidences = [] }) => {
                       </div>
                     )}
                 </>
+              )}
+
+              {/* 속성 노드 (attribute 타입) 정보 표시 */}
+              {hoveredNode.type === "attribute" && (
+                <div
+                  style={{
+                    fontSize: "11px",
+                    marginTop: "8px",
+                    padding: "10px",
+                    backgroundColor: "#F9FAFB",
+                    borderRadius: "6px",
+                    border: `1px solid ${COLORS.border}`,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: "600",
+                      color: COLORS.dark,
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <strong>📋 속성 정보</strong>
+                  </div>
+                  <div style={{ marginBottom: "6px" }}>
+                    <span style={{ fontWeight: "600", color: COLORS.dark }}>
+                      <strong>엔티티: </strong>
+                    </span>
+                    <span style={{ color: COLORS.gray }}>
+                      <strong>{hoveredNode.parentEntity}</strong>
+                    </span>
+                  </div>
+                  <div style={{ marginBottom: "6px" }}>
+                    <span style={{ fontWeight: "600", color: COLORS.dark }}>
+                      <strong>속성명: </strong>
+                    </span>
+                    <span style={{ color: COLORS.gray }}>
+                      <strong>{hoveredNode.attributeKey}</strong>
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      padding: "8px",
+                      backgroundColor: COLORS.secondary,
+                      borderRadius: "4px",
+                      border: `1px solid ${COLORS.border}`,
+                      marginTop: "8px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: "600",
+                        color: COLORS.dark,
+                        marginBottom: "4px",
+                        fontSize: "10px",
+                      }}
+                    >
+                      <strong>값:</strong>
+                    </div>
+                    <div
+                      style={{
+                        color: COLORS.gray,
+                        lineHeight: "1.4",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      <strong>{hoveredNode.attributeValue}</strong>
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* 속성/관계 노드 (value 타입) 정보 표시 */}
