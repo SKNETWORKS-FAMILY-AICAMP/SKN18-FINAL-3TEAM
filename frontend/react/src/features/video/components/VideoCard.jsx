@@ -57,6 +57,26 @@ const VideoCard = ({ video, onClick }) => {
           flexWrap: "wrap",
         }}
       >
+        {video.video_keyword && (
+          <>
+            {video.video_keyword.split(',').map((keyword, idx) => {
+              const trimmedKeyword = keyword.trim();
+              if (!trimmedKeyword) return null;
+              return (
+                <span
+                  key={`keyword-${idx}`}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "2px",
+                  }}
+                >
+                  <span>#{trimmedKeyword}</span>
+                </span>
+              );
+            })}
+          </>
+        )}
         {video.tags && Array.isArray(video.tags) && video.tags.length > 0 ? (
           video.tags.map((tag, idx) => (
             <span

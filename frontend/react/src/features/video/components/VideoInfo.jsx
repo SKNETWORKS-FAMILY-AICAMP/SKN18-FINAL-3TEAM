@@ -1,7 +1,7 @@
 import { COLORS } from '../../../constants/theme';
 import { HeartIcon, TagIcon } from '../../../components/common/Icons';
 
-const VideoInfo = ({ tags, title, date, isLiked, onLikeClick, likesCount = 0 }) => {
+const VideoInfo = ({ tags, title, date, isLiked, onLikeClick, likesCount = 0, video_keyword }) => {
   return (
     <div
       style={{
@@ -23,6 +23,26 @@ const VideoInfo = ({ tags, title, date, isLiked, onLikeClick, likesCount = 0 }) 
             flexWrap: 'wrap',
           }}
         >
+          {video_keyword && (
+            <>
+              {video_keyword.split(',').map((keyword, idx) => {
+                const trimmedKeyword = keyword.trim();
+                if (!trimmedKeyword) return null;
+                return (
+                  <span
+                    key={`keyword-${idx}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '2px',
+                    }}
+                  >
+                    <span>#{trimmedKeyword}</span>
+                  </span>
+                );
+              })}
+            </>
+          )}
           {tags && typeof tags === 'string' ? (
             // 문자열로 전달된 경우 (기존 형식 호환)
             tags.split(' ').map((tagItem, idx) => {
