@@ -151,3 +151,11 @@ docker login -u AWS --password-stdin $(aws ecr get-login-password --region ap-no
 ```powershell
 docker build -t skn-backend:latest -f backend/Dockerfile .
 ```
+
+```powershell
+# 1. 태그 달기
+docker tag skn-backend:latest 533124807326.dkr.ecr.ap-northeast-2.amazonaws.com/skn18-3-dev-web:latest
+
+# 2. 푸시하기
+docker push 533124807326.dkr.ecr.ap-northeast-2.amazonaws.com/skn18-3-dev-web:latest
+```
