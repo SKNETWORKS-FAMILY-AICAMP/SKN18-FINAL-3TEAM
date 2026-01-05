@@ -12,12 +12,24 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 from dotenv import load_dotenv
 from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(override=True, dotenv_path=BASE_DIR.parent.parent / ".env")
+
+# ------------------------------------------------------------------------
+# [경로 추가] Django에서 'backend' 모듈을 찾을 수 있도록 프로젝트 루트 추가
+# ------------------------------------------------------------------------
+# BASE_DIR = backend/django
+# BASE_DIR.parent = backend
+# BASE_DIR.parent.parent = 프로젝트 루트
+project_root = BASE_DIR.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+# ------------------------------------------------------------------------
 
 # Docker 환경에서 Fuseki URL 설정
 # Docker Compose에서 같은 네트워크의 서비스는 서비스 이름으로 접근 가능
@@ -363,3 +375,11 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
+
+# macOS에서 SIGSEGV 오류 방지: prefork 대신 solo 또는 threads 사용
+# torch, transformers 같은 대용량 라이브러리 사용 시 prefork 방식이 문제 발생
+import sys
+if sys.platform == "darwin":  # macOS
+    CELERY_WORKER_POOL = "solo"  # 또는 "threads"
+else:
+    CELERY_WORKER_POOL = "prefork"  # Linux에서는 prefork 사용 가능

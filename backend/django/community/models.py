@@ -7,10 +7,8 @@ class Comment(models.Model):
     """
     댓글 관리 테이블
 
-    init.sql에서 테이블 생성 (managed=False)
-    Django는 데이터 읽기/쓰기만 담당
-
     init.sql 테이블: comment
+    Django가 테이블 생성 및 마이그레이션 관리
     """
     # id는 Django 기본 pk 사용
     user = models.ForeignKey(
@@ -43,7 +41,7 @@ class Comment(models.Model):
 
     class Meta:
         db_table = 'comment'
-        managed = False  # init.sql에서 테이블 생성
+        managed = True  # Django가 테이블 생성 및 마이그레이션 관리
         ordering = ['-created_at']
         verbose_name = '댓글'
         verbose_name_plural = '댓글들'
@@ -57,10 +55,8 @@ class Reply(models.Model):
     """
     답글 관리 테이블
 
-    init.sql에서 테이블 생성 (managed=False)
-    Django는 데이터 읽기/쓰기만 담당
-
     init.sql 테이블: reply
+    Django가 테이블 생성 및 마이그레이션 관리
     """
     # id는 Django 기본 pk 사용
     comment = models.ForeignKey(
@@ -97,7 +93,7 @@ class Reply(models.Model):
 
     class Meta:
         db_table = 'reply'
-        managed = False  # init.sql에서 테이블 생성
+        managed = True  # Django가 테이블 생성 및 마이그레이션 관리
         ordering = ['created_at']
         verbose_name = '답글'
         verbose_name_plural = '답글들'
@@ -111,11 +107,9 @@ class Likes(models.Model):
     """
     좋아요 관리 테이블
 
-    init.sql에서 테이블 생성 (managed=False)
-    Django는 데이터 읽기/쓰기만 담당
-
     init.sql 테이블: likes
-    제약조건: video_id, comment_id, reply_id 중 정확히 하나만 NOT NULL
+    Django가 테이블 생성 및 마이그레이션 관리
+    제약조건: video_id, comment_id, reply_id 중 최소 하나는 NOT NULL (chk_at_least_one_not_null)
     """
     # id는 Django 기본 pk 사용
     user = models.ForeignKey(
@@ -159,11 +153,11 @@ class Likes(models.Model):
 
     class Meta:
         db_table = 'likes'
-        managed = False  # init.sql에서 테이블 생성
+        managed = True  # Django가 테이블 생성 및 마이그레이션 관리
         ordering = ['-created_at']
         verbose_name = '좋아요'
         verbose_name_plural = '좋아요들'
-        # 제약조건은 init.sql에서 정의됨 (likes_one_target_only)
+        # 제약조건은 init.sql에서 정의됨 (chk_at_least_one_not_null)
 
     def __str__(self):
         target = self.video or self.comment or self.reply

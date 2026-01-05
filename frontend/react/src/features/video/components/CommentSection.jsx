@@ -4,6 +4,7 @@ import { UserIcon, SendIcon } from "../../../components/common/Icons";
 import Comment from "./Comment";
 import { createComment } from "../../../api/communityApi";
 import { getProfileImageUrl } from "../../../utils/imageUtils";
+import { useBackgroundTask } from "../../../contexts/BackgroundTaskContext";
 
 const CommentSection = ({
   comments,
@@ -16,6 +17,7 @@ const CommentSection = ({
   const [commentText, setCommentText] = useState("");
   const [commentsList, setCommentsList] = useState(comments);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { startCeleryTaskPolling } = useBackgroundTask();
   
   // 하나의 동작만 가능하도록 전역 상태 관리
   const [activeReplyId, setActiveReplyId] = useState(null); // 'comment-{id}' 또는 'reply-{id}' 형식
@@ -62,6 +64,22 @@ const CommentSection = ({
         setCommentsList([newComment, ...commentsList]);
         if (onCommentAdd) {
           onCommentAdd(newComment);
+        }
+
+        // Celery task ID가 반환되면 폴링 시작
+        if (response.task_id) {
+          startCeleryTaskPolling(
+            response.task_id,
+            'AI 답글 생성',
+            (result) => {
+              // AI 답글이 완료되면 댓글 목록을 새로고침하거나 답글 추가
+              console.log('AI 답글 생성 완료:', result);
+              // 필요시 댓글 목록 리프레시 로직 추가
+              if (onCommentAdd) {
+                onCommentAdd(newComment); // 부모 컴포넌트에서 리프레시 처리
+              }
+            }
+          );
         }
       }
       setCommentText("");

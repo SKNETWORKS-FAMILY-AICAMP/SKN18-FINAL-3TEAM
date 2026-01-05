@@ -20,6 +20,20 @@ from backend.langgraph_fuseki.nodes.user_intent_clarification_node import UserCl
 
 logger = logging.getLogger("chatbot")
 
+
+def clear_thinking_session(request):
+    """
+    Thinking 관련 세션 데이터 정리 (통일된 함수)
+
+    재질문 전 이벤트는 유지하고, 재질문 관련 임시 데이터만 정리
+    """
+    request.session.pop('pending_thinking_events', None)
+    request.session.pop("pending_clarification_query", None)
+    request.session.pop("pending_expansion_directions", None)
+    request.session.pop("pending_basic_keywords", None)
+    request.session.modified = True
+    logger.info("[chat] Thinking session cleared")
+
 def _get_or_create_session_for_user(request, *, create=True):
     """
     인증된 사용자를 위한 ChatSession을 가져온다.
@@ -216,21 +230,18 @@ def _handle_question(request, chat_session=None):
             logger.info("[chat] Using ontology LangGraph (Thinking mode)")
             app = create_ontology_graph()
             
-            # 🧠 Thinking 콜백 설정 (비스트리밍 모드)
-            def thinking_callback(event_type: str, data: dict):
-                """비스트리밍 모드에서 thinking 이벤트를 세션에 저장"""
-                thinking_event = {
-                    "type": "thinking",
-                    "event": event_type,
-                    "data": data,
-                    "timestamp": time.time()
-                }
+            # Thinking 콜백 설정 (비스트리밍 모드)
+            def thinking_callback(event_dict: dict):
+                """
+                비스트리밍 모드에서 thinking 이벤트를 세션에 저장
+                통일된 이벤트 구조 사용
+                """
                 if 'pending_thinking_events' not in request.session:
                     request.session['pending_thinking_events'] = []
-                request.session['pending_thinking_events'].append(thinking_event)
+                request.session['pending_thinking_events'].append(event_dict)
                 request.session.modified = True
-                logger.info(f"[chat][thinking] Stored thinking event: {event_type}")
-            
+                logger.info(f"[chat][thinking] Stored thinking event: {event_dict.get('event')}")
+
             invoke_params["thinking_callback"] = thinking_callback
         else:
             logger.info("[chat] Using standard LangGraph")
@@ -337,6 +348,8 @@ def _handle_question(request, chat_session=None):
     except Exception:
         logger.exception("[chat] langgraph failed")
         error = "오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+        # 에러 발생 시 세션 정리
+        clear_thinking_session(request)
         # 일반 오류 시에도 변수 초기화
         needs_clarification = False
         expansion_directions = []
@@ -363,12 +376,7 @@ def _handle_question(request, chat_session=None):
     else:
         # 재질문이 완료되었거나 없으면 세션 정리
         if not (needs_clarification and expansion_directions):
-            # 🧠 정상 완료 시 세션 정리
-            request.session.pop('pending_thinking_events', None)
-            request.session.pop("pending_clarification_query", None)
-            request.session.pop("pending_expansion_directions", None) 
-            request.session.pop("pending_basic_keywords", None) 
-            request.session.modified = True
+            clear_thinking_session(request)
 
     return Response(response_data)
 
@@ -480,7 +488,7 @@ class ChatQuestionView(APIView):
                         app = create_ontology_graph()
                     else:
                         logger.info("[chat][stream] Using standard LangGraph")
-                        app = create_ontology_graph()
+                        app = create_graph_flow()
 
                     # LangGraph 호출 시 사용자 선택 포함
                     invoke_params = {
@@ -552,31 +560,28 @@ class ChatQuestionView(APIView):
                             logger.error(f"[chat][stream] Callback error: {e}", exc_info=True)
                     
                     # Thinking 모드 진행 상황 콜백 함수
-                    def thinking_callback(event_type: str, data: dict):
-                        """Thinking 모드 진행 상황을 큐에 저장 + 세션에 저장"""
+                    def thinking_callback(event_dict: dict):
+                        """
+                        Thinking 모드 진행 상황을 큐에 저장 + 세션에 저장
+                        통일된 이벤트 구조 사용
+                        """
                         try:
-                            thinking_event = {
-                                "type": "thinking",
-                                "event": event_type,
-                                "data": data,
-                                "timestamp": time.time()
-                            }
-                            logger.info(f"[chat][thinking] Sending thinking event: {event_type}")
-                            
+                            logger.info(f"[chat][thinking] Sending thinking event: {event_dict.get('event')}")
+
                             # 세션에 thinking 이벤트 저장 (재질문 시 복원용)
                             if 'pending_thinking_events' not in request.session:
                                 request.session['pending_thinking_events'] = []
-                            request.session['pending_thinking_events'].append(thinking_event)
+                            request.session['pending_thinking_events'].append(event_dict)
                             request.session.modified = True
-                            
+
                             # 즉시 큐에 추가하여 스트리밍 전송
                             if loop.is_running():
                                 asyncio.run_coroutine_threadsafe(
-                                    stream_queue.put(thinking_event), loop
+                                    stream_queue.put(event_dict), loop
                                 )
                             else:
                                 try:
-                                    stream_queue.put_nowait(thinking_event)
+                                    stream_queue.put_nowait(event_dict)
                                 except asyncio.QueueFull:
                                     logger.warn(f"[chat][stream] Queue full, dropping thinking event")
                         except Exception as e:
@@ -628,13 +633,10 @@ class ChatQuestionView(APIView):
                                 
                                 logger.info(f"[chat][stream] Sending final response: {len(ai_response)} chars")
                                 await stream_queue.put(("final", ai_response, evidences))
-                                
-                                # 🧠 정상 완료 시 세션 정리
-                                request.session.pop('pending_thinking_events', None)
-                                request.session.pop("pending_clarification_query", None)
-                                request.session.pop("pending_expansion_directions", None)
-                                request.session.pop("pending_basic_keywords", None) 
-                                request.session.modified = True
+
+                                # 정상 완료 시 세션 정리
+                                async_clear_session = sync_to_async(clear_thinking_session, thread_sensitive=True)
+                                await async_clear_session(request)
                                 
                             except UserClarificationRequired as e:
                                 # 사용자 재질문이 필요한 경우
@@ -685,6 +687,9 @@ class ChatQuestionView(APIView):
                                 
                         except Exception as e:
                             logger.exception("[chat][stream] langgraph failed")
+                            # 에러 발생 시 세션 정리
+                            async_clear_session = sync_to_async(clear_thinking_session, thread_sensitive=True)
+                            await async_clear_session(request)
                             await stream_queue.put(("error", "오류가 발생했습니다. 잠시 후 다시 시도해주세요."))
                     
                     # LangGraph 실행 태스크 시작
