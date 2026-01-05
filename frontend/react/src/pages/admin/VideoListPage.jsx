@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { COLORS } from "../../constants/theme";
 import { getVideos, deleteVideo } from "../../api/videoApi";
 import { getThumbnailUrl } from "../../utils/imageUtils";
+import { TagIcon } from "../../components/common/Icons";
 
 const VideoListPage = ({ onVideoClick }) => {
   const [videos, setVideos] = useState([]);
@@ -165,9 +166,29 @@ const VideoListPage = ({ onVideoClick }) => {
                       fontSize: "13px",
                       color: COLORS.gray,
                       marginBottom: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      flexWrap: "wrap",
                     }}
                   >
-                    {video.tags ? video.tags.map((t) => `#${t}`).join(" ") : ""}
+                    {video.tags && video.tags.length > 0 ? (
+                      video.tags.map((tag, idx) => (
+                        <span
+                          key={idx}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                          }}
+                        >
+                          <TagIcon size={12} color={COLORS.gray} />
+                          <span>{tag}</span>
+                        </span>
+                      ))
+                    ) : (
+                      <span>태그 없음</span>
+                    )}
                   </div>
                   <div
                     style={{
@@ -248,7 +269,8 @@ const VideoListPage = ({ onVideoClick }) => {
                           transition: "background-color 0.2s",
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = COLORS.lightGray;
+                          e.currentTarget.style.backgroundColor =
+                            COLORS.lightGray;
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = "transparent";

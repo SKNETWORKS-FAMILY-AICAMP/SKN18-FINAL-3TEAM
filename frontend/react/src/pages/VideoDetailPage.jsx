@@ -4,7 +4,10 @@ import VideoInfo from "../features/video/components/VideoInfo";
 import CommentSection from "../features/video/components/CommentSection";
 import { getVideo } from "../api/videoApi";
 import { getVideoComments, likeVideo, unlikeVideo } from "../api/communityApi";
-import { createWatchHistory, getWatchHistoryForVideo } from "../api/activityApi";
+import {
+  createWatchHistory,
+  getWatchHistoryForVideo,
+} from "../api/activityApi";
 import { getVideoUrl } from "../utils/imageUtils";
 
 const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
@@ -135,18 +138,10 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
           }
         }
 
-        // 시청 위치 로드 (로그인한 경우만)
-        if (isLoggedIn) {
-          try {
-            const watchResponse = await getWatchHistoryForVideo(actualVideoId);
-            const watchedSeconds = watchResponse?.data?.watched_seconds || 0;
-            setResumeSeconds(watchedSeconds);
-            currentSeconds.current = watchedSeconds;
-            lastSavedSeconds.current = watchedSeconds;
-          } catch (error) {
-            setResumeSeconds(0);
-          }
-        }
+        // 시청 위치는 항상 처음부터 시작 (0으로 설정)
+        setResumeSeconds(0);
+        currentSeconds.current = 0;
+        lastSavedSeconds.current = 0;
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
         // 에러 발생 시에도 로딩 상태 해제
@@ -166,7 +161,13 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
       return;
     }
     try {
-      await createWatchHistory(actualVideoId, seconds, video.tags || []);
+      await createWatchHistory(
+        actualVideoId,
+        seconds,
+        video.tags || [],
+        video.video_keyword || null,
+        video.recommended_keyword || null
+      );
     } catch (error) {
       // 403 에러는 권한 문제이므로 조용히 처리
       // 백엔드에서 시청 기록 저장 API가 특정 권한을 요구하거나
@@ -274,12 +275,13 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
           }
         />
         <VideoInfo
-          tags={video?.tags ? video.tags.map((t) => `#${t}`).join(" ") : ""}
+          tags={video?.tags || []}
           title={video?.title || "제목 없음"}
           date={formatKoreanDate(video?.upload_date)}
           isLiked={isLiked}
           onLikeClick={handleLikeClick}
           likesCount={likesCount}
+          video_keyword={video?.video_keyword || null}
         />
       </div>
 

@@ -18,6 +18,7 @@ import {
   getGoogleLoginUrl,
   logout as apiLogout,
 } from "./api/authApi";
+import { BackgroundTaskProvider } from "./contexts/BackgroundTaskContext";
 
 const App = () => {
   // URL에서 초기 페이지 상태 읽기
@@ -270,6 +271,7 @@ const App = () => {
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   };
 
+  // 검색 결과 페이지로 이동 (로그인 여부와 관계없이 모든 사용자에게 허용)
   const handleSearch = (query) => {
     setSearchQuery(query);
     setCurrentPage("search");
@@ -278,7 +280,7 @@ const App = () => {
   };
 
   return (
-    <>
+    <BackgroundTaskProvider>
       <style>{`
         ::selection {
           background-color: #c2e0f6;
@@ -389,7 +391,7 @@ const App = () => {
         {/* 챗봇 버튼 (로그인 시에만 표시) */}
         {isLoggedIn && <ChatbotButton onNavigate={handleNavigate} />}
       </div>
-    </>
+    </BackgroundTaskProvider>
   );
 };
 

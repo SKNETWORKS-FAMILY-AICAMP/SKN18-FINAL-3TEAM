@@ -18,8 +18,20 @@ import {
 import MarkdownRenderer from "../components/common/MarkdownRenderer";
 import EvidencePathView from "../components/common/EvidencePathView";
 import ThinkingMode from "../components/common/ThinkingMode/ThinkingMode";
+import { useBackgroundTask } from "../contexts/BackgroundTaskContext";
 
 const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
+  const { showToast } = useBackgroundTask();
+  const [isOnChatbotPage, setIsOnChatbotPage] = useState(true);
+
+  // 페이지 마운트/언마운트 감지
+  useEffect(() => {
+    setIsOnChatbotPage(true);
+    return () => {
+      setIsOnChatbotPage(false);
+    };
+  }, []);
+
   // 스크롤바 스타일 및 드래그 색상을 위한 CSS 추가
   useEffect(() => {
     const style = document.createElement("style");
@@ -206,7 +218,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
         const raw = await getChatHistory();
         const history = Array.isArray(raw) ? raw : raw?.sessions || [];
         setChatHistory(history || []);
-        
+
         // URL에서 세션 ID가 있으면 해당 세션 로드
         if (initialSessionId) {
           setSelectedSessionId(initialSessionId);
@@ -299,11 +311,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
     const userMessage = message.trim();
     setMessage("");
 
-    // Thinking 모드 초기화
-    if (isThinkingMode) {
-      setThinkingEvents([]);
-      setIsThinkingComplete(false);
-    }
+    // Thinking 모드는 이벤트를 초기화하지 않음 (재질문 후 이벤트 누적)
 
     setMessages((prev) => [...prev, { type: "user", text: userMessage }]);
 
@@ -396,6 +404,12 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
             finalHandled = true; // ★ 완료 플래그 설정
             setIsSubmitting(false);
             abortControllerRef.current = null;
+
+            // 페이지 이탈 시에만 토스트 표시
+            if (!isOnChatbotPage) {
+              const modeText = isThinkingMode ? "Thinking 모드" : "일반 모드";
+              showToast(`챗봇 ${modeText} 답변 생성 완료`, "success");
+            }
           } else if (streamEvent.type === "error") {
             // 에러 타입 처리 - 이미 처리되었음을 표시
             streamErrorHandled = true;
@@ -427,6 +441,12 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
           },
         ]);
         setIsSubmitting(false);
+
+        // 페이지 이탈 시 재질문 완료 토스트 표시
+        if (!isOnChatbotPage) {
+          showToast("챗봇 의도 파악 완료 - 선택지 제공", "success");
+        }
+
         return;
       }
 
@@ -550,11 +570,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
 
     setIsSubmitting(true);
 
-    // Thinking 모드 초기화
-    if (isThinkingMode) {
-      setThinkingEvents([]);
-      setIsThinkingComplete(false);
-    }
+    // Thinking 모드는 이벤트를 초기화하지 않음 (재질문 후 이벤트 누적)
 
     // AbortController 생성
     abortControllerRef.current = new AbortController();
@@ -724,9 +740,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
   return (
     <div
       style={{
-        marginTop: "72px", // 96px → 72px로 줄임 (24px 절약)
-        height: "calc(100vh - 72px)", // 높이도 맞춰서 조정
-        maxHeight: "calc(100vh - 72px)",
+        height: "calc(100vh - 76px)", // 비디오 생성 페이지와 동일한 높이로 맞춤
+        maxHeight: "calc(100vh - 76px)",
         backgroundColor: COLORS.background,
         display: "flex",
         flexDirection: "row",
@@ -745,7 +760,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
             style={{
               position: "fixed",
               left: showHistory ? "280px" : "40px", // 닫혀있을 때는 사이드바보다 오른쪽에
-              top: "82px", // 96px → 82px로 조정 (헤더 높이 + 10px 여백)
+              top: "86px", // 비디오 생성 페이지와 동일한 높이로 맞춤 (76px + 10px 여백)
               width: "72px",
               height: "72px",
               backgroundColor: "transparent",
@@ -789,7 +804,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
             style={{
               position: "fixed",
               left: showHistory ? "0" : "-320px",
-              top: "72px", // 96px → 72px로 조정
+              top: "76px", // 비디오 생성 페이지와 동일한 높이로 맞춤
               width: "300px",
               backgroundColor: "rgba(255, 255, 255, 0.95)",
               backdropFilter: "blur(20px)",
@@ -803,7 +818,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
               flexDirection: "column",
               overflowY: "auto",
               overflowX: "hidden",
-              height: "calc(100vh - 72px)", // 96px → 72px로 조정
+              height: "calc(100vh - 76px)", // 비디오 생성 페이지와 동일한 높이로 맞춤
               padding: "32px 24px",
               transition: "left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               zIndex: 1000,
@@ -1264,10 +1279,10 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
                 flex: 1,
                 overflowY: "auto",
                 overflowX: "hidden",
-                paddingTop: "20px",
+                paddingTop: "40px", // 상단 패딩 증가로 위 내용이 가려지지 않도록
                 paddingRight: "16px",
                 paddingLeft: "16px",
-                paddingBottom: "180px", // 패딩 증가 (120px → 180px)
+                paddingBottom: "100px", // 마지막 대화와 입력창 사이 간격 조정
                 touchAction: "pan-y",
                 WebkitOverflowScrolling: "touch",
               }}
@@ -1295,6 +1310,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
                   flexDirection: "column",
                   justifyContent: "flex-end",
                   gap: "24px",
+                  paddingTop: "20px", // 상단 여백 추가로 첫 메시지가 가려지지 않도록
                 }}
               >
                 {messages.map((msg, index) => (

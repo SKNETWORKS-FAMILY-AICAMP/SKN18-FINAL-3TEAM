@@ -17,6 +17,8 @@ class WatchingHistorySerializer(serializers.ModelSerializer):
             'video_title',
             'video_thumbnail',
             'user',
+            'user_email',
+            'user_nickname',
             'tags',
             'video_keyword',
             'recommended_keyword',
@@ -65,8 +67,9 @@ class WatchingHistoryCreateSerializer(serializers.ModelSerializer):
             ).order_by('-created_at').first()
 
         if existing:
+            # 항상 최신 값으로 업데이트 (None도 포함)
             for field in ("tags", "video_keyword", "recommended_keyword"):
-                if field in validated_data and validated_data[field] is not None:
+                if field in validated_data:
                     setattr(existing, field, validated_data[field])
             if "watched_seconds" in validated_data:
                 existing.watched_seconds = validated_data["watched_seconds"]

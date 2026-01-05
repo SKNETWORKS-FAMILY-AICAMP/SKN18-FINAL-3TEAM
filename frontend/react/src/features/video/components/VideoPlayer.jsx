@@ -85,6 +85,7 @@ const VideoPlayer = ({
   const playerRef = useRef(null);
   const containerRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
+  const hasPlayedRef = useRef(false); // 재생 이벤트 중복 방지
   const hasAppliedInitialTimeRef = useRef(false);
 
   // videoUrl이 변경되면 에러 상태 초기화
@@ -93,6 +94,7 @@ const VideoPlayer = ({
     setPlaying(false); // 재생 중단
     setPlayed(0);
     setDuration(0);
+    hasPlayedRef.current = false; // 재생 플래그 초기화
     hasAppliedInitialTimeRef.current = false;
   }, [videoUrl]);
 
@@ -106,10 +108,16 @@ const VideoPlayer = ({
         console.error("재생 실패:", err);
         setPlaying(false);
       });
+
+      // 최초 재생 시 onPlayStart 콜백 호출 (한 번만)
+      if (!hasPlayedRef.current && onPlayStart) {
+        hasPlayedRef.current = true;
+        onPlayStart();
+      }
     } else {
       video.pause();
     }
-  }, [playing]);
+  }, [playing, onPlayStart]);
 
   const handlePlayPause = () => {
     // 에러가 있으면 재생하지 않음
@@ -214,9 +222,18 @@ const VideoPlayer = ({
 
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
-      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
-      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        handleFullscreenChange
+      );
+      document.removeEventListener(
+        "mozfullscreenchange",
+        handleFullscreenChange
+      );
+      document.removeEventListener(
+        "MSFullscreenChange",
+        handleFullscreenChange
+      );
     };
   }, []);
 

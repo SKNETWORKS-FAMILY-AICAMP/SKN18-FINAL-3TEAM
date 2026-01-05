@@ -48,11 +48,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     """
     init.sql 기반 커스텀 User 모델
     
-    - init.sql에서 테이블 생성 (managed=False)
-    - Django는 데이터 읽기/쓰기만 담당
-    - allauth의 socialaccount 테이블들이 이 모델을 참조
-    
     init.sql 테이블: "user"
+    Django가 테이블 생성 및 마이그레이션 관리
+    allauth의 socialaccount 테이블들이 이 모델을 참조
     """
     
     # Django 기본 권한 시스템 비활성화
@@ -74,9 +72,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         blank=True,
         verbose_name='닉네임'
     )
-    profile_image = models.CharField(
-        max_length=100,
-        null=True, 
+    profile_image = models.TextField(
+        null=True,
         blank=True,
         verbose_name='프로필 이미지 URL'
     )
@@ -128,7 +125,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     
     class Meta:
         db_table = 'user'
-        managed = False  # init.sql에서 테이블 생성, Django는 데이터만 사용
+        managed = True  # Django가 테이블 생성 및 마이그레이션 관리
         verbose_name = '사용자'
         verbose_name_plural = '사용자들'
     
