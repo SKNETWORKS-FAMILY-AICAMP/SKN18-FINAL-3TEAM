@@ -18,3 +18,4 @@ export { default as MenuIcon } from './MenuIcon';
 export { default as TrashIcon } from './TrashIcon';
 export { default as TagIcon } from './TagIcon';
 export { default as CheckIcon } from './CheckIcon';
+export { default as KeyIcon } from './KeyIcon';
