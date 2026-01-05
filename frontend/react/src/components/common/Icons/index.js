@@ -8,6 +8,7 @@ export { default as GlobeIcon } from './GlobeIcon';
 export { default as SendIcon } from './SendIcon';
 export { default as StopIcon } from './StopIcon';
 export { default as ArrowLeftIcon } from './ArrowLeftIcon';
+export { default as ArrowRightIcon } from './ArrowRightIcon';
 export { default as PlusIcon } from './PlusIcon';
 export { default as CameraIcon } from './CameraIcon';
 export { default as EditIcon } from './EditIcon';
