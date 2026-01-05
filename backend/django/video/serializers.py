@@ -17,6 +17,8 @@ class VideoSerializer(serializers.ModelSerializer):
             'likes_count',
             'comments_count',
             'thumbnail_url',
+            'video_keyword',
+            'recommended_keyword',
         ]
 
     def get_comments_count(self, obj):
@@ -42,6 +44,8 @@ class VideoDetailSerializer(serializers.ModelSerializer):
             'comments_count',
             'is_liked',
             'thumbnail_url',
+            'video_keyword',
+            'recommended_keyword',
         ]
 
     def get_comments_count(self, obj):

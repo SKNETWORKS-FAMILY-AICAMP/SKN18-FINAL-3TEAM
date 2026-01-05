@@ -300,46 +300,125 @@ const EventItem = ({ event, stageColor }) => {
   );
 };
 
+// 재질문 구분선 컴포넌트
+const ClarificationDivider = () => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    margin: '16px 0',
+    padding: '12px 16px',
+    backgroundColor: '#f0f9ff',
+    border: '1px solid #bae6fd',
+    borderRadius: '12px'
+  }}>
+    <div style={{
+      width: '28px',
+      height: '28px',
+      borderRadius: '50%',
+      backgroundColor: '#0ea5e9',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: 'white',
+      fontSize: '16px',
+      fontWeight: '600'
+    }}>
+      ✓
+    </div>
+    <div style={{ flex: 1 }}>
+      <div style={{
+        fontSize: '13px',
+        fontWeight: '600',
+        color: '#0c4a6e',
+        marginBottom: '2px'
+      }}>
+        사용자 선택 완료
+      </div>
+      <div style={{
+        fontSize: '11px',
+        color: '#0369a1'
+      }}>
+        선택한 방향으로 상세 분석을 진행합니다
+      </div>
+    </div>
+  </div>
+);
+
 // 메인 ThinkingMode 컴포넌트
 const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
-  const [stages, setStages] = useState([]);
-  
-  // 이벤트를 단계별로 그룹화
+  const [preStages, setPreStages] = useState([]);
+  const [postStages, setPostStages] = useState([]);
+  const [hasClarification, setHasClarification] = useState(false);
+
+  // 이벤트를 재질문 전/후 + 단계별로 그룹화
   useEffect(() => {
-    const stageMap = new Map();
-    
-    thinkingEvents.forEach((event) => {
+    // 재질문 전/후 이벤트 분리
+    const preEvents = thinkingEvents.filter(e =>
+      e.stage?.is_pre_clarification === true
+    );
+    const postEvents = thinkingEvents.filter(e =>
+      e.stage?.is_pre_clarification === false
+    );
+
+    setHasClarification(preEvents.length > 0 && postEvents.length > 0);
+
+    // 재질문 전 이벤트 그룹화
+    const preStageMap = new Map();
+    preEvents.forEach((event) => {
       const stageInfo = getStageGroup(event.event);
       const groupId = stageInfo.groupId;
-      
-      if (!stageMap.has(groupId)) {
-        stageMap.set(groupId, {
+
+      if (!preStageMap.has(groupId)) {
+        preStageMap.set(groupId, {
           id: groupId,
           stage: stageInfo,
           events: [],
           isComplete: false
         });
       }
-      
-      stageMap.get(groupId).events.push(event);
+
+      preStageMap.get(groupId).events.push(event);
     });
-    
-    // 현재 활성 단계 결정 (마지막 이벤트가 속한 그룹)
-    const stageList = Array.from(stageMap.values());
-    if (stageList.length > 0) {
-      // 마지막 단계 외에는 모두 완료로 표시
-      stageList.forEach((stage, index) => {
-        stage.isComplete = isComplete || index < stageList.length - 1;
-        stage.isActive = !isComplete && index === stageList.length - 1;
-      });
-    }
-    
-    setStages(stageList);
+
+    const preStageList = Array.from(preStageMap.values());
+    preStageList.forEach((stage, index) => {
+      stage.isComplete = postEvents.length > 0 || index < preStageList.length - 1;
+      stage.isActive = postEvents.length === 0 && !isComplete && index === preStageList.length - 1;
+    });
+    setPreStages(preStageList);
+
+    // 재질문 후 이벤트 그룹화
+    const postStageMap = new Map();
+    postEvents.forEach((event) => {
+      const stageInfo = getStageGroup(event.event);
+      const groupId = stageInfo.groupId;
+
+      if (!postStageMap.has(groupId)) {
+        postStageMap.set(groupId, {
+          id: groupId,
+          stage: stageInfo,
+          events: [],
+          isComplete: false
+        });
+      }
+
+      postStageMap.get(groupId).events.push(event);
+    });
+
+    const postStageList = Array.from(postStageMap.values());
+    postStageList.forEach((stage, index) => {
+      stage.isComplete = isComplete || index < postStageList.length - 1;
+      stage.isActive = !isComplete && index === postStageList.length - 1;
+    });
+    setPostStages(postStageList);
   }, [thinkingEvents, isComplete]);
 
   if (thinkingEvents.length === 0) {
     return null;
   }
+
+  const totalStages = preStages.length + postStages.length;
 
   return (
     <div style={{
@@ -357,10 +436,10 @@ const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
         border: '1px solid #e2e8f0'
       }}>
         <span style={{ fontSize: '16px' }}>🧠</span>
-        <span style={{ 
-          fontSize: '14px', 
+        <span style={{
+          fontSize: '14px',
           fontWeight: '600',
-          color: COLORS.dark 
+          color: COLORS.dark
         }}>
           AI 사고 과정
         </span>
@@ -372,7 +451,7 @@ const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
           borderRadius: '10px',
           border: '1px solid #e2e8f0'
         }}>
-          {stages.length}단계
+          {totalStages}단계
         </span>
         {isComplete && (
           <span style={{
@@ -388,16 +467,38 @@ const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
         )}
       </div>
 
-      {/* 단계별 표시 */}
-      {stages.map((stageData) => (
-        <ThinkingStep
-          key={stageData.id}
-          stage={stageData.stage}
-          events={stageData.events}
-          isActive={stageData.isActive}
-          isComplete={stageData.isComplete}
-        />
-      ))}
+      {/* 재질문 전 단계 */}
+      {preStages.length > 0 && (
+        <div style={{ marginBottom: '8px' }}>
+          {preStages.map((stageData) => (
+            <ThinkingStep
+              key={stageData.id}
+              stage={stageData.stage}
+              events={stageData.events}
+              isActive={stageData.isActive}
+              isComplete={stageData.isComplete}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* 재질문 구분선 */}
+      {hasClarification && <ClarificationDivider />}
+
+      {/* 재질문 후 단계 */}
+      {postStages.length > 0 && (
+        <div>
+          {postStages.map((stageData) => (
+            <ThinkingStep
+              key={stageData.id}
+              stage={stageData.stage}
+              events={stageData.events}
+              isActive={stageData.isActive}
+              isComplete={stageData.isComplete}
+            />
+          ))}
+        </div>
+      )}
 
       <style>{`
         @keyframes spin {

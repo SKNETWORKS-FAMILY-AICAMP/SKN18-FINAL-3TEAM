@@ -477,8 +477,7 @@ def story_generator_node(state: GraphState) -> GraphState:
     
     llm = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL"),
-        temperature=0.7,  # 스토리 생성은 창의성 필요
-        streaming=stream_mode  # 스트리밍 모드 활성화
+        temperature=0.7
     )
 
     print(f"\n{'='*70}")
@@ -703,19 +702,25 @@ def story_generator_node(state: GraphState) -> GraphState:
 """
 
     try:
+        print(f"  [DEBUG] stream_mode={stream_mode}, stream_callback={'exists' if stream_callback else 'None'}")
         if stream_mode and stream_callback:
             # 스트리밍 모드: 청크 단위로 스트리밍
+            print(f"  [DEBUG] Starting LLM stream...")
             llm_answer = ""
+            chunk_count = 0
             for chunk in llm.stream(story_prompt):
                 if hasattr(chunk, 'content') and chunk.content:
                     chunk_text = chunk.content
                     llm_answer += chunk_text
+                    chunk_count += 1
                     # 스트리밍 콜백 호출 (프론트엔드로 전송)
                     if callable(stream_callback):
                         try:
+                            print(f"  [DEBUG] Calling stream_callback with chunk #{chunk_count}, len={len(chunk_text)}")
                             stream_callback(chunk_text)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            print(f"  [DEBUG] stream_callback failed: {e}")
+            print(f"  [DEBUG] LLM stream completed, total chunks: {chunk_count}")
             
             # 스트리밍 완료 후 최종 응답 생성
             response = type('Response', (), {'content': llm_answer})()

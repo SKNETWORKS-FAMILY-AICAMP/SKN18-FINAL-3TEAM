@@ -7,10 +7,8 @@ class Video(models.Model):
     """
     영상 관리 테이블
 
-    init.sql에서 테이블 생성 (managed=False)
-    Django는 데이터 읽기/쓰기만 담당
-
     init.sql 테이블: video
+    Django가 테이블 생성 및 마이그레이션 관리
     """
     # id는 Django 기본 pk 사용
     title = models.CharField(
@@ -18,9 +16,7 @@ class Video(models.Model):
         verbose_name='영상 제목'
     )
     video_url = models.TextField(
-        verbose_name='영상 URL',
-        null=True,
-        blank=True,  # 수정 필요: 운영 시 필수 필드로 되돌릴 것
+        verbose_name='영상 URL'
     )
     upload_date = models.DateTimeField(
         auto_now_add=True,
@@ -47,10 +43,20 @@ class Video(models.Model):
         blank=True,
         verbose_name='썸네일 URL'
     )
+    video_keyword = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name='영상 키워드 (쉼표 구분)'
+    )
+    recommended_keyword = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name='추천 키워드 (쉼표 구분)'
+    )
 
     class Meta:
         db_table = 'video'
-        managed = False  # init.sql에서 테이블 생성
+        managed = True  # Django가 테이블 생성 및 마이그레이션 관리
         ordering = ['-upload_date']
         verbose_name = '영상'
         verbose_name_plural = '영상들'
