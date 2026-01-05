@@ -1,3 +1,4 @@
+# 추후 Runpod과의 연결을 위한 NAT 게이트웨이 추가 필요
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
   Base network stack: VPC, public/private subnets, IGW/route tables, ALB + SG/TargetGroup/Listener.
@@ -7,6 +8,11 @@ Parameters:
     Type: String
     Default: skn18-3-dev
     Description: "Name prefix for all resources"
+  EnableVpcEndpoints:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: "Create VPC Endpoints to run ECS in private subnets without NAT"
   VpcCidr:
     Type: String
     Default: 10.0.0.0/16
@@ -22,6 +28,9 @@ Parameters:
   PrivateSubnet2Cidr:
     Type: String
     Default: 10.0.12.0/24
+    
+Conditions:
+  CreateVpcEndpoints: !Equals [!Ref EnableVpcEndpoints, "true"]
 
 Resources:
   # VPC 기본 설정
@@ -156,9 +165,7 @@ Resources:
           CidrIp: 0.0.0.0/0
       SecurityGroupEgress:
         - IpProtocol: "-1"
-          FromPort: 0
-          ToPort: 0
-          CidrIp: 0.0.0.0/0
+          CidrIp: !Ref VpcCidr
       Tags:
         - Key: Name
           Value: !Sub "${NamePrefix}-alb-sg"
@@ -205,6 +212,110 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref AlbTargetGroup
 
+  VpcEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: CreateVpcEndpoints
+    Properties:
+      GroupDescription: !Sub "${NamePrefix} vpc endpoint sg"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref VpcCidr
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: !Ref VpcCidr
+      Tags:
+        - Key: Name
+          Value: !Sub "${NamePrefix}-vpce-sg"
+
+  # (추가) Secrets Manager Interface Endpoint (ECS가 시크릿 조회 시 필요)
+  SecretsManagerEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: CreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.secretsmanager"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
+  # (추가) S3 Gateway Endpoint (ECR 이미지 레이어 다운로드 등에 필요)
+  S3GatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: CreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+
+  # (추가) ECR API Interface Endpoint
+  EcrApiEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: CreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.api"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
+  # (추가) ECR DKR Interface Endpoint (docker pull)
+  EcrDkrEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: CreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecr.dkr"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
+  # (추가) CloudWatch Logs Interface Endpoint (ECS 로그 전송)
+  LogsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: CreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
+  # (추가) STS Interface Endpoint (태스크 롤/자격증명 관련)
+  StsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: CreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.sts"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
 Outputs:
   VpcId:
     Value: !Ref VPC
@@ -232,3 +343,8 @@ Outputs:
     Value: !Ref AlbSecurityGroup
     Export:
       Name: !Sub "${NamePrefix}-alb-sg-id"
+  VpcEndpointSecurityGroupId:
+    Condition: CreateVpcEndpoints
+    Value: !Ref VpcEndpointSecurityGroup
+    Export:
+      Name: !Sub "${NamePrefix}-vpce-sg-id"

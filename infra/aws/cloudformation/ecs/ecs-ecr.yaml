@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Base compute stack: ECR repos, ECS cluster, task roles, shared log group.
+Description: "Base compute stack: ECR repos, ECS cluster, task roles, shared log group."
 
 Parameters:
   NamePrefix:
@@ -70,6 +70,16 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: !Sub "${NamePrefix}-execution-secretsmanager"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource: "*"
       Tags:
         - Key: Name
           Value: !Sub "${NamePrefix}-ecs-execution-role"
