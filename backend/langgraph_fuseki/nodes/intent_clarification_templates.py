@@ -270,13 +270,8 @@ def generate_clarification_question_template(
     Returns:
         사용자 친화적 질문 텍스트
     """
-    question_text = f'"{query}"는 여러 관점에서 답변할 수 있어요.\n\n'
-    question_text += "어떤 방향의 정보가 더 궁금하신가요?\n\n"
-
-    for direction in directions:
-        question_text += f"{direction['id']}️⃣ {direction['title']}\n"
-        question_text += f"   {direction['description']}\n\n"
-
+    # 간단한 재질문 텍스트만 반환 (카드에 내용이 있으므로)
+    question_text = f'"{query}"는 여러 관점에서 답변할 수 있어요. 어떤 방향의 정보가 더 궁금하신가요?'
     return question_text
 
 

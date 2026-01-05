@@ -240,7 +240,6 @@ def _handle_question(request, chat_session=None):
                     request.session['pending_thinking_events'] = []
                 request.session['pending_thinking_events'].append(event_dict)
                 request.session.modified = True
-                logger.info(f"[chat][thinking] Stored thinking event: {event_dict.get('event')}")
 
             invoke_params["thinking_callback"] = thinking_callback
         else:
@@ -525,15 +524,39 @@ class ChatQuestionView(APIView):
                     except RuntimeError:
                         loop = asyncio.get_event_loop()
                     
-                    # 🧠 이전 thinking 이벤트들을 스트리밍 큐에 먼저 전송
-                    pending_events = request.session.get('pending_thinking_events', [])
-                    if pending_events:
-                        logger.info(f"[chat][thinking] Restoring {len(pending_events)} pending thinking events")
-                        for event in pending_events:
-                            await stream_queue.put(event)
-                        # 복원 후 세션에서 제거
-                        request.session.pop('pending_thinking_events', None)
-                        request.session.modified = True
+                    # 🧠 이전 thinking 이벤트들을 스트리밍 큐에 먼저 전송 (재질문 응답인 경우에만)
+                    if user_selected_direction:
+                        pending_events = request.session.get('pending_thinking_events', [])
+                        if pending_events:
+                            for event in pending_events:
+                                await stream_queue.put(event)
+                            # 복원 후 세션에서 제거
+                            request.session.pop('pending_thinking_events', None)
+                            request.session.modified = True
+
+                        # 🎯 사용자 선택 완료 이벤트 전송
+                        import time
+                        user_selection_event = {
+                            "event": "user_selection_completed",
+                            "title": "사용자 선택 완료",
+                            "stage": {
+                                "number": 1,
+                                "name": "Stage 1: Query Classifier",
+                                "is_pre_clarification": True  # 의도 확인 단계에 포함
+                            },
+                            "data": {
+                                "selected_direction_id": user_selected_direction,
+                                "selected_direction_title": user_selected_title or "선택된 방향",
+                                "action": "선택한 방향으로 상세 분석 진행"
+                            },
+                            "timestamp": time.time()
+                        }
+                        await stream_queue.put(user_selection_event)
+                    else:
+                        # 새 질문인 경우 이전 thinking 이벤트 제거
+                        if 'pending_thinking_events' in request.session:
+                            request.session.pop('pending_thinking_events', None)
+                            request.session.modified = True
                     
                     # 스트리밍 콜백 함수 (각 청크를 큐에 저장)
                     def stream_callback(chunk_text: str):
@@ -560,13 +583,56 @@ class ChatQuestionView(APIView):
                             logger.error(f"[chat][stream] Callback error: {e}", exc_info=True)
                     
                     # Thinking 모드 진행 상황 콜백 함수
-                    def thinking_callback(event_dict: dict):
+                    def thinking_callback(event_name: str, event_data: dict):
                         """
                         Thinking 모드 진행 상황을 큐에 저장 + 세션에 저장
                         통일된 이벤트 구조 사용
+
+                        Args:
+                            event_name: 이벤트 이름 (예: "history_check_started")
+                            event_data: 이벤트 데이터 딕셔너리
                         """
                         try:
-                            logger.info(f"[chat][thinking] Sending thinking event: {event_dict.get('event')}")
+                            # is_pre_clarification 자동 설정
+                            if "stage" in event_data:
+                                # stage가 문자열이면 딕셔너리로 변환
+                                if isinstance(event_data["stage"], str):
+                                    event_data["stage"] = {
+                                        "name": event_data["stage"],
+                                        "is_pre_clarification": not user_selected_direction
+                                    }
+                                # stage가 딕셔너리이고 is_pre_clarification이 없으면 추가
+                                elif isinstance(event_data["stage"], dict):
+                                    if "is_pre_clarification" not in event_data["stage"]:
+                                        event_data["stage"]["is_pre_clarification"] = not user_selected_direction
+                            else:
+                                # stage 필드가 없으면 생성
+                                event_data["stage"] = {
+                                    "is_pre_clarification": not user_selected_direction
+                                }
+
+                            # data 필드 정리
+                            import time
+
+                            # 이미 data 필드가 있으면 그대로 사용, 없으면 생성
+                            if "data" in event_data:
+                                data_fields = event_data.get("data", {})
+                            else:
+                                # data 필드가 없으면 title, stage, timestamp를 제외한 나머지를 data로
+                                reserved_fields = {"title", "stage", "event", "timestamp"}
+                                data_fields = {}
+                                for key, value in list(event_data.items()):
+                                    if key not in reserved_fields:
+                                        data_fields[key] = value
+
+                            # 이벤트 딕셔너리 구성 (표준 구조)
+                            event_dict = {
+                                "event": event_name,
+                                "title": event_data.get("title", ""),
+                                "stage": event_data.get("stage", {}),
+                                "data": data_fields,
+                                "timestamp": event_data.get("timestamp", time.time())
+                            }
 
                             # 세션에 thinking 이벤트 저장 (재질문 시 복원용)
                             if 'pending_thinking_events' not in request.session:
@@ -681,7 +747,6 @@ class ChatQuestionView(APIView):
                                 await async_save_session()
                                 
                                 # 🧠 재질문 발생 시 thinking 이벤트는 세션에 보관 (사용자 응답 시 복원)
-                                logger.info(f"[chat][stream][thinking] Clarification required, saved expansion_directions={len(expansion_directions)}, basic_keywords={len(basic_keywords)}")
                                 
                                 await stream_queue.put(("clarification", clarification_question, expansion_directions))
                                 
@@ -703,8 +768,7 @@ class ChatQuestionView(APIView):
                             # 큐에서 항목 가져오기 (타임아웃 0.1초)
                             try:
                                 item = await asyncio.wait_for(stream_queue.get(), timeout=0.1)
-                                logger.info(f"[chat][stream] Got item from queue: {type(item)}")
-                                
+
                                 if isinstance(item, tuple):
                                     if item[0] == "clarification":
                                         yield f"data: {json.dumps({'type': 'clarification', 'question': item[1], 'options': item[2]})}\n\n"
@@ -718,15 +782,19 @@ class ChatQuestionView(APIView):
                                     elif item[0] == "error":
                                         yield f"data: {json.dumps({'type': 'error', 'text': item[1]})}\n\n"
                                         break
-                                elif isinstance(item, dict) and item.get("type") == "thinking":
-                                    # Thinking 모드 이벤트 전송
-                                    logger.info(f"[chat][stream] Sending thinking event: {item.get('event')}")
-                                    yield f"data: {json.dumps(item)}\n\n"
-                                else:
-                                    # 일반 텍스트 청크
+                                elif isinstance(item, dict):
+                                    # 딕셔너리는 thinking 이벤트 (event 필드 확인)
+                                    if "event" in item:
+                                        yield f"data: {json.dumps({'type': 'thinking', **item})}\n\n"
+                                    else:
+                                        logger.warn(f"[chat][stream] Unknown dict item: {item}")
+                                elif isinstance(item, str):
+                                    # 일반 텍스트 청크 (스트리밍)
                                     logger.info(f"[chat][stream] Yielding delta chunk: {len(item)} chars")
                                     yield f"data: {json.dumps({'type': 'delta', 'text': item})}\n\n"
                                     chunk_sent += 1
+                                else:
+                                    logger.warn(f"[chat][stream] Unknown item type: {type(item)}")
                             except asyncio.TimeoutError:
                                 # 큐가 비어있으면 계속 대기
                                 if langgraph_task.done():

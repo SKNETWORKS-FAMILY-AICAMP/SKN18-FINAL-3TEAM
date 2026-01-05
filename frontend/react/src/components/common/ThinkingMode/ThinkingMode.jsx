@@ -13,17 +13,17 @@ const STAGE_GROUPS = {
   'question_analysis': {
     title: '질문 분석',
     icon: '🔍',
-    events: ['history_check_started', 'history_check_completed', 'question_analysis_started', 'question_type_classified', 'keywords_extracted'],
+    events: ['history_check_started', 'history_check_completed', 'history_check_error', 'question_analysis_started', 'question_type_classified', 'keywords_extracted', 'stage1_completed'],
     color: '#3B82F6'
   },
   'intent_clarification': {
     title: '의도 확인',
     icon: '💭',
-    events: ['direction_generation_started', 'direction_generation_completed', 'intent_options_generated', 'user_selection_processing', 'intent_integration'],
+    events: ['direction_generation_started', 'direction_generation_completed', 'intent_options_generated', 'user_selection_completed', 'user_selection_processing', 'intent_integration'],
     color: '#8B5CF6'
   },
   'entity_expansion': {
-    title: '키워드 확장 및 엔티티 추출',
+    title: '키워드 확장 및 인물/사건 추출',
     icon: '🧩',
     events: ['entity_expansion_started', 'keyword_expansion_started', 'keyword_expansion_completed', 'ttl_matching_started', 'ttl_matching_completed', 'pgvector_search_started', 'pgvector_search_completed', 'sparql_scoring_started', 'entity_expansion_completed'],
     color: '#10B981'
@@ -230,9 +230,13 @@ const EventItem = ({ event, stageColor }) => {
       case 'history_check_started':
         return '역사 관련 질문인지 확인 중...';
       case 'history_check_completed':
-        return data.is_historical 
-          ? `역사 질문 확인됨 (${data.confidence_score}% 신뢰도)`
+        return data.is_historical
+          ? `역사 질문 확인됨`
           : '역사 질문이 아님';
+      case 'history_check_error':
+        return '역사 관련 체크 오류 (안전하게 역사 질문으로 처리)';
+      case 'stage1_completed':
+        return '질문 분석 완료 - 사용자 선택 대기';
       case 'question_analysis_started':
         return `질문 분석 시작: "${data.query?.slice(0, 30)}..."`;
       case 'question_type_classified':
@@ -242,35 +246,61 @@ const EventItem = ({ event, stageColor }) => {
       case 'direction_generation_started':
         return '확장 방향 생성 중...';
       case 'direction_generation_completed':
-        return `${data.directions_count || 0}개 확장 방향 생성됨`;
+        return `${data.direction_count || 0}개 확장 방향 생성됨`;
+      case 'user_selection_completed':
+        return `✓ 사용자 선택: "${data.selected_direction_title || '선택된 방향'}" - ${data.action || '상세 분석 진행'}`;
       case 'keyword_expansion_started':
-        return `키워드 확장 시작: ${data.basic_keywords?.slice(0, 3).join(', ')}...`;
+        const dirTitle = data.direction_title || '역사적 맥락';
+        const propGroups = data.property_groups || [];
+        const propInfo = propGroups.length > 0 ? ` (${propGroups.join(', ')} 관련)` : '';
+        return `키워드 확장 중: "${dirTitle}" 방향${propInfo}`;
       case 'keyword_expansion_completed':
-        return `${data.total_keywords || 0}개 키워드로 확장됨`;
+        return `키워드 확장 완료: ${data.total_keywords || 0}개 생성됨`;
       case 'entity_expansion_started':
-        return '엔티티 추출 및 확장 시작';
+        const selectedDir = data.selected_direction;
+        const basicKws = data.basic_keywords?.slice(0, 3).join(', ') || '';
+        return selectedDir
+          ? `선택한 방향: "${selectedDir.title || selectedDir}"`
+          : `관련 인물/사건 추출 시작`;
       case 'entity_expansion_completed':
-        return `${data.total_entities || 0}개 엔티티 추출됨`;
+        return `총 ${data.total_entities || 0}개 인물/사건 추출 완료`;
       case 'ttl_matching_started':
-        return 'TTL 데이터 매칭 시작';
+        return '역사 데이터베이스에서 정확 매칭 검색 중...';
       case 'ttl_matching_completed':
-        return `${data.matched_count || 0}개 엔티티 매칭됨`;
+        return `데이터베이스 매칭: ${data.matched_entities || data.matched_count || 0}개 발견`;
       case 'pgvector_search_started':
-        return 'pgvector 유사도 검색 시작';
+        return '유사한 역사 정보 검색 중...';
       case 'pgvector_search_completed':
-        return `${data.results_count || 0}개 유사 엔티티 발견`;
+        return `유사 정보 검색: ${data.added_entities || data.results_count || 0}개 발견`;
       case 'semantic_expansion_started':
-        return `${data.entity_count || 0}개 엔티티 의미 확장 시작`;
+        return `${data.entity_count || 0}개 항목의 연관 관계 탐색 중...`;
       case 'temporal_expansion_completed':
-        return `시간 관계 ${data.results_count || 0}개 발견`;
+        return `시간적 관계 (before/after/contemporary): ${data.results_count || 0}개 발견`;
       case 'causal_expansion_completed':
-        return `인과 관계 ${data.results_count || 0}개 발견`;
+        return `인과 관계 (cause/result): ${data.results_count || 0}개 발견`;
       case 'pgvector_expansion_completed':
-        return `의미적 유사 관계 ${data.results_count || 0}개 발견`;
+        return `의미적 유사 관계 (벡터 기반): ${data.results_count || 0}개 발견`;
       case 'thread_weights_applied':
-        return `${data.active_threads?.length || 0}개 Thread 가중치 적용`;
+        const queryType = data.query_type || 'default';
+        return `검색 가중치 적용: ${queryType}`;
       case 'sparql_search_completed':
-        return `SPARQL 검색 완료: ${data.total_results || 0}개 결과`;
+        const total = data.total_results || 0;
+        const threadResults = data.thread_results || {};
+        // 쓰레드 이름 한글 매핑
+        const threadNameMap = {
+          'outgoing_relations': '나가는 관계',
+          'incoming_relations': '들어오는 관계',
+          'entity_properties': '엔티티 속성',
+          'connected_entities': '연결 엔티티',
+          'type_and_summary': '타입/요약'
+        };
+        const threadBreakdown = Object.entries(threadResults)
+          .map(([thread, count]) => {
+            const threadName = threadNameMap[thread] || thread;
+            return `${threadName}: ${count}개`;
+          })
+          .join(', ');
+        return `SPARQL 검색 완료: 총 ${total}개 경로\n(${threadBreakdown})`;
       case 'answer_generation_started':
         return `${data.evidence_count || 0}개 근거로 답변 생성 중...`;
       default:
@@ -295,7 +325,7 @@ const EventItem = ({ event, stageColor }) => {
         marginTop: '6px',
         flexShrink: 0
       }} />
-      <span>{getEventDescription()}</span>
+      <span style={{ whiteSpace: 'pre-line' }}>{getEventDescription()}</span>
     </div>
   );
 };
@@ -346,20 +376,50 @@ const ClarificationDivider = () => (
 );
 
 // 메인 ThinkingMode 컴포넌트
-const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
+const ThinkingMode = ({
+  thinkingEvents = [],
+  isComplete = false,
+  clarification = null,
+  onClarificationChoice = null,
+  isSubmitting = false
+}) => {
   const [preStages, setPreStages] = useState([]);
   const [postStages, setPostStages] = useState([]);
   const [hasClarification, setHasClarification] = useState(false);
 
   // 이벤트를 재질문 전/후 + 단계별로 그룹화
   useEffect(() => {
+    // 중복 이벤트 제거 (같은 event 타입이 연속으로 나오면 첫 번째만 유지)
+    const deduplicatedEvents = thinkingEvents.reduce((acc, event, index) => {
+      // 이전 이벤트와 같은 타입이고 데이터도 거의 같으면 스킵
+      if (index > 0) {
+        const prevEvent = thinkingEvents[index - 1];
+        if (prevEvent.event === event.event &&
+            prevEvent.stage?.is_pre_clarification === event.stage?.is_pre_clarification) {
+          // 같은 이벤트 타입이 연속으로 나오면 중복으로 간주하고 스킵
+          return acc;
+        }
+      }
+      acc.push(event);
+      return acc;
+    }, []);
+
     // 재질문 전/후 이벤트 분리
-    const preEvents = thinkingEvents.filter(e =>
+    const preEvents = deduplicatedEvents.filter(e =>
       e.stage?.is_pre_clarification === true
     );
-    const postEvents = thinkingEvents.filter(e =>
+    const postEvents = deduplicatedEvents.filter(e =>
       e.stage?.is_pre_clarification === false
     );
+
+    // 디버깅: 이벤트 분리 결과 확인
+    console.log('[ThinkingMode] Event split:', {
+      total: deduplicatedEvents.length,
+      preEvents: preEvents.length,
+      postEvents: postEvents.length,
+      samplePreEvent: preEvents[0],
+      samplePostEvent: postEvents[0]
+    });
 
     setHasClarification(preEvents.length > 0 && postEvents.length > 0);
 
@@ -479,6 +539,147 @@ const ThinkingMode = ({ thinkingEvents = [], isComplete = false }) => {
               isComplete={stageData.isComplete}
             />
           ))}
+        </div>
+      )}
+
+      {/* 선택 카드 (의도 확인 단계 다음에 표시) */}
+      {clarification && (
+        <div style={{ marginTop: '16px', marginBottom: '16px' }}>
+          <div style={{
+            fontSize: '14px',
+            color: COLORS.dark,
+            lineHeight: '1.5',
+            marginBottom: '16px',
+            fontWeight: '500',
+          }}>
+            {clarification.question || '어떤 방향의 정보가 더 궁금하신가요?'}
+          </div>
+          <div
+            className="clarification-cards-scroll"
+            style={{
+              display: 'flex',
+              gap: '12px',
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              paddingBottom: '8px',
+              paddingRight: '40px',
+              marginRight: '-40px',
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'thin',
+              msOverflowStyle: 'auto',
+              scrollBehavior: 'smooth',
+              touchAction: 'pan-x',
+              scrollSnapType: 'x proximity',
+              width: '100%',
+              maxWidth: 'none',
+            }}
+          >
+            {clarification.options?.map((option, idx) => {
+              const isDisabled = clarification.isSelected || isSubmitting;
+              const isThisSelected = clarification.selectedId === option.direction_id;
+              return (
+                <button
+                  key={option.direction_id}
+                  onClick={(e) => {
+                    if (!isDisabled && onClarificationChoice) {
+                      e.currentTarget.style.transform = 'scale(0.98)';
+                      e.currentTarget.style.borderColor = COLORS.primary;
+                      e.currentTarget.style.backgroundColor = COLORS.primary;
+                      e.currentTarget.style.color = COLORS.dark;
+                      onClarificationChoice(option.direction_id, option.title);
+                    }
+                  }}
+                  disabled={isDisabled}
+                  style={{
+                    minWidth: '180px',
+                    maxWidth: '240px',
+                    padding: '16px',
+                    backgroundColor: isThisSelected ? COLORS.primary : COLORS.white,
+                    border: `2px solid ${isThisSelected ? COLORS.primary : COLORS.border}`,
+                    borderRadius: '16px',
+                    cursor: isDisabled ? 'not-allowed' : 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.2s ease-out',
+                    opacity: isDisabled && !isThisSelected ? 0.6 : 1,
+                    flexShrink: 0,
+                    boxShadow: isDisabled
+                      ? '0 1px 3px rgba(0,0,0,0.04)'
+                      : '0 2px 8px rgba(0,0,0,0.06)',
+                    scrollSnapAlign: 'start',
+                    marginLeft: idx === 0 ? '12px' : '0px',
+                    marginRight: idx === clarification.options.length - 1 ? '32px' : '0px',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isDisabled) {
+                      e.currentTarget.style.borderColor = COLORS.primary;
+                      e.currentTarget.style.backgroundColor = COLORS.tertiary;
+                      e.currentTarget.style.transform = 'translateY(-3px) scale(1.02)';
+                      e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.12)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isDisabled && !isThisSelected) {
+                      e.currentTarget.style.borderColor = COLORS.border;
+                      e.currentTarget.style.backgroundColor = COLORS.white;
+                      e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
+                    }
+                  }}
+                  onTouchStart={(e) => {
+                    if (!isDisabled) {
+                      e.currentTarget.style.transform = 'scale(0.98)';
+                    }
+                  }}
+                  onTouchEnd={(e) => {
+                    if (!isDisabled) {
+                      e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    }
+                  }}
+                >
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    color: COLORS.primary,
+                    marginBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}>
+                    <span style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      backgroundColor: COLORS.primary,
+                      color: COLORS.dark,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                    }}>
+                      {idx + 1}
+                    </span>
+                  </div>
+                  <div style={{
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    color: COLORS.dark,
+                    marginBottom: '8px',
+                    lineHeight: '1.3',
+                  }}>
+                    {option.title}
+                  </div>
+                  <div style={{
+                    fontSize: '13px',
+                    color: COLORS.gray,
+                    lineHeight: '1.5',
+                  }}>
+                    {option.description}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
