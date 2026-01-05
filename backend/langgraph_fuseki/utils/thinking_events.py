@@ -57,7 +57,7 @@ def send_thinking_event(
     thinking 콜백으로 이벤트 전송 (콜백이 있을 때만)
 
     Args:
-        callback: thinking_callback 함수
+        callback: thinking_callback 함수 (event_name, event_data 두 인자를 받음)
         event_type: 이벤트 타입
         title: 이벤트 제목
         stage_number: 단계 번호
@@ -66,16 +66,20 @@ def send_thinking_event(
         is_pre_clarification: 재질문 전/후 구분
     """
     if callback and callable(callback):
-        event = create_thinking_event(
-            event_type=event_type,
-            title=title,
-            stage_number=stage_number,
-            stage_name=stage_name,
-            data=data,
-            is_pre_clarification=is_pre_clarification
-        )
+        # 이벤트 데이터 구성 (event 필드 제외)
+        event_data = {
+            "title": title,
+            "stage": {
+                "number": stage_number,
+                "name": stage_name,
+                "is_pre_clarification": is_pre_clarification
+            },
+            "data": data or {},
+            "timestamp": time.time()
+        }
         try:
-            callback(event)
+            # thinking_callback(event_name, event_data) 형식으로 호출
+            callback(event_type, event_data)
         except Exception as e:
             print(f"  [Warning] Thinking callback failed: {e}")
 

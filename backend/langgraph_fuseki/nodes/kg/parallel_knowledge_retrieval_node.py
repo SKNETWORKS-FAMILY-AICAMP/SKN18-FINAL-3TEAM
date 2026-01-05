@@ -372,8 +372,10 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
     if thinking_callback:
         # Thread별 결과 수 계산
         thread_results = {}
-        for thread_name, thread_results_list in results.items():
-            thread_results[thread_name] = len(thread_results_list)
+        for thread_name, thread_result in results.items():
+            # thread_result는 {"status": "success", "bindings": [...], ...} 형태
+            bindings = thread_result.get("bindings", [])
+            thread_results[thread_name] = len(bindings)
         
         thinking_callback("sparql_search_completed", {
             "title": "SPARQL 지식 검색 완료",

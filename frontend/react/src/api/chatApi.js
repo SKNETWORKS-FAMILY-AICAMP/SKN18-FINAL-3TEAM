@@ -114,7 +114,8 @@ export const sendQuestion = async (question, sessionId = null, thinkingMode = fa
                 onStream({ type: "delta", text: data.text, fullText });
               } else if (data.type === "thinking") {
                 // Thinking 모드 이벤트 처리
-                onStream({ type: "thinking", event: data.event, data: data.data, timestamp: data.timestamp });
+                console.log("[chatApi] Received thinking event:", data.event, data);
+                onStream({ type: "thinking", event: data.event, title: data.title, stage: data.stage, data: data.data, timestamp: data.timestamp });
               } else if (data.type === "clarification") {
                 clarificationData = {
                   needs_clarification: true,

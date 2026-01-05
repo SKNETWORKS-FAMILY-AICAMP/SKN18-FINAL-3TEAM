@@ -141,8 +141,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
   const [hoveredDeleteBtn, setHoveredDeleteBtn] = useState(null);
   const [showHistory, setShowHistory] = useState(false);
   const [isThinkingMode, setIsThinkingMode] = useState(false); // Thinking 모드 상태 추가
-  const [thinkingEvents, setThinkingEvents] = useState([]); // Thinking 이벤트 저장
-  const [isThinkingComplete, setIsThinkingComplete] = useState(false); // Thinking 완료 상태
+  const [currentThinkingEvents, setCurrentThinkingEvents] = useState([]); // 현재 메시지의 Thinking 이벤트 (임시 저장)
+  const [currentClarification, setCurrentClarification] = useState(null); // 현재 진행 중인 재질문 데이터
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const containerRef = useRef(null);
@@ -298,7 +298,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
         }
       });
     }
-  }, [messages, streamingText]);
+  }, [messages, streamingText, currentThinkingEvents]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -377,7 +377,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
           } else if (streamEvent.type === "thinking") {
             // Thinking 모드 이벤트 처리
             if (isThinkingMode) {
-              setThinkingEvents((prev) => [...prev, streamEvent]);
+              setCurrentThinkingEvents((prev) => [...prev, streamEvent]);
             }
           } else if (streamEvent.type === "clarification") {
             // 재질문 데이터 저장
@@ -386,9 +386,6 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
             // 최종 답변 완료
             accumulatedText = streamEvent.text;
             setStreamingText("");
-            if (isThinkingMode) {
-              setIsThinkingComplete(true);
-            }
             const messageObj = { type: "assistant", text: accumulatedText };
             // ★ evidences 처리
             if (
@@ -397,6 +394,13 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
               streamEvent.evidences.length > 0
             ) {
               messageObj.evidences = streamEvent.evidences;
+            }
+            // ★ Thinking 이벤트 첨부 (현재 메시지에만)
+            if (isThinkingMode) {
+              setCurrentThinkingEvents((prevEvents) => {
+                messageObj.thinkingEvents = [...prevEvents]; // 현재까지 모은 이벤트들
+                return []; // 다음 메시지를 위해 초기화
+              });
             }
             setMessages((prev) => [...prev, messageObj]);
 
@@ -431,15 +435,26 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
         response.expansion_directions.length > 0
       ) {
         setStreamingText(""); // 스트리밍 텍스트 초기화
-        setMessages((prev) => [
-          ...prev,
-          {
-            type: "clarification",
+
+        // Thinking 모드일 때는 ThinkingMode 컴포넌트에서 표시하기 위해 state에 저장
+        if (isThinkingMode) {
+          setCurrentClarification({
             question: response.clarification_question,
             options: response.expansion_directions,
-            isActive: true, // 현재 진행 중인 재질문은 활성화
-          },
-        ]);
+          });
+        } else {
+          // 일반 모드일 때는 기존대로 별도 메시지로 추가
+          setMessages((prev) => [
+            ...prev,
+            {
+              type: "clarification",
+              question: response.clarification_question,
+              options: response.expansion_directions,
+              isActive: true,
+            },
+          ]);
+        }
+
         setIsSubmitting(false);
 
         // 페이지 이탈 시 재질문 완료 토스트 표시
@@ -558,15 +573,25 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
   };
 
   const handleClarificationChoice = async (directionId, optionTitle) => {
-    // 재질문 카드를 비활성화하고 사용자 선택을 메시지에 추가
-    setMessages((prev) => {
-      const updated = prev.map((msg) =>
-        msg.type === "clarification" && msg.isActive
-          ? { ...msg, isActive: false }
-          : msg
-      );
-      return [...updated, { type: "user", text: optionTitle }];
-    });
+    // Thinking 모드일 때는 선택된 카드 표시, 일반 모드일 때는 기존대로 처리
+    if (isThinkingMode) {
+      // ThinkingMode에서 선택된 카드를 강조 표시 (카드 유지)
+      setCurrentClarification(prev => ({
+        ...prev,
+        isSelected: true,
+        selectedId: directionId
+      }));
+    } else {
+      // 일반 모드: 재질문 카드를 비활성화하고 사용자 선택을 메시지에 추가
+      setMessages((prev) => {
+        const updated = prev.map((msg) =>
+          msg.type === "clarification" && msg.isActive
+            ? { ...msg, isActive: false }
+            : msg
+        );
+        return [...updated, { type: "user", text: optionTitle }];
+      });
+    }
 
     setIsSubmitting(true);
 
@@ -611,15 +636,12 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
           } else if (streamEvent.type === "thinking") {
             // Thinking 모드 이벤트 처리
             if (isThinkingMode) {
-              setThinkingEvents((prev) => [...prev, streamEvent]);
+              setCurrentThinkingEvents((prev) => [...prev, streamEvent]);
             }
           } else if (streamEvent.type === "final") {
             // 최종 답변 완료 - 받는 즉시 처리
             accumulatedText = streamEvent.text;
             setStreamingText("");
-            if (isThinkingMode) {
-              setIsThinkingComplete(true);
-            }
             const messageObj = { type: "assistant", text: accumulatedText };
             // ★ evidences는 streamEvent에서 가져오거나, 나중에 response에서 처리
             if (
@@ -628,6 +650,13 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
               streamEvent.evidences.length > 0
             ) {
               messageObj.evidences = streamEvent.evidences;
+            }
+            // ★ Thinking 이벤트 첨부 (현재 메시지에만)
+            if (isThinkingMode) {
+              setCurrentThinkingEvents((prevEvents) => {
+                messageObj.thinkingEvents = [...prevEvents]; // 현재까지 모은 이벤트들
+                return []; // 다음 메시지를 위해 초기화
+              });
             }
             setMessages((prev) => [...prev, messageObj]);
 
@@ -1293,16 +1322,6 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
                 e.stopPropagation();
               }}
             >
-              {/* Thinking Mode 컴포넌트 (Thinking 모드일 때만 표시) */}
-              {isThinkingMode && thinkingEvents.length > 0 && (
-                <div style={{ marginBottom: "24px" }}>
-                  <ThinkingMode
-                    thinkingEvents={thinkingEvents}
-                    isComplete={isThinkingComplete}
-                  />
-                </div>
-              )}
-
               <div
                 style={{
                   minHeight: "100%",
@@ -1584,6 +1603,15 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
                               boxSizing: "border-box",
                             }}
                           >
+                            {/* Thinking Mode 컴포넌트 (메시지에 thinking 이벤트가 있을 때만 표시) */}
+                            {msg.thinkingEvents && msg.thinkingEvents.length > 0 && (
+                              <div style={{ marginBottom: "16px" }}>
+                                <ThinkingMode
+                                  thinkingEvents={msg.thinkingEvents}
+                                  isComplete={true}
+                                />
+                              </div>
+                            )}
                             <MarkdownRenderer content={msg.text} />
                             {msg.evidences && msg.evidences.length > 0 && (
                               <EvidencePathView evidences={msg.evidences} />
@@ -1595,8 +1623,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
                   </div>
                 ))}
 
-                {/* 로딩 애니메이션 - 답변 대기 중 */}
-                {isSubmitting && !streamingText && (
+                {/* 로딩 애니메이션 - 답변 대기 중 (Thinking 모드가 아닐 때만) */}
+                {isSubmitting && !streamingText && !isThinkingMode && (
                   <div
                     style={{
                       display: "flex",
@@ -1679,6 +1707,43 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
                   </div>
                 )}
 
+                {/* Thinking Mode (실시간 스트리밍 중) - 텍스트 스트리밍 전에도 표시 */}
+                {isThinkingMode && currentThinkingEvents.length > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "12px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "50%",
+                        backgroundColor: COLORS.primary,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        marginTop: "2px",
+                      }}
+                    >
+                      <ChatIcon size={18} color={COLORS.dark} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <ThinkingMode
+                        thinkingEvents={currentThinkingEvents}
+                        isComplete={false}
+                        clarification={currentClarification}
+                        onClarificationChoice={handleClarificationChoice}
+                        isSubmitting={isSubmitting}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* 텍스트 스트리밍 */}
                 {streamingText && (
                   <div
                     style={{
