@@ -77,3 +77,13 @@ export const getRecommendedVideos = async (filter = 'all') => {
   });
   return response.data;
 };
+
+// ============================================
+// 시청 기록 분석 API
+// ============================================
+
+// 시청 기록 기반 분석 데이터 조회 (video_keyword와 tags 빈도 분석)
+export const getWatchingAnalytics = async () => {
+  const response = await api.get('/api/activity/watching-analytics/');
+  return response.data;
+};
