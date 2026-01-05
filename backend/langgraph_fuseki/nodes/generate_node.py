@@ -465,16 +465,6 @@ def story_generator_node(state: GraphState) -> GraphState:
     stream_callback = state.get("stream_callback", None)
     thinking_callback = state.get("thinking_callback", None)
     
-    # 🎯 Thinking 이벤트: 답변 생성 시작
-    if thinking_callback:
-        thinking_callback("answer_generation_started", {
-            "title": "답변 생성 시작",
-            "evidence_count": len(evidences),
-            "query_type": query_type,
-            "stream_mode": stream_mode,
-            "status": "processing"
-        })
-    
     llm = ChatOpenAI(
         model=os.getenv("OPENAI_MODEL"),
         temperature=0.7
@@ -539,25 +529,54 @@ def story_generator_node(state: GraphState) -> GraphState:
             if name:
                 entity_names.append(f"{entity_type}: {name}")
         if entity_names:
-            entity_info_text = f"\n## 추출된 핵심 엔티티\n{', '.join(entity_names)}\n→ 이 엔티티들을 반드시 답변에 포함하고 설명하세요.\n"
+            entity_info_text = f"\n## 추출된 핵심 인물/사건\n{', '.join(entity_names)}\n→ 이 인물/사건들을 반드시 답변에 포함하고 설명하세요.\n"
     
     # 질문 유형별 프롬프트 조정
-    if query_type == "deep_analysis":
-        instruction = """역사의 이면과 숨은 동기를 분석해 주세요.
-- 여러 근거를 종합하여 깊이 있는 해석을 제시합니다
-- 당시 정치적/사회적 맥락을 설명합니다
-- 다양한 관점에서 분석합니다"""
+    if query_type == "factual":
+        instruction = """역사적 사실을 정확하고 명확하게 설명해 주세요.
+- 핵심 사실을 먼저 제시합니다
+- 구체적인 인물, 시기, 장소 등을 포함합니다
+- 객관적이고 정확한 정보를 제공합니다"""
 
-    else:  # causal
+    elif query_type == "causal":
         instruction = """인과관계를 명확히 설명해 주세요.
 - 원인과 결과를 논리적으로 연결합니다
 - 시간 순서대로 전개합니다
 - 각 사건의 영향 관계를 설명합니다"""
 
+    elif query_type == "comparative":
+        instruction = """비교 대상 간의 차이점과 공통점을 분석해 주세요.
+- 주요 차이점을 명확하게 제시합니다
+- 공통점도 함께 설명합니다
+- 각각의 특징과 맥락을 고려합니다"""
+
+    elif query_type == "deep_analysis":
+        instruction = """역사의 이면과 숨은 동기를 분석해 주세요.
+- 여러 근거를 종합하여 깊이 있는 해석을 제시합니다
+- 당시 정치적/사회적 맥락을 설명합니다
+- 다양한 관점에서 분석합니다"""
+
+    else:  # 기본값
+        instruction = """질문에 대해 명확하고 상세하게 설명해 주세요.
+- 핵심 내용을 먼저 제시합니다
+- 근거를 바탕으로 설명합니다
+- 이해하기 쉽게 구조화합니다"""
+
+
     # 중복 제거 (전체 근거)
     print(f"  ├─ 전체 근거: {len(evidences)}개")
     deduplicated_evidences = deduplicate_and_select_top_evidences(evidences, top_k=len(evidences))
     print(f"  ├─ 중복 제거 후: {len(deduplicated_evidences)}개")
+    
+    # 🎯 Thinking 이벤트: 답변 생성 시작 (중복 제거 후 실제 사용할 근거 개수 전달)
+    if thinking_callback:
+        thinking_callback("answer_generation_started", {
+            "title": "답변 생성 시작",
+            "evidence_count": len(deduplicated_evidences),
+            "query_type": query_type,
+            "stream_mode": stream_mode,
+            "status": "processing"
+        })
     
     # 전체 근거 포맷팅 (중복 제거된 것)
     evidence_list_all, _ = format_evidence_for_prompt(deduplicated_evidences, query)
@@ -582,7 +601,7 @@ def story_generator_node(state: GraphState) -> GraphState:
     convergence_info = ""
     if convergence_nodes:
         convergence_formatted = format_convergence_nodes(convergence_nodes)
-        convergence_info = f"\n## 핵심 연결 노드 (수렴 노드)\n다음은 여러 엔티티를 연결하는 중요한 노드들입니다. 이 노드들을 답변에서 명시적으로 언급하고 설명하세요.\n\n{convergence_formatted}\n\n→ 이 수렴 노드들은 여러 인물/사건을 연결하는 중심 역할을 하므로, 답변에서 이들의 역할과 관계를 반드시 설명하세요.\n"
+        convergence_info = f"\n## 핵심 연결점\n다음은 여러 인물/사건을 연결하는 중요한 항목들입니다. 이 항목들을 답변에서 명시적으로 언급하고 설명하세요.\n\n{convergence_formatted}\n\n→ 이 연결점들은 여러 인물/사건을 연결하는 중심 역할을 하므로, 답변에서 이들의 역할과 관계를 반드시 설명하세요.\n"
 
     story_prompt = f"""당신은 조선시대 역사를 전문적으로 설명하는 역사가입니다.
 사용자와 자연스럽게 대화하듯 답변하되, 필요한 경우에만 구조화된 마크다운 형식을 사용하세요.
