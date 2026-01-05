@@ -435,15 +435,6 @@ def entity_expander_node(state: GraphState) -> GraphState:
         print(f"  ⚠️ WARNING: basic_keywords가 비어있습니다! 세션 복원 확인 필요")
     
 
-    # 🎯 Thinking 이벤트: Entity Expander 시작
-    if thinking_callback:
-        thinking_callback("entity_expansion_started", {
-            "title": "엔티티 확장 시작",
-            "stage": "Stage 2: Entity Expander",
-            "basic_keywords": basic_keywords,
-            "selected_direction": user_selected_direction
-        })
-    
     # ========== 1. 사용자 선택 방향 정보 조회 ==========
     selected_direction_info = None
     if user_selected_direction and expansion_directions:
@@ -451,10 +442,19 @@ def entity_expander_node(state: GraphState) -> GraphState:
             if direction.get("direction_id") == user_selected_direction:
                 selected_direction_info = direction
                 break
-        
+
         if not selected_direction_info:
             print(f"  ⚠️ 경고: direction_id '{user_selected_direction}'를 expansion_directions에서 찾을 수 없음")
             print(f"  expansion_directions 수: {len(expansion_directions)}")
+
+    # 🎯 Thinking 이벤트: Entity Expander 시작
+    if thinking_callback:
+        thinking_callback("entity_expansion_started", {
+            "title": "엔티티 확장 시작",
+            "stage": "Stage 2: Entity Expander",
+            "basic_keywords": basic_keywords,
+            "selected_direction": selected_direction_info  # 전체 방향 정보 전송
+        })
     
     expanded_keywords = basic_keywords.copy()
     expanded_keywords_dict = {}
