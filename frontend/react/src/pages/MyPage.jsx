@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { getWatchHistory } from "../api/activityApi";
 import { getMyActivity } from "../api/communityApi";
 import { getProfileImageUrl } from "../utils/imageUtils";
+import UserAnalytics from "../backup/features/user/components/UserAnalytics";
 import "../styles/histok.css";
 
 const MyPage = ({ onNavigate, user }) => {
@@ -233,26 +234,7 @@ const MyPage = ({ onNavigate, user }) => {
               <div className="mypage-section-header">
                 <h3 className="mypage-section-title">취향 분석</h3>
               </div>
-              <div className="analytics-grid">
-                <div className="analytics-item">
-                  <div className="analytics-number">
-                    {analytics.watchedCount}
-                  </div>
-                  <div className="analytics-label">본 이야기</div>
-                </div>
-                <div className="analytics-item">
-                  <div className="analytics-number">
-                    {analytics.commentsCount}
-                  </div>
-                  <div className="analytics-label">남긴 이야기</div>
-                </div>
-                <div className="analytics-item">
-                  <div className="analytics-number">
-                    {analytics.interestTopic}
-                  </div>
-                  <div className="analytics-label">관심 주제</div>
-                </div>
-              </div>
+              <UserAnalytics />
             </section>
           </div>
         </div>

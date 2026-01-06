@@ -121,7 +121,7 @@ const ChatbotButton = ({ onNavigate }) => {
               e.currentTarget.style.background = "transparent";
             }}
           >
-            질문하기
+            대화하기
           </div>
           <div
             onClick={handleVideoCreateClick}

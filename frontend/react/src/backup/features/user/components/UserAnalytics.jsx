@@ -87,12 +87,13 @@ const UserAnalytics = () => {
   };
 
   // 색상 팔레트
+  // 색상 팔레트 - 차분한 Jade/Warm 톤
   const chartColors = [
-    COLORS.primary,
-    COLORS.tag,
-    COLORS.cardSky,
-    COLORS.textMuted,
-    COLORS.gray,
+    "#7BA697",  // jade
+    "#a8c5bb",  // jade-light  
+    "#d4e4dd",  // jade-pale
+    "#c4a882",  // warm
+    "#e8dcc8",  // warm-light
   ];
 
   const getColorForIndex = (index) => {
@@ -114,9 +115,9 @@ const UserAnalytics = () => {
             style={{
               display: "inline-block",
               padding: "10px 20px",
-              backgroundColor: COLORS.gray,
+              backgroundColor: "var(--jade)",
               borderRadius: "8px",
-              color: COLORS.white,
+              color: "var(--black)",
               fontSize: "14px",
               fontWeight: "600",
             }}
@@ -126,12 +127,12 @@ const UserAnalytics = () => {
         </div>
         <div
           style={{
-            backgroundColor: COLORS.white,
+            backgroundColor: "var(--ink)",
             borderRadius: "12px",
-            border: "1px solid #eee",
+            border: "1px solid var(--line)",
             padding: "20px",
             textAlign: "center",
-            color: COLORS.textMuted,
+            color: "var(--gray)",
           }}
         >
           분석 데이터를 불러오는 중...
@@ -158,9 +159,9 @@ const UserAnalytics = () => {
             style={{
               display: "inline-block",
               padding: "10px 20px",
-              backgroundColor: COLORS.gray,
+              backgroundColor: "var(--jade)",
               borderRadius: "8px",
-              color: COLORS.white,
+              color: "var(--black)",
               fontSize: "14px",
               fontWeight: "600",
             }}
@@ -170,12 +171,12 @@ const UserAnalytics = () => {
         </div>
         <div
           style={{
-            backgroundColor: COLORS.white,
+            backgroundColor: "var(--ink)",
             borderRadius: "12px",
-            border: "1px solid #eee",
+            border: "1px solid var(--line)",
             padding: "20px",
             textAlign: "center",
-            color: COLORS.textMuted,
+            color: "var(--gray)",
           }}
         >
           시청 기록이 없습니다.
@@ -216,9 +217,9 @@ const UserAnalytics = () => {
       </div>
       <div
         style={{
-          backgroundColor: COLORS.white,
+          backgroundColor: "var(--ink)",
           borderRadius: "12px",
-          border: "1px solid #eee",
+          border: "1px solid var(--line)",
           padding: "20px",
         }}
       >
@@ -229,7 +230,7 @@ const UserAnalytics = () => {
             gap: "20px",
             marginBottom: "20px",
             paddingBottom: "20px",
-            borderBottom: "1px solid #eee",
+            borderBottom: "1px solid var(--line)",
           }}
         >
           <div style={{ flex: 1, textAlign: "center" }}>
@@ -237,7 +238,7 @@ const UserAnalytics = () => {
               style={{
                 fontSize: "24px",
                 fontWeight: "700",
-                color: COLORS.textPrimary,
+                color: "var(--white)",
               }}
             >
               {analytics.total_videos}
@@ -245,7 +246,7 @@ const UserAnalytics = () => {
             <div
               style={{
                 fontSize: "12px",
-                color: COLORS.textMuted,
+                color: "var(--gray)",
                 marginTop: "4px",
               }}
             >
@@ -257,7 +258,7 @@ const UserAnalytics = () => {
               style={{
                 fontSize: "24px",
                 fontWeight: "700",
-                color: COLORS.primary,
+                color: "var(--jade)",
               }}
             >
               {analytics.total_keywords}
@@ -265,7 +266,7 @@ const UserAnalytics = () => {
             <div
               style={{
                 fontSize: "12px",
-                color: COLORS.textMuted,
+                color: "var(--gray)",
                 marginTop: "4px",
               }}
             >
@@ -274,14 +275,14 @@ const UserAnalytics = () => {
           </div>
           <div style={{ flex: 1, textAlign: "center" }}>
             <div
-              style={{ fontSize: "24px", fontWeight: "700", color: COLORS.tag }}
+              style={{ fontSize: "24px", fontWeight: "700", color: "var(--jade-light)" }}
             >
               {analytics.total_tags}
             </div>
             <div
               style={{
                 fontSize: "12px",
-                color: COLORS.textMuted,
+                color: "var(--gray)",
                 marginTop: "4px",
               }}
             >
@@ -303,7 +304,7 @@ const UserAnalytics = () => {
           <div style={{ flexShrink: 0 }}>
             <svg width="160" height="160" viewBox="0 0 100 100">
               {pieData.length === 0 ? (
-                <circle cx="50" cy="50" r="40" fill={COLORS.lightGray} />
+                <circle cx="50" cy="50" r="40" fill="#e8e4df" />
               ) : (
                 pieData.map((item, index) => {
                   const slice = calculatePieSlice(index, pieData.length);
@@ -313,7 +314,7 @@ const UserAnalytics = () => {
                       key={`${item.type}-${item.label}-${index}`}
                       d={slice.path}
                       fill={slice.color}
-                      stroke={COLORS.white}
+                      stroke="#fafaf8"
                       strokeWidth="1"
                     />
                   );
@@ -332,7 +333,7 @@ const UserAnalytics = () => {
             }}
           >
             {pieData.length === 0 ? (
-              <div style={{ color: COLORS.textMuted, fontSize: "14px" }}>
+              <div style={{ color: "var(--gray)", fontSize: "14px" }}>
                 데이터가 없습니다.
               </div>
             ) : (
@@ -354,16 +355,16 @@ const UserAnalytics = () => {
                       style={{
                         minWidth: "60px",
                         fontSize: "12px",
-                        color: COLORS.textSecondary,
+                        color: "var(--white)",
                         display: "flex",
                         alignItems: "center",
                         gap: "4px",
                       }}
                     >
                       {isKeyword ? (
-                        <KeyIcon size={14} color={COLORS.primary} />
+                        <KeyIcon size={14} color="var(--jade)" />
                       ) : (
-                        <TagIcon size={14} color={COLORS.tag} />
+                        <TagIcon size={14} color="var(--jade-light)" />
                       )}
                       <span>{item.label}</span>
                     </div>
@@ -380,7 +381,7 @@ const UserAnalytics = () => {
                         paddingRight: "8px",
                         fontSize: "11px",
                         fontWeight: "600",
-                        color: COLORS.textPrimary,
+                        color: "var(--black)",
                       }}
                     >
                       {item.count}
@@ -396,16 +397,16 @@ const UserAnalytics = () => {
         {(analytics.video_keywords.length > 0 || analytics.tags.length > 0) && (
           <div
             style={{
-              marginTop: "24px",
-              paddingTop: "20px",
-              borderTop: "1px solid #eee",
+            marginTop: "24px",
+            paddingTop: "20px",
+            borderTop: "1px solid var(--line)",
             }}
           >
             <div
               style={{
                 fontSize: "14px",
                 fontWeight: "600",
-                color: COLORS.textPrimary,
+                color: "var(--white)",
                 marginBottom: "12px",
               }}
             >
@@ -419,7 +420,7 @@ const UserAnalytics = () => {
                   style={{
                     fontSize: "12px",
                     fontWeight: "600",
-                    color: COLORS.textSecondary,
+                    color: "var(--gray)",
                     marginBottom: "8px",
                     display: "flex",
                     alignItems: "center",
@@ -435,8 +436,8 @@ const UserAnalytics = () => {
                       key={`keyword-${idx}`}
                       style={{
                         padding: "4px 10px",
-                        backgroundColor: COLORS.primary,
-                        color: COLORS.textPrimary,
+                        backgroundColor: "var(--jade)",
+                        color: "var(--black)",
                         borderRadius: "12px",
                         fontSize: "11px",
                         fontWeight: "500",
@@ -456,7 +457,7 @@ const UserAnalytics = () => {
                   style={{
                     fontSize: "12px",
                     fontWeight: "600",
-                    color: COLORS.textSecondary,
+                    color: "var(--gray)",
                     marginBottom: "8px",
                     display: "flex",
                     alignItems: "center",
@@ -472,8 +473,8 @@ const UserAnalytics = () => {
                       key={`tag-${idx}`}
                       style={{
                         padding: "4px 10px",
-                        backgroundColor: COLORS.tag,
-                        color: COLORS.textPrimary,
+                        backgroundColor: "var(--jade-light)",
+                        color: "var(--black)",
                         borderRadius: "12px",
                         fontSize: "11px",
                         fontWeight: "500",

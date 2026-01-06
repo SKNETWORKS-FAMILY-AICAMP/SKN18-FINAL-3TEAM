@@ -594,8 +594,8 @@ const ExpandableSearch = ({
                               }}
                               style={{
                                 padding: "8px 16px",
-                                backgroundColor: COLORS.sub_color, // 연노랑색
-                                border: `1.5px solid ${COLORS.sub_color}`,
+                                backgroundColor: COLORS.jadePale, // 밝은 제이드
+                                border: `1.5px solid ${COLORS.jadePale}`,
                                 borderRadius: "20px",
                                 color: COLORS.dark, // 블랙
                                 fontSize: "12px",
@@ -611,15 +611,15 @@ const ExpandableSearch = ({
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.backgroundColor =
-                                  COLORS.sky; // 하늘색
-                                e.currentTarget.style.borderColor = COLORS.sky;
+                                  COLORS.jadeLight; // 제이드 라이트
+                                e.currentTarget.style.borderColor = COLORS.jadeLight;
                                 e.currentTarget.style.color = COLORS.dark; // 블랙 유지
                               }}
                               onMouseLeave={(e) => {
                                 e.currentTarget.style.backgroundColor =
-                                  COLORS.sub_color; // 연노랑색
+                                  COLORS.jadePale; // 밝은 제이드
                                 e.currentTarget.style.borderColor =
-                                  COLORS.sub_color;
+                                  COLORS.jadePale;
                                 e.currentTarget.style.color = COLORS.dark; // 블랙
                               }}
                             >

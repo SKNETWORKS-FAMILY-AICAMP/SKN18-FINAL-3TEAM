@@ -36,21 +36,35 @@ const VideoCard = ({ video, onClick }) => {
       <div
         style={{
           width: "100%",
-          aspectRatio: "16/10",
-          backgroundColor: COLORS.lightGray,
+          aspectRatio: "16/9",
+          backgroundColor: video.thumbnail_url ? "transparent" : COLORS.jadePale,
           borderRadius: "12px",
           marginBottom: "12px",
           overflow: "hidden",
           position: "relative",
           backgroundImage: video.thumbnail_url
             ? `url(${getThumbnailUrl(video.thumbnail_url)})`
-            : "none",
+            : `linear-gradient(135deg, ${COLORS.jadePale} 0%, ${COLORS.jadeLight} 50%, ${COLORS.dark} 100%)`,
           backgroundSize: isHovered ? "110%" : "cover",
           backgroundPosition: "center",
           transform: isHovered ? "scale(1.03)" : "scale(1)",
           transition: "background-size 0.5s ease, transform 0.3s ease",
         }}
       >
+        {/* 썸네일이 없을 때 제이드 그라데이션 배경 */}
+        {!video.thumbnail_url && (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: `linear-gradient(135deg, ${COLORS.jadePale} 0%, ${COLORS.jadeLight} 30%, ${COLORS.jade} 70%, ${COLORS.dark} 100%)`,
+              opacity: 0.8,
+            }}
+          />
+        )}
         {/* 호버 시 하단 그라데이션 오버레이 */}
         <div
           style={{
@@ -60,7 +74,7 @@ const VideoCard = ({ video, onClick }) => {
             right: 0,
             height: "70%",
             background: isHovered
-              ? `linear-gradient(to top, rgba(207, 253, 30, 0.3), rgba(194, 224, 246, 0.2), transparent)`
+              ? `linear-gradient(to top, ${COLORS.jade}40, ${COLORS.jadeLight}30, transparent)`
               : "transparent",
             transition: "opacity 0.3s ease, background 0.3s ease",
             pointerEvents: "none",
