@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HisToK — 조선의 이야기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200;300;400;500;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black: #0a0a0a; --black-light: #141414; --white: #fafaf8; --cream: #f5f3ef; --cream-dark: #e8e4df;
+      --jade: #7BA697; --jade-light: #a8c5bb; --jade-pale: #d4e4dd; --jade-dark: #5a8577;
+      --warm: #c4a882; --warm-light: #e8dcc8; --ink: #2a2a2a; --gray: #888; --line: rgba(255,255,255,0.12); --line-dark: rgba(0,0,0,0.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { font-size: 16px; scroll-behavior: smooth; }
+    body { font-family: 'Noto Serif KR', serif; background: var(--black); color: var(--white); line-height: 1.6; overflow-x: hidden; }
+    .page { display: none; } .page.active { display: block; }
+    .header { position: fixed; top: 0; left: 0; right: 0; z-index: 1000; padding: 1.5rem 3rem; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(to bottom, var(--black) 0%, transparent 100%); }
+    .header-logo { font-size: 1.25rem; font-weight: 400; letter-spacing: 0.2em; cursor: pointer; transition: color 0.3s; }
+    .header-logo:hover { color: var(--jade); }
+    .header-nav { display: flex; gap: 2.5rem; }
+    .header-nav a { color: var(--white); text-decoration: none; font-size: 0.8rem; letter-spacing: 0.15em; opacity: 0.7; transition: all 0.3s; cursor: pointer; }
+    .header-nav a:hover, .header-nav a.active { opacity: 1; color: var(--jade-light); }
+    .header-right { display: flex; align-items: center; gap: 1.5rem; }
+    .header-search { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 50%; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
+    .header-search:hover { border-color: var(--jade); background: rgba(123,166,151,0.1); }
+    .header-search svg { width: 16px; height: 16px; stroke: var(--white); }
+    .header-login { padding: 0.5rem 1.25rem; border: 1px solid var(--line); background: transparent; color: var(--white); font-family: inherit; font-size: 0.75rem; letter-spacing: 0.15em; cursor: pointer; transition: all 0.3s; }
+    .header-login:hover { border-color: var(--jade); background: var(--jade); color: var(--black); }
+    .header-profile { width: 36px; height: 36px; border-radius: 50%; background: var(--jade-pale); display: none; align-items: center; justify-content: center; cursor: pointer; font-size: 0.8rem; color: var(--jade-dark); font-weight: 500; }
+    .home-hero { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; }
+    .home-hero-left { display: flex; align-items: center; justify-content: center; padding: 4rem; position: relative; }
+    .home-hero-left::after { content: ''; position: absolute; right: 0; top: 10%; height: 80%; width: 1px; background: var(--line); }
+    .title-vertical { writing-mode: vertical-rl; text-orientation: mixed; display: flex; gap: 2.5rem; align-items: flex-start; }
+    .title-main { font-size: clamp(4rem, 12vw, 8rem); font-weight: 200; letter-spacing: 0.3em; line-height: 1.1; }
+    .title-sub { display: flex; flex-direction: column; gap: 0.75rem; padding-top: 1.5rem; }
+    .title-accent { font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 300; color: var(--jade); letter-spacing: 0.4em; }
+    .title-en { font-size: 0.7rem; letter-spacing: 0.25em; color: var(--gray); text-transform: uppercase; }
+    .home-hero-right { display: flex; flex-direction: column; justify-content: space-between; padding: 6rem 4rem 4rem; }
+    .hero-intro { max-width: 420px; }
+    .hero-intro h2 { font-size: clamp(1.4rem, 2.5vw, 1.8rem); font-weight: 300; line-height: 1.9; margin-bottom: 1.5rem; }
+    .hero-intro h2 .accent { color: var(--jade); font-weight: 400; }
+    .hero-intro p { font-size: 0.85rem; color: var(--gray); line-height: 1.9; margin-bottom: 2.5rem; }
+    .hero-cta { display: inline-flex; align-items: center; gap: 0.75rem; color: var(--white); font-size: 0.8rem; letter-spacing: 0.15em; padding: 0.75rem 0; border-bottom: 1px solid var(--line); transition: all 0.4s; cursor: pointer; }
+    .hero-cta:hover { border-color: var(--jade); padding-left: 0.75rem; }
+    .hero-cta svg { width: 18px; height: 18px; stroke: var(--jade); transition: transform 0.4s; }
+    .hero-cta:hover svg { transform: translateX(6px); }
+    .hero-footer { display: flex; justify-content: space-between; align-items: flex-end; font-size: 0.65rem; color: var(--gray); }
+    .scroll-indicator { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+    .scroll-line { width: 1px; height: 50px; background: linear-gradient(to bottom, var(--jade), transparent); animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+    .videos-section { padding: 6rem 4rem; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--line); }
+    .section-header-left { display: flex; align-items: center; gap: 1.5rem; }
+    .section-number { font-size: 0.65rem; letter-spacing: 0.25em; color: var(--gray); }
+    .section-title { font-size: 1.25rem; font-weight: 400; letter-spacing: 0.15em; }
+    .section-title-en { font-size: 0.65rem; color: var(--gray); text-transform: uppercase; margin-left: 1rem; }
+    .filter-group { display: flex; gap: 0.5rem; }
+    .filter-btn { padding: 0.5rem 1rem; border: 1px solid var(--line); background: transparent; color: var(--gray); font-family: inherit; font-size: 0.7rem; cursor: pointer; transition: all 0.3s; }
+    .filter-btn:hover { border-color: var(--jade); color: var(--white); }
+    .filter-btn.active { border-color: var(--jade); background: var(--jade); color: var(--black); }
+    .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2rem; }
+    .video-card { cursor: pointer; transition: transform 0.3s; }
+    .video-card:hover { transform: translateY(-4px); }
+    .video-thumbnail { aspect-ratio: 9/12; background: var(--ink); margin-bottom: 1rem; position: relative; overflow: hidden; }
+    .video-thumbnail-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 50%); opacity: 0; transition: opacity 0.3s; }
+    .video-card:hover .video-thumbnail-overlay { opacity: 1; }
+    .video-play-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 50px; height: 50px; border: 1px solid rgba(255,255,255,0.5); border-radius: 50%; display: flex; align-items: center; justify-content: center; opacity: 0; transition: all 0.3s; }
+    .video-card:hover .video-play-btn { opacity: 1; }
+    .video-play-btn svg { width: 16px; height: 16px; fill: var(--white); margin-left: 2px; }
+    .video-info { padding: 0 0.25rem; }
+    .video-keyword { font-size: 0.65rem; letter-spacing: 0.2em; color: var(--jade); margin-bottom: 0.5rem; text-transform: uppercase; }
+    .video-title { font-size: 1rem; font-weight: 400; margin-bottom: 0.75rem; line-height: 1.4; }
+    .video-tags { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .video-tag { padding: 0.2rem 0.5rem; background: var(--ink); font-size: 0.6rem; color: var(--gray); }
+    .video-meta { display: flex; gap: 1rem; font-size: 0.65rem; color: var(--gray); }
+    .search-overlay { position: fixed; inset: 0; z-index: 2000; pointer-events: none; opacity: 0; }
+    .search-overlay.open { pointer-events: auto; opacity: 1; }
+    .search-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0); transition: background 0.4s; }
+    .search-overlay.open .search-backdrop { background: rgba(0,0,0,0.9); }
+    .search-container { position: absolute; top: 1.5rem; right: 3rem; width: 36px; height: 36px; background: var(--cream); border-radius: 18px; overflow: hidden; transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
+    .search-overlay.open .search-container { top: 50%; left: 50%; transform: translate(-50%,-50%); width: 90%; max-width: 900px; height: auto; max-height: 80vh; border-radius: 4px; }
+    .search-content { opacity: 0; padding: 0; transition: opacity 0.3s ease 0.2s; color: var(--black); }
+    .search-overlay.open .search-content { opacity: 1; padding: 2rem; }
+    .search-input-row { display: flex; align-items: center; gap: 1rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--line-dark); margin-bottom: 1.5rem; }
+    .search-input-row svg { width: 22px; height: 22px; stroke: var(--gray); }
+    .search-input { flex: 1; border: none; background: transparent; font-family: inherit; font-size: 1.25rem; color: var(--black); outline: none; }
+    .search-input::placeholder { color: var(--gray); }
+    .search-close { width: 36px; height: 36px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .search-close:hover { transform: scale(1.1); }
+    .search-close svg { width: 20px; height: 20px; stroke: var(--gray); }
+    .search-body { display: grid; grid-template-columns: 280px 1fr; gap: 2rem; max-height: calc(80vh - 150px); overflow: hidden; }
+    .search-left { border-right: 1px solid var(--line-dark); padding-right: 2rem; overflow-y: auto; }
+    .search-section { margin-bottom: 2rem; }
+    .search-section-title { font-size: 0.7rem; letter-spacing: 0.15em; color: var(--gray); margin-bottom: 1rem; text-transform: uppercase; }
+    .search-keywords, .search-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .search-keyword-btn { padding: 0.5rem 0.875rem; border: 1px solid var(--jade); background: transparent; font-family: inherit; font-size: 0.7rem; color: var(--jade-dark); cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 0.35rem; }
+    .search-keyword-btn:hover { background: var(--jade); color: var(--white); }
+    .search-keyword-btn svg { width: 12px; height: 12px; stroke: currentColor; }
+    .search-tag-btn { padding: 0.5rem 0.875rem; border: 1px solid var(--warm); background: transparent; font-family: inherit; font-size: 0.7rem; color: var(--warm); cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 0.35rem; }
+    .search-tag-btn:hover { background: var(--warm); color: var(--black); }
+    .search-tag-btn svg { width: 12px; height: 12px; stroke: currentColor; }
+    .search-history-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .search-history-item { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; font-size: 0.8rem; color: var(--ink); cursor: pointer; }
+    .search-history-item:hover { color: var(--jade-dark); }
+    .search-history-delete { width: 20px; height: 20px; border: none; background: transparent; cursor: pointer; opacity: 0; }
+    .search-history-item:hover .search-history-delete { opacity: 1; }
+    .search-history-delete svg { width: 14px; height: 14px; stroke: var(--gray); }
+    .search-right { overflow-y: auto; }
+    .search-videos-title { font-size: 0.85rem; font-weight: 500; margin-bottom: 1.25rem; color: var(--black); }
+    .search-videos-grid { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 1rem; }
+    .search-video-card { flex: 0 0 150px; cursor: pointer; }
+    .search-video-thumb { width: 150px; height: 200px; background: var(--cream-dark); margin-bottom: 0.75rem; }
+    .search-video-card:hover .search-video-thumb { transform: scale(1.02); }
+    .search-video-keyword { font-size: 0.6rem; color: var(--jade-dark); margin-bottom: 0.25rem; }
+    .search-video-title { font-size: 0.8rem; color: var(--black); line-height: 1.4; margin-bottom: 0.35rem; }
+    .search-video-tags { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+    .search-video-tag { font-size: 0.55rem; color: var(--gray); background: var(--cream-dark); padding: 0.15rem 0.35rem; }
+    .search-no-result { text-align: center; padding: 3rem; color: var(--gray); }
+    .about-page { min-height: 100vh; position: relative; display: flex; align-items: center; justify-content: center; }
+    .about-bg { position: absolute; inset: 0; background: linear-gradient(135deg, var(--black) 0%, var(--black-light) 50%, var(--black) 100%); }
+    .about-webgl { position: absolute; inset: 0; z-index: 1; opacity: 0.3; background: radial-gradient(ellipse at 30% 40%, rgba(123,166,151,0.15) 0%, transparent 50%), radial-gradient(ellipse at 70% 60%, rgba(196,168,130,0.1) 0%, transparent 50%); }
+    .about-content { position: relative; z-index: 10; max-width: 600px; text-align: center; padding: 4rem; }
+    .about-label { font-size: 0.7rem; letter-spacing: 0.3em; color: var(--jade); margin-bottom: 2rem; text-transform: uppercase; }
+    .about-title { font-size: clamp(2.5rem, 6vw, 4rem); font-weight: 200; letter-spacing: 0.2em; margin-bottom: 0.5rem; }
+    .about-title-en { font-size: 0.9rem; letter-spacing: 0.3em; color: var(--gray); margin-bottom: 3rem; }
+    .about-desc { font-size: 1rem; font-weight: 300; line-height: 2; color: var(--cream); margin-bottom: 3rem; }
+    .about-features { display: flex; justify-content: center; gap: 3rem; margin-bottom: 4rem; }
+    .about-feature { text-align: center; }
+    .about-feature-icon { width: 48px; height: 48px; border: 1px solid var(--line); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
+    .about-feature-icon svg { width: 20px; height: 20px; stroke: var(--jade); }
+    .about-feature-text { font-size: 0.75rem; color: var(--gray); }
+    .about-cta { display: inline-flex; align-items: center; gap: 0.75rem; padding: 1rem 2rem; border: 1px solid var(--jade); background: transparent; color: var(--white); font-family: inherit; font-size: 0.8rem; letter-spacing: 0.15em; cursor: pointer; transition: all 0.4s; }
+    .about-cta:hover { background: var(--jade); color: var(--black); }
+    .about-cta svg { width: 16px; height: 16px; stroke: currentColor; }
+    .about-cta:hover svg { transform: translateX(4px); }
+    .video-detail-page { padding-top: 80px; }
+    .video-detail-container { display: grid; grid-template-columns: 1fr 420px; min-height: calc(100vh - 80px); }
+    .video-player-area { padding: 2rem; display: flex; flex-direction: column; }
+    .video-player { aspect-ratio: 16/9; background: var(--ink); position: relative; margin-bottom: 2rem; }
+    .video-player-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+    .video-player-btn { width: 80px; height: 80px; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; background: rgba(0,0,0,0.3); backdrop-filter: blur(10px); }
+    .video-player-btn:hover { border-color: var(--jade); background: rgba(123,166,151,0.2); }
+    .video-player-btn svg { width: 28px; height: 28px; fill: var(--white); margin-left: 4px; }
+    .video-detail-info { padding: 0 0.5rem; }
+    .video-detail-keyword { font-size: 0.7rem; letter-spacing: 0.25em; color: var(--jade); margin-bottom: 0.75rem; text-transform: uppercase; }
+    .video-detail-title { font-size: 1.75rem; font-weight: 400; margin-bottom: 1rem; line-height: 1.4; }
+    .video-detail-meta { display: flex; gap: 1.5rem; font-size: 0.75rem; color: var(--gray); margin-bottom: 1.25rem; }
+    .video-detail-tags { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .video-detail-tag { padding: 0.4rem 0.75rem; border: 1px solid var(--line); font-size: 0.65rem; color: var(--gray); cursor: pointer; }
+    .video-detail-tag:hover { border-color: var(--jade); color: var(--jade); }
+    .video-like-btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.25rem; border: 1px solid var(--line); background: transparent; color: var(--white); font-family: inherit; font-size: 0.75rem; cursor: pointer; }
+    .video-like-btn:hover { border-color: var(--jade); }
+    .video-like-btn.liked { border-color: var(--jade); background: var(--jade); color: var(--black); }
+    .video-like-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
+    .video-like-btn.liked svg { fill: currentColor; }
+    .comments-area { background: var(--cream); color: var(--black); padding: 2rem; display: flex; flex-direction: column; height: calc(100vh - 80px); overflow: hidden; }
+    .comments-header { padding-bottom: 1.25rem; border-bottom: 1px solid var(--line-dark); margin-bottom: 1.25rem; }
+    .comments-title { font-size: 1rem; font-weight: 400; }
+    .comments-title span { color: var(--gray); font-size: 0.8rem; margin-left: 0.5rem; }
+    .comments-list { flex: 1; overflow-y: auto; }
+    .comment-item { padding: 1rem 0; border-bottom: 1px solid var(--line-dark); }
+    .comment-main { display: flex; gap: 0.75rem; }
+    .comment-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--jade-pale); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: var(--jade-dark); flex-shrink: 0; }
+    .comment-body { flex: 1; }
+    .comment-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .comment-author { font-size: 0.8rem; font-weight: 500; }
+    .comment-date { font-size: 0.65rem; color: var(--gray); }
+    .comment-text { font-size: 0.85rem; line-height: 1.7; color: var(--ink); margin-bottom: 0.75rem; }
+    .comment-actions { display: flex; gap: 1rem; }
+    .comment-action-btn { background: none; border: none; font-family: inherit; font-size: 0.7rem; color: var(--gray); cursor: pointer; display: flex; align-items: center; gap: 0.25rem; }
+    .comment-action-btn:hover { color: var(--jade-dark); }
+    .comment-action-btn svg { width: 14px; height: 14px; stroke: currentColor; }
+    .comment-replies { margin-top: 1rem; padding-left: 2.5rem; border-left: 2px solid var(--jade-pale); }
+    .reply-item { padding: 0.75rem 0; border-bottom: 1px solid var(--line-dark); }
+    .reply-item:last-child { border-bottom: none; }
+    .reply-main { display: flex; gap: 0.6rem; }
+    .reply-avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--warm-light); display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: var(--warm); flex-shrink: 0; }
+    .reply-body { flex: 1; }
+    .reply-header { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem; }
+    .reply-author { font-size: 0.75rem; font-weight: 500; }
+    .reply-date { font-size: 0.6rem; color: var(--gray); }
+    .reply-text { font-size: 0.8rem; line-height: 1.6; color: var(--ink); }
+    .reply-form { margin-top: 0.75rem; padding-left: 2.5rem; display: none; }
+    .reply-form.show { display: block; }
+    .reply-input-wrapper { display: flex; gap: 0.5rem; }
+    .reply-input { flex: 1; padding: 0.6rem 0.75rem; border: 1px solid var(--line-dark); background: var(--white); font-family: inherit; font-size: 0.8rem; outline: none; }
+    .reply-input:focus { border-color: var(--jade); }
+    .reply-submit { padding: 0.6rem 1rem; border: none; background: var(--jade); color: var(--white); font-family: inherit; font-size: 0.7rem; cursor: pointer; }
+    .reply-submit:hover { background: var(--jade-dark); }
+    .comment-input-area { padding-top: 1.25rem; border-top: 1px solid var(--line-dark); }
+    .comment-input { width: 100%; padding: 0.875rem; border: 1px solid var(--line-dark); background: var(--white); font-family: inherit; font-size: 0.85rem; resize: none; outline: none; margin-bottom: 0.75rem; }
+    .comment-input:focus { border-color: var(--jade); }
+    .comment-submit { padding: 0.6rem 1.5rem; border: none; background: var(--black); color: var(--white); font-family: inherit; font-size: 0.75rem; cursor: pointer; }
+    .comment-submit:hover { background: var(--jade-dark); }
+    .chat-page { padding-top: 80px; height: 100vh; display: flex; }
+    .chat-sidebar { width: 280px; background: var(--black); border-right: 1px solid var(--line); display: flex; flex-direction: column; height: calc(100vh - 80px); }
+    .chat-sidebar-header { padding: 1.5rem; border-bottom: 1px solid var(--line); }
+    .chat-new-btn { width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--jade); background: transparent; color: var(--white); font-family: inherit; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+    .chat-new-btn:hover { background: var(--jade); color: var(--black); }
+    .chat-new-btn svg { width: 14px; height: 14px; stroke: currentColor; }
+    .chat-sidebar-title { font-size: 0.7rem; letter-spacing: 0.15em; color: var(--gray); padding: 1.5rem 1.5rem 1rem; }
+    .chat-session-list { flex: 1; overflow-y: auto; padding: 0 0.75rem; }
+    .chat-session-item { padding: 1rem; border-radius: 4px; cursor: pointer; margin-bottom: 0.25rem; }
+    .chat-session-item:hover { background: var(--ink); }
+    .chat-session-item.active { background: var(--ink); border-left: 2px solid var(--jade); }
+    .chat-session-title { font-size: 0.8rem; margin-bottom: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chat-session-date { font-size: 0.65rem; color: var(--gray); }
+    .chat-main { flex: 1; display: flex; flex-direction: column; background: var(--cream); height: calc(100vh - 80px); }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 2rem 4rem; }
+    .chat-message { max-width: 70%; margin-bottom: 1.5rem; }
+    .chat-message.bot { margin-right: auto; }
+    .chat-message.user { margin-left: auto; }
+    .chat-message-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+    .chat-message-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--jade-pale); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: var(--jade-dark); font-weight: 500; }
+    .chat-message-name { font-size: 0.8rem; font-weight: 500; color: var(--black); }
+    .chat-message-bubble { padding: 1.25rem 1.5rem; font-size: 0.9rem; line-height: 1.8; color: var(--black); }
+    .chat-message.bot .chat-message-bubble { background: var(--white); border: 1px solid var(--line-dark); border-radius: 0 12px 12px 12px; }
+    .chat-message.user .chat-message-bubble { background: var(--jade-pale); border-radius: 12px 0 12px 12px; }
+    .chat-thinking { padding: 1rem 1.25rem; background: rgba(123,166,151,0.1); border: 1px solid var(--jade-pale); border-radius: 8px; margin-bottom: 1rem; cursor: pointer; }
+    .chat-thinking-header { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--jade-dark); }
+    .chat-thinking-header svg { width: 14px; height: 14px; stroke: var(--jade); animation: spin 2s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .chat-thinking-content { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--jade-pale); font-size: 0.8rem; color: var(--gray); line-height: 1.6; display: none; }
+    .chat-thinking.expanded .chat-thinking-content { display: block; }
+    .chat-input-area { padding: 1.5rem 4rem 2rem; background: var(--cream); border-top: 1px solid var(--line-dark); }
+    .chat-input-wrapper { display: flex; align-items: center; gap: 0.75rem; background: var(--white); border: 1px solid var(--line-dark); border-radius: 28px; padding: 0.5rem 0.5rem 0.5rem 1.5rem; }
+    .chat-input-wrapper:focus-within { border-color: var(--jade); }
+    .chat-input { flex: 1; border: none; background: transparent; font-family: inherit; font-size: 0.9rem; color: var(--black); outline: none; }
+    .chat-input::placeholder { color: var(--gray); }
+    .chat-thinking-toggle { display: flex; align-items: center; gap: 0.4rem; padding: 0.5rem 0.75rem; border: 1px solid var(--line-dark); border-radius: 16px; background: transparent; font-family: inherit; font-size: 0.7rem; color: var(--gray); cursor: pointer; }
+    .chat-thinking-toggle:hover { border-color: var(--jade); color: var(--jade-dark); }
+    .chat-thinking-toggle.active { background: var(--jade-pale); border-color: var(--jade); color: var(--jade-dark); }
+    .chat-thinking-toggle svg { width: 14px; height: 14px; stroke: currentColor; }
+    .chat-send-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--black); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .chat-send-btn:hover { background: var(--jade-dark); }
+    .chat-send-btn svg { width: 16px; height: 16px; stroke: var(--white); }
+    .mypage { padding: 100px 4rem 4rem; min-height: 100vh; }
+    .mypage-header { margin-bottom: 3rem; }
+    .mypage-title { font-size: 2rem; font-weight: 300; letter-spacing: 0.15em; margin-bottom: 0.5rem; }
+    .mypage-subtitle { font-size: 0.75rem; color: var(--gray); }
+    .mypage-grid { display: grid; grid-template-columns: 300px 1fr; gap: 3rem; }
+    .profile-card { background: var(--ink); padding: 2.5rem 2rem; text-align: center; height: fit-content; position: sticky; top: 100px; }
+    .profile-avatar { width: 100px; height: 100px; border-radius: 50%; background: var(--jade-pale); margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: var(--jade-dark); }
+    .profile-name { font-size: 1.25rem; font-weight: 400; margin-bottom: 0.5rem; }
+    .profile-email { font-size: 0.75rem; color: var(--gray); margin-bottom: 2rem; }
+    .profile-edit-btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.25rem; border: 1px solid var(--line); background: transparent; color: var(--white); font-family: inherit; font-size: 0.7rem; cursor: pointer; }
+    .profile-edit-btn:hover { border-color: var(--jade); color: var(--jade); }
+    .profile-edit-btn svg { width: 12px; height: 12px; stroke: currentColor; }
+    .mypage-content { display: flex; flex-direction: column; gap: 3rem; }
+    .mypage-section { background: var(--ink); padding: 2rem; }
+    .mypage-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
+    .mypage-section-title { font-size: 1rem; font-weight: 400; }
+    .mypage-section-more { font-size: 0.7rem; color: var(--gray); cursor: pointer; }
+    .mypage-section-more:hover { color: var(--jade); }
+    .watch-history-scroll { display: flex; gap: 1rem; overflow-x: auto; }
+    .watch-history-item { flex: 0 0 160px; cursor: pointer; }
+    .watch-history-thumb { width: 160px; height: 200px; background: var(--black); margin-bottom: 0.75rem; }
+    .watch-history-title { font-size: 0.8rem; }
+    .my-comments-list { display: flex; flex-direction: column; gap: 1rem; }
+    .my-comment-item { padding: 1rem; background: var(--black); border-left: 2px solid var(--jade); }
+    .my-comment-video { font-size: 0.7rem; color: var(--jade); margin-bottom: 0.5rem; }
+    .my-comment-text { font-size: 0.85rem; line-height: 1.6; }
+    .analytics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+    .analytics-item { text-align: center; padding: 1.5rem; background: var(--black); }
+    .analytics-number { font-size: 2rem; font-weight: 300; color: var(--jade); margin-bottom: 0.5rem; }
+    .analytics-label { font-size: 0.7rem; color: var(--gray); }
+    .footer { padding: 3rem 4rem; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+    .footer-logo { font-size: 1rem; font-weight: 300; letter-spacing: 0.2em; }
+    .footer-links { display: flex; gap: 2rem; }
+    .footer-links a { color: var(--gray); text-decoration: none; font-size: 0.7rem; }
+    .footer-links a:hover { color: var(--white); }
+    .footer-copy { font-size: 0.65rem; color: var(--gray); }
+    @media (max-width: 1024px) {
+      .home-hero { grid-template-columns: 1fr; }
+      .home-hero-left::after { display: none; }
+      .video-detail-container { grid-template-columns: 1fr; }
+      .comments-area { height: auto; min-height: 400px; }
+      .chat-sidebar { display: none; }
+      .mypage-grid { grid-template-columns: 1fr; }
+      .profile-card { position: static; }
+      .search-body { grid-template-columns: 1fr; }
+      .search-left { border-right: none; border-bottom: 1px solid var(--line-dark); padding-right: 0; padding-bottom: 1.5rem; }
+    }
+    @media (max-width: 768px) {
+      .header { padding: 1rem 1.5rem; }
+      .header-nav { display: none; }
+      .videos-section { padding: 3rem 1.5rem; }
+      .chat-messages { padding: 1.5rem; }
+      .chat-input-area { padding: 1rem 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-logo" onclick="navigateTo('home')">HisToK</div>
+    <nav class="header-nav">
+      <a onclick="navigateTo('home')" class="active">이야기</a>
+      <a onclick="navigateTo('about')">아가씨</a>
+      <a onclick="navigateTo('chat')">묻기</a>
+      <a onclick="navigateTo('mypage')">나의 공간</a>
+    </nav>
+    <div class="header-right">
+      <button class="header-search" onclick="openSearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></button>
+      <button class="header-login" id="loginBtn" onclick="toggleLogin()">LOGIN</button>
+      <div class="header-profile" id="profileBtn" onclick="navigateTo('mypage')">김</div>
+    </div>
+  </header>
+
+  <div id="page-home" class="page active">
+    <section class="home-hero">
+      <div class="home-hero-left"><div class="title-vertical"><h1 class="title-main">이야기</h1><div class="title-sub"><span class="title-accent">조선</span><span class="title-en">Joseon Dynasty Stories</span></div></div></div>
+      <div class="home-hero-right">
+        <div class="hero-intro">
+          <h2><span class="accent">조선</span>의 양반집 아가씨가<br>들려주는 오백 년의 이야기</h2>
+          <p>역사 속 인물이 직접 전하는 생생한 조선의 일상.<br>시간을 거슬러 그녀의 공간으로 초대합니다.</p>
+          <div class="hero-cta" onclick="navigateTo('about')">아가씨를 만나보세요<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></div>
+        </div>
+        <div class="hero-footer"><span>SCROLL</span><div class="scroll-indicator"><div class="scroll-line"></div></div><span>2025</span></div>
+      </div>
+    </section>
+    <section class="videos-section">
+      <div class="section-header">
+        <div class="section-header-left"><span class="section-number">01</span><h2 class="section-title" id="videosTitle">많이 본 이야기</h2><span class="section-title-en" id="videosTitleEn">Popular Stories</span></div>
+        <div class="filter-group"><button class="filter-btn active" onclick="setFilter(this)">인기순</button><button class="filter-btn" onclick="setFilter(this)">최신순</button></div>
+      </div>
+      <div class="video-grid">
+        <div class="video-card" onclick="navigateTo('video')"><div class="video-thumbnail"><div class="video-thumbnail-overlay"></div><div class="video-play-btn"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div></div><div class="video-info"><div class="video-keyword">궁중생활</div><h3 class="video-title">세자빈의 하루 — 궁중의 아침</h3><div class="video-tags"><span class="video-tag">조선왕실</span><span class="video-tag">세자빈</span><span class="video-tag">일상</span></div><div class="video-meta"><span>12:32</span><span>좋아요 1.2천</span></div></div></div>
+        <div class="video-card" onclick="navigateTo('video')"><div class="video-thumbnail"><div class="video-thumbnail-overlay"></div><div class="video-play-btn"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div></div><div class="video-info"><div class="video-keyword">혼례</div><h3 class="video-title">혼례의 날, 그 첫 만남</h3><div class="video-tags"><span class="video-tag">육례</span><span class="video-tag">양반가</span><span class="video-tag">전통혼례</span></div><div class="video-meta"><span>15:24</span><span>좋아요 982</span></div></div></div>
+        <div class="video-card" onclick="navigateTo('video')"><div class="video-thumbnail"><div class="video-thumbnail-overlay"></div><div class="video-play-btn"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div></div><div class="video-info"><div class="video-keyword">일상</div><h3 class="video-title">규방의 시간들</h3><div class="video-tags"><span class="video-tag">규수</span><span class="video-tag">자수</span><span class="video-tag">서책</span></div><div class="video-meta"><span>11:08</span><span>좋아요 756</span></div></div></div>
+        <div class="video-card" onclick="navigateTo('video')"><div class="video-thumbnail"><div class="video-thumbnail-overlay"></div><div class="video-play-btn"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div></div><div class="video-info"><div class="video-keyword">사계</div><h3 class="video-title">사계의 풍경 — 봄</h3><div class="video-tags"><span class="video-tag">한양</span><span class="video-tag">세시풍속</span><span class="video-tag">계절</span></div><div class="video-meta"><span>09:45</span><span>좋아요 634</span></div></div></div>
+      </div>
+    </section>
+    <footer class="footer"><div class="footer-logo">HisToK</div><div class="footer-links"><a href="#">About</a><a href="#">Contact</a><a href="#">Terms</a></div><div class="footer-copy">© 2025 HisToK</div></footer>
+  </div>
+
+  <div id="page-about" class="page">
+    <div class="about-page">
+      <div class="about-bg"></div><div class="about-webgl"></div>
+      <div class="about-content">
+        <div class="about-label">Meet the Storyteller</div>
+        <h1 class="about-title">아가씨</h1>
+        <p class="about-title-en">Agassi</p>
+        <p class="about-desc">조선시대 양반가의 규수.<br>오백 년 역사의 기억을 품고<br>당신에게 조선의 이야기를 들려드립니다.</p>
+        <div class="about-features">
+          <div class="about-feature"><div class="about-feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg></div><div class="about-feature-text">역사 지식 기반</div></div>
+          <div class="about-feature"><div class="about-feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg></div><div class="about-feature-text">자연스러운 대화</div></div>
+          <div class="about-feature"><div class="about-feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></div><div class="about-feature-text">추론 과정 공개</div></div>
+        </div>
+        <button class="about-cta" onclick="navigateTo('chat')">아가씨에게 묻기<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-video" class="page">
+    <div class="video-detail-page">
+      <div class="video-detail-container">
+        <div class="video-player-area">
+          <div class="video-player"><div class="video-player-placeholder"><div class="video-player-btn"><svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div></div></div>
+          <div class="video-detail-info">
+            <div class="video-detail-keyword">궁중생활</div>
+            <h1 class="video-detail-title">세자빈의 하루 — 궁중의 아침</h1>
+            <div class="video-detail-meta"><span>12분 32초</span><span>조회 24,521</span><span>2025.01.03</span></div>
+            <div class="video-detail-tags"><span class="video-detail-tag">조선왕실</span><span class="video-detail-tag">세자빈</span><span class="video-detail-tag">일상</span><span class="video-detail-tag">궁중</span></div>
+            <button class="video-like-btn" onclick="toggleLike(this)"><svg viewBox="0 0 24 24" stroke-width="1.5"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg><span>좋아요 1,234</span></button>
+          </div>
+        </div>
+        <div class="comments-area">
+          <div class="comments-header"><h3 class="comments-title">이야기를 나누다 <span>32</span></h3></div>
+          <div class="comments-list">
+            <div class="comment-item">
+              <div class="comment-main"><div class="comment-avatar">박</div><div class="comment-body"><div class="comment-header"><span class="comment-author">박지현</span><span class="comment-date">2시간 전</span></div><p class="comment-text">세자빈의 하루가 이렇게 바빴군요. 새벽부터 일어나서 문안인사를 드리고... 정말 대단합니다.</p><div class="comment-actions"><button class="comment-action-btn" onclick="toggleReplyForm(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>답글</button><button class="comment-action-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>12</button></div></div></div>
+              <div class="comment-replies">
+                <div class="reply-item"><div class="reply-main"><div class="reply-avatar">이</div><div class="reply-body"><div class="reply-header"><span class="reply-author">이민호</span><span class="reply-date">1시간 전</span></div><p class="reply-text">맞아요, 저도 이 부분이 인상 깊었어요.</p></div></div></div>
+                <div class="reply-item"><div class="reply-main"><div class="reply-avatar">최</div><div class="reply-body"><div class="reply-header"><span class="reply-author">최수현</span><span class="reply-date">45분 전</span></div><p class="reply-text">그래도 왕실에서의 삶이니까 일반 백성들보다는 나았을 것 같아요.</p></div></div></div>
+              </div>
+              <div class="reply-form" id="replyForm1"><div class="reply-input-wrapper"><input type="text" class="reply-input" placeholder="답글을 입력하세요..."><button class="reply-submit">등록</button></div></div>
+            </div>
+            <div class="comment-item">
+              <div class="comment-main"><div class="comment-avatar">이</div><div class="comment-body"><div class="comment-header"><span class="comment-author">이승우</span><span class="comment-date">5시간 전</span></div><p class="comment-text">영상 퀄리티가 정말 좋네요. 조선시대에 대해 이렇게 생생하게 배울 수 있다니 감사합니다.</p><div class="comment-actions"><button class="comment-action-btn" onclick="toggleReplyForm(2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>답글</button><button class="comment-action-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>8</button></div></div></div>
+              <div class="reply-form" id="replyForm2"><div class="reply-input-wrapper"><input type="text" class="reply-input" placeholder="답글을 입력하세요..."><button class="reply-submit">등록</button></div></div>
+            </div>
+          </div>
+          <div class="comment-input-area"><textarea class="comment-input" rows="3" placeholder="이야기를 남겨주세요..."></textarea><button class="comment-submit">등록</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-chat" class="page">
+    <div class="chat-page">
+      <aside class="chat-sidebar">
+        <div class="chat-sidebar-header"><button class="chat-new-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 4v16m8-8H4"/></svg>새 대화</button></div>
+        <div class="chat-sidebar-title">지난 대화</div>
+        <div class="chat-session-list">
+          <div class="chat-session-item active"><div class="chat-session-title">조선시대 혼례 절차에 대해...</div><div class="chat-session-date">오늘</div></div>
+          <div class="chat-session-item"><div class="chat-session-title">양반가의 식사 예절</div><div class="chat-session-date">어제</div></div>
+        </div>
+      </aside>
+      <main class="chat-main">
+        <div class="chat-messages">
+          <div class="chat-message bot">
+            <div class="chat-message-header"><div class="chat-message-avatar">秀</div><span class="chat-message-name">아가씨</span></div>
+            <div class="chat-thinking" onclick="this.classList.toggle('expanded')"><div class="chat-thinking-header"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>생각하는 과정 보기</div><div class="chat-thinking-content">사용자가 조선시대 혼례에 대해 물었습니다. 혼례는 육례의 절차를 따릅니다...</div></div>
+            <div class="chat-message-bubble">어서 오세요. 조선시대 혼례 절차가 궁금하시군요.<br><br>혼례는 <strong>육례</strong>라 하여 여섯 가지 예법을 따릅니다.</div>
+          </div>
+          <div class="chat-message user"><div class="chat-message-bubble">그럼 혼례 당일에는 어떤 일이 있나요?</div></div>
+        </div>
+        <div class="chat-input-area">
+          <div class="chat-input-wrapper">
+            <input type="text" class="chat-input" placeholder="아가씨에게 물어보세요...">
+            <button class="chat-thinking-toggle" onclick="this.classList.toggle('active')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>Thinking</button>
+            <button class="chat-send-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div id="page-mypage" class="page">
+    <div class="mypage">
+      <div class="mypage-header"><h1 class="mypage-title">나의 공간</h1><p class="mypage-subtitle">My Space</p></div>
+      <div class="mypage-grid">
+        <div class="profile-card"><div class="profile-avatar">김</div><h2 class="profile-name">김민수</h2><p class="profile-email">minsu@email.com</p><button class="profile-edit-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>프로필 수정</button></div>
+        <div class="mypage-content">
+          <section class="mypage-section"><div class="mypage-section-header"><h3 class="mypage-section-title">본 이야기</h3><span class="mypage-section-more">전체보기 →</span></div><div class="watch-history-scroll"><div class="watch-history-item" onclick="navigateTo('video')"><div class="watch-history-thumb"></div><div class="watch-history-title">세자빈의 하루</div></div><div class="watch-history-item" onclick="navigateTo('video')"><div class="watch-history-thumb"></div><div class="watch-history-title">혼례의 날</div></div><div class="watch-history-item" onclick="navigateTo('video')"><div class="watch-history-thumb"></div><div class="watch-history-title">규방의 시간들</div></div></div></section>
+          <section class="mypage-section"><div class="mypage-section-header"><h3 class="mypage-section-title">남긴 이야기</h3><span class="mypage-section-more">전체보기 →</span></div><div class="my-comments-list"><div class="my-comment-item"><div class="my-comment-video">세자빈의 하루</div><p class="my-comment-text">정말 흥미로운 내용이네요.</p></div><div class="my-comment-item"><div class="my-comment-video">혼례의 날</div><p class="my-comment-text">육례의 절차가 정말 복잡하군요.</p></div></div></section>
+          <section class="mypage-section"><div class="mypage-section-header"><h3 class="mypage-section-title">취향 분석</h3></div><div class="analytics-grid"><div class="analytics-item"><div class="analytics-number">12</div><div class="analytics-label">본 이야기</div></div><div class="analytics-item"><div class="analytics-number">8</div><div class="analytics-label">남긴 이야기</div></div><div class="analytics-item"><div class="analytics-number">궁중</div><div class="analytics-label">관심 주제</div></div></div></section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="search-overlay" id="searchOverlay">
+    <div class="search-backdrop" onclick="closeSearch()"></div>
+    <div class="search-container">
+      <div class="search-content">
+        <div class="search-input-row">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" class="search-input" id="searchInput" placeholder="찾고 싶은 이야기를 검색하세요" oninput="handleSearchInput(this.value)">
+          <button class="search-close" onclick="closeSearch()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+        <div class="search-body">
+          <div class="search-left">
+            <div class="search-section"><div class="search-section-title">추천 키워드</div><div class="search-keywords"><button class="search-keyword-btn" onclick="searchBy('궁중생활')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/></svg>궁중생활</button><button class="search-keyword-btn" onclick="searchBy('혼례')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/></svg>혼례</button><button class="search-keyword-btn" onclick="searchBy('일상')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/></svg>일상</button><button class="search-keyword-btn" onclick="searchBy('사계')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/></svg>사계</button></div></div>
+            <div class="search-section"><div class="search-section-title">추천 태그</div><div class="search-tags"><button class="search-tag-btn" onclick="searchBy('조선왕실')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>조선왕실</button><button class="search-tag-btn" onclick="searchBy('세자빈')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>세자빈</button><button class="search-tag-btn" onclick="searchBy('양반가')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>양반가</button><button class="search-tag-btn" onclick="searchBy('한양')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>한양</button></div></div>
+            <div class="search-section" id="historySection" style="display:none;"><div class="search-section-title">최근 검색</div><div class="search-history-list"><div class="search-history-item" onclick="searchBy('세자빈')"><span>세자빈의 하루</span><button class="search-history-delete" onclick="event.stopPropagation()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div></div></div>
+          </div>
+          <div class="search-right"><div class="search-videos-title" id="searchVideosTitle"></div><div class="search-videos-grid" id="searchVideosGrid"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const allVideos = [
+      { id: 1, keyword: '궁중생활', title: '세자빈의 하루 — 궁중의 아침', tags: ['조선왕실', '세자빈', '일상'] },
+      { id: 2, keyword: '혼례', title: '혼례의 날, 그 첫 만남', tags: ['육례', '양반가', '전통혼례'] },
+      { id: 3, keyword: '일상', title: '규방의 시간들', tags: ['규수', '자수', '서책'] },
+      { id: 4, keyword: '사계', title: '사계의 풍경 — 봄', tags: ['한양', '세시풍속', '계절'] },
+      { id: 5, keyword: '궁중생활', title: '왕비의 수라상', tags: ['궁중음식', '왕실', '식문화'] },
+      { id: 6, keyword: '교육', title: '서당에서의 하루', tags: ['양반', '교육', '유학'] }
+    ];
+    let isLoggedIn = false;
+
+    function navigateTo(page) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('page-' + page).classList.add('active');
+      document.querySelectorAll('.header-nav a').forEach(a => a.classList.remove('active'));
+      const navMap = { home: 0, about: 1, chat: 2, mypage: 3 };
+      if (navMap[page] !== undefined) document.querySelectorAll('.header-nav a')[navMap[page]].classList.add('active');
+      window.scrollTo(0, 0);
+    }
+
+    function toggleLogin() {
+      isLoggedIn = !isLoggedIn;
+      document.getElementById('loginBtn').style.display = isLoggedIn ? 'none' : 'block';
+      document.getElementById('profileBtn').style.display = isLoggedIn ? 'flex' : 'none';
+      document.getElementById('videosTitle').textContent = isLoggedIn ? '당신을 위한 이야기' : '많이 본 이야기';
+      document.getElementById('videosTitleEn').textContent = isLoggedIn ? 'Recommended for You' : 'Popular Stories';
+      document.getElementById('historySection').style.display = isLoggedIn ? 'block' : 'none';
+    }
+
+    function setFilter(btn) {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    function openSearch() {
+      document.getElementById('searchOverlay').classList.add('open');
+      setTimeout(function() { document.getElementById('searchInput').focus(); }, 400);
+      if (isLoggedIn) {
+        document.getElementById('searchVideosTitle').textContent = '인기 이야기';
+        renderSearchVideos(allVideos.slice(0, 4));
+      } else {
+        document.getElementById('searchVideosTitle').textContent = '';
+        document.getElementById('searchVideosGrid').innerHTML = '';
+      }
+    }
+
+    function closeSearch() {
+      document.getElementById('searchOverlay').classList.remove('open');
+      document.getElementById('searchInput').value = '';
+    }
+
+    var searchTimeout;
+    function handleSearchInput(value) {
+      clearTimeout(searchTimeout);
+      if (!value.trim()) {
+        if (isLoggedIn) {
+          document.getElementById('searchVideosTitle').textContent = '인기 이야기';
+          renderSearchVideos(allVideos.slice(0, 4));
+        } else {
+          document.getElementById('searchVideosTitle').textContent = '';
+          document.getElementById('searchVideosGrid').innerHTML = '';
+        }
+        return;
+      }
+      searchTimeout = setTimeout(function() {
+        var results = allVideos.filter(function(v) {
+          return v.keyword.indexOf(value) !== -1 || v.title.indexOf(value) !== -1 || v.tags.some(function(t) { return t.indexOf(value) !== -1; });
+        });
+        document.getElementById('searchVideosTitle').textContent = '"' + value + '" 관련 이야기';
+        if (results.length > 0) renderSearchVideos(results);
+        else document.getElementById('searchVideosGrid').innerHTML = '<div class="search-no-result">검색 결과가 없습니다.</div>';
+      }, 300);
+    }
+
+    function renderSearchVideos(videos) {
+      var html = '';
+      for (var i = 0; i < videos.length; i++) {
+        var v = videos[i];
+        html += '<div class="search-video-card" onclick="navigateTo(\'video\'); closeSearch();">';
+        html += '<div class="search-video-thumb"></div>';
+        html += '<div class="search-video-keyword">' + v.keyword + '</div>';
+        html += '<div class="search-video-title">' + v.title + '</div>';
+        html += '<div class="search-video-tags">';
+        for (var j = 0; j < Math.min(2, v.tags.length); j++) {
+          html += '<span class="search-video-tag">' + v.tags[j] + '</span>';
+        }
+        html += '</div></div>';
+      }
+      document.getElementById('searchVideosGrid').innerHTML = html;
+    }
+
+    function searchBy(term) {
+      document.getElementById('searchInput').value = term;
+      handleSearchInput(term);
+    }
+
+    function toggleLike(btn) { btn.classList.toggle('liked'); }
+
+    function toggleReplyForm(id) {
+      var form = document.getElementById('replyForm' + id);
+      form.classList.toggle('show');
+      if (form.classList.contains('show')) form.querySelector('input').focus();
+    }
+
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeSearch(); });
+  </script>
+</body>
+</html>
