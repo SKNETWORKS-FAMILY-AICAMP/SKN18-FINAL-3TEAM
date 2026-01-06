@@ -1037,7 +1037,7 @@ const EvidencePathView = ({ evidences = [] }) => {
   // 컨테이너 크기 상태 추가
   const [containerSize, setContainerSize] = useState({
     width: 800,
-    height: 400,
+    height: 280, // 높이를 400px에서 280px로 감소
   });
 
   // 컨테이너 크기 측정
@@ -1050,7 +1050,7 @@ const EvidencePathView = ({ evidences = [] }) => {
         const rect = graphContainer.getBoundingClientRect();
         setContainerSize({
           width: Math.max(rect.width || 800, 400),
-          height: Math.max(rect.height || 400, 300),
+          height: Math.max(rect.height || 280, 250), // 높이를 280px로 감소, 최소값 250px
         });
       }
     };
@@ -1187,7 +1187,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                 scrollableParent.scrollTop +
                 containerRect.top -
                 parentRect.top -
-                50; // 여백 증가 (50px → 150px) - 더 많이 스크롤
+                30; // 여백 증가 (50px → 150px) - 더 많이 스크롤
               scrollableParent.scrollTo({
                 top: scrollTop,
                 behavior: "smooth",
@@ -1500,7 +1500,7 @@ const EvidencePathView = ({ evidences = [] }) => {
             style={{
               width: "100%",
               maxWidth: "100%",
-              height: "400px", // 높이 감소 (600px → 400px)
+              height: "280px", // 높이 감소 (400px → 280px)
               backgroundColor: COLORS.white,
               borderRadius: "8px",
               border: `1px solid ${COLORS.border}`,
@@ -1579,7 +1579,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                   ref={graphRef}
                   graphData={graphData}
                   width={containerSize.width || 800}
-                  height={containerSize.height || 400}
+                  height={containerSize.height || 280} // 높이를 280px로 감소
                   nodeLabel="name"
                   nodeColor={getNodeColor}
                   nodeRelSize={getNodeSize}
