@@ -11,8 +11,8 @@ import { COLORS } from "../../../constants/theme";
 // 단계 그룹 정의 (관련 이벤트들을 그룹화)
 const STAGE_GROUPS = {
   question_analysis: {
-    title: "질문 분석",
-    icon: "🔍",
+    title: "질문을 살펴보는 중",
+    icon: null,
     events: [
       "history_check_started",
       "history_check_completed",
@@ -22,11 +22,11 @@ const STAGE_GROUPS = {
       "keywords_extracted",
       "stage1_completed",
     ],
-    color: "#3B82F6",
+    color: COLORS.jade,
   },
   intent_clarification: {
-    title: "의도 확인",
-    icon: "💭",
+    title: "무엇이 궁금한지 알아보는 중",
+    icon: null,
     events: [
       "direction_generation_started",
       "direction_generation_completed",
@@ -35,11 +35,11 @@ const STAGE_GROUPS = {
       "user_selection_processing",
       "intent_integration",
     ],
-    color: "#8B5CF6",
+    color: COLORS.jadeLight,
   },
   entity_expansion: {
-    title: "키워드 확장 및 인물/사건 추출",
-    icon: "🧩",
+    title: "관련된 이야기를 찾아보는 중",
+    icon: null,
     events: [
       "entity_expansion_started",
       "keyword_expansion_started",
@@ -51,30 +51,30 @@ const STAGE_GROUPS = {
       "sparql_scoring_started",
       "entity_expansion_completed",
     ],
-    color: "#10B981",
+    color: COLORS.jade,
   },
   semantic_expansion: {
-    title: "의미론적 확장",
-    icon: "🌐",
+    title: "연관된 내용을 찾아보는 중",
+    icon: null,
     events: [
       "semantic_expansion_started",
       "temporal_expansion_completed",
       "causal_expansion_completed",
       "pgvector_expansion_completed",
     ],
-    color: "#F59E0B",
+    color: COLORS.jadeLight,
   },
   knowledge_retrieval: {
-    title: "지식 검색",
-    icon: "🔎",
+    title: "기록을 찾아보는 중",
+    icon: null,
     events: ["thread_weights_applied", "sparql_search_completed"],
-    color: "#EC4899",
+    color: COLORS.jade,
   },
   answer_generation: {
-    title: "답변 생성",
-    icon: "✍️",
+    title: "답변을 준비하는 중",
+    icon: null,
     events: ["answer_generation_started"],
-    color: "#06B6D4",
+    color: COLORS.jadeLight,
   },
 };
 
@@ -87,8 +87,8 @@ const getStageGroup = (eventType) => {
   }
   return {
     groupId: "other",
-    title: "기타 처리",
-    icon: "📋",
+    title: "다른 일을 하는 중",
+    icon: null,
     color: COLORS.gray,
   };
 };
@@ -124,12 +124,12 @@ const ThinkingStep = ({ stage, events, isActive, isComplete, onToggle }) => {
     <div
       style={{
         marginBottom: "12px",
-        border: `1px solid ${isActive ? stage.color : "#e5e7eb"}`,
+        border: `1px solid ${isActive ? stage.color : COLORS.border}`,
         borderRadius: "12px",
         overflow: "hidden",
         backgroundColor: COLORS.white,
         boxShadow: isActive
-          ? `0 2px 12px ${stage.color}20`
+          ? `0 2px 12px ${stage.color}30`
           : "0 1px 3px rgba(0, 0, 0, 0.05)",
         transition: "all 0.3s ease",
       }}
@@ -138,9 +138,9 @@ const ThinkingStep = ({ stage, events, isActive, isComplete, onToggle }) => {
       <div
         style={{
           padding: "12px 16px",
-          backgroundColor: isActive ? `${stage.color}10` : "#f9fafb",
+          backgroundColor: isActive ? `${stage.color}15` : COLORS.cream,
           borderBottom: isExpanded
-            ? `1px solid ${isActive ? stage.color : "#e5e7eb"}`
+            ? `1px solid ${isActive ? stage.color : COLORS.border}`
             : "none",
           cursor: "pointer",
           display: "flex",
@@ -158,10 +158,10 @@ const ThinkingStep = ({ stage, events, isActive, isComplete, onToggle }) => {
               height: "28px",
               borderRadius: "50%",
               backgroundColor: isComplete
-                ? `${stage.color}20`
+                ? `${stage.color}25`
                 : isActive
                 ? stage.color
-                : "#e5e7eb",
+                : COLORS.lightGray,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -170,7 +170,15 @@ const ThinkingStep = ({ stage, events, isActive, isComplete, onToggle }) => {
             }}
           >
             {isComplete ? (
-              <span style={{ color: stage.color }}>✓</span>
+              <span
+                style={{
+                  color: COLORS.jade,
+                  fontSize: "16px",
+                  fontWeight: "600",
+                }}
+              >
+                ✓
+              </span>
             ) : isActive ? (
               <div
                 style={{
@@ -182,9 +190,7 @@ const ThinkingStep = ({ stage, events, isActive, isComplete, onToggle }) => {
                   animation: "spin 0.8s linear infinite",
                 }}
               />
-            ) : (
-              <span style={{ fontSize: "12px" }}>{stage.icon}</span>
-            )}
+            ) : null}
           </div>
 
           <span
@@ -202,13 +208,13 @@ const ThinkingStep = ({ stage, events, isActive, isComplete, onToggle }) => {
               style={{
                 fontSize: "11px",
                 color: stage.color,
-                backgroundColor: `${stage.color}15`,
+                backgroundColor: `${stage.color}20`,
                 padding: "2px 8px",
                 borderRadius: "10px",
                 fontWeight: "500",
               }}
             >
-              진행 중...
+              생각 중...
             </span>
           )}
 
@@ -216,8 +222,8 @@ const ThinkingStep = ({ stage, events, isActive, isComplete, onToggle }) => {
             <span
               style={{
                 fontSize: "11px",
-                color: "#10B981",
-                backgroundColor: "#10B98115",
+                color: COLORS.jade,
+                backgroundColor: `${COLORS.jade}20`,
                 padding: "2px 8px",
                 borderRadius: "10px",
                 fontWeight: "500",
@@ -261,7 +267,7 @@ const ThinkingStep = ({ stage, events, isActive, isComplete, onToggle }) => {
         <div
           style={{
             height: "2px",
-            backgroundColor: "#f0f0f0",
+            backgroundColor: COLORS.lightGray,
             position: "relative",
             overflow: "hidden",
           }}
@@ -287,74 +293,76 @@ const EventItem = ({ event, stageColor }) => {
   const getEventDescription = () => {
     switch (eventType) {
       case "history_check_started":
-        return "역사 관련 질문인지 확인 중...";
+        return "역사에 관한 이야기인지 살펴보는 중...";
       case "history_check_completed":
-        return data.is_historical ? `역사 질문 확인됨` : "역사 질문이 아님";
+        return data.is_historical
+          ? `역사 이야기로 보이네요`
+          : "역사 이야기가 아닌 것 같아요";
       case "history_check_error":
-        return "역사 관련 체크 오류 (안전하게 역사 질문으로 처리)";
+        return "확인이 어려워서 역사 이야기로 생각해볼게요";
       case "stage1_completed":
-        return "질문 분석 완료 - 사용자 선택 대기";
+        return "질문을 살펴봤어요 - 어떤 방향이 궁금한지 물어볼게요";
       case "question_analysis_started":
-        return `질문 분석 시작: "${data.query?.slice(0, 30)}..."`;
+        return `"${data.query?.slice(0, 30)}..." 이 질문을 살펴보는 중이에요`;
       case "question_type_classified":
-        return `질문 유형: ${data.query_type}`;
+        return `이런 종류의 질문이네요: ${data.query_type}`;
       case "keywords_extracted":
-        return `키워드 ${data.keywords?.length || 0}개 추출: ${data.keywords
-          ?.slice(0, 5)
-          .join(", ")}...`;
+        return `중요한 말씀 ${
+          data.keywords?.length || 0
+        }개를 찾았어요: ${data.keywords?.slice(0, 5).join(", ")}...`;
       case "direction_generation_started":
-        return "확장 방향 생성 중...";
+        return "어떤 방향으로 알아볼지 생각해보는 중...";
       case "direction_generation_completed":
-        return `${data.direction_count || 0}개 확장 방향 생성됨`;
+        return `${data.direction_count || 0}가지 방향을 생각해봤어요`;
       case "user_selection_completed":
-        return `✓ 사용자 선택: "${
-          data.selected_direction_title || "선택된 방향"
-        }" - ${data.action || "상세 분석 진행"}`;
+        return `"${
+          data.selected_direction_title || "선택하신 방향"
+        }"으로 더 자세히 알아볼게요`;
       case "keyword_expansion_started":
         const dirTitle = data.direction_title || "역사적 맥락";
         const propGroups = data.property_groups || [];
         const propInfo =
           propGroups.length > 0 ? ` (${propGroups.join(", ")} 관련)` : "";
-        return `키워드 확장 중: "${dirTitle}" 방향${propInfo}`;
+        return `"${dirTitle}" 방향으로 관련된 말씀들을 찾아보는 중이에요${propInfo}`;
       case "keyword_expansion_completed":
-        return `키워드 확장 완료: ${data.total_keywords || 0}개 생성됨`;
+        return `관련된 말씀 ${data.total_keywords || 0}개를 찾았어요`;
       case "entity_expansion_started":
         const selectedDir = data.selected_direction;
         const basicKws = data.basic_keywords?.slice(0, 3).join(", ") || "";
         return selectedDir
-          ? `선택한 방향: "${selectedDir.title || selectedDir}"`
-          : `관련 인물/사건 추출 시작`;
+          ? `"${
+              selectedDir.title || selectedDir
+            }" 방향으로 관련된 이야기를 찾아보는 중이에요`
+          : `관련된 인물이나 사건을 찾아보는 중이에요`;
       case "entity_expansion_completed":
-        return `총 ${
+        return `관련된 인물이나 사건 ${
           data.final_entity_count || data.total_entities || 0
-        }개 인물/사건 추출 완료`;
+        }개를 찾았어요`;
       case "ttl_matching_started":
-        return "역사 데이터베이스에서 정확 매칭 검색 중...";
+        return "기록에서 정확히 일치하는 내용을 찾아보는 중이에요...";
       case "ttl_matching_completed":
-        return `데이터베이스 매칭: ${
+        return `기록에서 ${
           data.matched_entities || data.matched_count || 0
-        }개 발견`;
+        }개를 찾았어요`;
       case "pgvector_search_started":
-        return "유사한 역사 정보 검색 중...";
+        return "비슷한 이야기를 찾아보는 중이에요...";
       case "pgvector_search_completed":
-        return `유사 정보 검색: ${
+        return `비슷한 이야기 ${
           data.added_entities || data.results_count || 0
-        }개 발견`;
+        }개를 찾았어요`;
       case "semantic_expansion_started":
-        return `${data.entity_count || 0}개 항목의 연관 관계 탐색 중...`;
+        return `${
+          data.entity_count || 0
+        }개와 연관된 내용을 찾아보는 중이에요...`;
       case "temporal_expansion_completed":
-        return `시간적 관계 (before/after/contemporary): ${
-          data.results_count || 0
-        }개 발견`;
+        return `시간적으로 관련된 내용 ${data.results_count || 0}개를 찾았어요`;
       case "causal_expansion_completed":
-        return `인과 관계 (cause/result): ${data.results_count || 0}개 발견`;
+        return `인과 관계가 있는 내용 ${data.results_count || 0}개를 찾았어요`;
       case "pgvector_expansion_completed":
-        return `의미적 유사 관계 (벡터 기반): ${
-          data.results_count || 0
-        }개 발견`;
+        return `의미가 비슷한 내용 ${data.results_count || 0}개를 찾았어요`;
       case "thread_weights_applied":
         const queryType = data.query_type || "default";
-        return `검색 가중치 적용: ${queryType}`;
+        return `이런 종류의 질문에 맞게 찾아보고 있어요: ${queryType}`;
       case "sparql_search_completed":
         const total = data.total_results || 0;
         const threadResults = data.thread_results || {};
@@ -362,9 +370,9 @@ const EventItem = ({ event, stageColor }) => {
         const threadNameMap = {
           outgoing_relations: "나가는 관계",
           incoming_relations: "들어오는 관계",
-          entity_properties: "엔티티 속성",
-          connected_entities: "연결 엔티티",
-          type_and_summary: "타입/요약",
+          entity_properties: "속성",
+          connected_entities: "연결된 것",
+          type_and_summary: "종류와 요약",
         };
         const threadBreakdown = Object.entries(threadResults)
           .map(([thread, count]) => {
@@ -372,9 +380,11 @@ const EventItem = ({ event, stageColor }) => {
             return `${threadName}: ${count}개`;
           })
           .join(", ");
-        return `SPARQL 검색 완료: 총 ${total}개 경로\n(${threadBreakdown})`;
+        return `총 ${total}개의 관련 내용을 찾았어요\n(${threadBreakdown})`;
       case "answer_generation_started":
-        return `${data.evidence_count || 0}개 근거로 답변 생성 중...`;
+        return `${
+          data.evidence_count || 0
+        }개의 근거를 바탕으로 답변을 준비하는 중이에요...`;
       default:
         return data.title || eventType;
     }
@@ -415,8 +425,8 @@ const ClarificationDivider = () => (
       gap: "12px",
       margin: "16px 0",
       padding: "12px 16px",
-      backgroundColor: "#f0f9ff",
-      border: "1px solid #bae6fd",
+      backgroundColor: `${COLORS.jade}15`,
+      border: `1px solid ${COLORS.jadeLight}`,
       borderRadius: "12px",
     }}
   >
@@ -425,11 +435,11 @@ const ClarificationDivider = () => (
         width: "28px",
         height: "28px",
         borderRadius: "50%",
-        backgroundColor: "#0ea5e9",
+        backgroundColor: COLORS.jade,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "white",
+        color: COLORS.white,
         fontSize: "16px",
         fontWeight: "600",
       }}
@@ -441,19 +451,19 @@ const ClarificationDivider = () => (
         style={{
           fontSize: "13px",
           fontWeight: "600",
-          color: "#0c4a6e",
+          color: COLORS.dark,
           marginBottom: "2px",
         }}
       >
-        사용자 선택 완료
+        선택하신 방향으로
       </div>
       <div
         style={{
           fontSize: "11px",
-          color: "#0369a1",
+          color: COLORS.jadeDark,
         }}
       >
-        선택한 방향으로 상세 분석을 진행합니다
+        더 자세히 알아볼게요
       </div>
     </div>
   </div>
@@ -585,12 +595,11 @@ const ThinkingMode = ({
           gap: "8px",
           marginBottom: "12px",
           padding: "8px 12px",
-          backgroundColor: "#f8fafc",
+          backgroundColor: COLORS.cream,
           borderRadius: "8px",
-          border: "1px solid #e2e8f0",
+          border: `1px solid ${COLORS.border}`,
         }}
       >
-        <span style={{ fontSize: "16px" }}>🧠</span>
         <span
           style={{
             fontSize: "14px",
@@ -598,7 +607,7 @@ const ThinkingMode = ({
             color: COLORS.dark,
           }}
         >
-          AI 사고 과정
+          아가씨가 생각하는 중...
         </span>
         <span
           style={{
@@ -607,7 +616,7 @@ const ThinkingMode = ({
             backgroundColor: COLORS.white,
             padding: "2px 8px",
             borderRadius: "10px",
-            border: "1px solid #e2e8f0",
+            border: `1px solid ${COLORS.border}`,
           }}
         >
           {totalStages}단계
@@ -616,8 +625,8 @@ const ThinkingMode = ({
           <span
             style={{
               fontSize: "11px",
-              color: "#10B981",
-              backgroundColor: "#10B98115",
+              color: COLORS.jade,
+              backgroundColor: `${COLORS.jade}20`,
               padding: "2px 8px",
               borderRadius: "10px",
               marginLeft: "auto",
