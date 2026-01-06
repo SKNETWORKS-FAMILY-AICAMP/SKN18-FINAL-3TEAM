@@ -146,3 +146,8 @@ class GraphState(TypedDict):
     #     "aggregator_threads": {"outgoing_relations": True, "incoming_relations": False, ...},
     #     "entity_boost_mode": "exact_match"  # "exact_match" | "partial_match" | "normalized_match" | "penalty_match"
     # }
+
+    # ========== 스트리밍 모드 ==========
+    stream_mode: NotRequired[bool]  # 스트리밍 모드 활성화 여부
+    stream_callback: NotRequired[Any]  # 스트리밍 콜백 함수 (청크 단위 전송)
+    thinking_callback: NotRequired[Any]  # Thinking 모드 진행 상황 콜백 함수
