@@ -34,12 +34,10 @@ CREATE TABLE IF NOT EXISTS "user" (
 CREATE TABLE IF NOT EXISTS video (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
-    video_url TEXT NOT NULL,
     upload_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     tags TEXT[] NULL,
     likes_count INT NOT NULL DEFAULT 0,
-    comments_count INT NOT NULL DEFAULT 0,
-    thumbnail_url TEXT NULL
+    comments_count INT NOT NULL DEFAULT 0
 );
 
 -- 시청 기록 관리 테이블 생성
