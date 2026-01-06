@@ -17,7 +17,7 @@ const VideoCreateWelcomeMessage = ({ nickname }) => {
     // 초기화
     setDisplayedName("");
     setDisplayedQuestion("");
-    
+
     // 이름 텍스트 스트리밍
     let nameIndex = 0;
     const nameInterval = setInterval(() => {
@@ -173,7 +173,8 @@ const VideoCreatePage = ({ onNavigate, user }) => {
       .catch((error) => {
         console.error("영상 생성 실패:", error);
 
-        let errorMessage = "죄송합니다. 오류가 발생했습니다. 다시 시도해주세요.";
+        let errorMessage =
+          "죄송합니다. 오류가 발생했습니다. 다시 시도해주세요.";
 
         if (error.response?.status === 404) {
           errorMessage =
@@ -250,7 +251,8 @@ const VideoCreatePage = ({ onNavigate, user }) => {
       style={{
         height: "calc(100vh - 76px)",
         maxHeight: "calc(100vh - 76px)",
-        backgroundColor: messages.length > 0 ? "var(--cream)" : COLORS.background,
+        backgroundColor:
+          messages.length > 0 ? "var(--cream)" : COLORS.background,
         display: "flex",
         flexDirection: "row",
         padding: 0,
@@ -319,9 +321,7 @@ const VideoCreatePage = ({ onNavigate, user }) => {
                   <div key={index}>
                     {msg.type === "user" && (
                       <div className="chat-message user">
-                        <div className="chat-message-bubble">
-                          {msg.text}
-                        </div>
+                        <div className="chat-message-bubble">{msg.text}</div>
                       </div>
                     )}
 
@@ -384,15 +384,22 @@ const VideoCreatePage = ({ onNavigate, user }) => {
             </div>
 
             {/* 입력 영역 */}
-            <div className={messages.length > 0 ? "chat-input-area" : ""} style={messages.length > 0 ? {} : {
-              position: "fixed",
-              bottom: "40px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: "calc(100% - 120px)",
-              maxWidth: "1200px",
-              zIndex: 998,
-            }}>
+            <div
+              className={messages.length > 0 ? "chat-input-area" : ""}
+              style={
+                messages.length > 0
+                  ? {}
+                  : {
+                      position: "fixed",
+                      bottom: "40px",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      width: "calc(100% - 120px)",
+                      maxWidth: "1200px",
+                      zIndex: 998,
+                    }
+              }
+            >
               <form onSubmit={handleSubmit}>
                 {messages.length > 0 ? (
                   <div className="chat-input-wrapper">
@@ -409,16 +416,42 @@ const VideoCreatePage = ({ onNavigate, user }) => {
                     <button
                       type="submit"
                       disabled={!message.trim() || isSubmitting}
-                      className="chat-send-btn"
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "8px",
+                        backgroundColor:
+                          message.trim() && !isSubmitting
+                            ? COLORS.primary
+                            : COLORS.lightGray,
+                        border: "none",
+                        cursor:
+                          message.trim() && !isSubmitting
+                            ? "pointer"
+                            : "not-allowed",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.2s",
+                        padding: 0,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (message.trim() && !isSubmitting) {
+                          e.currentTarget.style.transform = "scale(1.05)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "scale(1)";
+                      }}
                     >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                      >
-                        <path d="M5 12h14M12 5l7 7-7 7" />
-                      </svg>
+                      <SendIcon
+                        size={16}
+                        color={
+                          message.trim() && !isSubmitting
+                            ? COLORS.dark
+                            : COLORS.gray
+                        }
+                      />
                     </button>
                   </div>
                 ) : (

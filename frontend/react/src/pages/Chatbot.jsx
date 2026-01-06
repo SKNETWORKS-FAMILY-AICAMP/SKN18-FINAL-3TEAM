@@ -380,7 +380,19 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
   }, [messages.length]);
 
   useEffect(() => {
-    if (containerRef.current && messages.length > 0) {
+    // 메시지, 스트리밍 텍스트, 또는 Thinking 이벤트가 변경될 때마다 맨 아래로 스크롤
+    if (messagesEndRef.current) {
+      // 약간의 지연을 두어 DOM이 완전히 렌더링된 후 스크롤
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "end",
+          });
+        }
+      }, 100);
+    } else if (containerRef.current && messages.length > 0) {
+      // fallback: messagesEndRef가 없을 경우 containerRef 사용
       requestAnimationFrame(() => {
         if (containerRef.current) {
           containerRef.current.scrollTop = containerRef.current.scrollHeight;
@@ -1432,7 +1444,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
               flex: 1,
               display: "flex",
               flexDirection: "column",
-              maxWidth: "1200px",
+              maxWidth: "900px", // 전체 창 폭을 좁게 조정
               width: "100%",
               marginLeft: "auto",
               marginRight: "auto",

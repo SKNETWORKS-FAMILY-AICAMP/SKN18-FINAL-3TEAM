@@ -325,7 +325,9 @@ const EventItem = ({ event, stageColor }) => {
           ? `선택한 방향: "${selectedDir.title || selectedDir}"`
           : `관련 인물/사건 추출 시작`;
       case "entity_expansion_completed":
-        return `총 ${data.total_entities || 0}개 인물/사건 추출 완료`;
+        return `총 ${
+          data.final_entity_count || data.total_entities || 0
+        }개 인물/사건 추출 완료`;
       case "ttl_matching_started":
         return "역사 데이터베이스에서 정확 매칭 검색 중...";
       case "ttl_matching_completed":
