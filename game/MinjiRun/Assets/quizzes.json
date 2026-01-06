@@ -1,0 +1,214 @@
+{
+  "quizzes": [
+    {
+      "question": "대한민국의 수도는?",
+      "correctAnswer": "서울",
+      "wrongAnswers": ["부산", "인천"],
+      "explanation": "대한민국의 수도는 서울입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "조선을 건국한 사람은?",
+      "correctAnswer": "이성계",
+      "wrongAnswers": ["왕건", "박혁거세"],
+      "explanation": "이성계가 1392년 조선을 건국했습니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "한글을 창제한 왕은?",
+      "correctAnswer": "세종대왕",
+      "wrongAnswers": ["태종", "정조"],
+      "explanation": "세종대왕이 1443년 한글을 창제했습니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "지구에서 가장 큰 대륙은?",
+      "correctAnswer": "아시아",
+      "wrongAnswers": ["아프리카", "유럽"],
+      "explanation": "아시아는 면적 약 44,579,000km²로 가장 큰 대륙입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "태양계에서 가장 큰 행성은?",
+      "correctAnswer": "목성",
+      "wrongAnswers": ["토성", "천왕성"],
+      "explanation": "목성은 지구의 약 1,300배 크기입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "물의 화학식은?",
+      "correctAnswer": "H2O",
+      "wrongAnswers": ["CO2", "O2"],
+      "explanation": "물은 수소 2개와 산소 1개로 이루어져 있습니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "프랑스의 수도는?",
+      "correctAnswer": "파리",
+      "wrongAnswers": ["런던", "베를린"],
+      "explanation": "파리는 프랑스의 수도이자 최대 도시입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "광합성을 하는 식물 기관은?",
+      "correctAnswer": "잎",
+      "wrongAnswers": ["뿌리", "줄기"],
+      "explanation": "잎의 엽록체에서 광합성이 일어납니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "1년은 며칠인가?",
+      "correctAnswer": "365일",
+      "wrongAnswers": ["360일", "366일"],
+      "explanation": "평년은 365일, 윤년은 366일입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "한국전쟁이 발발한 연도는?",
+      "correctAnswer": "1950년",
+      "wrongAnswers": ["1945년", "1960년"],
+      "explanation": "한국전쟁은 1950년 6월 25일 발발했습니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "세계에서 가장 높은 산은?",
+      "correctAnswer": "에베레스트",
+      "wrongAnswers": ["K2", "킬리만자로"],
+      "explanation": "에베레스트는 해발 8,849m로 세계 최고봉입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "인간의 심장은 몇 개의 방으로 구성되어 있나?",
+      "correctAnswer": "4개",
+      "wrongAnswers": ["2개", "3개"],
+      "explanation": "심장은 좌심방, 우심방, 좌심실, 우심실 4개의 방으로 구성됩니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "삼국시대의 나라가 아닌 것은?",
+      "correctAnswer": "조선",
+      "wrongAnswers": ["고구려", "백제"],
+      "explanation": "삼국시대는 고구려, 백제, 신라입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "빛의 3원색이 아닌 것은?",
+      "correctAnswer": "노란색",
+      "wrongAnswers": ["빨간색", "파란색"],
+      "explanation": "빛의 3원색은 빨강(R), 초록(G), 파랑(B)입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "일본의 수도는?",
+      "correctAnswer": "도쿄",
+      "wrongAnswers": ["오사카", "교토"],
+      "explanation": "도쿄는 일본의 수도이자 최대 도시입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "김구 선생이 쓴 자서전은?",
+      "correctAnswer": "백범일지",
+      "wrongAnswers": ["독립신문", "삼국유사"],
+      "explanation": "백범일지는 김구 선생의 자서전입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "세계에서 가장 긴 강은?",
+      "correctAnswer": "나일강",
+      "wrongAnswers": ["아마존강", "양쯔강"],
+      "explanation": "나일강은 약 6,650km로 세계에서 가장 긴 강입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "지구의 자전 주기는?",
+      "correctAnswer": "24시간",
+      "wrongAnswers": ["12시간", "48시간"],
+      "explanation": "지구는 약 24시간에 한 바퀴 자전합니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "피카소는 어느 나라 화가인가?",
+      "correctAnswer": "스페인",
+      "wrongAnswers": ["프랑스", "이탈리아"],
+      "explanation": "파블로 피카소는 스페인 출신의 화가입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "컴퓨터의 두뇌에 해당하는 부품은?",
+      "correctAnswer": "CPU",
+      "wrongAnswers": ["RAM", "HDD"],
+      "explanation": "CPU(중앙처리장치)는 컴퓨터의 두뇌 역할을 합니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "우리나라 최초의 비행기 조종사는?",
+      "correctAnswer": "안창남",
+      "wrongAnswers": ["이봉창", "윤봉길"],
+      "explanation": "안창남은 1922년 최초로 고국 하늘을 난 비행사입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "사과가 떨어지는 것을 보고 만유인력을 발견한 과학자는?",
+      "correctAnswer": "뉴턴",
+      "wrongAnswers": ["아인슈타인", "갈릴레이"],
+      "explanation": "아이작 뉴턴이 만유인력의 법칙을 발견했습니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "우리나라 최초의 우주인은?",
+      "correctAnswer": "이소연",
+      "wrongAnswers": ["김연아", "박세리"],
+      "explanation": "이소연은 2008년 우리나라 최초의 우주인이 되었습니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "태극기의 건곤감리 중 '물'을 상징하는 괘는?",
+      "correctAnswer": "감",
+      "wrongAnswers": ["건", "곤"],
+      "explanation": "감(☵)은 물을 상징합니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "DNA의 이중나선 구조를 발견한 과학자는?",
+      "correctAnswer": "왓슨",
+      "wrongAnswers": ["다윈", "멘델"],
+      "explanation": "제임스 왓슨과 프랜시스 크릭이 DNA 이중나선 구조를 발견했습니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "세계 3대 미술관이 아닌 것은?",
+      "correctAnswer": "국립중앙박물관",
+      "wrongAnswers": ["루브르박물관", "대영박물관"],
+      "explanation": "세계 3대 미술관은 루브르, 대영박물관, 메트로폴리탄 미술관입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "훈민정음이 반포된 연도는?",
+      "correctAnswer": "1446년",
+      "wrongAnswers": ["1443년", "1450년"],
+      "explanation": "훈민정음은 1443년 창제, 1446년 반포되었습니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "올림픽이 처음 개최된 나라는?",
+      "correctAnswer": "그리스",
+      "wrongAnswers": ["프랑스", "영국"],
+      "explanation": "고대 올림픽은 그리스에서 시작되었습니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "한국의 국화는?",
+      "correctAnswer": "무궁화",
+      "wrongAnswers": ["장미", "진달래"],
+      "explanation": "무궁화는 대한민국의 국화입니다.",
+      "rewardScore": 100
+    },
+    {
+      "question": "인터넷 주소 www는 무엇의 약자인가?",
+      "correctAnswer": "World Wide Web",
+      "wrongAnswers": ["Web World Wide", "Wide World Web"],
+      "explanation": "WWW는 World Wide Web의 약자입니다.",
+      "rewardScore": 100
+    }
+  ]
+}
