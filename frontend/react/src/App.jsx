@@ -3,6 +3,7 @@ import { COLORS } from "./constants/theme";
 import Header from "./components/layout/Header";
 import ExpandableSearch from "./features/search/components/ExpandableSearch";
 import MainPage from "./pages/MainPage";
+import AboutPage from "./pages/AboutPage";
 import VideoDetailPage from "./pages/VideoDetailPage";
 import SearchResultPage from "./pages/SearchResultPage";
 import MyPage from "./pages/MyPage";
@@ -29,7 +30,12 @@ const App = () => {
       const [page, param, subPage, subParam] = parts;
 
       // 영상 편집 페이지 (#admin/video/edit/123)
-      if (page === "admin" && param === "video" && subPage === "edit" && subParam) {
+      if (
+        page === "admin" &&
+        param === "video" &&
+        subPage === "edit" &&
+        subParam
+      ) {
         return {
           page: "admin-video-edit",
           videoId: parseInt(subParam),
@@ -78,7 +84,9 @@ const App = () => {
   const [currentPage, setCurrentPage] = useState(initial.page);
   const [selectedVideoId, setSelectedVideoId] = useState(initial.videoId);
   const [searchQuery, setSearchQuery] = useState(initial.searchQuery || "");
-  const [initialSessionId, setInitialSessionId] = useState(initial.sessionId || null);
+  const [initialSessionId, setInitialSessionId] = useState(
+    initial.sessionId || null
+  );
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -124,7 +132,10 @@ const App = () => {
           // 네트워크 에러는 조용히 처리 (비로그인 상태로 설정)
           setIsLoggedIn(false);
           setUser(null);
-        } else if (error.response?.status === 401 || error.response?.status === 403) {
+        } else if (
+          error.response?.status === 401 ||
+          error.response?.status === 403
+        ) {
           // 401/403 에러는 토큰 만료 또는 인증 실패
           // axios 인터셉터에서 이미 처리했지만, 여기서도 상태 초기화
           console.warn("⚠️ 인증 실패. 로그아웃 처리...");
@@ -133,9 +144,11 @@ const App = () => {
           setUser(null);
           // 강제 새로고침 (프론트엔드 URL로 리다이렉트)
           setTimeout(() => {
-            const frontendUrl = window.location.port === "8000" || window.location.hostname.includes("8000")
-              ? "http://localhost:3000/"
-              : `${window.location.origin}/`;
+            const frontendUrl =
+              window.location.port === "8000" ||
+              window.location.hostname.includes("8000")
+                ? "http://localhost:3000/"
+                : `${window.location.origin}/`;
             window.location.href = frontendUrl;
           }, 100);
         } else {
@@ -281,27 +294,15 @@ const App = () => {
 
   return (
     <BackgroundTaskProvider>
-      <style>{`
-        ::selection {
-          background-color: #c2e0f6;
-          color: #effd9a;
-        }
-        ::-moz-selection {
-          background-color: #c2e0f6;
-          color: #effd9a;
-        }
-      `}</style>
-
       <div
         style={{
-          fontFamily:
-            "'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif",
+          fontFamily: "'Noto Serif KR', serif",
           backgroundColor: COLORS.background,
           minHeight: "100vh",
           width: "100%",
           margin: 0,
           padding: 0,
-          color: COLORS.dark,
+          color: COLORS.white,
           overflowX: "hidden",
         }}
       >
@@ -317,6 +318,7 @@ const App = () => {
           onLogout={handleLogout}
           onAdminClick={handleAdminClick}
           currentPage={currentPage}
+          onNavigate={handleNavigate}
         />
 
         <ExpandableSearch
@@ -331,6 +333,8 @@ const App = () => {
           {currentPage === "main" && (
             <MainPage isLoggedIn={isLoggedIn} onVideoClick={handleVideoClick} />
           )}
+
+          {currentPage === "about" && <AboutPage onNavigate={handleNavigate} />}
 
           {currentPage === "video" && (
             <VideoDetailPage

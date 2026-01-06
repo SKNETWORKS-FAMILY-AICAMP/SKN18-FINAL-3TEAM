@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import VideoPlayer from "../features/video/components/VideoPlayer";
-import VideoInfo from "../features/video/components/VideoInfo";
-import CommentSection from "../features/video/components/CommentSection";
 import { getVideo } from "../api/videoApi";
-import { getVideoComments, likeVideo, unlikeVideo } from "../api/communityApi";
+import {
+  getVideoComments,
+  likeVideo,
+  unlikeVideo,
+  createComment,
+} from "../api/communityApi";
 import {
   createWatchHistory,
   getWatchHistoryForVideo,
@@ -11,7 +14,6 @@ import {
 import { getVideoUrl } from "../utils/imageUtils";
 
 const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
-  // videoId가 없으면 기본값 1 사용
   const actualVideoId = videoId || 1;
 
   const [video, setVideo] = useState(null);
@@ -19,22 +21,23 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [commentText, setCommentText] = useState("");
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [showReplyForm, setShowReplyForm] = useState({});
+  const [replyTexts, setReplyTexts] = useState({});
   const watchHistoryStarted = useRef(false);
   const lastSavedSeconds = useRef(0);
   const currentSeconds = useRef(0);
   const [resumeSeconds, setResumeSeconds] = useState(0);
 
-  // 한국 날짜 형식 포맷팅 함수 (YYYY. MM. DD.)
   const formatKoreanDate = (dateString) => {
     if (!dateString) return "";
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return "";
-
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, "0");
       const day = String(date.getDate()).padStart(2, "0");
-
       return `${year}. ${month}. ${day}.`;
     } catch (error) {
       console.error("날짜 포맷 오류:", error, dateString);
@@ -47,14 +50,12 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return "";
-
       const now = new Date();
       const diffMs = now - date;
       const diffSec = Math.floor(diffMs / 1000);
       const diffMins = Math.floor(diffMs / 60000);
       const diffHours = Math.floor(diffMs / 3600000);
       const diffDays = Math.floor(diffMs / 86400000);
-
       if (diffSec < 60) return "방금 전";
       if (diffMins < 60) return `${diffMins}분 전`;
       if (diffHours < 24) return `${diffHours}시간 전`;
@@ -70,6 +71,13 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
     }
   };
 
+  const formatDuration = (seconds) => {
+    if (!seconds) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${String(secs).padStart(2, "0")}`;
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -79,39 +87,29 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
         currentSeconds.current = 0;
         setResumeSeconds(0);
 
-        // videoId가 없으면 조기 종료
         if (!actualVideoId) {
           console.error("videoId가 없습니다.");
           setLoading(false);
           return;
         }
 
-        // 비디오 정보 로드
         try {
           const videoResponse = await getVideo(actualVideoId);
           const videoData = videoResponse?.data ?? videoResponse;
           if (videoData) {
-            const processedUrl = videoData.video_url
-              ? getVideoUrl(videoData.video_url)
-              : "/videos/selected_scene_1_video.mp4";
             setVideo(videoData);
             setLikesCount(videoData.likes_count || 0);
-
-            // 백엔드에서 받은 좋아요 상태 설정
             if (isLoggedIn) {
               setIsLiked(videoData.is_liked || false);
             }
           } else {
-            console.warn("비디오 데이터가 없습니다.");
             setVideo(null);
           }
         } catch (error) {
           console.error("비디오 정보 로드 실패:", error);
-          // 비디오 로드 실패해도 페이지는 표시 (에러 메시지와 함께)
           setVideo(null);
         }
 
-        // 댓글 로드 (로그인한 경우만)
         if (isLoggedIn) {
           try {
             const commentsResponse = await getVideoComments(actualVideoId);
@@ -126,7 +124,7 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
                 comment_likes_count: c.comment_likes_count || 0,
                 created_at: c.created_at,
                 timeAgo: formatTimeAgo(c.created_at),
-                replies: c.replies || [], // 백엔드에서 받은 replies 사용
+                replies: c.replies || [],
                 user: c.user,
                 is_liked: c.is_liked || false,
               }));
@@ -138,13 +136,11 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
           }
         }
 
-        // 시청 위치는 항상 처음부터 시작 (0으로 설정)
         setResumeSeconds(0);
         currentSeconds.current = 0;
         lastSavedSeconds.current = 0;
       } catch (error) {
         console.error("데이터 로딩 실패:", error);
-        // 에러 발생 시에도 로딩 상태 해제
       } finally {
         setLoading(false);
       }
@@ -154,12 +150,8 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
   }, [actualVideoId, isLoggedIn]);
 
   const saveWatchProgress = async (seconds) => {
-    if (!isLoggedIn || !video || !actualVideoId) {
-      return;
-    }
-    if (seconds <= 0) {
-      return;
-    }
+    if (!isLoggedIn || !video || !actualVideoId) return;
+    if (seconds <= 0) return;
     try {
       await createWatchHistory(
         actualVideoId,
@@ -169,16 +161,12 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
         video.recommended_keyword || null
       );
     } catch (error) {
-      // 403 에러는 권한 문제이므로 조용히 처리
-      // 백엔드에서 시청 기록 저장 API가 특정 권한을 요구하거나
-      // 인증 토큰이 만료되었을 수 있음
+      // 조용히 처리
     }
   };
 
   const handlePlayStart = async () => {
-    if (!isLoggedIn || !video || !actualVideoId) {
-      return;
-    }
+    if (!isLoggedIn || !video || !actualVideoId) return;
     watchHistoryStarted.current = true;
     const seconds = Math.floor(currentSeconds.current);
     if (seconds > lastSavedSeconds.current) {
@@ -192,13 +180,9 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
   };
 
   const handlePause = async () => {
-    if (!watchHistoryStarted.current) {
-      return;
-    }
+    if (!watchHistoryStarted.current) return;
     const seconds = Math.floor(currentSeconds.current);
-    if (seconds <= lastSavedSeconds.current) {
-      return;
-    }
+    if (seconds <= lastSavedSeconds.current) return;
     lastSavedSeconds.current = seconds;
     await saveWatchProgress(seconds);
   };
@@ -215,85 +199,267 @@ const VideoDetailPage = ({ videoId, isLoggedIn = false, user = null }) => {
 
     try {
       if (isLiked) {
-        // 좋아요 취소
         await unlikeVideo(actualVideoId);
         setIsLiked(false);
         setLikesCount((prev) => Math.max(0, prev - 1));
       } else {
-        // 좋아요 추가
         await likeVideo(actualVideoId);
         setIsLiked(true);
         setLikesCount((prev) => prev + 1);
       }
     } catch (error) {
       console.error("좋아요 처리 실패:", error);
-      // 에러 발생 시 상태 롤백
-      if (
-        error.response?.status === 400 &&
-        error.response?.data?.error?.code === "ALREADY_LIKED"
-      ) {
-        // 이미 좋아요가 있는 경우
-        setIsLiked(true);
-      } else if (error.response?.status === 404) {
-        // 좋아요가 없는 경우
-        setIsLiked(false);
-      }
     }
   };
 
-  const handleCommentDelete = (commentId) => {
-    setComments(comments.filter((c) => c.id !== commentId));
+  const handleCommentSubmit = async () => {
+    if (!isLoggedIn || !commentText.trim() || isSubmittingComment) return;
+
+    setIsSubmittingComment(true);
+    try {
+      const response = await createComment(actualVideoId, commentText.trim());
+      if (response?.data) {
+        const newComment = {
+          id: response.data.id,
+          username: user?.nickname || user?.display_name || "사용자",
+          text: response.data.comment_content,
+          comment_content: response.data.comment_content,
+          profileImage: user?.profile_image,
+          likes: 0,
+          comment_likes_count: 0,
+          created_at: response.data.created_at || new Date().toISOString(),
+          timeAgo: "방금 전",
+          replies: [],
+          user: user,
+          is_liked: false,
+        };
+        setComments([newComment, ...comments]);
+        setCommentText("");
+      }
+    } catch (error) {
+      console.error("댓글 작성 실패:", error);
+      alert("댓글 작성에 실패했습니다.");
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const toggleReplyForm = (commentId) => {
+    setShowReplyForm((prev) => ({
+      ...prev,
+      [commentId]: !prev[commentId],
+    }));
+  };
+
+  const formatLikes = (count) => {
+    if (count >= 1000) {
+      return `${(count / 1000).toFixed(1)}천`;
+    }
+    return count.toString();
   };
 
   if (loading) {
     return (
-      <div style={{ padding: "60px", textAlign: "center" }}>로딩 중...</div>
+      <div className="video-detail-page">
+        <div style={{ padding: "60px", textAlign: "center", color: "#888" }}>
+          로딩 중...
+        </div>
+      </div>
+    );
+  }
+
+  if (!video) {
+    return (
+      <div className="video-detail-page">
+        <div style={{ padding: "60px", textAlign: "center", color: "#888" }}>
+          영상을 찾을 수 없습니다.
+        </div>
+      </div>
     );
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: "30px",
-        padding: "60px 60px 30px 60px",
-        minHeight: "calc(100vh - 76px)",
-        boxSizing: "border-box",
-      }}
-    >
-      <div style={{ flex: 1 }}>
-        <VideoPlayer
-          initialTime={resumeSeconds}
-          onPlayStart={handlePlayStart}
-          onTimeUpdate={handleTimeUpdate}
-          onPause={handlePause}
-          onEnded={handleEnded}
-          videoUrl={
-            video?.video_url
-              ? getVideoUrl(video.video_url)
-              : "/videos/selected_scene_1_video.mp4"
-          }
-        />
-        <VideoInfo
-          tags={video?.tags || []}
-          title={video?.title || "제목 없음"}
-          date={formatKoreanDate(video?.upload_date)}
-          isLiked={isLiked}
-          onLikeClick={handleLikeClick}
-          likesCount={likesCount}
-          video_keyword={video?.video_keyword || null}
-        />
-      </div>
+    <div className="page active">
+      <div className="video-detail-page">
+        <div className="video-detail-container">
+          <div className="video-player-area">
+            <div className="video-player">
+              <VideoPlayer
+                initialTime={resumeSeconds}
+                onPlayStart={handlePlayStart}
+                onTimeUpdate={handleTimeUpdate}
+                onPause={handlePause}
+                onEnded={handleEnded}
+                videoUrl={
+                  video?.video_url
+                    ? getVideoUrl(video.video_url)
+                    : "/videos/selected_scene_1_video.mp4"
+                }
+              />
+            </div>
+            <div className="video-detail-info">
+              {video.video_keyword && (
+                <div className="video-detail-keyword">
+                  {video.video_keyword}
+                </div>
+              )}
+              <h1 className="video-detail-title">
+                {video.title || "제목 없음"}
+              </h1>
+              <div className="video-detail-meta">
+                <span>{formatDuration(video.duration)}</span>
+                <span>조회 {video.views_count || 0}</span>
+                <span>{formatKoreanDate(video.upload_date)}</span>
+              </div>
+              {video.tags && video.tags.length > 0 && (
+                <div className="video-detail-tags">
+                  {video.tags.map((tag, idx) => (
+                    <span key={idx} className="video-detail-tag">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <button
+                className={`video-like-btn ${isLiked ? "liked" : ""}`}
+                onClick={handleLikeClick}
+              >
+                <svg viewBox="0 0 24 24" strokeWidth="1.5">
+                  <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+                <span>좋아요 {formatLikes(likesCount)}</span>
+              </button>
+            </div>
+          </div>
 
-      {isLoggedIn && (
-        <CommentSection
-          comments={comments}
-          videoId={actualVideoId}
-          user={user}
-          isLoggedIn={isLoggedIn}
-          onCommentDelete={handleCommentDelete}
-        />
-      )}
+          {isLoggedIn && (
+            <div className="comments-area">
+              <div className="comments-header">
+                <h3 className="comments-title">
+                  이야기를 나누다 <span>{comments.length}</span>
+                </h3>
+              </div>
+              <div className="comments-list">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="comment-item">
+                    <div className="comment-main">
+                      <div className="comment-avatar">
+                        {comment.user?.nickname?.[0] ||
+                          comment.user?.display_name?.[0] ||
+                          comment.username?.[0] ||
+                          "사용자"}
+                      </div>
+                      <div className="comment-body">
+                        <div className="comment-header">
+                          <span className="comment-author">
+                            {comment.username}
+                          </span>
+                          <span className="comment-date">
+                            {comment.timeAgo}
+                          </span>
+                        </div>
+                        <p className="comment-text">{comment.text}</p>
+                        <div className="comment-actions">
+                          <button
+                            className="comment-action-btn"
+                            onClick={() => toggleReplyForm(comment.id)}
+                          >
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                            >
+                              <path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                            </svg>
+                            답글
+                          </button>
+                          <button className="comment-action-btn">
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                            >
+                              <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                            </svg>
+                            {comment.comment_likes_count || 0}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    {comment.replies && comment.replies.length > 0 && (
+                      <div className="comment-replies">
+                        {comment.replies.map((reply) => (
+                          <div key={reply.id} className="reply-item">
+                            <div className="reply-main">
+                              <div className="reply-avatar">
+                                {reply.user?.nickname?.[0] ||
+                                  reply.user?.display_name?.[0] ||
+                                  "사용자"}
+                              </div>
+                              <div className="reply-body">
+                                <div className="reply-header">
+                                  <span className="reply-author">
+                                    {reply.user?.nickname ||
+                                      reply.user?.display_name ||
+                                      "사용자"}
+                                  </span>
+                                  <span className="reply-date">
+                                    {formatTimeAgo(reply.created_at)}
+                                  </span>
+                                </div>
+                                <p className="reply-text">
+                                  {reply.reply_content}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {showReplyForm[comment.id] && (
+                      <div className="reply-form show">
+                        <div className="reply-input-wrapper">
+                          <input
+                            type="text"
+                            className="reply-input"
+                            placeholder="답글을 입력하세요..."
+                            value={replyTexts[comment.id] || ""}
+                            onChange={(e) =>
+                              setReplyTexts({
+                                ...replyTexts,
+                                [comment.id]: e.target.value,
+                              })
+                            }
+                          />
+                          <button className="reply-submit">등록</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="comment-input-area">
+                <textarea
+                  className="comment-input"
+                  rows="3"
+                  placeholder="이야기를 남겨주세요..."
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                />
+                <button
+                  className="comment-submit"
+                  onClick={handleCommentSubmit}
+                  disabled={!commentText.trim() || isSubmittingComment}
+                >
+                  등록
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
