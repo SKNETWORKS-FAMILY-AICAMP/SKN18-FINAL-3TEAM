@@ -444,7 +444,8 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
                   fontSize: "16px",
                   backgroundColor:
                     formData.gender === true ? COLORS.primary : "transparent",
-                  color: COLORS.dark,
+                  color:
+                    formData.gender === true ? COLORS.white : COLORS.textPrimary,
                   cursor: "pointer",
                   fontWeight: formData.gender === true ? "700" : "500",
                 }}
@@ -465,7 +466,8 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
                   fontSize: "16px",
                   backgroundColor:
                     formData.gender === false ? COLORS.primary : "transparent",
-                  color: COLORS.dark,
+                  color:
+                    formData.gender === false ? COLORS.white : COLORS.textPrimary,
                   cursor: "pointer",
                   fontWeight: formData.gender === false ? "700" : "500",
                 }}
@@ -484,7 +486,8 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
                   fontSize: "16px",
                   backgroundColor:
                     formData.gender === null ? COLORS.primary : "transparent",
-                  color: COLORS.dark,
+                  color:
+                    formData.gender === null ? COLORS.white : COLORS.textPrimary,
                   cursor: "pointer",
                   fontWeight: formData.gender === null ? "700" : "500",
                 }}
@@ -551,7 +554,7 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
               fontSize: "16px",
               fontWeight: "600",
               cursor: "pointer",
-              color: COLORS.dark,
+              color: COLORS.textPrimary,
             }}
           >
             취소

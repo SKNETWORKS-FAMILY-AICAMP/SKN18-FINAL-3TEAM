@@ -44,7 +44,7 @@ const SearchHistory = ({ items, onItemClick, onItemDelete, contentVisible }) => 
             <span
               style={{
                 fontSize: '14px',
-                color: COLORS.gray,
+                color: COLORS.dark,
               }}
             >
               {item}

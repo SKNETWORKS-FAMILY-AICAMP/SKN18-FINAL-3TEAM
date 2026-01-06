@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { COLORS } from "../../constants/theme";
 import { getProfileImageUrl } from "../../utils/imageUtils";
+import { UserIcon } from "../common/Icons";
 
 const Header = ({
   isLoggedIn,
@@ -31,47 +32,42 @@ const Header = ({
       <div className="header-logo" onClick={onLogoClick}>
         HisToK
       </div>
-      <nav className="header-nav">
-        <a
-          onClick={() => handleNavClick("main")}
-          className={getNavClass("main")}
-        >
-          이야기
-        </a>
-        <a
-          onClick={() => handleNavClick("about")}
-          className={getNavClass("about")}
-        >
-          아가씨
-        </a>
-        {isLoggedIn && (
+      {isLoggedIn && (
+        <nav className="header-nav">
+          <a
+            onClick={() => handleNavClick("about")}
+            className={getNavClass("about")}
+          >
+            아가씨
+          </a>
+          <a
+            onClick={() => handleNavClick("question")}
+            className={getNavClass("question")}
+          >
+            대화하기
+          </a>
           <a
             onClick={() => handleNavClick("video-create")}
             className={getNavClass("video-create")}
           >
             이야기 만들기
           </a>
-        )}
-        <a
-          onClick={() => handleNavClick("question")}
-          className={getNavClass("question")}
-        >
-          묻기
-        </a>
-        <a
-          onClick={() => handleNavClick("mypage")}
-          className={getNavClass("mypage")}
-        >
-          나의 공간
-        </a>
-      </nav>
+          <a
+            onClick={() => handleNavClick("mypage")}
+            className={getNavClass("mypage")}
+          >
+            나의 공간
+          </a>
+        </nav>
+      )}
       <div className="header-right">
         <button className="header-search" onClick={onSearchClick}>
           <svg
             viewBox="0 0 24 24"
             fill="none"
-            stroke="currentColor"
+            stroke={COLORS.jade}
             strokeWidth="1.5"
+            style={{ stroke: COLORS.jade }}
           >
             <circle cx="11" cy="11" r="8" />
             <path d="M21 21l-4.35-4.35" />
@@ -80,15 +76,48 @@ const Header = ({
         {isLoggedIn ? (
           <div
             className="header-profile"
-            style={{ display: "flex" }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "40px",
+              height: "40px",
+              borderRadius: "50%",
+              backgroundColor: user?.profile_image
+                ? "transparent"
+                : COLORS.primary,
+              backgroundImage: user?.profile_image
+                ? `url(${getProfileImageUrl(user.profile_image)})`
+                : "none",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              cursor: "pointer",
+              transition: "transform 0.2s ease",
+            }}
             onClick={() => {
               setShowUserDropdown(!showUserDropdown);
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "scale(1.05)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
+            }}
           >
-            {user?.nickname?.[0] ||
-              user?.display_name?.[0] ||
-              user?.email?.[0]?.toUpperCase() ||
-              "사용자"}
+            {!user?.profile_image && (
+              <span
+                style={{
+                  fontSize: "16px",
+                  fontWeight: "600",
+                  color: COLORS.dark,
+                }}
+              >
+                {user?.nickname?.[0] ||
+                  user?.display_name?.[0] ||
+                  user?.email?.[0]?.toUpperCase() ||
+                  "사용자"}
+              </span>
+            )}
           </div>
         ) : (
           <button className="header-login" id="loginBtn" onClick={onLogin}>
@@ -159,7 +188,7 @@ const Header = ({
               e.currentTarget.style.color = COLORS.white;
             }}
           >
-            나의 기록
+            나의 공간
           </div>
           <div
             onClick={() => {

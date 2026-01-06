@@ -1042,6 +1042,22 @@ const EvidencePathView = ({ evidences = [] }) => {
 
   // 컨테이너 크기 측정
   useEffect(() => {
+    const updateSize = () => {
+      const graphContainer = containerRef.current?.querySelector(
+        "[data-graph-container]"
+      );
+      if (graphContainer) {
+        const rect = graphContainer.getBoundingClientRect();
+        setContainerSize({
+          width: Math.max(rect.width || 800, 400),
+          height: Math.max(rect.height || 400, 300),
+        });
+      }
+    };
+
+    // 초기 크기 설정
+    updateSize();
+
     const graphContainer = containerRef.current?.querySelector(
       "[data-graph-container]"
     );
@@ -1562,8 +1578,8 @@ const EvidencePathView = ({ evidences = [] }) => {
                 <ForceGraph2D
                   ref={graphRef}
                   graphData={graphData}
-                  width={containerSize.width}
-                  height={containerSize.height}
+                  width={containerSize.width || 800}
+                  height={containerSize.height || 400}
                   nodeLabel="name"
                   nodeColor={getNodeColor}
                   nodeRelSize={getNodeSize}

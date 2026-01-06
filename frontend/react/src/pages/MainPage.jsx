@@ -85,7 +85,7 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
               들려주는 오백 년의 이야기
             </h2>
             <p>
-              역사 속 인물이 직접 전하는 생생한 조선의 일상.
+              조선의 아가씨가 직접 전하는 생생한 조선의 역사.
               <br />
               시간을 거슬러 그녀의 공간으로 초대합니다.
             </p>
@@ -233,11 +233,6 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
 
       <footer className="footer">
         <div className="footer-logo">HisToK</div>
-        <div className="footer-links">
-          <a href="#">About</a>
-          <a href="#">Contact</a>
-          <a href="#">Terms</a>
-        </div>
         <div className="footer-copy">© 2025 HisToK</div>
       </footer>
     </div>
