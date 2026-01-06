@@ -1,4 +1,4 @@
-# 🎮 minji_run 러닝 게임 완전 설정 가이드
+ # 🎮 minji_run 러닝 게임 완전 설정 가이드
 
 Unity 에디터에서 **처음부터 끝까지** 설정하는 완벽 가이드
 
@@ -56,15 +56,37 @@ QuizTrigger 통과 (첫 번째만)
 ```
 
 ### 핵심 메커니즘
+
+#### 퀴즈 시스템
 - **100초 타이머**: 정답 시 +5초, 오답 시 -5초
 - **점수 = 정답 개수**: 정답 문 통과 시 +1
 - **문 기반 퀴즈**: 정답 문은 통과 가능(Trigger), 오답 문은 벽처럼 막힘(Solid)
 - **퀴즈 표시 3초**: 질문이 화면에 표시되는 동안에도 게임 계속 진행 (일시정지 없음)
 - **퀴즈 중복 방지**: 한 게임에서 같은 퀴즈는 한 번만 출제 (모든 퀴즈 완료 시 더 이상 퀴즈 없음)
 - **⭐ 하이브리드 체인**: 첫 QuizTrigger만 필요, 정답 시 다음 퀴즈 자동 활성화 (1.5초 후)
+- **체크포인트**: 퀴즈 시작 시 위치 저장, 오답 시 되돌리기 가능 (선택사항)
+
+#### 플레이어 조작
 - **게이지 기반 대쉬**: Z 키로 대쉬, 게이지 소모 50/초, 회복 25/초
 - **더블 점프**: Ctrl 키로 최대 2번 점프 가능
 - **낙사 리스폰**: 떨어지면 마지막 안전 위치로 자동 복귀, 1초 스턴
+
+#### 장애물 시스템 ⭐ NEW
+- **다양한 장애물 타입**:
+  - 회전/왕복 이동 장애물
+  - 직선 발사체 (Projectile)
+  - 플레이어 추적 장애물 (Target Player)
+  - 레인 돌진 장애물 (Lane Rush)
+  - 부유형/파도형/원형 장애물
+- **자동 생성 시스템**:
+  - LaneObstacleSpawner: 레인 기반 장애물 주기적 생성
+  - ProjectileSpawner: 여러 위치에서 발사체 생성
+  - RepeatingProjectile: 반복 발사 장애물
+- **오브젝트 풀링**: 성능 최적화를 위한 재사용 시스템
+
+#### 게임 클리어
+- **EndpointTrigger**: 플레이어가 골 지점에 도달하면 게임 클리어
+- **시간 내 완주**: 타이머가 0이 되기 전에 도착해야 함
 
 ---
 
@@ -192,6 +214,31 @@ QuizTrigger 통과 (첫 번째만)
 - `TriggerQuiz()`: 퀴즈 시작 (GameStateManager.StartQuiz() 호출 안 함!)
 **중요:** 게임 일시정지 제거를 위해 GameState를 Quiz로 변경하지 않고, QuizManager.StartNewQuiz()만 호출합니다.
 
+#### QuizCheckpoint.cs ⭐
+**역할:** 퀴즈 체크포인트 관리자 (싱글톤)
+```
+주요 기능:
+- 퀴즈 시작 시 플레이어 위치 저장
+- 오답 시 저장된 위치로 되돌리기
+- CharacterController와 Rigidbody 호환
+- 체크포인트 리셋 기능
+```
+**핵심 메서드:**
+- `SaveCheckpoint()`: 현재 위치를 체크포인트로 저장
+- `RestoreCheckpoint()`: 체크포인트 위치로 되돌리기 (오답 시)
+- `ResetCheckpoint()`: 체크포인트 리셋
+- `SaveCheckpointAt(Vector3, Quaternion)`: 특정 위치로 체크포인트 설정
+**설정 (Inspector):**
+- `playerTransform`: 플레이어 Transform (자동 탐색 가능)
+**접근자:**
+- `HasCheckpoint`: 체크포인트 존재 여부
+- `LastCheckpointPosition`: 마지막 체크포인트 위치
+- `LastCheckpointRotation`: 마지막 체크포인트 회전
+**사용:**
+- Managers 오브젝트에 Add Component → Quiz Checkpoint
+- 퀴즈 시작 시 SaveCheckpoint() 호출
+- 오답 시 RestoreCheckpoint() 호출
+
 ---
 
 ### 🎮 Player Control (플레이어 제어)
@@ -291,7 +338,7 @@ QuizTrigger 통과 (첫 번째만)
 - **자동 생성 기능 제거됨** (SpawnObstacles 메서드 삭제)
 - ObstacleRoot는 Unity에서 직접 배치한 장애물을 담는 부모 역할만 수행
 
-#### GoalTrigger.cs ⭐ (NEW)
+#### GoalTrigger.cs ⭐
 **역할:** 골 지점 트리거 - 게임 클리어 감지
 ```
 주요 기능:
@@ -308,6 +355,138 @@ QuizTrigger 통과 (첫 번째만)
 **사용:**
 - EndPoint 오브젝트에 Add Component → Goal Trigger
 - 플레이어에 Tag "Player" 필요
+
+#### EndpointTrigger.cs ⭐
+**역할:** 골 지점 트리거 - 게임 클리어 감지 (GoalTrigger의 향상된 버전)
+```
+주요 기능:
+- 플레이어가 Endpoint에 도착하면 게임 클리어
+- Box Collider 자동 설정 및 검증
+- Scene 뷰에서 초록색 Gizmo 표시
+- 중복 트리거 방지
+- 선택적 클리어 이펙트/사운드 지원
+```
+**핵심 메서드:**
+- `OnTriggerEnter(Collider other)`: 플레이어 감지 시 GameStateManager.GameClear() 호출
+- `ResetTrigger()`: 트리거 리셋 (재시작 시 사용)
+**설정:**
+- `showDebugMessages`: 디버그 메시지 표시 여부
+- `clearEffect`: 클리어 파티클 이펙트 (선택사항)
+- `clearSound`: 클리어 사운드 (선택사항)
+**사용:**
+- EndPoint 오브젝트에 Add Component → Endpoint Trigger
+- 플레이어에 Tag "Player" 필요
+- BoxCollider가 자동으로 Trigger로 설정됨
+
+#### ObstacleController.cs ⭐
+**역할:** 장애물 애니메이션 및 이동 제어
+```
+주요 기능:
+- 회전 애니메이션 (Rotation)
+- 왕복 이동 (Move)
+- 다양한 비행 모드:
+  * None: 날아가지 않음
+  * Projectile: 직선 발사
+  * TargetPlayer: 플레이어 추적
+  * LaneRush: 레인 돌진 (플레이어를 향해 달려옴)
+  * Float: 부유형 (위아래)
+  * Wave: 파도형 (물결)
+  * Circle: 원형 회전
+- 활성화 지연 (Activation Delay)
+- 거리 제한 자동 삭제
+```
+**핵심 메서드:**
+- `InitializeObstacle()`: 장애물 초기화
+- `ActivateFlight()`: 비행 활성화
+- `SetupLaneRush(int laneIndex, float laneWidth, float speed)`: LaneRush 모드 설정 (Public)
+**설정 (Inspector):**
+- `rotate`: 회전 활성화
+- `rotationSpeed`: 회전 속도 (Vector3)
+- `flyMode`: 비행 모드 선택
+- `flySpeed`: 비행 속도
+- `laneIndex`: 레인 번호 (0=왼쪽, 1=중앙, 2=오른쪽)
+- `rushSpeed`: 돌진 속도
+**사용:**
+- 장애물 프리팹에 Add Component → Obstacle Controller
+- 원하는 애니메이션 효과 설정
+
+#### LaneObstacleSpawner.cs ⭐
+**역할:** 레인 기반 장애물 자동 생성 시스템
+```
+주요 기능:
+- 주기적으로 1~3개 레인에 장애물 생성
+- 생성 확률 조절 (Spawn Probability)
+- 플레이어 위치 기반 또는 고정 위치 생성
+- 패턴 기반 생성 또는 랜덤 생성
+- 자동 정리 (뒤로 지나간 장애물 삭제)
+```
+**핵심 메서드:**
+- `SpawnObstacles()`: 장애물 생성
+- `ManualSpawn()`: 수동 생성 (테스트용)
+- `ClearAllObstacles()`: 모든 장애물 제거
+**설정 (Inspector):**
+- `autoSpawn`: 자동 생성 활성화
+- `spawnInterval`: 생성 간격 (초)
+- `spawnProbability`: 생성 확률 (0~1)
+- `obstaclePrefab`: 장애물 프리팹
+- `obstacleRushSpeed`: 돌진 속도
+- `laneWidth`: 레인 간격 (기본: 3)
+- `usePatterns`: 패턴 사용 여부
+- `spawnPatterns`: 생성 패턴 배열
+**사용:**
+- 빈 오브젝트 생성 → Add Component → Lane Obstacle Spawner
+- Obstacle Prefab 연결 (ObstacleController 필요)
+- 패턴 설정 또는 랜덤 모드 사용
+
+#### ProjectileSpawner.cs ⭐
+**역할:** 발사체 자동 생성 시스템
+```
+주요 기능:
+- 여러 위치에서 반복적으로 발사체 생성
+- 발사 간격 및 지연 시간 설정
+- 랜덤 또는 모든 위치에서 동시 발사
+- 발사체 생존 시간 관리
+- 최대 발사 횟수 제한
+```
+**핵심 메서드:**
+- `SpawnProjectiles()`: 발사체 생성
+- `SetupDefaultSpawnPoints()`: 기본 발사 위치 설정
+**설정 (Inspector):**
+- `autoSpawn`: 자동 발사 활성화
+- `spawnInterval`: 발사 간격 (초)
+- `projectilePrefab`: 발사체 프리팹
+- `projectileSpeed`: 발사 속도
+- `projectileLifetime`: 생존 시간 (초)
+- `spawnPoints`: 발사 위치 배열
+- `randomSpawn`: 랜덤 위치 발사
+- `spawnAllAtOnce`: 모든 위치 동시 발사
+**사용:**
+- 빈 오브젝트 생성 → Add Component → Projectile Spawner
+- Projectile Prefab 연결
+- Spawn Points 설정 (위치, 방향, 확률)
+
+#### RepeatingProjectile.cs ⭐
+**역할:** 반복 발사 장애물
+```
+주요 기능:
+- 배치한 위치에서 일정 간격으로 복제본 발사
+- 원본은 숨김 처리 (발사기 역할만)
+- 복제본은 자동 삭제
+- 최대 반복 횟수 제한
+```
+**핵심 메서드:**
+- `SpawnProjectile()`: 발사체 생성
+- `ResetRepeater()`: 리셋
+**설정 (Inspector):**
+- `enableRepeat`: 반복 발사 활성화
+- `repeatInterval`: 반복 간격 (초)
+- `startDelay`: 시작 지연
+- `maxRepeats`: 최대 반복 횟수 (-1 = 무제한)
+- `projectileLifetime`: 발사체 생존 시간
+**사용:**
+- 장애물 프리팹에 Add Component → Repeating Projectile
+- ObstacleController와 함께 사용
+- 원본 오브젝트는 자동으로 숨김 처리됨
 
 ---
 
@@ -379,6 +558,75 @@ public enum GameState
 ```
 **사용 방법:** Quiz Panel에 붙이고 Play 모드에서 Space 키 누르기
 **주의:** 개발/디버깅 전용 스크립트입니다. 릴리즈 시 제거 가능.
+
+#### AutoTiling.cs ⭐
+**역할:** Material Tiling 자동 조정 유틸리티
+```
+주요 기능:
+- Scale 변경 시 Material Tiling 자동 조정
+- 텍스처가 늘어나지 않고 반복됨 (타일링)
+- 에디터 모드에서도 실시간 적용
+- Auto Detect 또는 Manual Mapping 모드
+- 프리셋 지원 (Floor/Ceiling, Wall, Long Wall)
+- Material Baking 기능 (프리팹 제작 전 사용)
+```
+**핵심 메서드:**
+- `UpdateTiling()`: Tiling 업데이트
+- `ResetReferenceScale()`: 기준 Scale 리셋
+- `BakeMaterial()`: 현재 Tiling을 Asset으로 저장
+**설정 (Inspector):**
+- `mode`: Auto Detect (자동) 또는 Manual Mapping (수동)
+- `baseTiling`: 기본 Tiling 값
+- `referenceScale`: 기준 Scale (기본: (1,1,1))
+- `scaleXMultiplier`, `scaleYMultiplier`, `scaleZMultiplier`: 수동 모드 매핑 설정
+**사용:**
+- 타일링이 필요한 오브젝트에 Add Component → Auto Tiling
+- Auto Detect 모드: X→U, Z→V로 자동 매핑
+- Manual 모드: Multiplier로 세밀 조정
+- Context Menu에서 프리셋 선택 가능
+- **프리팹 제작 전:** Bake Material로 Material을 Asset으로 저장하고 AutoTiling 컴포넌트 제거
+**주의:** `[ExecuteInEditMode]`로 에디터에서도 동작합니다.
+
+---
+
+### ⚡ Performance Optimization (성능 최적화)
+
+#### ObjectPool.cs ⭐
+**역할:** 범용 오브젝트 풀 시스템 (싱글톤)
+```
+주요 기능:
+- 오브젝트 재사용으로 Instantiate/Destroy 비용 감소
+- WebGL 성능 최적화
+- 여러 풀 동시 관리 (Dictionary 기반)
+- 풀 고갈 시 자동 확장
+- IPooledObject 인터페이스 지원
+```
+**핵심 메서드:**
+- `SpawnFromPool(string tag, Vector3 position, Quaternion rotation)`: 풀에서 오브젝트 가져오기
+- `ReturnToPool(string tag, GameObject obj)`: 오브젝트 반환
+- `AddPool(string tag, GameObject prefab, int size)`: 런타임에 풀 추가
+- `ClearAllPools()`: 모든 풀 초기화
+**설정 (Inspector):**
+- `pools`: Pool 배열
+  - `tag`: 풀 식별 태그
+  - `prefab`: 오브젝트 프리팹
+  - `size`: 초기 풀 크기
+- `poolParent`: 풀 오브젝트들의 부모 Transform
+**IPooledObject 인터페이스:**
+```csharp
+public interface IPooledObject
+{
+    void OnObjectSpawn();  // 풀에서 스폰될 때 호출
+}
+```
+**사용:**
+- Managers 오브젝트에 Add Component → Object Pool
+- Inspector에서 풀 설정 (tag, prefab, size)
+- 코드에서 `ObjectPool.Instance.SpawnFromPool("tag", position, rotation)` 호출
+- 사용 완료 후 `ObjectPool.Instance.ReturnToPool("tag", obj)` 호출
+**주의:**
+- 풀링된 오브젝트에 `IPooledObject` 인터페이스 구현 권장
+- Destroy 대신 ReturnToPool 사용
 
 ---
 
@@ -993,10 +1241,12 @@ Player 오브젝트에 다음 컴포넌트들이 모두 있어야 합니다:
 
 ```
 Managers/
-├─ GameStateManager
-├─ GameTimerManager
-├─ QuizManager
-└─ SegmentManager
+├─ GameStateManager (필수)
+├─ GameTimerManager (필수)
+├─ QuizManager (필수)
+├─ SegmentManager (필수)
+├─ QuizCheckpoint ⭐ (선택사항 - 체크포인트 사용 시)
+└─ ObjectPool ⭐ (선택사항 - 오브젝트 풀링 사용 시)
 ```
 
 **⚠️ 중요: QuizDoorController는 Managers에 없습니다!**
@@ -1070,6 +1320,65 @@ UIManager는 **Canvas**에 붙입니다. (10~11장 참고)
 - 자동 세그먼트/장애물 생성 기능이 제거되었습니다.
 - Unity에서 수동으로 트랙을 배치하는 방식으로 변경되었습니다.
 - 별도의 설정이 필요 없습니다.
+
+---
+
+### 6.7 QuizCheckpoint 설정 ⭐ (선택사항)
+
+**Managers 우클릭 → Create Empty → 이름: QuizCheckpoint**
+
+**Managers/QuizCheckpoint 선택 → Add Component → Quiz Checkpoint**
+
+설정:
+- **Player Transform**: `Player` 오브젝트 드래그 (또는 비워두면 자동 탐색)
+
+**역할:**
+- 퀴즈 시작 시 플레이어 위치 저장
+- 오답 시 저장된 위치로 되돌리기
+- CharacterController와 Rigidbody 호환
+
+**사용 방법:**
+- QuizTrigger에서 퀴즈 시작 시 `QuizCheckpoint.Instance.SaveCheckpoint()` 호출
+- QuizDoor에서 오답 시 `QuizCheckpoint.Instance.RestoreCheckpoint()` 호출
+
+**주의:** 선택적 기능입니다. 필요하지 않으면 추가하지 않아도 됩니다.
+
+---
+
+### 6.8 ObjectPool 설정 ⭐ (선택사항)
+
+**Managers 우클릭 → Create Empty → 이름: ObjectPool**
+
+**Managers/ObjectPool 선택 → Add Component → Object Pool**
+
+설정:
+- **Pools**: 배열 크기 설정 (예: 2)
+  - **Element 0**:
+    - Tag: `"Obstacle"`
+    - Prefab: 장애물 프리팹 드래그
+    - Size: `10` (초기 풀 크기)
+  - **Element 1**:
+    - Tag: `"Projectile"`
+    - Prefab: 발사체 프리팹 드래그
+    - Size: `20`
+
+**역할:**
+- 오브젝트 재사용으로 Instantiate/Destroy 비용 감소
+- WebGL 성능 최적화
+- 장애물, 발사체 등 반복 생성되는 오브젝트 관리
+
+**사용 방법:**
+```csharp
+// 풀에서 가져오기
+GameObject obj = ObjectPool.Instance.SpawnFromPool("Obstacle", position, rotation);
+
+// 풀에 반환
+ObjectPool.Instance.ReturnToPool("Obstacle", obj);
+```
+
+**주의:**
+- 장애물 자동 생성 시스템(LaneObstacleSpawner, ProjectileSpawner)을 사용할 경우 권장
+- 사용하지 않으면 추가하지 않아도 됩니다
 
 ---
 
@@ -2222,6 +2531,223 @@ Wave Frequency: 2
 ```
 
 ---
+
+### 10.13 LaneObstacleSpawner 설정 ⭐ (자동 생성 시스템)
+
+**역할:** 주기적으로 1~3개 레인에 장애물을 자동 생성하는 스포너
+
+#### 10.13.1 Spawner 오브젝트 생성
+1. **Hierarchy 우클릭 → Create Empty**
+2. 이름: `LaneObstacleSpawner`
+3. Position: 장애물이 생성될 시작 위치 (예: `(0, 1, 100)`)
+4. **Add Component → Lane Obstacle Spawner**
+
+#### 10.13.2 Inspector 설정
+**Spawner Settings:**
+```
+Auto Spawn: ✓
+Use Player Position: false (고정 위치 생성)
+Spawn Interval: 2.5 (생성 간격, 초)
+Spawn Distance: 50 (플레이어 앞쪽 거리, Use Player Position 사용 시)
+Spawn Height: 1
+Spawn Probability: 0.75 (생성 확률, 0~1)
+```
+
+**Obstacle Prefab:**
+```
+Obstacle Prefab: Obstacle_Box (또는 다른 장애물 프리팹)
+Obstacle Rush Speed: 15 (돌진 속도)
+```
+
+**Lane Settings:**
+```
+Lane Width: 3
+Min Lanes: 1 (동시 생성 최소 레인 개수)
+Max Lanes: 2 (동시 생성 최대 레인 개수)
+```
+
+**Pattern Settings:**
+```
+Use Patterns: ✓ (패턴 사용 시 체크)
+Spawn Patterns: Size 6 (기본 패턴)
+  - Element 0: Single_Left (레인: [0], 확률: 0.2)
+  - Element 1: Single_Center (레인: [1], 확률: 0.2)
+  - Element 2: Single_Right (레인: [2], 확률: 0.2)
+  - Element 3: Double_LeftCenter (레인: [0,1], 확률: 0.15)
+  - Element 4: Double_CenterRight (레인: [1,2], 확률: 0.15)
+  - Element 5: Double_LeftRight (레인: [0,2], 확률: 0.1)
+```
+
+#### 10.13.3 Obstacle Prefab 요구사항
+- **ObstacleController** 컴포넌트 필수
+- Spawner가 `SetupLaneRush()` 메서드를 호출하여 자동 설정
+
+#### 10.13.4 사용 팁
+- **여러 Spawner 배치**: 트랙 여러 곳에 배치하여 다양한 패턴 생성
+- **난이도 조절**:
+  - 쉬움: Spawn Interval 3.0, Probability 0.5
+  - 보통: Spawn Interval 2.5, Probability 0.75
+  - 어려움: Spawn Interval 2.0, Probability 0.9
+- **패턴 vs 랜덤**: Use Patterns 체크 해제 시 완전 랜덤 생성
+
+---
+
+### 10.14 ProjectileSpawner 설정 ⭐ (발사체 자동 생성)
+
+**역할:** 여러 위치에서 반복적으로 발사체를 생성하는 스포너
+
+#### 10.14.1 Spawner 오브젝트 생성
+1. **Hierarchy 우클릭 → Create Empty**
+2. 이름: `ProjectileSpawner`
+3. Position: 발사 위치 (예: `(5, 2, 50)`)
+4. **Add Component → Projectile Spawner**
+
+#### 10.14.2 Inspector 설정
+**Spawner Settings:**
+```
+Auto Spawn: ✓
+Spawn Interval: 2.0 (발사 간격, 초)
+Spawn Delay: 0 (시작 지연)
+Max Spawn Count: -1 (무제한)
+```
+
+**Projectile Settings:**
+```
+Projectile Prefab: Obstacle_Sphere (발사체 프리팹)
+Projectile Speed: 8
+Projectile Lifetime: 5 (생존 시간, 초)
+```
+
+**Spawn Positions:**
+```
+Spawn Points: Size 3
+  - Element 0:
+    - Local Position: (0, 0, 0)
+    - Direction: (-1, 0, 0) (왼쪽으로 발사)
+    - Spawn Chance: 1.0
+  - Element 1:
+    - Local Position: (0, 1, 0)
+    - Direction: (0, -1, 0) (아래로 발사)
+    - Spawn Chance: 0.7
+  - Element 2:
+    - Local Position: (0, -1, 0)
+    - Direction: (0, 1, 0) (위로 발사)
+    - Spawn Chance: 0.5
+
+Random Spawn: ✓ (랜덤 위치 선택)
+Spawn All At Once: false (모든 위치 동시 발사)
+```
+
+#### 10.14.3 발사 패턴 예시
+**벽 발사기 (왼쪽에서 오른쪽으로):**
+```
+Spawn Points: Size 1
+  - Local Position: (0, 0, 0)
+  - Direction: (1, 0, 0)
+  - Projectile Speed: 10
+```
+
+**십자 발사 (4방향):**
+```
+Spawn Points: Size 4
+  - Element 0: Direction (1, 0, 0)
+  - Element 1: Direction (-1, 0, 0)
+  - Element 2: Direction (0, 0, 1)
+  - Element 3: Direction (0, 0, -1)
+Spawn All At Once: ✓
+```
+
+---
+
+### 10.15 RepeatingProjectile 설정 ⭐ (반복 발사 장애물)
+
+**역할:** 배치한 위치에서 일정 간격으로 복제본을 발사하는 장애물
+
+#### 10.15.1 사용 방법
+1. **기존 장애물 프리팹 선택** (예: Obstacle_Box)
+2. **Add Component → Repeating Projectile**
+3. **ObstacleController 설정** (Fly Mode 등)
+
+#### 10.15.2 Inspector 설정
+**Repeat Settings:**
+```
+Enable Repeat: ✓
+Repeat Interval: 2.0 (반복 간격, 초)
+Start Delay: 0
+Max Repeats: -1 (무제한, 또는 특정 횟수)
+Projectile Lifetime: 5 (발사체 생존 시간)
+```
+
+#### 10.15.3 동작 원리
+1. **원본 오브젝트**: 렌더링/콜라이더 비활성화 (발사기 역할만)
+2. **복제본 생성**: 일정 간격으로 복제본 생성 및 발사
+3. **자동 삭제**: 복제본은 Lifetime 후 자동 삭제
+
+#### 10.15.4 사용 예시
+**직선 발사:**
+```
+ObstacleController:
+  Fly Mode: Projectile
+  Fly Direction: (0, 0, 1)
+  Fly Speed: 8
+
+RepeatingProjectile:
+  Repeat Interval: 1.5
+  Max Repeats: 10
+```
+
+**플레이어 추적 발사:**
+```
+ObstacleController:
+  Fly Mode: TargetPlayer
+  Fly Speed: 10
+
+RepeatingProjectile:
+  Repeat Interval: 2.0
+  Start Delay: 1.0
+```
+
+---
+
+### 10.16 AutoTiling 사용법 ⭐ (텍스처 타일링)
+
+**역할:** Scale 변경 시 Material Tiling 자동 조정 (텍스처가 늘어나지 않고 반복됨)
+
+#### 10.16.1 사용 방법
+1. **타일링이 필요한 오브젝트 선택** (예: Ground, Wall)
+2. **Add Component → Auto Tiling**
+
+#### 10.16.2 Inspector 설정
+**Auto Detect 모드 (권장):**
+```
+Mode: Auto Detect
+Base Tiling: (1, 1) (Material의 기본 Tiling)
+Reference Scale: (1, 1, 1)
+```
+
+**Manual Mapping 모드 (고급):**
+```
+Mode: Manual Mapping
+Scale X Multiplier: (1, 0) - X축 → Tiling U
+Scale Y Multiplier: (0, 1) - Y축 → Tiling V
+Scale Z Multiplier: (0, 0) - Z축 → 사용 안 함
+```
+
+#### 10.16.3 프리셋 사용
+**Context Menu에서 선택:**
+- **Preset: Floor/Ceiling** - X=Width, Z=Depth
+- **Preset: Wall** - X=Width, Y=Height
+- **Preset: Long Wall** - Z=Length, Y=Height
+
+#### 10.16.4 프리팹 제작 시 주의사항
+1. **Tiling 조정 완료 후**
+2. **Context Menu → Bake Material**
+3. Material이 Assets/Materials/AutoTiled/에 저장됨
+4. **AutoTiling 컴포넌트 제거**
+5. **프리팹으로 저장**
+
+---
+
 ## 11. UI 구성
 
 ### 11.1 Canvas 설정
