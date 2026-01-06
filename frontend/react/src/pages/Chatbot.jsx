@@ -404,8 +404,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
     setStreamingText("");
     // Thinking 모드는 이벤트를 초기화하지 않음 (재질문 후 이벤트 누적)
     if (!isThinkingMode) {
-      setThinkingEvents([]);
-      setIsThinkingComplete(false);
+      setCurrentThinkingEvents([]);
     }
 
     setMessages((prev) => [...prev, { type: "user", text: userMessage }]);
@@ -727,8 +726,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
     setStreamingText("");
     // Thinking 모드는 이벤트를 초기화하지 않음 (재질문 후 이벤트 누적)
     if (!isThinkingMode) {
-      setThinkingEvents([]);
-      setIsThinkingComplete(false);
+      setCurrentThinkingEvents([]);
     }
 
     // AbortController 생성
@@ -2112,7 +2110,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
             <div
               style={{
                 width: "100%",
-                maxWidth: "1200px",
+                maxWidth: "900px",
               }}
             >
               <form onSubmit={handleSubmit}>
