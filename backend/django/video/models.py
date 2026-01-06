@@ -50,7 +50,7 @@ class Video(models.Model):
 
     class Meta:
         db_table = 'video'
-        managed = False  # init.sql에서 테이블 생성
+        managed = True  # init.sql에서 테이블 생성
         ordering = ['-upload_date']
         verbose_name = '영상'
         verbose_name_plural = '영상들'
