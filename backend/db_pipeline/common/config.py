@@ -45,7 +45,7 @@ OPENAPI_API_KEY = OPENAI_API_KEY
 # DATA PATH SETTINGS
 # --------------------------------------
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
-INPUT_CSV = os.path.join(DATA_DIR, "encykorea_cleaned6.csv")
+INPUT_CSV = os.path.join(DATA_DIR, "llm_faithfulness_098.csv")
 OUTPUT_CSV = os.path.join(DATA_DIR, "transformed_chunks.csv")
 
 # --------------------------------------
