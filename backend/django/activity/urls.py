@@ -4,6 +4,7 @@ from .views import (
     WatchingHistoryListCreateView,
     get_recommended_keyword,
     get_recommended_videos,
+    get_watching_analytics,
 )
 
 # activity 앱 URL 패턴
@@ -35,4 +36,10 @@ urlpatterns = [
     # ============================================
     # GET /api/activity/recommended-videos/ - 최근 시청 기록 기반 추천 영상 (created_at 최신순)
     path('recommended-videos/', get_recommended_videos, name='recommended-videos'),
+    
+    # ============================================
+    # 시청 기록 분석 API
+    # ============================================
+    # GET /api/activity/watching-analytics/ - 시청 기록 기반 분석 데이터 (video_keyword, tags 빈도)
+    path('watching-analytics/', get_watching_analytics, name='watching-analytics'),
 ]

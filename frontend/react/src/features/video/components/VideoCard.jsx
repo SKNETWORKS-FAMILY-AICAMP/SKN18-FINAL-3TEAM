@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { COLORS } from "../../../constants/theme";
 import { getThumbnailUrl } from "../../../utils/imageUtils";
-import { TagIcon } from "../../../components/common/Icons";
+import { TagIcon, ArrowRightIcon } from "../../../components/common/Icons";
 
 const VideoCard = ({ video, onClick }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
   if (!video) {
     return null;
   }
@@ -19,6 +22,8 @@ const VideoCard = ({ video, onClick }) => {
     <div
       style={{ cursor: "pointer", position: "relative" }}
       onClick={handleClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -31,21 +36,51 @@ const VideoCard = ({ video, onClick }) => {
       <div
         style={{
           width: "100%",
-          aspectRatio: "16/10",
-          backgroundColor: COLORS.lightGray,
+          aspectRatio: "16/9",
+          backgroundColor: video.thumbnail_url ? "transparent" : COLORS.jadePale,
           borderRadius: "12px",
           marginBottom: "12px",
-          transition: "transform 0.3s ease",
           overflow: "hidden",
+          position: "relative",
           backgroundImage: video.thumbnail_url
             ? `url(${getThumbnailUrl(video.thumbnail_url)})`
-            : "none",
-          backgroundSize: "cover",
+            : `linear-gradient(135deg, ${COLORS.jadePale} 0%, ${COLORS.jadeLight} 50%, ${COLORS.dark} 100%)`,
+          backgroundSize: isHovered ? "110%" : "cover",
           backgroundPosition: "center",
+          transform: isHovered ? "scale(1.03)" : "scale(1)",
+          transition: "background-size 0.5s ease, transform 0.3s ease",
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-      ></div>
+      >
+        {/* 썸네일이 없을 때 제이드 그라데이션 배경 */}
+        {!video.thumbnail_url && (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: `linear-gradient(135deg, ${COLORS.jadePale} 0%, ${COLORS.jadeLight} 30%, ${COLORS.jade} 70%, ${COLORS.dark} 100%)`,
+              opacity: 0.8,
+            }}
+          />
+        )}
+        {/* 호버 시 하단 그라데이션 오버레이 */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: "70%",
+            background: isHovered
+              ? `linear-gradient(to top, ${COLORS.jade}40, ${COLORS.jadeLight}30, transparent)`
+              : "transparent",
+            transition: "opacity 0.3s ease, background 0.3s ease",
+            pointerEvents: "none",
+          }}
+        />
+      </div>
       <div
         style={{
           fontSize: "13px",
@@ -100,9 +135,25 @@ const VideoCard = ({ video, onClick }) => {
           fontSize: "17px",
           fontWeight: "600",
           color: COLORS.dark,
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
         }}
       >
-        {video.title || ""}
+        <span>{video.title || ""}</span>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            opacity: isHovered ? 1 : 0,
+            transform: isHovered
+              ? "translateX(0) rotate(-45deg)"
+              : "translateX(-8px) rotate(-45deg)",
+            transition: "opacity 0.3s ease, transform 0.3s ease",
+          }}
+        >
+          <ArrowRightIcon size={18} color={COLORS.dark} />
+        </span>
       </div>
     </div>
   );

@@ -121,7 +121,7 @@ const ChatbotButton = ({ onNavigate }) => {
               e.currentTarget.style.background = "transparent";
             }}
           >
-            질문하기
+            대화하기
           </div>
           <div
             onClick={handleVideoCreateClick}
@@ -140,7 +140,7 @@ const ChatbotButton = ({ onNavigate }) => {
               e.currentTarget.style.background = "transparent";
             }}
           >
-            영상만들기
+            이야기 만들기
           </div>
         </div>
       )}

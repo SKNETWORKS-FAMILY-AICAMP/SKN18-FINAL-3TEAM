@@ -296,10 +296,10 @@ const SearchResultPage = ({ query, onVideoClick, isLoggedIn }) => {
                     style={{
                       padding: "6px 12px",
                       backgroundColor: isSelected
-                        ? COLORS.sub_color
+                        ? COLORS.jadePale
                         : "transparent",
-                      color: COLORS.textPrimary,
-                      border: isSelected ? "none" : `1.5px solid ${COLORS.sub_color}`,
+                      color: COLORS.dark,
+                      border: isSelected ? "none" : `1.5px solid ${COLORS.jadePale}`,
                       borderRadius: "16px",
                       cursor: "pointer",
                       fontSize: "13px",
