@@ -53,6 +53,12 @@ const Header = ({
             이야기 만들기
           </a>
           <a
+            onClick={() => handleNavClick("play")}
+            className={getNavClass("play")}
+          >
+            놀이
+          </a>
+          <a
             onClick={() => handleNavClick("mypage")}
             className={getNavClass("mypage")}
           >

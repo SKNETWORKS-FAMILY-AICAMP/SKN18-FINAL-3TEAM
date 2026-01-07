@@ -13,6 +13,7 @@ import AdminPage from "./pages/AdminPage";
 import VideoEditPage from "./pages/admin/VideoEditPage";
 import Chatbot from "./pages/Chatbot";
 import VideoCreatePage from "./pages/VideoCreatePage";
+import PlayPage from "./pages/PlayPage";
 import ChatbotButton from "./components/common/ChatbotButton";
 import {
   checkAuth,
@@ -389,6 +390,10 @@ const App = () => {
 
           {currentPage === "video-create" && (
             <VideoCreatePage onNavigate={handleNavigate} user={user} />
+          )}
+
+          {currentPage === "play" && (
+            <PlayPage onNavigate={handleNavigate} />
           )}
         </div>
 
