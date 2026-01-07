@@ -19,9 +19,7 @@ from PIL import Image
 # Load environment variables
 load_dotenv()
 
-# nanobanana API 설정
-GENAI_API_VERSION = os.getenv("GENAI_API_VERSION", "v1")
-MODEL_IMAGE = os.getenv("MODEL_IMAGE", "imagen-4.0-fast-generate-001 ")
+# Gemini API 설정 (백그라운드 이미지 생성과 동일한 방식)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Configure Gemini API for Image Generation
@@ -50,48 +48,105 @@ def generate_thumbnail_prompt(title: str) -> str:
     Returns:
         썸네일 생성 프롬프트
     """
-    prompt = f"""Create a thumbnail image for a historical Korean drama video titled "{title}".
+    prompt = f"""Create a dynamic, engaging thumbnail image for a historical Korean drama video titled "{title}".
 
-REQUIREMENTS:
-1. **Main Character**: Feature the character from minji&minseok.png as the protagonist
-   - The character should be prominently displayed in the foreground
-   - Character should have a friendly, engaging expression
-   - Character should be in Joseon Dynasty traditional clothing (hanbok)
+CHARACTER REQUIREMENTS (Inspired by minji&minseok.png reference):
+1. **Character Style - CHIBI/ANIME with Large Heads**:
+   - **Large, round heads** - heads should be disproportionately large compared to bodies (chibi/super deformed style)
+   - **Character options** (choose 1-2 characters based on composition):
+     * **Minji (Girl)**: Long brown hair styled in a **braid hanging down below the shoulders** (not over the shoulder, but hanging down), large round warm brown eyes, expressive face
+     * **Minseok (Boy)**: Short straight black hair with bangs, large dark eyes, expressive face
+   - **Facial features**: Large expressive eyes, tiny dot nose, small mouth
+   - **3D glossy/chibi animation style** - inspired by but not limited to the reference image
+   - **Dynamic, engaging expressions** - can be smiling, surprised, determined, or action-oriented
 
-2. **Background Setting**: 
+2. **Character Proportions & Poses**:
+   - Head-to-body ratio: approximately 1:2 or 1:3 (head is very large)
+   - Small, stout bodies
+   - **DYNAMIC POSES**: Characters should be in action or expressive poses
+     * Running, jumping, pointing, reaching, reading, writing, or other engaging actions
+     * Avoid static standing poses - make it lively and energetic
+   - Characters can be positioned anywhere in the frame (center, left, right, foreground, midground)
+   - One or both characters can appear - composition is flexible
+
+3. **Clothing & Appearance**:
+   - **Traditional Korean clothing (hanbok) is preferred but can be varied**
+   - Clothing can be simplified, stylized, or adapted for the scene
+   - Colors can be adjusted to match the mood and composition
+   - Characters should look polished and appealing (beautified/stylized)
+
+4. **Background Characters**:
+   - **Additional background people are welcome** - can include other characters in the scene
+   - **Background characters MUST use DIFFERENT art style**:
+     * Normal human proportions (realistic or semi-realistic)
+     * Standard head-to-body ratio (approximately 1:7 or 1:8)
+     * NOT chibi style - contrast with main characters
+     * Can be in traditional Korean clothing (hanbok) or period-appropriate attire
+   - Background characters should be:
+     * Smaller in size compared to main characters
+     * Less detailed than main characters
+     * Positioned in midground or background
+     * Support the scene but not compete with main characters
+   - Examples: scholars, servants, guards, villagers, court officials, etc.
+
+5. **Background Setting**: 
    - Joseon Dynasty period (16th century Korea)
-   - Historical Korean architecture (palaces, traditional houses, or courtyards)
+   - Historical Korean architecture (palaces, traditional houses, courtyards, or natural settings)
    - Authentic Joseon Dynasty atmosphere and environment
+   - Background should complement the dynamic character action
+   - Can include background characters in the scene
 
-3. **Composition**:
+6. **Composition**:
    - Thumbnail-style composition (eye-catching, clear focal point)
-   - Character positioned prominently but not blocking important background elements
+   - Dynamic, energetic layout with movement and action
+   - Main characters (Minji/Minseok) can be positioned creatively (not fixed to center)
+   - Background characters add depth and context to the scene
    - Balanced layout suitable for video thumbnail
    - 16:9 aspect ratio
 
-4. **Art Style**:
-   - Soft anime/animated illustration style
-   - Digital painting with smooth brush strokes
-   - Semi-realistic with stylized anime aesthetic
-   - Clean and polished appearance
-   - Medium detail level
+7. **Art Style - DUAL STYLE APPROACH**:
+   - **Main characters (Minji/Minseok)**: 
+     * **Chibi/anime style with large heads** - inspired by reference but can be stylized
+     * 3D rendered look with glossy finish OR 2D anime illustration style
+     * Large heads, small bodies (chibi proportions)
+   - **Background characters**:
+     * **Normal human proportions** - realistic or semi-realistic style
+     * Standard head-to-body ratio (1:7 or 1:8)
+     * Can be in same art medium but different proportions
+     * Less detailed, smaller, supporting role
+   - Clean, polished, beautified appearance overall
+   - Bright, vibrant colors
+   - Main character design should be recognizable as Minji/Minseok but can be enhanced/stylized
 
-5. **Color & Lighting**:
+8. **Color & Lighting**:
    - Warm, inviting colors suitable for a thumbnail
-   - Good contrast to make the character stand out
-   - Soft, diffused lighting
-   - Atmospheric but clear
+   - Good contrast to make the main characters stand out
+   - Dynamic lighting that enhances the action
+   - Bright and clear
 
-6. **Mood**:
-   - Engaging and inviting
+9. **Mood**:
+   - Energetic, dynamic, and engaging
    - Historical but approachable
+   - Action-oriented or expressive
    - Professional thumbnail quality
 
+CRITICAL - ABSOLUTELY NO TEXT:
+- **ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO CAPTIONS, NO SUBTITLES, NO KOREAN CHARACTERS, NO ENGLISH LETTERS, NO NUMBERS**
+- **NO TEXT ON CLOTHING, NO TEXT ON SIGNS, NO TEXT ON SCROLLS, NO TEXT ON BOOKS**
+- **NO TEXT ANYWHERE IN THE IMAGE - COMPLETELY TEXT-FREE**
+- If books, scrolls, or documents appear, they must be blank or show only abstract patterns/lines
+
 IMPORTANT: 
-- NO TEXT, NO CAPTIONS, NO KOREAN CHARACTERS, NO SUBTITLES
-- Pure visual illustration only
-- The character from minji&minseok.png should be clearly recognizable as the main subject
+- Main characters (Minji/Minseok) should be DYNAMIC and in ACTION - avoid static poses
+- One or both main characters can appear - composition is flexible
+- Main characters can be positioned anywhere - not fixed to center
+- Clothing can vary - traditional hanbok preferred but can be adapted
+- Main characters should be beautified/stylized - don't need to match reference exactly
+- **Main characters: Large heads, chibi proportions - this is CRITICAL**
+- **Background characters: Normal human proportions (1:7 or 1:8 ratio) - DIFFERENT art style**
+- Background characters are optional but welcome - they add depth and context
 - Background should clearly show Joseon Dynasty setting
+- Clear visual distinction between chibi main characters and normal-proportioned background characters
 """
     return prompt
 
@@ -99,6 +154,7 @@ IMPORTANT:
 def generate_thumbnail_with_nanobanana(prompt: str, output_path: str) -> str:
     """
     nanobanana API (Gemini Image API)를 사용하여 썸네일 생성
+    - Minji & Minseok 캐릭터 이미지를 참조로 전달
     
     Args:
         prompt: 썸네일 생성 프롬프트
@@ -114,13 +170,35 @@ def generate_thumbnail_with_nanobanana(prompt: str, output_path: str) -> str:
         img.save(output_path)
         return output_path
     
-    print(f"🖼️ [Thumbnail] nanobanana API로 썸네일 생성 중...")
-    print(f"   모델: {MODEL_IMAGE}, API 버전: {GENAI_API_VERSION}")
+    print(f"🖼️ [Thumbnail] Gemini Image API로 썸네일 생성 중...")
+    print(f"   모델: gemini-2.5-flash-image")
+    
+    # Minji & Minseok 캐릭터 이미지 로드 및 전달
+    character_image_part = None
+    if CHARACTER_IMAGE_PATH.exists():
+        try:
+            with open(CHARACTER_IMAGE_PATH, 'rb') as f:
+                image_bytes = f.read()
+            character_image_part = types.Part.from_bytes(
+                data=image_bytes,
+                mime_type="image/png"
+            )
+            print(f"   ✅ 캐릭터 이미지 로드 완료: {CHARACTER_IMAGE_PATH}")
+        except Exception as e:
+            print(f"   ⚠️ 캐릭터 이미지 로드 실패: {e}")
+    else:
+        print(f"   ⚠️ 캐릭터 이미지 파일을 찾을 수 없습니다: {CHARACTER_IMAGE_PATH}")
     
     try:
+        # 이미지와 텍스트 프롬프트를 함께 전달
+        contents = []
+        if character_image_part:
+            contents.append(character_image_part)
+        contents.append(prompt)
+        
         response = gemini_client.models.generate_content(
-            model=MODEL_IMAGE,
-            contents=[prompt],
+            model="gemini-2.5-flash-image",
+            contents=contents,
             config=types.GenerateContentConfig(
                 response_modalities=['Image'],
                 image_config=types.ImageConfig(
@@ -166,8 +244,8 @@ def thumbnail_gen_node(state: GraphState) -> GraphState:
     
     if not title:
         print("⚠️ [Thumbnail] 제목이 없어 썸네일을 생성할 수 없습니다.")
+        # 병렬 실행 시 LangGraph 오류 방지: 업데이트하는 키만 반환
         return {
-            **state,
             "thumbnail_url": None,
         }
     
@@ -198,8 +276,8 @@ def thumbnail_gen_node(state: GraphState) -> GraphState:
         
         print(f"   ✅ 썸네일 URL 생성: {thumbnail_url}")
         
+        # 병렬 실행 시 LangGraph 오류 방지: 업데이트하는 키만 반환
         return {
-            **state,
             "thumbnail_url": thumbnail_url,
         }
         
@@ -207,8 +285,8 @@ def thumbnail_gen_node(state: GraphState) -> GraphState:
         print(f"❌ [Thumbnail] 썸네일 생성 실패: {e}")
         import traceback
         print(traceback.format_exc())
+        # 병렬 실행 시 LangGraph 오류 방지: 업데이트하는 키만 반환
         return {
-            **state,
             "thumbnail_url": None,
         }
 
