@@ -95,8 +95,8 @@ def extract_video_tag(state: GraphState) -> GraphState:
         tags = []
         evidence = {}
 
+    # 병렬 실행 시 LangGraph 오류 방지: 업데이트하는 키만 반환
     return {
-        **state,
         "video_tags": tags,
         "video_tag_evidence": evidence,
         "extracted_tags_json": result_text,
