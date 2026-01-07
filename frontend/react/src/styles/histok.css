@@ -98,6 +98,10 @@ body {
 .header-search {
   width: 36px;
   height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  margin: 0;
   border: 1px solid var(--line);
   border-radius: 50%;
   background: transparent;
@@ -106,6 +110,7 @@ body {
   align-items: center;
   justify-content: center;
   transition: all 0.3s;
+  box-sizing: border-box;
 }
 
 .header-search:hover {
@@ -116,7 +121,11 @@ body {
 .header-search svg {
   width: 16px;
   height: 16px;
+  min-width: 16px;
+  min-height: 16px;
   stroke: var(--jade);
+  color: var(--jade);
+  display: block;
 }
 
 .header-login {
