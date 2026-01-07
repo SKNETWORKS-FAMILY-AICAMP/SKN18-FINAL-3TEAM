@@ -282,6 +282,36 @@ body {
   transform: translateX(6px);
 }
 
+.hero-video {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: flex-start;
+  background: transparent;
+  position: relative;
+}
+
+.hero-video video {
+  width: 100%;
+  max-width: 300px;
+  height: auto;
+  background: transparent !important;
+  background-color: transparent !important;
+  object-fit: contain;
+  /* 검은색 배경 제거를 위한 mix-blend-mode */
+  mix-blend-mode: screen;
+  /* 사파리 특정 스타일 */
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* mix-blend-mode가 비디오 색상에 영향을 주는 경우를 위한 대안 */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  .hero-video video {
+    /* 사파리에서만 적용되는 스타일 */
+    isolation: isolate;
+  }
+}
+
 .hero-footer {
   display: flex;
   justify-content: space-between;
@@ -564,12 +594,65 @@ body {
     );
 }
 
-.about-content {
+.about-container {
   position: relative;
   z-index: 10;
-  max-width: 600px;
-  text-align: center;
+  width: 100%;
+  max-width: 1400px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
   padding: 4rem;
+  align-items: center;
+}
+
+.about-video {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  position: relative;
+  background: transparent;
+}
+
+.about-video::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 10%;
+  height: 80%;
+  width: 1px;
+  background: var(--line);
+}
+
+.about-video video {
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  background: transparent !important;
+  background-color: transparent !important;
+  object-fit: contain;
+  /* 검은색 배경 제거를 위한 mix-blend-mode */
+  mix-blend-mode: screen;
+  -webkit-appearance: none;
+  appearance: none;
+  /* 사파리에서 투명 배경 처리 */
+  isolation: isolate;
+}
+
+/* mix-blend-mode가 색상에 영향을 주는 경우를 위한 대안 */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  .about-video video {
+    /* 사파리 특정 처리 */
+    background-size: transparent;
+    -webkit-background-size: transparent;
+  }
+}
+
+.about-content {
+  max-width: 600px;
+  text-align: left;
+  padding: 2rem;
 }
 
 .about-label {
@@ -604,7 +687,7 @@ body {
 
 .about-features {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 3rem;
   margin-bottom: 4rem;
 }
@@ -1937,6 +2020,20 @@ body {
   }
   .home-hero-left::after {
     display: none;
+  }
+  .about-container {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    padding: 2rem;
+  }
+  .about-video::after {
+    display: none;
+  }
+  .about-content {
+    text-align: center;
+  }
+  .about-features {
+    justify-content: center;
   }
   .videos-section {
     padding: 3rem 1.5rem;
