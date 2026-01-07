@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { getWatchHistory } from "../api/activityApi";
 import { getMyActivity } from "../api/communityApi";
 import { getProfileImageUrl } from "../utils/imageUtils";
-import UserAnalytics from "../backup/features/user/components/UserAnalytics";
+import UserAnalytics from "../features/user/components/UserAnalytics";
 import "../styles/histok.css";
 
 const MyPage = ({ onNavigate, user }) => {

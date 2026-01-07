@@ -379,7 +379,7 @@ const ExpandableSearch = ({
                 style={{
                   fontSize: "15px",
                   fontWeight: "600",
-                  color: COLORS.textPrimary,
+                  color: COLORS.dark,
                   marginRight: "16px",
                   whiteSpace: "nowrap",
                 }}
@@ -463,7 +463,7 @@ const ExpandableSearch = ({
                       style={{
                         fontSize: "14px",
                         fontWeight: "700",
-                        color: COLORS.textPrimary,
+                        color: COLORS.dark,
                         marginBottom: "16px",
                       }}
                     >
@@ -612,7 +612,8 @@ const ExpandableSearch = ({
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.backgroundColor =
                                   COLORS.jadeLight; // 제이드 라이트
-                                e.currentTarget.style.borderColor = COLORS.jadeLight;
+                                e.currentTarget.style.borderColor =
+                                  COLORS.jadeLight;
                                 e.currentTarget.style.color = COLORS.dark; // 블랙 유지
                               }}
                               onMouseLeave={(e) => {
@@ -691,7 +692,7 @@ const ExpandableSearch = ({
                   style={{
                     fontSize: "14px",
                     fontWeight: "700",
-                    color: COLORS.textPrimary,
+                    color: COLORS.dark,
                     marginBottom: "16px",
                   }}
                 >
