@@ -162,7 +162,7 @@ def background_gen_node(state: GraphState) -> GraphState:
     except Exception as e:
         print(f"⚠️ 대본 저장 중 에러 발생: {e}")
 
+    # 병렬 실행 시 LangGraph 오류 방지: 업데이트하는 키만 반환
     return {
-        **state,
-        "scene_script": script_json, 
+        "scene_script": script_json,
     }
