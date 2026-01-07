@@ -10,6 +10,7 @@ from backend.langgraph_structure1.nodes.extract_video_tag import extract_video_t
 # [병합 완료] 두 노드 모두 임포트
 from backend.langgraph_structure1.nodes.background_gen_node import background_gen_node
 from backend.langgraph_structure1.nodes.reaction_node import reaction_node
+from backend.langgraph_structure1.nodes.thumbnail_gen_node import thumbnail_gen_node
 
 def create_graph_flow():
     # 그래프에 사용할 변수 정의
@@ -26,6 +27,7 @@ def create_graph_flow():
     # 신규 노드들 등록
     workflow.add_node("reaction_node", reaction_node)           # 리액션용
     workflow.add_node("background_gen_node", background_gen_node) # 배경 생성용
+    workflow.add_node("thumbnail_gen_node", thumbnail_gen_node) # 썸네일 생성용
 
     # 2. 엣지(연결) 설정
     workflow.set_entry_point("classify_node")
@@ -59,9 +61,15 @@ def create_graph_flow():
         },
     )
 
-    # [복구 완료] 장면 분리 -> 배경 생성 -> 종료
+    # [병렬 실행] 장면 분리 -> 태그 추출 & 썸네일 생성 & 배경 생성 (모두 병렬) -> 종료
+    # scene_split_node 이후 세 작업을 모두 병렬로 실행
     workflow.add_edge("scene_split_node", "extract_video_tag")
-    workflow.add_edge("extract_video_tag", "background_gen_node")
+    workflow.add_edge("scene_split_node", "thumbnail_gen_node")
+    workflow.add_edge("scene_split_node", "background_gen_node")
+    
+    # 세 병렬 작업이 모두 완료되면 종료
+    workflow.add_edge("extract_video_tag", END)
+    workflow.add_edge("thumbnail_gen_node", END)
     workflow.add_edge("background_gen_node", END)
 
     # 그래프 compile
