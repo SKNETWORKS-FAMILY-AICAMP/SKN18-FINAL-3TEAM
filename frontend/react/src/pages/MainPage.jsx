@@ -106,13 +106,30 @@ const MainPage = ({ isLoggedIn, onVideoClick }) => {
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
             </div>
+            <div className="hero-video">
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                style={{
+                  width: "100%",
+                  maxWidth: "300px",
+                  height: "auto",
+                  background: "transparent",
+                  backgroundColor: "transparent",
+                }}
+              >
+                <source src="/videos/Minji_intro.webm" type="video/webm" />
+              </video>
+            </div>
           </div>
           <div className="hero-footer">
             <span>SCROLL</span>
             <div className="scroll-indicator">
               <div className="scroll-line"></div>
             </div>
-            <span>2025</span>
+            <span></span>
           </div>
         </div>
       </section>
