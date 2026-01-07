@@ -164,5 +164,5 @@ def background_gen_node(state: GraphState) -> GraphState:
 
     return {
         **state,
-        "scene_script": script_json, 
+        "scene_script": script_json,
     }
