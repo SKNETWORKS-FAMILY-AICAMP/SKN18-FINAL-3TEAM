@@ -89,7 +89,7 @@ services:
       dockerfile: backend/Dockerfile
     container_name: django_web
     env_file:
-      - ../.env
+      - ../../.env
     environment:
       # Docker 환경에서 Fuseki 서비스 이름으로 접근
       - FUSEKI_URL=http://fuseki:3030/korean-history
@@ -111,6 +111,25 @@ services:
       - redis
       - neo4j
       - fuseki
+
+  # Celery Worker
+  celery:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    container_name: django_celery
+    env_file:
+      - ../../.env
+    environment:
+      - FUSEKI_URL=http://fuseki:3030/korean-history
+      - DOCKER_ENV=true
+    working_dir: /app/backend/django
+    command: ["celery", "-A", "config", "worker", "--loglevel=info"]
+    volumes:
+      - ../../backend:/app/backend
+    depends_on:
+      - redis
+      - postgres
 
 volumes:
   fuseki-data:

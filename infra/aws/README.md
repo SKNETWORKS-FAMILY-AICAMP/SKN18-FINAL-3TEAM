@@ -144,7 +144,7 @@ aws cloudformation delete-stack `
 
 ### powershell
 ```powershell
-docker login -u AWS --password-stdin $(aws ecr get-login-password --region ap-northeast-2) 533124807326.dkr.ecr.ap-northeast-2.amazonaws.com
+docker login -u AWS --password $(aws ecr get-login-password --region ap-northeast-2) 533124807326.dkr.ecr.ap-northeast-2.amazonaws.com
 ```
 
 ## ECR에 Docker 이미지 push : 도커 이미지 빌드
@@ -158,4 +158,48 @@ docker tag skn-backend:latest 533124807326.dkr.ecr.ap-northeast-2.amazonaws.com/
 
 # 2. 푸시하기
 docker push 533124807326.dkr.ecr.ap-northeast-2.amazonaws.com/skn18-3-dev-web:latest
+```
+
+## SSM 전용 스택
+```powershell
+aws cloudformation deploy `
+  --stack-name skn18-3-params `
+  --template-file infra/aws/cloudformation/params/ssm-params.yaml `
+  --region ap-northeast-2 `
+  --capabilities CAPABILITY_NAMED_IAM `
+  --parameter-overrides `
+    NamePrefix=skn18-3-dev `
+    DjangoSecretKey=YOUR_DJANGO_SECRET_KEY `
+    PostgresPassword=YOUR_POSTGRES_PASSWORD `
+    Neo4jPassword=YOUR_NEO4J_PASSWORD `
+    Neo4jAuth=neo4j/YOUR_NEO4J_PASSWORD `
+    FusekiAdminPassword=YOUR_FUSEKI_ADMIN_PASSWORD `
+    BotPassword=YOUR_BOT_PASSWORD `
+    BotEmail=YOUR_BOT_EMAIL `
+    OpenaiApiKey=YOUR_OPENAI_API_KEY `
+    HfApiToken=YOUR_HF_API_TOKEN `
+    LangchainApiKey=YOUR_LANGCHAIN_API_KEY `
+    GeminiApiKey=YOUR_GEMINI_API_KEY `
+    FalKey=YOUR_FAL_KEY `
+    GoogleOauthClientSecret=YOUR_GOOGLE_OAUTH_CLIENT_SECRET `
+    GoogleOauthClientId=YOUR_GOOGLE_OAUTH_CLIENT_ID
+```
+
+## 공식 이미지 미러링
+```
+docker pull redis:7-alpine
+docker tag redis:7-alpine 533124807326.dkr.ecr.ap-northeast-2.amazonaws.com/skn18-3-dev-redis:latest
+docker push 533124807326.dkr.ecr.ap-northeast-2.amazonaws.com/skn18-3-dev-redis:latest
+
+docker pull pgvector/pgvector:pg16
+docker tag pgvector/pgvector:pg16 533124807326.dkr.ecr.ap-northeast-2.amazonaws.com/skn18-3-dev-postgres:latest
+docker push 533124807326.dkr.ecr.ap-northeast-2.amazonaws.com/skn18-3-dev-postgres:latest
+
+docker pull stain/jena-fuseki:latest
+docker tag stain/jena-fuseki:latest 533124807326.dkr.ecr.ap-northeast-2.amazonaws.com/skn18-3-dev-fuseki:latest
+docker push 533124807326.dkr.ecr.ap-northeast-2.amazonaws.com/skn18-3-dev-fuseki:latest
+
+docker pull neo4j:5.18
+docker tag neo4j:5.18 533124807326.dkr.ecr.ap-northeast-2.amazonaws.com/skn18-3-dev-neo4j:latest
+docker push 533124807326.dkr.ecr.ap-northeast-2.amazonaws.com/skn18-3-dev-neo4j:latest
 ```

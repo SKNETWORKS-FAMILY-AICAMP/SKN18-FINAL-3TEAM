@@ -19,3 +19,12 @@ COPY backend /app/backend
 COPY frontend/video_pipeline /app/frontend/video_pipeline
 COPY backend/django/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
+
+# 작업 디렉토리가 /app/backend/django 라면 경로에 주의하세요
+WORKDIR /app/backend/django
+
+# ENTRYPOINT는 반드시 리스트 형태로 작성
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+# 기본 실행 명령 (ECS에서 override 하지 않을 경우)
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

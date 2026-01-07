@@ -1,11 +1,13 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.http import HttpResponse
 from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from users.views import oauth_login_cancelled
 
 urlpatterns = [
+    path('health/', lambda request: HttpResponse('ok'), name='health'),
     path('admin/', admin.site.urls),
 
     # OAuth 취소 처리 (allauth.urls보다 먼저 선언하여 오버라이드)

@@ -245,6 +245,36 @@ Resources:
       SecurityGroupIds:
         - !Ref VpcEndpointSecurityGroup
 
+  # (추가) SSM Interface Endpoint (SSM Parameter Store 접근)
+  SsmEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: CreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ssm"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
+  # (추가) EC2 Messages Interface Endpoint (SSM 내부 통신)
+  Ec2MessagesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: CreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ec2messages"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
   # (추가) S3 Gateway Endpoint (ECR 이미지 레이어 다운로드 등에 필요)
   S3GatewayEndpoint:
     Type: AWS::EC2::VPCEndpoint
@@ -316,7 +346,56 @@ Resources:
       SecurityGroupIds:
         - !Ref VpcEndpointSecurityGroup
 
+  # (추가) ECS Interface Endpoint (ECS 에이전트 통신)
+  EcsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: CreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecs"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
+  # (추가) ECS Telemetry Interface Endpoint (ECS 메트릭)
+  EcsTelemetryEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: CreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecs-telemetry"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
+  # (추가) ECS Agent Interface Endpoint (ECS 에이전트 업데이트)
+  EcsAgentEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: CreateVpcEndpoints
+    Properties:
+      VpcId: !Ref VPC
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ecs-agent"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
 Outputs:
+  VpcCidr:
+    Value: !Ref VpcCidr
+    Export:
+      Name: !Sub "${NamePrefix}-vpc-cidr"
   VpcId:
     Value: !Ref VPC
     Export:
