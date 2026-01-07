@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: e2b046e2da56ac54b8db61c9e75f9afa
+ShaderIncludeImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 271920
+  packageName: 'NHA - Gyeongbokgung Palace Vol.4: Gyotaejeon Hall'
+  packageVersion: 1.0
+  assetPath: Assets/GyotaejeonComplex/Shaders/LWCOperations.hlsl
+  uploadId: 644395

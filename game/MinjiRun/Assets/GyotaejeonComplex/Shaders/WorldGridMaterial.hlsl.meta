@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 08b3290fc47cca04d9f6a0cd86af5a9c
+ShaderIncludeImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 271920
+  packageName: 'NHA - Gyeongbokgung Palace Vol.4: Gyotaejeon Hall'
+  packageVersion: 1.0
+  assetPath: Assets/GyotaejeonComplex/Shaders/WorldGridMaterial.hlsl
+  uploadId: 644395
