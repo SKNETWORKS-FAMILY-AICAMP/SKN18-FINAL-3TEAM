@@ -240,7 +240,7 @@ namespace minji_run
                 questionText.text = quiz.question;
                 questionText.gameObject.SetActive(true);
                 questionText.color = Color.white;
-                questionText.fontSize = 80f;
+                // Font Size는 Inspector 설정 사용 (코드에서 설정하지 않음)
                 questionText.enabled = true;
             }
 

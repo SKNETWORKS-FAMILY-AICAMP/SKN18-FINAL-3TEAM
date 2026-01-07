@@ -30,6 +30,7 @@ namespace minji_run
         private bool hasBeenSelected = false;
         private bool hasPenaltyApplied = false;  // 페널티가 한 번만 적용되도록
         private bool hasBeenUsedPermanently = false;  // 이 문이 한 번이라도 사용되었는지 (영구적, 게임 재시작 전까지 유지)
+        private QuizDoorController myController;  // 이 문을 관리하는 컨트롤러 (Initialize 시 설정)
 
         private void Awake()
         {
@@ -53,7 +54,7 @@ namespace minji_run
         /// <summary>
         /// 문 초기화
         /// </summary>
-        public void Initialize(int index, string text, bool isCorrect)
+        public void Initialize(int index, string text, bool isCorrect, QuizDoorController controller)
         {
             // 이미 사용된 문이면 초기화 거부
             if (hasBeenUsedPermanently)
@@ -66,6 +67,7 @@ namespace minji_run
             choiceIndex = index;
             choiceText = text;
             isCorrectAnswer = isCorrect;
+            myController = controller;  // 컨트롤러 참조 저장
 
             // 문 활성화 (혹시 비활성화되어 있었다면)
             gameObject.SetActive(true);
@@ -121,12 +123,11 @@ namespace minji_run
                 // 포털 색상 변경 (초록색)
                 SetPortalColor(correctColor);
 
-                // QuizManager에 정답 제출 (자신의 참조 + 부모 컨트롤러 참조 전달)
+                // QuizManager에 정답 제출 (자신의 참조 + 컨트롤러 참조 전달)
                 if (QuizManager.Instance != null)
                 {
-                    QuizDoorController controller = GetComponentInParent<QuizDoorController>();
-                    Debug.Log($"[QuizDoor] {gameObject.name} SubmitAnswer 호출! Controller: {controller?.gameObject.name}");
-                    QuizManager.Instance.SubmitAnswer(choiceIndex, this, controller);
+                    Debug.Log($"[QuizDoor] {gameObject.name} SubmitAnswer 호출! Controller: {myController?.gameObject.name}");
+                    QuizManager.Instance.SubmitAnswer(choiceIndex, this, myController);
                 }
                 else
                 {

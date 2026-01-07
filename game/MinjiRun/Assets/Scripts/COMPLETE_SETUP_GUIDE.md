@@ -297,18 +297,25 @@ QuizTrigger 통과 (첫 번째만)
 주요 기능:
 - HUD 패널 (점수, 거리, 타이머)
 - Quiz 패널 (질문 표시)
-- Result 패널 (게임 결과)
+- Result 패널 (게임 결과) - GameClear 또는 Result 상태일 때 표시 ⭐
 - GameOver 패널
 - 대쉬 게이지 표시
 ```
 **핵심 메서드:**
+- `OnGameStateChanged(GameState previousState, GameState newState)`: 게임 상태 변경 시 패널 전환
+  - `GameState.Running`: HUD Panel 표시
+  - `GameState.Quiz`: Quiz Panel 표시
+  - `GameState.GameClear`: **Result Panel 표시** ⭐
+  - `GameState.GameOver`: GameOver Panel 표시
 - `OnQuizLoaded(QuizData quiz)`: 퀴즈 질문 3초 표시
 - `HideQuestionAndSpawnDoors()`: 질문 숨기고 문에 답안 할당
 - `UpdateHUD(GameStats stats)`: HUD 업데이트
+- `UpdateResultPanel()`: Result Panel 업데이트 (점수, 거리, 시간, 정답/오답)
 - `UpdateGameTimer(float timeRemaining)`: 타이머 업데이트
 **중요:**
 - 퀴즈 질문은 3초 후 자동으로 숨겨짐
 - 질문이 표시되는 동안에도 게임은 계속 진행 (일시정지 없음)
+- **GoalTrigger에 도착하면 GameClear 상태가 되어 Result Panel이 자동으로 표시됨** ⭐
 
 ---
 
@@ -1261,13 +1268,21 @@ Managers/
 
 설정:
 - **Game Config**: `GameConfig` 드래그
-- **Player**: `Player` 오브젝트 드래그 ⭐
-- **Start Track Segment**: 시작 트랙 세그먼트 드래그 (Section 7에서 생성) ⭐
+- **Player**: `Player` 오브젝트 드래그 ⭐⭐⭐ **필수!**
+- **Start Track Segment**: 시작 트랙 세그먼트 드래그 (Section 7에서 생성) ⭐⭐⭐ **필수!**
 - **Current State**: `Running`
 
-**⚠️ 새로운 기능:**
+**⚠️ 매우 중요:**
+- **Player와 Start Track Segment를 반드시 연결해야 합니다!**
+- 이것들이 연결되지 않으면:
+  - ❌ 게임 재시작 시 플레이어가 시작 위치로 이동하지 않음
+  - ❌ 재시작 버튼을 눌러도 플레이어가 골 지점에 그대로 있음
+  - ❌ 게임이 제대로 초기화되지 않음
+
+**⭐ 주요 기능:**
 - **Player 시작 위치 자동 설정**: 게임 시작/재시작 시 플레이어를 StartTrackSegment의 StartPoint로 자동 이동
 - **게임 클리어**: 플레이어가 EndPoint에 도달하면 게임 클리어 (Section 7.8 참고)
+- **게임 재시작**: RestartGame() 호출 시 모든 퀴즈/트리거 리셋 + 플레이어 위치 초기화
 
 ---
 
@@ -1515,9 +1530,10 @@ StartTrackSegment (Empty, Scale: 1, 1, 1)
    - **End Point**: EndPoint 드래그
 
 **작동 방식:**
-- 플레이어가 EndPoint 트리거에 진입 → 게임 클리어!
-- GameState가 GameClear로 변경
-- 타이머 정지, 게임 일시정지
+- 플레이어가 EndPoint 트리거에 진입 → 게임 클리어! 🎉
+- GameState가 **GameClear**로 변경
+- **Result Panel 자동 표시** ⭐ (최종 점수, 거리, 시간, 정답/오답 수)
+- 타이머 정지, 게임 일시정지 (`Time.timeScale = 0`)
 - Console에 클리어 메시지 + 최종 점수/거리/시간 표시
 
 **Scene 뷰에서:**
@@ -2823,59 +2839,193 @@ Scale Z Multiplier: (0, 0) - Z축 → 사용 안 함
 
 ---
 
-#### DashGauge ⭐ (대쉬 게이지)
+#### DashGauge ⭐ (대쉬 게이지 - 3레이어 방식)
+
+**⚠️ 사전 준비: 게이지 이미지 Import 설정**
+
+게이지 이미지가 있다면 먼저 설정:
+
+1. **게이지 이미지 선택** (예: `Assets/UI/DashGauge/Gemini_Generated_Image_emvn0zemvn0zemvn.png`)
+
+2. **Inspector 설정:**
+   ```
+   Texture Type: Sprite (2D and UI)
+   Sprite Mode: Multiple (여러 게이지 나눠 쓰려면)
+   Pixels Per Unit: 100
+   Alpha Source: Input Texture Alpha
+   Alpha Is Transparency: ✓ 체크 (투명 배경 필수!) ⭐⭐⭐
+   Read/Write Enabled: ✓ 체크
+   ```
+
+3. **Apply** 클릭
+
+4. **Sprite Editor로 분할:**
+   - **Sprite Editor** 버튼 클릭
+   - **Slice → Type: Grid By Cell Count** 선택
+   - **Column: 1, Row: 4** (세로로 4개 분할)
+   - **Slice** 버튼 클릭
+   - 각 스프라이트 이름 변경:
+     - 첫 번째: `DashGauge_Frame` (테두리)
+     - 두 번째: `DashGauge_Empty` (빈 게이지)
+     - 세 번째: `DashGauge_Half` (선택사항)
+     - 네 번째: `DashGauge_Full` (가득 찬 게이지)
+   - **Apply** 클릭
+
+---
+
+**대쉬 게이지 UI 생성 (3레이어 구조):**
+
+#### 레이어 1: Background (배경 - 빈 게이지)
+
 **HUD Panel 우클릭 → UI → Image**
 
-1. 이름: `DashGauge`
+1. 이름: `DashGauge_Background`
 2. Rect Transform:
    - Anchor: **Top Left**
    - Pos: `(150, -150)`
    - Size: `(200, 30)`
 3. Image:
-   - **Source Image**: `TempDashGauge` (없으면 UI용 Sprite 아무거나)
-   - **Image Type**: Filled
-   - **Fill Method**: Horizontal
-   - **Fill Origin**: Left
-   - Color: 흰색
-   - **Raycast Target**: 체크 해제 (HUD 클릭 방지)
-
-**기능:**
-- Z 키 누르는 동안 fillAmount 감소
-- 게이지 소진 시 회색, 있을 때 흰색
+   - **Source Image**: `DashGauge_Empty` (빈 게이지 스프라이트)
+   - **Image Type**: Simple
+   - Color: 흰색 또는 약간 어두운 회색
+   - **Raycast Target**: 체크 해제
 
 ---
 
-### 10.3 Quiz Panel 생성 ⭐
+#### 레이어 2: Fill (채워지는 게이지) ⭐⭐⭐
+
+**DashGauge_Background 우클릭 → UI → Image** (자식으로 생성)
+
+1. 이름: `DashGauge_Fill` ⭐ (UIManager에 연결할 것!)
+2. Rect Transform:
+   - Anchor: **Stretch** (Alt+Shift+클릭으로 설정)
+   - Left: `0`, Top: `0`, Right: `0`, Bottom: `0`
+   - Pos X: `0`, Pos Y: `0`, Pos Z: `0`
+3. Image:
+   - **Source Image**: `DashGauge_Full` (가득 찬 게이지 스프라이트) ⭐
+   - **Image Type**: Filled ⭐⭐⭐ (가장 중요!)
+   - **Fill Method**: Horizontal
+   - **Fill Origin**: Left
+   - **Fill Amount**: `1` (0~1, 게이지 정도)
+   - Color: 밝은 파란색 또는 흰색
+   - **Raycast Target**: 체크 해제
+
+---
+
+#### 레이어 3: Frame (테두리/프레임)
+
+**DashGauge_Background 우클릭 → UI → Image** (자식으로 생성)
+
+1. 이름: `DashGauge_Frame`
+2. Rect Transform:
+   - Anchor: **Stretch** (Alt+Shift+클릭)
+   - Left: `0`, Top: `0`, Right: `0`, Bottom: `0`
+   - Pos X: `0`, Pos Y: `0`, Pos Z: `0`
+3. Image:
+   - **Source Image**: `DashGauge_Frame` (테두리 스프라이트)
+   - **Image Type**: Simple
+   - Color: 흰색
+   - **Raycast Target**: 체크 해제
+
+---
+
+**최종 Hierarchy 구조:**
+```
+HUD Panel
+└─ DashGauge_Background (부모, 빈 게이지)
+   ├─ DashGauge_Fill (자식, Filled 타입) ⭐ UIManager 연결!
+   └─ DashGauge_Frame (자식, 테두리)
+```
+
+**⚠️ 중요:**
+- UIManager의 **Dash Gauge Fill Image**에는 `DashGauge_Fill`을 연결!
+- Frame은 Hierarchy에서 제일 아래에 있어야 맨 위에 렌더링됨
+
+**기능:**
+- Z 키 누르는 동안 fillAmount 감소 (오른쪽부터 사라짐)
+- Z 키 떼면 fillAmount 회복 (왼쪽부터 채워짐)
+- 3개 레이어가 겹쳐서 멋진 게이지 효과
+
+**임시 이미지 사용 시:**
+게이지 이미지가 없다면 Unity 기본 Sprite로 임시 사용 가능:
+- Source Image: `UI/Skin/UISprite` 또는 흰색 Sprite
+- 나중에 실제 게이지 이미지로 교체
+
+---
+
+### 10.3 Quiz Panel 생성 ⭐ (화면 상단 배치)
 
 **Canvas 우클릭 → UI → Panel**
 
 1. 이름: `Quiz Panel`
-2. Color: 반투명 검정 `(0, 0, 0, 200)`
-3. **초기 상태: 비활성화** (체크 해제)
+
+2. **Rect Transform** (화면 상단에 작게 배치):
+   - **Anchor Presets**: Top (상단 중앙) ⭐
+     - Inspector 좌상단의 정사각형 아이콘 클릭 → 상단 중앙 선택
+   - **Pos X**: `0` (중앙)
+   - **Pos Y**: `-120` (타이머 아래, 상단에서 120px 아래) ⭐
+   - **Width**: `800` (넓게, 질문이 잘 보이도록)
+   - **Height**: `120` (높이는 작게) ⭐
+
+3. **Image 컴포넌트:**
+   - **Color**: 반투명 검정 `(0, 0, 0, 200)` (R:0, G:0, B:0, A:200)
+   - **Raycast Target**: 체크 (패널이 클릭 이벤트 차단)
+
+4. **초기 상태: 비활성화** (Hierarchy에서 체크 해제) ⭐
+
+**💡 배치 예시:**
+```
+화면 구조:
+┌─────────────────────────────────┐
+│      제한시간: 01:40              │ ← 타이머 (상단 중앙)
+│                                   │
+│  ┌─────────────────────────┐    │
+│  │  대한민국의 수도는?      │    │ ← Quiz Panel (Pos Y: -120)
+│  └─────────────────────────┘    │
+│                                   │
+│      (게임 화면)                  │
+└─────────────────────────────────┘
+```
 
 ---
 
 #### QuestionText (질문만 3초 표시)
+
 **Quiz Panel 우클릭 → UI → Text - TextMeshPro**
 
 1. 이름: `QuestionText`
-2. Rect Transform:
-   - Anchor: Center
-   - Pos: `(0, 0)`
-   - Size: `(1000, 200)`
-3. TextMeshPro:
-   - Text: `"질문이 여기에 표시됩니다"`
-   - Font Size: `48`
-   - Alignment: Center
-   - Wrapping: Enabled
-   - Color: 흰색
-   - Font Style: Bold
+
+2. **Rect Transform** (패널 내부에 딱 맞게):
+   - **Anchor**: Stretch (패널 전체 크기에 맞춤)
+     - Alt+Shift+클릭으로 Stretch 선택
+   - **Left**: `25` (왼쪽 여백)
+   - **Top**: `10` (위쪽 여백)
+   - **Right**: `25` (오른쪽 여백)
+   - **Bottom**: `10` (아래쪽 여백)
+   - **Pos Z**: `0`
+
+3. **TextMeshPro 컴포넌트:**
+   - **Text**: `"질문이 여기에 표시됩니다"`
+   - **Font Size**: `36` ⭐ (전체 화면보다 작게, 패널에 맞춤)
+   - **Auto Size**: ❌ **체크 해제** ⭐⭐⭐ (매우 중요!)
+     - 이게 체크되어 있으면 Font Size가 강제로 80 등으로 바뀜!
+   - **Alignment**: Center (가로/세로 중앙)
+   - **Wrapping**: Enabled (자동 줄바꿈)
+   - **Overflow**: Overflow (텍스트 잘리지 않게)
+   - **Color**: 흰색 `(255, 255, 255, 255)`
+   - **Font Style**: Bold
 
 **⚠️ 중요:**
 - **버튼은 만들지 않습니다!** (Choice Buttons/Texts는 Size 0)
 - 질문만 3초 표시 후 자동으로 숨김
+- 질문이 표시되는 동안에도 **게임은 계속 진행**됨 (일시정지 없음)
 - QuizDoorController가 Unity에 배치된 3개 문에 정답/오답 데이터를 할당 (생성 X)
 - 플레이어가 문을 통과하면 답안 선택
+
+**📏 크기 조정 팁:**
+- 질문이 길면 **Panel Height**를 늘리기 (예: 150)
+- 질문이 잘리면 **Font Size**를 줄이기 (예: 32)
+- Panel이 타이머와 겹치면 **Pos Y**를 더 아래로 (예: -150)
 
 ---
 
@@ -3180,17 +3330,24 @@ UIManager 컴포넌트에서 다음 필드를 찾아 연결:
    - ⚠️ **이게 없으면 타이머가 안 보입니다!**
 
 **3-4. Dash Gauge Fill Image (대쉬 게이지)** ⭐
-   - **위치**: `Canvas → HUD Panel → DashGauge`
+   - **위치**: `Canvas → HUD Panel → DashGauge_Background → DashGauge_Fill` ⭐⭐⭐
    - **연결**: UIManager의 **Dash Gauge Fill Image** 슬롯에 드래그
    - **역할**: Z 키 대쉬 게이지 표시 (fillAmount로 게이지 감소/회복 표현)
    - **표시 위치**: 화면 좌상단
-   - ⚠️ **Image** 컴포넌트가 있는 오브젝트를 드래그해야 합니다
+   - ⚠️ **중요**: `DashGauge_Fill` (채워지는 게이지, Filled 타입)을 연결!
+   - ❌ **주의**: Background나 Frame이 아닌 Fill을 연결해야 함!
+   - **구조 확인**:
+     ```
+     DashGauge_Background (부모, Simple 타입)
+     ├─ DashGauge_Fill (자식, Filled 타입) ← 이것을 연결!
+     └─ DashGauge_Frame (자식, Simple 타입)
+     ```
 
 **HUD 연결 확인:**
 - [ ] Score Text 연결됨
 - [ ] Distance Text 연결됨
 - [ ] Game Timer Text 연결됨 (타이머)
-- [ ] Dash Gauge Fill Image 연결됨 (게이지)
+- [ ] Dash Gauge Fill Image에 `DashGauge_Fill` 연결됨 ⭐ (Background나 Frame 아님!)
 
 ---
 
@@ -3308,7 +3465,7 @@ UIManager 하단의 색상 설정:
 - [ ] Score Text: `ScoreText` 연결됨 (점수)
 - [ ] Distance Text: `DistanceText` 연결됨 (거리)
 - [ ] **Game Timer Text**: `GameTimerText` 연결됨 ⭐ (제한시간 타이머)
-- [ ] **Dash Gauge Fill Image**: `DashGauge` 연결됨 ⭐ (대쉬 게이지)
+- [ ] **Dash Gauge Fill Image**: `DashGauge_Fill` 연결됨 ⭐⭐⭐ (채워지는 게이지, Filled 타입)
 
 ---
 
@@ -3536,6 +3693,14 @@ Play 모드 시작 전에 다음을 확인하세요:
 ❌ **문제 3: Quiz Panel이 계속 켜져있음**
 → Quiz Panel의 초기 상태 확인:
   - Hierarchy에서 Quiz Panel 체크 해제 (비활성화)
+
+❌ **문제 4: Font Size가 강제로 80 등으로 바뀜** ⭐ NEW
+→ **TextMeshPro의 Auto Size 기능** 때문:
+  - QuestionText 선택
+  - Inspector → TextMeshPro 컴포넌트
+  - **Auto Size 체크 해제** ⭐⭐⭐
+  - Font Size를 원하는 크기(예: 36)로 다시 설정
+  - Auto Size가 켜져 있으면 수동 설정이 무시됨!
 
 ---
 
@@ -3846,7 +4011,9 @@ python -m http.server 8000
 ✅ **해결:**
 - **Z 키**를 **누르고 있기** (GetKey)
 - Dash Gauge가 0보다 큰지 확인
-- UIManager에 Dash Gauge Fill Image 연결 확인
+- UIManager에 `DashGauge_Fill` (Filled 타입) 연결 확인 ⭐
+- DashGauge_Fill의 Image Type이 **Filled**로 설정되었는지 확인
+- Fill Method가 **Horizontal**, Fill Origin이 **Left**인지 확인
 
 ### ❌ 트랙이 생성되지 않음
 ✅ **해결:**
@@ -3889,6 +4056,25 @@ python -m http.server 8000
 - 모든 참조 연결 확인
 - Console 에러 확인
 
+### ❌ 재시작 버튼을 눌러도 재시작이 안됨 ⭐ NEW
+✅ **해결:**
+- **원인 1**: GameOver/Result 상태일 때 `Time.timeScale = 0`이 설정되어 있어 재시작 작업이 제대로 실행되지 않음
+  - **수정**: GameStateManager.cs의 RestartGame() 시작 부분에 `Time.timeScale = 1f;` 추가 (이미 수정됨)
+
+- **원인 2**: **GameStateManager에 Player 또는 Start Track Segment가 연결되지 않음** ⭐⭐⭐
+  - **증상**: 재시작 버튼을 누르면 타이머는 시작되지만 플레이어가 골 지점에 그대로 있음
+  - **수정**: 
+    1. Hierarchy → Managers → GameStateManager 선택
+    2. Inspector에서 **Player** 필드에 Player 오브젝트 드래그
+    3. Inspector에서 **Start Track Segment** 필드에 시작 트랙 세그먼트 드래그
+  - Console에 "Player reference is not set!" 또는 "StartTrackSegment is not set!" 경고가 있는지 확인
+
+- **확인 사항**:
+  - Inspector → GameStateManager → Player가 연결되어 있는지 확인 ⭐⭐⭐
+  - Inspector → GameStateManager → Start Track Segment가 연결되어 있는지 확인 ⭐⭐⭐
+  - RestartButton의 On Click 이벤트에 GameStateManager.RestartGame() 연결 확인
+  - Console에서 리셋 로그 확인 ("QuizDoor 완전 리셋 완료!", "QuizTrigger 리셋 완료!" 등)
+
 ---
 
 ## 📚 다음 단계
@@ -3906,7 +4092,37 @@ python -m http.server 8000
 
 ---
 
-## 📝 최신 변경사항 (2025-12-30)
+## 📝 최신 변경사항 (2025-01-07)
+
+### 🐛 버그 수정
+
+**1. 재시작 버튼 문제 해결** ⭐ NEW
+- **문제 1**: 재시작 버튼을 눌러도 게임이 재시작되지 않음
+  - **원인**: GameOver/Result 상태에서 `Time.timeScale = 0`으로 설정되어 리셋 작업이 실행되지 않음
+  - **해결**: RestartGame() 시작 부분에 `Time.timeScale = 1f;` 추가
+- **문제 2**: 재시작 시 플레이어가 골 지점에 그대로 있음 ⭐⭐⭐
+  - **원인**: GameStateManager에 Player 또는 Start Track Segment가 연결되지 않음
+  - **해결**: Inspector에서 Player와 Start Track Segment를 GameStateManager에 드래그 연결
+  - **중요**: 이 설정이 없으면 MovePlayerToStart()가 작동하지 않음!
+
+**2. Quiz Panel 레이아웃 개선**
+- 전체 화면 → 화면 상단 작은 패널로 변경 (타이머 아래)
+- Pos Y: -120, Width: 800, Height: 120
+
+**3. Font Size 자동 변경 문제 해결**
+- UIManager.cs에서 `questionText.fontSize = 80f;` 제거
+- Inspector 설정만 사용 (Font Size: 36)
+- TextMeshPro의 Auto Size 기능 주의사항 추가
+
+### 🎯 기능 확인 및 가이드 개선
+
+**4. GameClear 상태 및 Result Panel 표시 확인** ⭐ NEW
+- **기능**: GoalTrigger/EndpointTrigger에 도착하면 GameClear 상태로 전환
+- **UI**: GameClear 상태일 때 Result Panel이 자동으로 표시됨 (UIManager.cs 라인 184-187)
+- **가이드 업데이트**:
+  - GoalTrigger 섹션에 Result Panel 표시 내용 추가
+  - UIManager 섹션에 GameClear 상태 처리 명시
+- **이미 완벽하게 구현되어 있음!** 추가 코드 변경 불필요
 
 ### 🎮 퀴즈 시스템 개선
 

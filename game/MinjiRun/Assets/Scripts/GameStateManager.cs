@@ -249,6 +249,9 @@ namespace minji_run
         /// </summary>
         public void RestartGame()
         {
+            // ⭐ 먼저 게임 재개 (Time.timeScale = 0에서 리셋이 안될 수 있음)
+            Time.timeScale = 1f;
+
             // 퀴즈 진행 상황 리셋
             if (QuizManager.Instance != null)
             {

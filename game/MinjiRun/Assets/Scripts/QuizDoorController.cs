@@ -142,13 +142,13 @@ namespace minji_run
                 allChoices[randomIndex] = temp;
             }
 
-            // 각 문에 할당
+            // 각 문에 할당 (컨트롤러 참조도 함께 전달)
             for (int i = 0; i < 3; i++)
             {
                 string choiceText = allChoices[i];
                 bool isCorrect = (choiceText == quizData.correctAnswer);
 
-                quizDoors[i].Initialize(i, choiceText, isCorrect);
+                quizDoors[i].Initialize(i, choiceText, isCorrect, this);
             }
         }
 
