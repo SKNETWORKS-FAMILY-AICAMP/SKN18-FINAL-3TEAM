@@ -339,6 +339,8 @@ infra/database/
 backend/ragas/data/
 backend/ragas/ontology_evaluate/data/
 backend/langgraph_fuseki/log/
+frontend/react/public/assets/
+concept_board/
 
 celery.pid
 

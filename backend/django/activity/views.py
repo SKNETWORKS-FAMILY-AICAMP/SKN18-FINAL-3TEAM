@@ -383,3 +383,95 @@ def get_recommended_videos(request):
         'data': serializer.data,
         'message': 'ok'
     })
+
+
+# ============================================
+# 시청 기록 분석 API
+# ============================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_watching_analytics(request):
+    """
+    시청 기록 기반 분석 데이터 반환
+    
+    video_keyword와 tags를 분리하여 빈도수 분석
+    
+    GET /api/activity/watching-analytics/
+    
+    Response:
+    {
+        "data": {
+            "video_keywords": [
+                {"keyword": "키워드1", "count": 5},
+                {"keyword": "키워드2", "count": 3},
+                ...
+            ],
+            "tags": [
+                {"tag": "태그1", "count": 8},
+                {"tag": "태그2", "count": 4},
+                ...
+            ],
+            "total_videos": 10,
+            "total_keywords": 15,
+            "total_tags": 12
+        },
+        "message": "ok"
+    }
+    """
+    from collections import Counter
+    
+    user = request.user
+    
+    # 사용자의 모든 시청 기록 조회
+    watch_histories = WatchingHistory.objects.filter(
+        user=user
+    ).select_related('video').order_by('-created_at')
+    
+    if not watch_histories.exists():
+        return Response({
+            'data': {
+                'video_keywords': [],
+                'tags': [],
+                'total_videos': 0,
+                'total_keywords': 0,
+                'total_tags': 0
+            },
+            'message': '시청 기록이 없습니다.'
+        })
+    
+    # video_keyword 수집 및 빈도 계산
+    video_keyword_counter = Counter()
+    for watch in watch_histories:
+        if watch.video_keyword:
+            keywords = [k.strip() for k in watch.video_keyword.split(',') if k.strip()]
+            video_keyword_counter.update(keywords)
+    
+    # tags 수집 및 빈도 계산
+    tags_counter = Counter()
+    for watch in watch_histories:
+        if watch.tags:
+            tag_list = [t.strip() for t in watch.tags.split(',') if t.strip()]
+            tags_counter.update(tag_list)
+    
+    # 상위 10개만 추출 (빈도수 기준 내림차순)
+    top_video_keywords = [
+        {'keyword': kw, 'count': count}
+        for kw, count in video_keyword_counter.most_common(10)
+    ]
+    
+    top_tags = [
+        {'tag': tag, 'count': count}
+        for tag, count in tags_counter.most_common(10)
+    ]
+    
+    return Response({
+        'data': {
+            'video_keywords': top_video_keywords,
+            'tags': top_tags,
+            'total_videos': watch_histories.count(),
+            'total_keywords': len(video_keyword_counter),
+            'total_tags': len(tags_counter)
+        },
+        'message': 'ok'
+    })

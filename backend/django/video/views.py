@@ -147,7 +147,14 @@ async def create_video_from_langgraph(request):
         try: title = GoogleTranslator(source="en", target="ko").translate(title)
         except: pass
 
-    payload = {"title": title, "video_url": body.get("video_url", "https://skn18-3-dev-temp.s3.amazonaws.com/background_scene_1_video.mp4"), "tags": result_state.get("video_tags") or [], "thumbnail_url": body.get("thumbnail_url")}
+    thumbnail_url = result_state.get("thumbnail_url") or body.get("thumbnail_url")
+    
+    payload = {
+        "title": title, 
+        "video_url": body.get("video_url", "https://skn18-3-dev-temp.s3.amazonaws.com/background_scene_1_video.mp4"), 
+        "tags": result_state.get("video_tags") or [], 
+        "thumbnail_url": thumbnail_url
+    }
     serializer = VideoCreateSerializer(data=payload)
     await sync_to_async(serializer.is_valid)(raise_exception=True)
     video = await sync_to_async(serializer.save)()
