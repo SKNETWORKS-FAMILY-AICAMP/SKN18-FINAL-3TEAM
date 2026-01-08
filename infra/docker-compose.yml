@@ -90,7 +90,18 @@ services:
     container_name: django_web
     env_file:
       - ../.env
-    command: ["/app/entrypoint.sh", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+    environment:
+      # Docker 환경에서 Fuseki 서비스 이름으로 접근
+      - FUSEKI_URL=http://fuseki:3030/korean-history
+      - DOCKER_ENV=true
+    command:
+      [
+        "/app/backend/django/entrypoint.sh",
+        "python",
+        "manage.py",
+        "runserver",
+        "0.0.0.0:8000",
+      ]
     ports:
       - "8000:8000"
     volumes:

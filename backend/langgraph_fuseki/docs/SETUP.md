@@ -366,8 +366,8 @@ LANGCHAIN_PROJECT=Korean-History-LangGraph
 FUSEKI_USER=admin
 FUSEKI_PASSWORD=fuseki1234
 
-# OpenAI 모델 (기본값: gpt-4o-mini)
-OPENAI_MODEL=gpt-4o-mini
+# OpenAI 모델 (기본값: gpt-5-mini)
+OPENAI_MODEL=gpt-5-mini
 ```
 
 **⚠️ 필수 설정:**

@@ -9,6 +9,7 @@ Parallel Knowledge Retrieval Node
 
 import os
 import time
+import threading
 import requests
 import concurrent.futures
 from datetime import datetime
@@ -23,9 +24,11 @@ from backend.langgraph_fuseki.config import (
     THREAD_WEIGHT_ENTITY_PROPERTIES,
     THREAD_WEIGHT_TYPE_AND_SUMMARY
 )
+from backend.langgraph_fuseki.utils.fuseki_client import execute_sparql_query
 
 
-SAVE_INFERENCE_TRIPLES = os.getenv("SAVE_INFERENCE_TRIPLES", "true").lower() == "true"
+# 추론 결과 저장 비활성화 (평가 모드에서는 불필요)
+SAVE_INFERENCE_TRIPLES = False
 
 # 질문 유형별 Thread 가중치 (config에서 가져온 값 사용)
 THREAD_WEIGHTS = {
@@ -56,18 +59,11 @@ THREAD_WEIGHTS = {
         "connected_entities": THREAD_WEIGHT_CONNECTED_ENTITIES,
         "entity_properties": THREAD_WEIGHT_ENTITY_PROPERTIES,
         "type_and_summary": THREAD_WEIGHT_TYPE_AND_SUMMARY
-    },
-    "what_if": {
-        "outgoing_relations": THREAD_WEIGHT_OUTGOING_RELATIONS,
-        "incoming_relations": THREAD_WEIGHT_INCOMING_RELATIONS,
-        "connected_entities": THREAD_WEIGHT_CONNECTED_ENTITIES,
-        "entity_properties": THREAD_WEIGHT_ENTITY_PROPERTIES,
-        "type_and_summary": THREAD_WEIGHT_TYPE_AND_SUMMARY
     }
 }
 
 # 데이터 기반 Thread 설정 (SPARQL 템플릿)
-# ⚡ 라벨 기반 검색: URI 대신 라벨로 검색하여 데이터 불일치 문제 해결
+# [OPTIMIZATION] 라벨 기반 검색: URI 대신 라벨로 검색하여 데이터 불일치 문제 해결
 DATA_THREADS = {
     "outgoing_relations": {
         "description": "엔티티에서 나가는 모든 관계 (엔티티 → ?)",
@@ -84,7 +80,7 @@ DATA_THREADS = {
                 OPTIONAL {{ ?object rdfs:label ?objectLabel }}
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
-            }} LIMIT 100
+            }} LIMIT 30
         """
     },
     "incoming_relations": {
@@ -102,7 +98,7 @@ DATA_THREADS = {
                 OPTIONAL {{ ?subject rdfs:label ?subjectLabel }}
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
-            }} LIMIT 100
+            }} LIMIT 30
         """
     },
     "entity_properties": {
@@ -118,7 +114,7 @@ DATA_THREADS = {
                 ?entity ?predicate ?value .
                 FILTER(isLiteral(?value))
                 FILTER(?predicate != rdfs:label)
-            }} LIMIT 100
+            }} LIMIT 30
         """
     },
     "connected_entities": {
@@ -149,7 +145,7 @@ DATA_THREADS = {
                 FILTER(?entity1 != ?entity2)
                 FILTER(?predicate != rdf:type)
                 FILTER(?predicate != rdfs:label)
-            }} LIMIT 100
+            }} LIMIT 30
         """,
         "use_bidirectional_bfs": True  # 양방향 BFS 활성화 플래그
     },
@@ -167,7 +163,7 @@ DATA_THREADS = {
                 OPTIONAL {{ ?entity hist:hasSummary ?summary }}
                 OPTIONAL {{ ?entity hist:hasCategory ?category }}
                 OPTIONAL {{ ?entity hist:hasYear ?year }}
-            }} LIMIT 50
+            }} LIMIT 30
         """
     }
 }
@@ -229,13 +225,16 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
 
     # Thread 가중치 설정
     thread_weights = THREAD_WEIGHTS.get(query_type, THREAD_WEIGHTS["causal"])
+    
+    # Thinking 모드 콜백 함수 가져오기
+    thinking_callback = state.get("thinking_callback")
 
     # 실행할 Thread 선택 (test_config에 따라)
     if test_config and "aggregator_threads" in test_config:
         thread_config = test_config["aggregator_threads"]
         active_threads = [t for t, enabled in thread_config.items() if enabled]
         print(f"\n{'='*70}")
-        print(f"[3/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
+        print(f"[Stage 4/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
         print(f"{'='*70}")
         print(f"  ├─ [테스트 모드] 활성화된 Thread:")
         for thread in active_threads:
@@ -244,10 +243,34 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
     else:
         active_threads = list(DATA_THREADS.keys())
         print(f"\n{'='*70}")
-        print(f"[3/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
+        print(f"[Stage 4/6] 병렬 지식 검색 (Parallel Knowledge Retrieval)")
         print(f"{'='*70}")
         print(f"  ├─ [일반 모드] Thread 수: {len(DATA_THREADS)}개")
         print(f"  ├─ 엔티티: {len(entities)}개")
+
+    # 🎯 Thinking 이벤트: Thread 가중치 정보 전송
+    if thinking_callback:
+        # 가중치 매트릭스 가져오기
+        from backend.langgraph_fuseki.config import get_weight_matrix_for_query_type
+        weight_matrix = get_weight_matrix_for_query_type(query_type)
+        
+        # Thread별 결과 수 미리 계산 (예상값)
+        estimated_thread_results = {}
+        for thread_name in active_threads:
+            estimated_thread_results[thread_name] = f"검색 중..."
+        
+        thinking_callback("thread_weights_applied", {
+            "title": "Thread 가중치 적용",
+            "query_type": query_type,
+            "weight_matrix": {
+                "thread": f"{weight_matrix['thread']*100:.0f}%",
+                "semantic": f"{weight_matrix['semantic']*100:.0f}%", 
+                "entity_boost": f"{weight_matrix['entity_boost']*100:.0f}%"
+            },
+            "active_threads": active_threads,
+            "entity_count": len(entities),
+            "status": "processing"
+        })
 
     if selected_groups:
         print(f"  └─ 프로퍼티 필터: {', '.join(selected_groups[:3])}{'...' if len(selected_groups) > 3 else ''} ({len(selected_groups)}개)")
@@ -292,7 +315,7 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
     total_bindings = sum(len(r.get("bindings", [])) for r in results.values())
 
     # Thread별 검색 결과 상세
-    print(f"\n      [Thread별 검색 결과]")
+    print(f"  │\n  │   [Thread별 검색 결과]")
     for thread_type, result in results.items():
         bindings = result.get("bindings", [])
         status = result.get("status", "unknown")
@@ -310,7 +333,7 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
         }
         thread_display = thread_name_map.get(thread_type, thread_type)
 
-        print(f"      {status_icon} {thread_display:15s}: {len(bindings):3d}개")
+        print(f"  │   {status_icon} {thread_display:15s}: {len(bindings):3d}개")
 
         # 상위 3개 결과 샘플 표시 (라벨만)
         if bindings and len(bindings) > 0:
@@ -339,11 +362,28 @@ def parallel_knowledge_retrieval_node(state: GraphState) -> GraphState:
                 if label and len(label) > 0:
                     # 라벨 길이 제한
                     label_display = label[:40] + "..." if len(label) > 40 else label
-                    print(f"         {i}. {label_display}")
+                    print(f"  │      {i}. {label_display}")
 
     node_elapsed = time.time() - node_start
     print(f"  └─ 완료: {total_bindings}개 결과 ({node_elapsed:.2f}초)")
     print()
+
+    # 🎯 Thinking 이벤트: SPARQL 검색 완료
+    if thinking_callback:
+        # Thread별 결과 수 계산
+        thread_results = {}
+        for thread_name, thread_result in results.items():
+            # thread_result는 {"status": "success", "bindings": [...], ...} 형태
+            bindings = thread_result.get("bindings", [])
+            thread_results[thread_name] = len(bindings)
+        
+        thinking_callback("sparql_search_completed", {
+            "title": "SPARQL 지식 검색 완료",
+            "total_results": total_bindings,
+            "thread_results": thread_results,
+            "processing_time": node_elapsed,
+            "status": "completed"
+        })
 
     # 지식 검색 결과를 TTL로 저장 (옵션)
     inference_ttl_path = None
@@ -462,6 +502,63 @@ def execute_unified_thread(
     return result
 
 
+def get_uri_labels_batch(uris: list) -> dict:
+    """
+    여러 URI의 라벨을 한 번의 SPARQL 쿼리로 조회
+    
+    Args:
+        uris: URI 리스트
+    
+    Returns:
+        {uri: label} 딕셔너리
+    """
+    if not uris:
+        return {}
+    
+    uri_to_label = {}
+    
+    try:
+        # VALUES 절로 여러 URI 한 번에 조회
+        uri_values = []
+        for uri in uris:
+            if uri.startswith("hist:"):
+                uri_values.append(uri)
+            elif uri.startswith("http://"):
+                uri_values.append(f"<{uri}>")
+            elif uri.startswith("<"):
+                uri_values.append(uri)
+            else:
+                uri_values.append(f"hist:{uri}" if ":" not in uri else uri)
+        
+        values_clause = " ".join(uri_values)
+        
+        sparql_query = f"""
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            
+            SELECT ?entity ?label WHERE {{
+                VALUES ?entity {{ {values_clause} }}
+                ?entity rdfs:label ?label .
+            }}
+        """
+        
+        result = execute_sparql_query(FUSEKI_URL, sparql_query, timeout=3)
+        if result and "results" in result and "bindings" in result["results"]:
+            for binding in result["results"]["bindings"]:
+                entity_uri = binding.get("entity", {}).get("value", "")
+                label = binding.get("label", {}).get("value", "")
+                if entity_uri and label:
+                    uri_to_label[entity_uri] = label
+                    # hist: prefix 형태도 매핑
+                    if "#" in entity_uri:
+                        short_uri = "hist:" + entity_uri.split("#")[-1]
+                        uri_to_label[short_uri] = label
+    except Exception as e:
+        pass
+    
+    return uri_to_label
+
+
 def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> list:
     """
     여러 엔티티 쌍에 대해 양방향 BFS 경로 탐색 실행
@@ -483,11 +580,15 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
         print(f"      └─ URI가 있는 엔티티가 2개 미만 ({len(entities_with_uri)}개)")
         return []
 
-    print(f"      ├─ 엔티티 쌍 탐색: {len(entities_with_uri)}개 엔티티 중 최대 {max_pairs}개 쌍")
+    print(f"    │ ├─ 엔티티 쌍 탐색: {len(entities_with_uri)}개 엔티티 중 최대 {max_pairs}개 쌍")
 
     # 모든 쌍 시도 (최대 max_pairs)
     pairs_tried = 0
     paths_found = 0
+    
+    # 모든 경로에서 발견된 URI 수집 (라벨 일괄 조회용)
+    all_path_uris = set()
+    all_paths_info = []  # (entity_a, entity_b, paths) 저장
     
     for i in range(len(entities_with_uri)):
         for j in range(i + 1, len(entities_with_uri)):
@@ -511,43 +612,135 @@ def execute_bidirectional_path_search(entities: list, max_pairs: int = 5) -> lis
             
             if paths:
                 paths_found += len(paths)
-                print(f"      │  ├─ [{name_a} ↔ {name_b}]: {len(paths)}개 경로 발견")
-
-            # 경로를 Fuseki binding 형식으로 변환
-            for path_info in paths:
-                path_uris = path_info.get("path", [])
-                predicates = path_info.get("predicates", [])
-                convergence = path_info.get("convergence_node", "")
-
-                if len(path_uris) >= 2:
-                    # 경로 정보를 binding으로 변환
-                    # URI에서 네임스페이스 제거 (hist:Person_xxx 형식 유지)
-                    path_labels = []
-                    for uri in path_uris:
-                        if "#" in uri:
-                            path_labels.append(uri.split("#")[-1])
-                        elif ":" in uri:
-                            path_labels.append(uri.split(":")[-1])
-                        else:
-                            path_labels.append(uri)
-                    
-                    path_str = " → ".join(path_labels)
-
-                    bindings.append({
-                        "entity1": {"value": uri_a},
-                        "label1": {"value": name_a},
-                        "entity2": {"value": uri_b},
-                        "label2": {"value": name_b},
-                        "path": {"value": path_str},
-                        "path_length": {"value": str(len(path_uris))},
-                        "convergence_node": {"value": convergence.split("#")[-1] if convergence and "#" in convergence else (convergence.split(":")[-1] if convergence and ":" in convergence else convergence)},
-                        "method": {"value": "bidirectional_bfs"}
-                    })
+                print(f"    │ │  ├─ [{name_a} ↔ {name_b}]: {len(paths)}개 경로 발견")
+                
+                # 경로의 모든 URI 수집
+                for path_info in paths:
+                    path_uris = path_info.get("path", [])
+                    all_path_uris.update(path_uris)
+                    convergence = path_info.get("convergence_node", "")
+                    if convergence:
+                        all_path_uris.add(convergence)
+                
+                all_paths_info.append((entity_a, entity_b, paths))
 
             pairs_tried += 1
 
         if pairs_tried >= max_pairs:
             break
+
+    # 모든 URI의 라벨을 한 번에 조회
+    uri_labels = get_uri_labels_batch(list(all_path_uris))
+    
+    # 경로를 Fuseki binding 형식으로 변환 (라벨 사용)
+    for entity_a, entity_b, paths in all_paths_info:
+        uri_a = entity_a.get("uri")
+        uri_b = entity_b.get("uri")
+        name_a = entity_a.get("name", "")
+        name_b = entity_b.get("name", "")
+        
+        for path_info in paths:
+            path_uris = path_info.get("path", [])
+            predicates = path_info.get("predicates", [])
+            convergence = path_info.get("convergence_node", "")
+
+            if len(path_uris) >= 2:
+                # 경로의 각 URI에 대해 라벨 조회 (없으면 URI에서 추출)
+                path_labels = []
+                for uri in path_uris:
+                    # 먼저 조회된 라벨 사용
+                    label = uri_labels.get(uri, "")
+                    if not label:
+                        # full URI로도 시도
+                        if uri.startswith("hist:"):
+                            full_uri = f"http://www.example.org/korean-history#{uri.split(':')[-1]}"
+                            label = uri_labels.get(full_uri, "")
+                    
+                    # 라벨이 없으면 URI에서 추출 (하위 호환성)
+                    if not label:
+                        if "#" in uri:
+                            uri_part = uri.split("#")[-1]
+                        elif ":" in uri:
+                            uri_part = uri.split(":")[-1]
+                        else:
+                            uri_part = uri
+                        
+                        # Type_ID 형식이면 Type만 추출 (예: Person_abc123 → Person)
+                        if "_" in uri_part and len(uri_part.split("_")) > 1:
+                            parts = uri_part.split("_")
+                            # ID가 긴 해시값인 경우 Type만 사용
+                            if len(parts[1]) > 6:
+                                label = parts[0]
+                            else:
+                                label = uri_part
+                        else:
+                            label = uri_part
+                    
+                    path_labels.append(label)
+                
+                path_str = " → ".join(path_labels)
+                
+                # predicates를 읽기 좋게 변환 (URI에서 네임스페이스 제거)
+                predicate_labels = []
+                for pred_uri in predicates:
+                    if "#" in pred_uri:
+                        pred_label = pred_uri.split("#")[-1]
+                    elif ":" in pred_uri:
+                        pred_label = pred_uri.split(":")[-1]
+                    else:
+                        pred_label = pred_uri
+                    # predicate 이름을 읽기 좋게 변환
+                    pred_label = pred_label.replace("has", "").replace("_", " ")
+                    predicate_labels.append(pred_label)
+                
+                predicates_str = " → ".join(predicate_labels) if predicate_labels else ""
+                
+                # 수렴 노드의 실제 라벨 조회
+                convergence_node_label = ""
+                if convergence:
+                    # 먼저 일괄 조회 결과에서 찾기
+                    convergence_node_label = uri_labels.get(convergence, "")
+                    if not convergence_node_label:
+                        # full URI로도 시도
+                        if convergence.startswith("hist:"):
+                            full_uri = f"http://www.example.org/korean-history#{convergence.split(':')[-1]}"
+                            convergence_node_label = uri_labels.get(full_uri, "")
+                    
+                    # 없으면 개별 조회
+                    if not convergence_node_label:
+                        convergence_node_label = get_convergence_node_label(convergence)
+                
+                # URI에서 짧은 형태 추출
+                if "#" in convergence:
+                    convergence_node_uri = convergence.split("#")[-1]
+                elif ":" in convergence:
+                    convergence_node_uri = convergence.split(":")[-1]
+                else:
+                    convergence_node_uri = convergence
+                
+                # 라벨이 없으면 URI에서 추출 (하위 호환성)
+                if not convergence_node_label:
+                    if "_" in convergence_node_uri:
+                        parts = convergence_node_uri.split("_")
+                        if len(parts[1]) > 6:
+                            convergence_node_label = parts[0]
+                        else:
+                            convergence_node_label = convergence_node_uri
+                    else:
+                        convergence_node_label = convergence_node_uri
+
+                bindings.append({
+                    "entity1": {"value": uri_a},
+                    "label1": {"value": name_a},
+                    "entity2": {"value": uri_b},
+                    "label2": {"value": name_b},
+                    "path": {"value": path_str},
+                    "predicates": {"value": predicates_str},
+                    "path_length": {"value": str(len(path_uris))},
+                    "convergence_node": {"value": convergence_node_uri},
+                    "convergence_node_label": {"value": convergence_node_label},
+                    "method": {"value": "bidirectional_bfs"}
+                })
 
     print(f"      └─ 총 {pairs_tried}개 쌍 탐색, {paths_found}개 경로 발견")
     return bindings
@@ -653,6 +846,55 @@ def find_bidirectional_paths(entity_a_uri: str, entity_b_uri: str, max_depth: in
     return found_paths[:5]  # 상위 5개 경로만
 
 
+def get_convergence_node_label(convergence_uri: str) -> str:
+    """
+    수렴 노드의 실제 라벨을 SPARQL로 조회
+    
+    Args:
+        convergence_uri: 수렴 노드 URI (예: hist:Place_5fbcb94e)
+    
+    Returns:
+        실제 라벨 (예: "경복궁"), 없으면 빈 문자열
+    """
+    if not convergence_uri:
+        return ""
+    
+    try:
+        # URI 형식 처리
+        if convergence_uri.startswith("hist:"):
+            uri_sparql = convergence_uri
+        elif convergence_uri.startswith("http://"):
+            uri_sparql = f"<{convergence_uri}>"
+        elif convergence_uri.startswith("<"):
+            uri_sparql = convergence_uri
+        else:
+            uri_sparql = f"hist:{convergence_uri}" if ":" not in convergence_uri else convergence_uri
+        
+        # SPARQL 쿼리: 수렴 노드의 라벨 조회
+        sparql_query = f"""
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            
+            SELECT ?label WHERE {{
+                {uri_sparql} rdfs:label ?label .
+            }} LIMIT 1
+        """
+        
+        result = execute_sparql_query(FUSEKI_URL, sparql_query, timeout=2)
+        if result and "results" in result and "bindings" in result["results"]:
+            bindings = result["results"]["bindings"]
+            if bindings and len(bindings) > 0:
+                label = bindings[0].get("label", {}).get("value", "")
+                if label:
+                    return label
+        
+    except Exception as e:
+        # 실패 시 빈 문자열 반환
+        pass
+    
+    return ""
+
+
 def get_1hop_neighbors(entity_uri: str, timeout: int = 2) -> list:
     """
     엔티티의 1-hop 이웃 조회 (양방향)
@@ -697,15 +939,8 @@ def get_1hop_neighbors(entity_uri: str, timeout: int = 2) -> list:
     """
 
     try:
-        response = requests.post(
-            f"{FUSEKI_URL}/sparql",
-            data={"query": sparql},
-            headers={"Accept": "application/sparql-results+json"},
-            timeout=timeout
-        )
-
-        if response.status_code == 200:
-            results = response.json()
+        results = execute_sparql_query(FUSEKI_URL, sparql, timeout=timeout)
+        if results:
             bindings = results.get("results", {}).get("bindings", [])
 
             neighbors = []
@@ -827,7 +1062,7 @@ SELECT ?s ?p ?o ?sLabel WHERE {{
     ?entity ?p ?o .
     BIND(?entity AS ?s)
     OPTIONAL {{ ?s rdfs:label ?sLabel }}
-}} LIMIT 100"""
+}} LIMIT 30"""
 
 
 def execute_inference_api(thread_type: str, sparql: str, hypothetical: list = None, query_type: str = None) -> dict:
@@ -843,12 +1078,19 @@ def execute_inference_api(thread_type: str, sparql: str, hypothetical: list = No
     return execute_fuseki_direct(thread_type, sparql)
 
 
+# Fuseki 요청 간 지연을 위한 락 (동시성 제어)
+_fuseki_request_lock = threading.Semaphore(5)  # 최대 3개 동시 요청 허용
+_last_request_time = {}
+_request_time_lock = threading.Lock()
+
 def execute_fuseki_direct(thread_type: str, sparql: str, debug: bool = False) -> dict:
     """
     Fuseki에 직접 SPARQL 쿼리 (경량 모드)
     
     Java Reasoner 없이 이미 Fuseki에 저장된 데이터에서 쿼리.
     추론은 제한되지만 메모리 부족 환경에서 유용.
+    
+    동시성 제어: Semaphore로 최대 3개 동시 요청만 허용하여 잠금 방지
     """
     
     endpoint = f"{FUSEKI_URL}/sparql"
@@ -858,48 +1100,56 @@ def execute_fuseki_direct(thread_type: str, sparql: str, debug: bool = False) ->
         print(f"\n[DEBUG] {thread_type} SPARQL:")
         print(sparql[:500])
     
-    try:
-        response = requests.post(
-            endpoint,
-            data={"query": sparql},
-            headers={"Accept": "application/sparql-results+json"},
-            timeout=30
-        )
+    # 동시성 제어: Semaphore로 최대 3개 동시 요청만 허용
+    with _fuseki_request_lock:
+        # 요청 간 최소 간격 유지 (50ms) - 잠금 방지
+        with _request_time_lock:
+            current_time = time.time()
+            if thread_type in _last_request_time:
+                elapsed = current_time - _last_request_time[thread_type]
+                if elapsed < 0.05:  # 50ms
+                    time.sleep(0.05 - elapsed)
+            _last_request_time[thread_type] = time.time()
         
-        # 에러 응답 상세 로그
-        if response.status_code != 200:
-            error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
-            if debug:
-                print(f"[DEBUG] {thread_type} 에러: {error_msg}")
+        try:
+            result = execute_sparql_query(endpoint.replace("/sparql", ""), sparql, timeout=30)
+
+            if not result:
+                error_msg = "HTTP 500 or timeout"
+                if debug:
+                    print(f"[DEBUG] {thread_type} 에러: {error_msg}")
+                return {
+                    "status": "error",
+                    "bindings": [],
+                    "error": error_msg,
+                    "thread_type": thread_type
+                }
+
+            bindings = result.get("results", {}).get("bindings", [])
+
             return {
-                "status": "error",
-                "bindings": [],
-                "error": error_msg,
+                "status": "success",
+                "bindings": bindings,
+                "fuseki_endpoint": endpoint,
+                "thread_type": thread_type,
+                "mode": "light"
+            }
+
+        except requests.exceptions.ConnectionError:
+            print(f"    ├─ SPARQL 연결 실패: {endpoint}")
+            print(f"    └─ Fuseki 서버가 실행 중인지 확인하세요")
+            return {
+                "status": "error", 
+                "bindings": [], 
+                "error": f"Fuseki 서버 연결 실패 ({endpoint}). Docker 컨테이너가 실행 중인지 확인하세요.",
                 "thread_type": thread_type
             }
-        
-        result = response.json()
-        bindings = result.get("results", {}).get("bindings", [])
-        
-        return {
-            "status": "success",
-            "bindings": bindings,
-            "fuseki_endpoint": endpoint,
-            "thread_type": thread_type,
-            "mode": "light"
-        }
-        
-    except requests.exceptions.ConnectionError:
-        return {
-            "status": "error", 
-            "bindings": [], 
-            "error": f"Fuseki 서버 연결 실패 ({endpoint}). Docker 컨테이너가 실행 중인지 확인하세요.",
-            "thread_type": thread_type
-        }
-    except requests.exceptions.Timeout:
-        return {"status": "timeout", "bindings": [], "thread_type": thread_type}
-    except Exception as e:
-        return {"status": "error", "bindings": [], "error": str(e), "thread_type": thread_type}
+        except requests.exceptions.Timeout:
+            print(f"    ├─ SPARQL 타임아웃: {endpoint}")
+            return {"status": "timeout", "bindings": [], "thread_type": thread_type}
+        except Exception as e:
+            print(f"    ├─ SPARQL 오류: {str(e)}")
+            return {"status": "error", "bindings": [], "error": str(e), "thread_type": thread_type}
 
 
 def save_inference_results_as_ttl(

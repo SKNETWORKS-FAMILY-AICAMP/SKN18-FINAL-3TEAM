@@ -6,11 +6,42 @@ class GraphState(TypedDict):
 
     # ========== 입력 ==========
     query: str  # 사용자 질문
+    session_id: NotRequired[str]  # Django 세션 ID (Phase 2: 체크포인트 키)
+
+    # ========== Django 통합 필드 ==========
+    tag: NotRequired[str]  # "chat" = Django API 모드, "" = 터미널 모드
+    skip_clarification: NotRequired[bool]  # True = 재질문 스킵 (사용자가 이미 선택함)
+    user_selected_direction: NotRequired[str]  # 사용자가 선택한 방향 (direction_id)
 
     # ========== 1단계: 질문 분석 (Query Classifier) ==========
     is_historical: NotRequired[bool]  # 역사 관련 질문 여부 (False면 조기 종료)
-    query_type: NotRequired[Literal["causal", "what_if", "deep_analysis"]]  # 질문 유형
+    query_type: NotRequired[Literal["causal", "factual", "deep_analysis", "comparative"]]  # 질문 유형 (최종)
+    query_type_initial: NotRequired[Literal["causal", "factual", "deep_analysis", "comparative"]]  # 초기 예측
     query_intent: NotRequired[str]  # 핵심 의도 (예: "궁궐을 건설한 왕 찾기")
+    
+    # 키워드 관련
+    basic_keywords: NotRequired[List[str]]  # Stage 1-0에서 추출한 기본 키워드
+
+    # ========== 1.5단계: 사용자 의도 확인 (User Intent Clarification) ==========
+    needs_clarification: NotRequired[bool]  # 의도 확인 필요 여부
+    classification_strategy: NotRequired[Literal["time-based", "class-based", "depth-based", "scope-based", "mixed"]]  # 선택된 분류 전략
+    expansion_directions: NotRequired[List[Dict[str, Any]]]  # LLM이 제시하는 확장 방향 옵션
+    # [
+    #     {
+    #         "id": 1,
+    #         "direction_id": "cause",
+    #         "title": "시해 원인 (사건 이전)",
+    #         "description": "시해가 일어난 정치적 배경과 원인",
+    #         "keywords": ["청일전쟁", "일본 세력 확대", ...],
+    #         "property_groups": ["인과관계", "외교", "통치"]
+    #     },
+    #     ...
+    # ]
+    clarification_question: NotRequired[str]  # 사용자에게 보여줄 질문 텍스트
+    
+    # Stage 1-B 백그라운드 작업 추적
+    stage1b_started: NotRequired[bool]  # Stage 1-B가 시작되었는지 여부
+    stage1b_task_id: NotRequired[str]  # Stage 1-B 백그라운드 작업 ID
 
     # 프로퍼티 그룹 선택
     selected_property_groups: NotRequired[List[str]]  # 선택된 프로퍼티 그룹 (예: ["건설", "설립", "통치"])
@@ -73,6 +104,20 @@ class GraphState(TypedDict):
     #     ...
     # ]
 
+    convergence_nodes: NotRequired[List[Dict[str, Any]]]  # 수렴 노드 (여러 엔티티를 연결하는 중요 노드)
+    # [
+    #     {
+    #         "uri": "hist:Event_xxx",
+    #         "label": "임진왜란",
+    #         "type": "Event",
+    #         "count": 3,
+    #         "connected_entities": ["이순신", "원균", "선조"],
+    #         "properties": {"hasYear": "1592", "hasCategory": "전쟁"},
+    #         "relations": [{"predicate": "leadsTo", "related": "정유재란"}, ...]
+    #     },
+    #     ...
+    # ]
+
     # ========== 7단계: 최종 생성 ==========
     final_answer: NotRequired[str]  # 최종 스토리 답변
     answer_with_sources: NotRequired[Dict[str, Any]]  # 근거 포함 답변
@@ -101,3 +146,8 @@ class GraphState(TypedDict):
     #     "aggregator_threads": {"outgoing_relations": True, "incoming_relations": False, ...},
     #     "entity_boost_mode": "exact_match"  # "exact_match" | "partial_match" | "normalized_match" | "penalty_match"
     # }
+
+    # ========== 스트리밍 모드 ==========
+    stream_mode: NotRequired[bool]  # 스트리밍 모드 활성화 여부
+    stream_callback: NotRequired[Any]  # 스트리밍 콜백 함수 (청크 단위 전송)
+    thinking_callback: NotRequired[Any]  # Thinking 모드 진행 상황 콜백 함수

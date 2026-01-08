@@ -190,7 +190,7 @@ const AllCommentsPage = ({ onNavigate }) => {
             style={{
               fontSize: "32px",
               fontWeight: "800",
-              color: COLORS.textPrimary,
+              color: COLORS.jade,
             }}
           >
             내가 남긴 댓글
@@ -202,7 +202,7 @@ const AllCommentsPage = ({ onNavigate }) => {
               backgroundColor: COLORS.primary,
               fontSize: "15px",
               fontWeight: "700",
-              color: COLORS.textPrimary,
+              color: COLORS.dark,
             }}
           >
             {allComments.reduce(
@@ -298,7 +298,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                     <span
                       style={{
                         fontSize: "13px",
-                        color: COLORS.textMuted,
+                        color: COLORS.dark,
                         fontWeight: "500",
                       }}
                     >
@@ -366,7 +366,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                                 {!comment.user?.profile_image && (
                                   <UserIcon
                                     size={14}
-                                    color={COLORS.textPrimary}
+                                    color={COLORS.dark}
                                   />
                                 )}
                               </div>
@@ -374,7 +374,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                                 style={{
                                   fontSize: "13px",
                                   fontWeight: "700",
-                                  color: COLORS.textPrimary,
+                                  color: COLORS.dark,
                                 }}
                               >
                                 나
@@ -382,7 +382,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                               <span
                                 style={{
                                   fontSize: "11px",
-                                  color: COLORS.textMuted,
+                                  color: COLORS.dark,
                                   marginLeft: "8px",
                                 }}
                               >
@@ -393,7 +393,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                                 <span
                                   style={{
                                     fontSize: "11px",
-                                    color: COLORS.textMuted,
+                                    color: COLORS.dark,
                                     marginLeft: "auto",
                                   }}
                                 >
@@ -404,7 +404,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                             <p
                               style={{
                                 fontSize: "15px",
-                                color: COLORS.textPrimary,
+                                color: COLORS.dark,
                                 margin: 0,
                                 lineHeight: "1.5",
                               }}
@@ -435,8 +435,8 @@ const AllCommentsPage = ({ onNavigate }) => {
                                       top: "-8px",
                                       width: "14px",
                                       height: "28px",
-                                      borderLeft: `2px solid ${COLORS.border}`,
-                                      borderBottom: `2px solid ${COLORS.border}`,
+                                      borderLeft: `2px solid var(--jade-dark)`,
+                                      borderBottom: `2px solid var(--jade-dark)`,
                                       borderBottomLeftRadius: "12px",
                                     }}
                                   />
@@ -468,14 +468,14 @@ const AllCommentsPage = ({ onNavigate }) => {
                                       >
                                         <UserIcon
                                           size={12}
-                                          color={COLORS.textPrimary}
+                                          color={COLORS.dark}
                                         />
                                       </div>
                                       <span
                                         style={{
                                           fontSize: "13px",
                                           fontWeight: "700",
-                                          color: COLORS.textPrimary,
+                                          color: COLORS.dark,
                                         }}
                                       >
                                         {reply.user?.display_name ||
@@ -485,7 +485,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                                       <span
                                         style={{
                                           fontSize: "11px",
-                                          color: COLORS.textMuted,
+                                          color: COLORS.dark,
                                           marginLeft: "8px",
                                         }}
                                       >
@@ -495,7 +495,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                                     <p
                                       style={{
                                         fontSize: "15px",
-                                        color: COLORS.textPrimary,
+                                        color: COLORS.dark,
                                         margin: 0,
                                         lineHeight: "1.5",
                                       }}
@@ -529,8 +529,8 @@ const AllCommentsPage = ({ onNavigate }) => {
                                                     top: "-6px",
                                                     width: "12px",
                                                     height: "24px",
-                                                    borderLeft: `2px solid ${COLORS.border}`,
-                                                    borderBottom: `2px solid ${COLORS.border}`,
+                                                    borderLeft: `2px solid var(--jade-dark)`,
+                                                    borderBottom: `2px solid var(--jade-dark)`,
                                                     borderBottomLeftRadius:
                                                       "10px",
                                                   }}
@@ -567,39 +567,39 @@ const AllCommentsPage = ({ onNavigate }) => {
                                                       <UserIcon
                                                         size={10}
                                                         color={
-                                                          COLORS.textPrimary
+                                                          COLORS.dark
                                                         }
                                                       />
                                                     </div>
-                                                    <span
-                                                      style={{
-                                                        fontSize: "12px",
-                                                        fontWeight: "600",
-                                                        color:
-                                                          COLORS.textPrimary,
-                                                      }}
-                                                    >
-                                                      {childReply.user
-                                                        ?.display_name ||
-                                                        childReply.user
-                                                          ?.nickname ||
-                                                        "사용자"}
-                                                    </span>
-                                                    <span
-                                                      style={{
-                                                        fontSize: "10px",
-                                                        color: COLORS.textMuted,
-                                                      }}
-                                                    >
-                                                      {formatTimeAgo(
-                                                        childReply.created_at
-                                                      )}
-                                                    </span>
+                                                      <span
+                                                        style={{
+                                                          fontSize: "12px",
+                                                          fontWeight: "600",
+                                                          color:
+                                                            COLORS.dark,
+                                                        }}
+                                                      >
+                                                        {childReply.user
+                                                          ?.display_name ||
+                                                          childReply.user
+                                                            ?.nickname ||
+                                                          "사용자"}
+                                                      </span>
+                                                      <span
+                                                        style={{
+                                                          fontSize: "10px",
+                                                          color: COLORS.dark,
+                                                        }}
+                                                      >
+                                                        {formatTimeAgo(
+                                                          childReply.created_at
+                                                        )}
+                                                      </span>
                                                   </div>
                                                   <p
                                                     style={{
                                                       fontSize: "14px",
-                                                      color: COLORS.textPrimary,
+                                                      color: COLORS.dark,
                                                       margin: 0,
                                                       lineHeight: "1.5",
                                                     }}
@@ -628,7 +628,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                             style={{
                               fontSize: "14px",
                               fontWeight: "600",
-                              color: COLORS.textPrimary,
+                              color: COLORS.dark,
                               marginBottom: "12px",
                             }}
                           >
@@ -682,7 +682,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                                     {!reply.comment_user?.profile_image && (
                                       <UserIcon
                                         size={14}
-                                        color={COLORS.textPrimary}
+                                        color={COLORS.dark}
                                       />
                                     )}
                                   </div>
@@ -690,7 +690,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                                     style={{
                                       fontSize: "13px",
                                       fontWeight: "700",
-                                      color: COLORS.textPrimary,
+                                      color: COLORS.dark,
                                     }}
                                   >
                                     {reply.comment_user?.display_name ||
@@ -700,7 +700,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                                   <span
                                     style={{
                                       fontSize: "11px",
-                                      color: COLORS.textMuted,
+                                      color: COLORS.dark,
                                       marginLeft: "8px",
                                     }}
                                   >
@@ -712,7 +712,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                                 <p
                                   style={{
                                     fontSize: "15px",
-                                    color: COLORS.textPrimary,
+                                    color: COLORS.dark,
                                     margin: 0,
                                     lineHeight: "1.5",
                                   }}
@@ -737,8 +737,8 @@ const AllCommentsPage = ({ onNavigate }) => {
                                       top: "-8px",
                                       width: "14px",
                                       height: "28px",
-                                      borderLeft: `2px solid ${COLORS.border}`,
-                                      borderBottom: `2px solid ${COLORS.border}`,
+                                      borderLeft: `2px solid var(--jade-dark)`,
+                                      borderBottom: `2px solid var(--jade-dark)`,
                                       borderBottomLeftRadius: "12px",
                                     }}
                                   />
@@ -778,7 +778,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                                         {!reply.user?.profile_image && (
                                           <UserIcon
                                             size={12}
-                                            color={COLORS.textPrimary}
+                                            color={COLORS.dark}
                                           />
                                         )}
                                       </div>
@@ -786,7 +786,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                                         style={{
                                           fontSize: "13px",
                                           fontWeight: "700",
-                                          color: COLORS.textPrimary,
+                                          color: COLORS.dark,
                                         }}
                                       >
                                         나
@@ -794,7 +794,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                                       <span
                                         style={{
                                           fontSize: "11px",
-                                          color: COLORS.textMuted,
+                                          color: COLORS.dark,
                                           marginLeft: "8px",
                                         }}
                                       >
@@ -804,7 +804,7 @@ const AllCommentsPage = ({ onNavigate }) => {
                                     <p
                                       style={{
                                         fontSize: "15px",
-                                        color: COLORS.textPrimary,
+                                        color: COLORS.dark,
                                         margin: 0,
                                         lineHeight: "1.5",
                                       }}

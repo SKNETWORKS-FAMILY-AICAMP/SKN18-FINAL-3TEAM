@@ -31,11 +31,14 @@ CREATE TABLE IF NOT EXISTS "user" (
 );
 
 -- 영상 관리 테이블 생성
+-- 영상 생성과 동시에 fuseki 동장 후 video_keyword 채움
 CREATE TABLE IF NOT EXISTS video (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     upload_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     tags TEXT[] NULL,
+    video_keyword TEXT NULL,
+    recommended_keyword TEXT NULL,
     likes_count INT NOT NULL DEFAULT 0,
     comments_count INT NOT NULL DEFAULT 0
 );
@@ -45,7 +48,9 @@ CREATE TABLE IF NOT EXISTS watching_history (
     id SERIAL PRIMARY KEY,
     video_id INT NOT NULL REFERENCES video(id) ON DELETE CASCADE,
     user_id INT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
-    tags TEXT[] NULL,
+    tags TEXT NULL,
+    video_keyword TEXT NULL,
+    recommended_keyword TEXT NULL,
     watched_seconds INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

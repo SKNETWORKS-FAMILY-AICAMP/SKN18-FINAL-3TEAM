@@ -48,38 +48,32 @@ class VideoSearchView(APIView):
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            # 검색 기록 저장 (로그인한 경우)
-            if request.user.is_authenticated:
-                try:
-                    SearchHistory.objects.create(
-                        user=request.user,
-                        search_query=query
-                    )
-                except Exception as e:
-                    # 검색 기록 저장 실패는 무시
-                    pass
+            # 검색 기록 저장은 프론트엔드에서 처리하므로 백엔드에서는 저장하지 않음
+            # 검색창에서 엔터를 눌렀을 때만 프론트엔드에서 createSearchHistory API를 호출함
 
-            # 검색 쿼리 (제목 + 태그)
+            # 검색 쿼리 (제목 + 태그 + video_keyword)
             # 제목 검색 또는 태그 배열의 각 요소에 대한 부분 일치 검색
+            # video_keyword 필드도 검색에 포함
             # EXISTS를 사용하여 각 태그를 개별적으로 검색
             print(f"🔍 검색어: '{query}'")
 
             videos = Video.objects.extra(
                 where=["""
                     title ILIKE %s OR
+                    video_keyword ILIKE %s OR
                     EXISTS (
                         SELECT 1 FROM unnest(tags) AS tag
                         WHERE tag ILIKE %s
                     )
                 """],
-                params=[f'%{query}%', f'%{query}%']
+                params=[f'%{query}%', f'%{query}%', f'%{query}%']
             )
 
             print(f"🔍 검색 결과 개수: {videos.count()}")
 
-            # 디버깅: 처음 5개 영상의 제목과 태그 출력
+            # 디버깅: 처음 5개 영상의 제목, 태그, video_keyword 출력
             for v in videos[:5]:
-                print(f"  - ID:{v.id}, 제목:{v.title}, 태그:{v.tags}")
+                print(f"  - ID:{v.id}, 제목:{v.title}, 태그:{v.tags}, 키워드:{v.video_keyword}")
 
         # 태그 필터링 (부분 일치 지원)
         if tags_param:
