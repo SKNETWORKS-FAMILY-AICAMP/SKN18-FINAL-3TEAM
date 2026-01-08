@@ -46,7 +46,7 @@ namespace minji_run
         [Header("Lane Rush Settings")]
         [SerializeField] private int laneIndex = 1;                       // 레인 번호 (0=왼쪽, 1=중앙, 2=오른쪽)
         [SerializeField] private float laneWidth = 3f;                    // 레인 간격
-        [SerializeField] private float rushSpeed = 15f;                   // 돌진 속도
+        [SerializeField] private float rushSpeed = 15f;                   // 돌진 속도 (⚠️ Spawner가 SetupLaneRush로 덮어씀)
 
         private Vector3 startPosition;
         private float moveTimer = 0f;
@@ -107,7 +107,7 @@ namespace minji_run
             laneIndex = lane;
             laneWidth = width;
             rushSpeed = speed;
-            destroyOnDistance = true;
+            destroyOnDistance = false;  // ⚠️ Spawner의 CleanupObstacles만 사용
             maxDistance = 100f;
             
             // 레인 위치로 이동

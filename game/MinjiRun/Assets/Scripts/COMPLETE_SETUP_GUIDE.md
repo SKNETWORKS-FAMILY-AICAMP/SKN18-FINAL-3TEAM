@@ -71,18 +71,16 @@ QuizTrigger 통과 (첫 번째만)
 - **더블 점프**: Ctrl 키로 최대 2번 점프 가능
 - **낙사 리스폰**: 떨어지면 마지막 안전 위치로 자동 복귀, 1초 스턴
 
-#### 장애물 시스템 ⭐ NEW
-- **다양한 장애물 타입**:
-  - 회전/왕복 이동 장애물
-  - 직선 발사체 (Projectile)
-  - 플레이어 추적 장애물 (Target Player)
-  - 레인 돌진 장애물 (Lane Rush)
-  - 부유형/파도형/원형 장애물
+#### 장애물 시스템 ⭐ (3가지 타입)
+- **3가지 장애물 타입**:
+  1. **Lane Obstacle (레인 돌진)**: 3개 레인 중 하나에서 플레이어를 향해 돌진
+  2. **Projectile (발사체)**: 벽이나 특정 위치에서 일정 방향으로 발사
+  3. **Popup Wall (솟구치는 벽)**: 바닥에서 위로 솟아올라 길을 막는 장애물
 - **자동 생성 시스템**:
   - LaneObstacleSpawner: 레인 기반 장애물 주기적 생성
   - ProjectileSpawner: 여러 위치에서 발사체 생성
-  - RepeatingProjectile: 반복 발사 장애물
-- **오브젝트 풀링**: 성능 최적화를 위한 재사용 시스템
+  - PopupWall: 수동 배치 (플레이어 감지 시 자동 솟아오름)
+- **난이도 조절**: 속도, 간격, 패턴 조합으로 다양한 난이도 구성
 
 #### 게임 클리어
 - **EndpointTrigger**: 플레이어가 골 지점에 도달하면 게임 클리어
@@ -2245,522 +2243,626 @@ QuizZone_3 (마지막)
 
 ---
 
-## 10. Obstacle 프리팹 생성
+## 10. Obstacle 프리팹 생성 (3가지 타입) ⭐
 
-### 10.1 Box Obstacle
+이 게임에서는 **3가지 타입의 장애물**을 사용합니다:
+
+1. **Lane Obstacle (레인 장애물)**: 3개 레인 중 하나에서 플레이어를 향해 돌진
+2. **Projectile (발사체)**: 벽이나 특정 위치에서 일정 방향으로 발사
+3. **Popup Wall (솟구치는 벽)**: 바닥에서 위로 솟아올라 길을 막는 장애물
+
+각 타입별로 프리팹을 만들고 자동 생성 시스템을 설정합니다.
+
+---
+
+## 10.1 ⭐ 타입 1: Lane Obstacle (레인 돌진 장애물)
+
+### 📝 특징
+- 3개 레인(왼쪽, 중앙, 오른쪽) 중 하나에서 생성
+- 플레이어를 향해 일직선으로 돌진
+- 템플런 스타일의 핵심 장애물
+
+---
+
+### 10.1.1 Lane Obstacle 프리팹 만들기
+
+**Step 1: 기본 오브젝트 생성**
 1. **Hierarchy 우클릭 → 3D Object → Cube**
-2. 이름: `Obstacle_Box`
-3. 설정:
-   - Position: `(0, 0.5, 0)`
-   - Scale: `(1, 1, 1)`
-   - Tag: `Obstacle`
+2. 이름: `Obstacle_Lane`
+3. Transform:
+   - Position: `(0, 1, 0)`
+   - Rotation: `(0, 0, 0)`
+   - Scale: `(2, 2, 2)` (플레이어보다 크게)
 
-### 10.2 Collider 설정
-**Box Collider 컴포넌트:**
-- **Is Trigger**: 체크
-- Center: `(0, 0, 0)`
-- Size: `(1, 1, 1)`
+**Step 2: Tag 설정**
+- Inspector 상단 Tag: `Obstacle`
 
-### 10.3 ObstacleController 추가
-**Add Component → Obstacle Controller**
+**Step 3: Collider 설정**
+- Box Collider (자동 생성됨):
+  - Is Trigger: ✅ 체크 (플레이어와 충돌 감지)
+  - Center: `(0, 0, 0)`
+  - Size: `(1, 1, 1)`
 
-설정:
-- **Rotate**: 체크
-- **Rotation Speed**: `(0, 50, 0)`
-- **Move**: 체크 해제
+**Step 4: Material 생성 및 적용**
+1. Project → Create → Material
+2. 이름: `LaneObstacleMaterial`
+3. Color: 빨간색 `RGB(255, 0, 0)`
+4. Obstacle_Lane의 Mesh Renderer에 드래그
 
-### 10.4 Material 생성
-1. **Project → Create → Material → `ObstacleMaterial`**
-2. 색상: 빨간색
-3. Obstacle_Box의 Mesh Renderer에 적용
+**Step 5: ObstacleController 추가**
+- Add Component → Obstacle Controller
+- 설정:
+  ```
+  Rotate: ✅ 체크 (회전 효과)
+  Rotation Speed: (0, 100, 0)
+  
+  Fly Mode: LaneRush ⭐
+  Rush Speed: 15
+  Destroy On Distance: false (Spawner가 관리)
+  ```
 
-### 10.5 Prefab 저장
-1. **`Assets/Prefabs/Obstacles/` 폴더 생성**
-2. **Obstacle_Box를 폴더로 드래그**
-3. **Hierarchy에서 삭제**
-
-### 10.6 추가 Obstacle 생성 (선택사항)
-- `Obstacle_Sphere` (Sphere로 생성)
-- `Obstacle_Cylinder` (Cylinder로 생성)
-- `Obstacle_Wall` (Cube, Scale Z를 크게)
-
-
-### 10.7 날아가는 장애물 시스템 ⭐ NEW
-
-ObstacleController에 다양한 날아가기 모드가 추가되었습니다!
-
-#### 🎯 Fly Mode 종류
-
-**1. None (기본)**
-- 날아가지 않음
-- 왕복 이동(Move)과 회전(Rotate)만 사용
-
-**2. Projectile (발사형)**
-- 설정한 방향으로 직선 이동
-- 예: 화살, 총알처럼 날아가는 장애물
-
-**3. TargetPlayer (플레이어 추적형)**
-- 게임 시작 시 플레이어 위치를 감지
-- 플레이어를 향해 일직선으로 날아감
-- 장애물이 자동으로 플레이어 방향으로 회전
-
-**4. LaneRush (레인 돌진형)** ⭐ 템플런 스타일
-- 3개 레인 중 하나에서 플레이어를 향해 달려옴
-- X축 위치는 레인에 고정, Z축으로만 이동
-- 플레이어는 좌우로만 피할 수 있음
-
-**5. Float (부유형)**
-- 앞으로 이동하면서 위아래로 떠다님
-- 새처럼 날아가는 효과
-
-**6. Wave (파도형)**
-- 앞으로 이동하면서 좌우로 물결침
-- 뱀처럼 구불구불 날아가는 효과
-
-**7. Circle (원형)**
-- 원을 그리며 이동
-- 회전하면서 날아가는 효과
+**Step 6: Prefab 저장**
+1. Project → `Assets/Prefabs/Obstacles/` 폴더 생성
+2. Obstacle_Lane을 폴더로 드래그
+3. Hierarchy에서 Obstacle_Lane 삭제
 
 ---
 
-### 10.8 레인 장애물 설정
+### 10.1.2 LaneObstacleSpawner 설정 (자동 생성)
 
-#### 레인 시스템 구조
-```
-트랙이 3개 레인으로 나뉩니다:
-- 레인 0 = 왼쪽 (X = -3)
-- 레인 1 = 중앙 (X = 0)
-- 레인 2 = 오른쪽 (X = +3)
-```
+**역할:** 주기적으로 1~3개 레인에 장애물을 자동 생성
 
-#### 단일 레인 장애물 만들기
-
-1. **Obstacle 프리팹 선택**
-2. **ObstacleController 설정:**
-   ```
-   Flying Settings:
-   ├─ Fly Mode: LaneRush
-   ├─ Destroy On Distance: ✓ 체크
-   └─ Max Distance: 100
-   
-   Lane Rush Settings:
-   ├─ Lane Index: 1 (0=왼쪽, 1=중앙, 2=오른쪽)
-   ├─ Lane Width: 3
-   └─ Rush Speed: 15
-   ```
-
-#### 여러 레인 동시에 막기
-
-**2개 레인 패턴:**
-1. 빈 GameObject 생성: `Pattern_Double`
-2. 두 개의 장애물 자식으로 추가:
-   - Obstacle1: Lane Index = 0 (왼쪽)
-   - Obstacle2: Lane Index = 1 (중앙)
-3. 플레이어는 오른쪽(Lane 2)으로 피해야 함
-
-**3개 레인 패턴 (점프 필요):**
-1. 빈 GameObject 생성: `Pattern_Triple`
-2. 세 개의 장애물 자식으로 추가:
-   - Obstacle1: Lane Index = 0
-   - Obstacle2: Lane Index = 1
-   - Obstacle3: Lane Index = 2
-3. 플레이어는 점프로 피해야 함
-
----
-
-### 10.9 자동 레인 장애물 생성기 ⭐ NEW
-
-#### LaneObstacleSpawner 설정
-
-1. **빈 GameObject 생성**
-   - 이름: `LaneObstacleSpawner`
-   - Position: `(0, 0, 0)`
-
-2. **Add Component → Lane Obstacle Spawner**
-
-3. **Inspector 설정:**
-   ```
-   Spawner Settings:
-   ├─ Auto Spawn: ✓ 체크
-   ├─ Spawn Interval: 2.5 (생성 간격 초)
-   ├─ Spawn Distance: 50 (플레이어 앞쪽 거리)
-   └─ Spawn Height: 1
-   
-   Obstacle Prefab:
-   ├─ Obstacle Prefab: Obstacle_Box (드래그)
-   └─ Obstacle Rush Speed: 15
-   
-   Lane Settings:
-   ├─ Lane Width: 3
-   ├─ Min Lanes: 1 (최소 생성 개수)
-   └─ Max Lanes: 2 (최대 생성 개수)
-   
-   Pattern Settings:
-   ├─ Use Patterns: ✓ 체크
-   └─ Spawn Patterns: (패턴 배열)
-   ```
-
-4. **Spawn Patterns 설정 (Size: 6):**
-   ```
-   Element 0:
-   ├─ Pattern Name: "Single_Left"
-   ├─ Lanes: Size(1) → 0
-   └─ Probability: 0.2
-   
-   Element 1:
-   ├─ Pattern Name: "Single_Center"
-   ├─ Lanes: Size(1) → 1
-   └─ Probability: 0.2
-   
-   Element 2:
-   ├─ Pattern Name: "Single_Right"
-   ├─ Lanes: Size(1) → 2
-   └─ Probability: 0.2
-   
-   Element 3:
-   ├─ Pattern Name: "Double_LeftCenter"
-   ├─ Lanes: Size(2) → 0, 1
-   └─ Probability: 0.15
-   
-   Element 4:
-   ├─ Pattern Name: "Double_CenterRight"
-   ├─ Lanes: Size(2) → 1, 2
-   └─ Probability: 0.15
-   
-   Element 5:
-   ├─ Pattern Name: "Double_LeftRight"
-   ├─ Lanes: Size(2) → 0, 2
-   └─ Probability: 0.1
-   ```
-
-#### 작동 방식
-- 2.5초마다 자동으로 장애물 생성
-- 패턴 확률에 따라 1~2개 레인에 장애물 생성
-- 플레이어 뒤로 지나간 장애물은 자동 제거
-- 생성된 장애물은 LaneObstacleSpawner의 자식으로 관리
-
----
-
-### 10.10 장애물 배치 예시
-
-#### 초급 구간
-```
-TrackSegment_Easy:
-└─ ObstaclePatterns:
-    ├─ Pattern_Single_Center (Z=20)
-    ├─ Pattern_Single_Left (Z=35)
-    └─ Pattern_Single_Right (Z=50)
-```
-
-#### 중급 구간
-```
-TrackSegment_Medium:
-└─ ObstaclePatterns:
-    ├─ Pattern_Double_LeftCenter (Z=20)
-    ├─ Pattern_Double_CenterRight (Z=40)
-    └─ Pattern_Single_Center (Z=60)
-```
-
-#### 고급 구간
-```
-TrackSegment_Hard:
-└─ ObstaclePatterns:
-    ├─ Pattern_Triple_All (Z=20) ← 점프 필요
-    ├─ Pattern_Double_LeftRight (Z=40)
-    └─ Pattern_Zigzag (Z=60) ← 시간차 공격
-```
-
-#### 시간차 공격 패턴 (Zigzag)
-```
-Pattern_Zigzag:
-├─ Obstacle1 (Z=60, Lane=0, Rush Speed=15)
-├─ Obstacle2 (Z=55, Lane=1, Rush Speed=15)
-└─ Obstacle3 (Z=50, Lane=2, Rush Speed=15)
-```
-
----
-
-### 10.11 난이도별 권장 설정
-
-**쉬움 (초보자용):**
-```
-Rush Speed: 10
-Spawn Interval: 3.0
-Min Lanes: 1
-Max Lanes: 1
-```
-
-**보통:**
-```
-Rush Speed: 15
-Spawn Interval: 2.5
-Min Lanes: 1
-Max Lanes: 2
-```
-
-**어려움:**
-```
-Rush Speed: 20
-Spawn Interval: 2.0
-Min Lanes: 1
-Max Lanes: 2
-```
-
-**매우 어려움:**
-```
-Rush Speed: 25
-Spawn Interval: 1.5
-Min Lanes: 2
-Max Lanes: 3
-Lane Width: 2 (좁은 레인)
-```
-
----
-
-### 10.12 기타 Fly Mode 예시
-
-#### TargetPlayer (플레이어 추적)
-```
-Fly Mode: TargetPlayer
-Fly Speed: 8
-Activation Delay: 0.5
-Destroy On Distance: ✓
-Max Distance: 100
-```
-
-#### Float (부유형)
-```
-Fly Mode: Float
-Fly Direction: (0, 0, 1)
-Fly Speed: 5
-Float Amplitude: 2
-Float Frequency: 1
-```
-
-#### Wave (파도형)
-```
-Fly Mode: Wave
-Fly Direction: (0, 0, 1)
-Fly Speed: 6
-Wave Amplitude: 3
-Wave Frequency: 2
-```
-
----
-
-### 10.13 LaneObstacleSpawner 설정 ⭐ (자동 생성 시스템)
-
-**역할:** 주기적으로 1~3개 레인에 장애물을 자동 생성하는 스포너
-
-#### 10.13.1 Spawner 오브젝트 생성
-1. **Hierarchy 우클릭 → Create Empty**
+**Step 1: Spawner 오브젝트 생성**
+1. Hierarchy 우클릭 → Create Empty
 2. 이름: `LaneObstacleSpawner`
-3. Position: 장애물이 생성될 시작 위치 (예: `(0, 1, 100)`)
-4. **Add Component → Lane Obstacle Spawner**
+3. Position: `(0, 0, 100)` (고정 생성 위치)
 
-#### 10.13.2 Inspector 설정
-**Spawner Settings:**
-```
-Auto Spawn: ✓
-Use Player Position: false (고정 위치 생성)
-Spawn Interval: 2.5 (생성 간격, 초)
-Spawn Distance: 50 (플레이어 앞쪽 거리, Use Player Position 사용 시)
-Spawn Height: 1
-Spawn Probability: 0.75 (생성 확률, 0~1)
-```
+**Step 2: LaneObstacleSpawner 컴포넌트 추가**
+- Add Component → Lane Obstacle Spawner
 
-**Obstacle Prefab:**
+**Step 3: Inspector 설정**
 ```
-Obstacle Prefab: Obstacle_Box (또는 다른 장애물 프리팹)
-Obstacle Rush Speed: 15 (돌진 속도)
-```
+Spawner Settings:
+├─ Auto Spawn: ✅
+├─ Use Player Position: ❌ (고정 위치에서 생성)
+├─ Spawn Interval: 2.5 (생성 간격, 초)
+├─ Spawn Height: 1
+└─ Spawn Probability: 0.8
 
-**Lane Settings:**
-```
-Lane Width: 3
-Min Lanes: 1 (동시 생성 최소 레인 개수)
-Max Lanes: 2 (동시 생성 최대 레인 개수)
-```
+Obstacle Prefab:
+├─ Obstacle Prefab: Obstacle_Lane (드래그)
+└─ Obstacle Rush Speed: 15
 
-**Pattern Settings:**
-```
-Use Patterns: ✓ (패턴 사용 시 체크)
-Spawn Patterns: Size 6 (기본 패턴)
-  - Element 0: Single_Left (레인: [0], 확률: 0.2)
-  - Element 1: Single_Center (레인: [1], 확률: 0.2)
-  - Element 2: Single_Right (레인: [2], 확률: 0.2)
-  - Element 3: Double_LeftCenter (레인: [0,1], 확률: 0.15)
-  - Element 4: Double_CenterRight (레인: [1,2], 확률: 0.15)
-  - Element 5: Double_LeftRight (레인: [0,2], 확률: 0.1)
+Lane Settings:
+├─ Lane Width: 3
+├─ Min Lanes: 1
+└─ Max Lanes: 2
+
+Pattern Settings:
+├─ Use Patterns: ✅
+└─ Spawn Patterns: Size 6
+    ├─ Element 0: Single_Left (Lanes: [0], Probability: 0.2)
+    ├─ Element 1: Single_Center (Lanes: [1], Probability: 0.2)
+    ├─ Element 2: Single_Right (Lanes: [2], Probability: 0.2)
+    ├─ Element 3: Double_LeftCenter (Lanes: [0,1], Probability: 0.15)
+    ├─ Element 4: Double_CenterRight (Lanes: [1,2], Probability: 0.15)
+    └─ Element 5: Double_LeftRight (Lanes: [0,2], Probability: 0.1)
+
+Cleanup Settings: ⭐
+└─ Cleanup Distance From Spawner: 100
 ```
 
-#### 10.13.3 Obstacle Prefab 요구사항
-- **ObstacleController** 컴포넌트 필수
-- Spawner가 `SetupLaneRush()` 메서드를 호출하여 자동 설정
+**⚠️ Cleanup Settings 설명:**
+- **From Spawner**: Spawner로부터 100m 이상 멀어지면 장애물 자동 제거
 
-#### 10.13.4 사용 팁
-- **여러 Spawner 배치**: 트랙 여러 곳에 배치하여 다양한 패턴 생성
-- **난이도 조절**:
-  - 쉬움: Spawn Interval 3.0, Probability 0.5
-  - 보통: Spawn Interval 2.5, Probability 0.75
-  - 어려움: Spawn Interval 2.0, Probability 0.9
-- **패턴 vs 랜덤**: Use Patterns 체크 해제 시 완전 랜덤 생성
+**테스트:**
+- Play 모드 실행 → 2.5초마다 장애물이 생성되고 플레이어를 향해 돌진
+- 패턴에 따라 1~2개 레인에 동시 생성
 
 ---
 
-### 10.14 ProjectileSpawner 설정 ⭐ (발사체 자동 생성)
+## 10.2 ⭐ 타입 2: Projectile (발사체 장애물)
 
-**역할:** 여러 위치에서 반복적으로 발사체를 생성하는 스포너
+### 📝 특징
+- 벽이나 특정 위치에서 일정 방향으로 발사
+- 직선으로 날아가는 화살, 총알 스타일
+- 여러 발사 위치 설정 가능
 
-#### 10.14.1 Spawner 오브젝트 생성
-1. **Hierarchy 우클릭 → Create Empty**
+---
+
+### 10.2.1 Projectile 프리팹 만들기
+
+**Step 1: 기본 오브젝트 생성**
+1. Hierarchy 우클릭 → 3D Object → Sphere
+2. 이름: `Obstacle_Projectile`
+3. Transform:
+   - Position: `(0, 1, 0)`
+   - Scale: `(0.5, 0.5, 0.5)` (작게)
+
+**Step 2: Tag 설정**
+- Tag: `Obstacle`
+
+**Step 3: Collider 설정**
+- Sphere Collider:
+  - Is Trigger: ✅ 체크
+  - Center: `(0, 0, 0)`
+  - Radius: `0.5`
+
+**Step 4: Material 적용**
+1. Project → Create → Material
+2. 이름: `ProjectileMaterial`
+3. Color: 주황색 `RGB(255, 165, 0)`
+4. Mesh Renderer에 드래그
+
+**Step 5: ObstacleController 추가**
+- Add Component → Obstacle Controller
+- 설정:
+  ```
+  Rotate: ❌ (발사체는 회전 안함)
+  
+  Fly Mode: Projectile ⭐
+  Fly Direction: (0, 0, 1) (앞으로)
+  Fly Speed: 8
+  Activation Delay: 0
+  Destroy On Distance: ✅
+  Max Distance: 100
+  ```
+
+**Step 6: Prefab 저장**
+- Obstacle_Projectile을 `Assets/Prefabs/Obstacles/`로 드래그
+- Hierarchy에서 삭제
+
+---
+
+### 10.2.2 ProjectileSpawner 설정 (자동 발사)
+
+**역할:** 여러 위치에서 반복적으로 발사체를 생성
+
+**Step 1: Spawner 오브젝트 생성**
+1. Hierarchy 우클릭 → Create Empty
 2. 이름: `ProjectileSpawner`
-3. Position: 발사 위치 (예: `(5, 2, 50)`)
-4. **Add Component → Projectile Spawner**
+3. Position: `(5, 2, 50)` (트랙 옆 벽)
 
-#### 10.14.2 Inspector 설정
-**Spawner Settings:**
-```
-Auto Spawn: ✓
-Spawn Interval: 2.0 (발사 간격, 초)
-Spawn Delay: 0 (시작 지연)
-Max Spawn Count: -1 (무제한)
-```
+**Step 2: ProjectileSpawner 컴포넌트 추가**
+- Add Component → Projectile Spawner
 
-**Projectile Settings:**
+**Step 3: Inspector 설정**
 ```
-Projectile Prefab: Obstacle_Sphere (발사체 프리팹)
-Projectile Speed: 8
-Projectile Lifetime: 5 (생존 시간, 초)
-```
+Spawner Settings:
+├─ Auto Spawn: ✅
+├─ Spawn Interval: 2.0 (발사 간격)
+├─ Spawn Delay: 0
+└─ Max Spawn Count: -1 (무제한)
 
-**Spawn Positions:**
-```
-Spawn Points: Size 3
-  - Element 0:
-    - Local Position: (0, 0, 0)
-    - Direction: (-1, 0, 0) (왼쪽으로 발사)
-    - Spawn Chance: 1.0
-  - Element 1:
-    - Local Position: (0, 1, 0)
-    - Direction: (0, -1, 0) (아래로 발사)
-    - Spawn Chance: 0.7
-  - Element 2:
-    - Local Position: (0, -1, 0)
-    - Direction: (0, 1, 0) (위로 발사)
-    - Spawn Chance: 0.5
+Projectile Settings:
+├─ Projectile Prefab: Obstacle_Projectile (드래그)
+├─ Projectile Speed: 8
+└─ Projectile Lifetime: 5
 
-Random Spawn: ✓ (랜덤 위치 선택)
-Spawn All At Once: false (모든 위치 동시 발사)
+Spawn Positions:
+├─ Spawn Points: Size 1
+│   └─ Element 0:
+│       ├─ Local Position: (0, 0, 0)
+│       ├─ Direction: (-1, 0, 0) (왼쪽으로 발사)
+│       └─ Spawn Chance: 1.0
+│
+├─ Random Spawn: ❌
+└─ Spawn All At Once: ❌
 ```
 
-#### 10.14.3 발사 패턴 예시
-**벽 발사기 (왼쪽에서 오른쪽으로):**
+**발사 패턴 예시:**
+
+**패턴 1: 벽에서 트랙으로 (왼쪽 → 오른쪽)**
 ```
-Spawn Points: Size 1
-  - Local Position: (0, 0, 0)
-  - Direction: (1, 0, 0)
-  - Projectile Speed: 10
+Position: (5, 2, 50)
+Direction: (-1, 0, 0)
 ```
 
-**십자 발사 (4방향):**
+**패턴 2: 십자 발사 (4방향)**
 ```
 Spawn Points: Size 4
-  - Element 0: Direction (1, 0, 0)
-  - Element 1: Direction (-1, 0, 0)
-  - Element 2: Direction (0, 0, 1)
-  - Element 3: Direction (0, 0, -1)
-Spawn All At Once: ✓
+├─ Element 0: Direction (1, 0, 0)
+├─ Element 1: Direction (-1, 0, 0)
+├─ Element 2: Direction (0, 0, 1)
+└─ Element 3: Direction (0, 0, -1)
+Spawn All At Once: ✅
+```
+
+**테스트:**
+- Play 모드 → Spawner 위치에서 2초마다 발사체 생성
+- 설정한 방향으로 직선 비행
+
+---
+
+## 10.3 ⭐ 타입 3: Popup Wall (솟구치는 벽 장애물) ⭐ NEW
+
+### 📝 특징
+- 바닥에서 위로 솟아오르는 벽
+- 플레이어가 접근하면 빠르게 올라와 길을 막음
+- 일정 시간 후 다시 내려감
+- 점프로 넘어가야 함
+
+---
+
+### 10.3.1 Popup Wall 프리팹 만들기
+
+**Step 1: 기본 오브젝트 생성**
+1. Hierarchy 우클릭 → 3D Object → Cube
+2. 이름: `Obstacle_PopupWall`
+3. Transform:
+   - Position: `(0, -2, 0)` ⭐ (바닥 아래 시작)
+   - Rotation: `(0, 0, 0)`
+   - Scale: `(10, 4, 0.5)` ⭐ (넓고 높은 벽)
+
+**Step 2: Tag 설정**
+- Tag: `Obstacle`
+
+**Step 3: Collider 설정**
+- Box Collider:
+  - Is Trigger: ✅ 체크
+  - Center: `(0, 0, 0)`
+  - Size: `(1, 1, 1)`
+
+**Step 4: Material 적용**
+1. Project → Create → Material
+2. 이름: `PopupWallMaterial`
+3. Color: 보라색 `RGB(128, 0, 255)`
+4. Mesh Renderer에 드래그
+
+**Step 5: Animator 추가 (솟구치는 애니메이션)**
+
+**⚠️ 방법 A: Animation으로 구현 (권장)**
+
+1. **Animator 추가**:
+   - Add Component → Animator
+   
+2. **Animation 생성**:
+   - Window → Animation → Animation
+   - Create 버튼 클릭
+   - 저장: `Assets/Animations/PopupWall_Rise.anim`
+
+3. **애니메이션 키프레임 설정**:
+   ```
+   0:00 (시작) - Position Y: -2 (아래)
+   0:30 (0.5초) - Position Y: 2 (위로 솟음)
+   2:00 (2초) - Position Y: 2 (유지)
+   2:30 (2.5초) - Position Y: -2 (다시 내려감)
+   ```
+
+4. **Animator Controller 설정**:
+   - Project → Create → Animator Controller
+   - 이름: `PopupWallController`
+   - Animator 컴포넌트의 Controller에 드래그
+   - Animator 창에서 PopupWall_Rise 애니메이션 연결
+   - Loop Time: ✅ 체크
+
+**⚠️ 방법 B: 스크립트로 구현 (간단)**
+
+만약 Animation을 사용하지 않고 스크립트로 구현하려면:
+
+**PopupWallController.cs 생성:**
+```csharp
+using UnityEngine;
+
+public class PopupWallController : MonoBehaviour
+{
+    [Header("Popup Settings")]
+    [SerializeField] private float riseHeight = 4f;        // 올라갈 높이
+    [SerializeField] private float riseSpeed = 8f;         // 올라가는 속도
+    [SerializeField] private float stayDuration = 2f;      // 위에서 머무는 시간
+    [SerializeField] private float fallSpeed = 4f;         // 내려가는 속도
+    [SerializeField] private float triggerDistance = 10f;  // 플레이어 감지 거리
+
+    [Header("References")]
+    [SerializeField] private Transform playerTransform;
+
+    private Vector3 hiddenPosition;   // 숨겨진 위치 (아래)
+    private Vector3 visiblePosition;  // 보이는 위치 (위)
+    private float currentStayTime = 0f;
+    
+    private enum WallState { Hidden, Rising, Visible, Falling }
+    private WallState currentState = WallState.Hidden;
+
+    void Start()
+    {
+        if (playerTransform == null)
+            playerTransform = GameObject.FindGameObjectWithTag("Player")?.transform;
+
+        hiddenPosition = transform.position;
+        visiblePosition = hiddenPosition + Vector3.up * riseHeight;
+    }
+
+    void Update()
+    {
+        if (playerTransform == null) return;
+
+        float distanceToPlayer = Vector3.Distance(transform.position, playerTransform.position);
+
+        switch (currentState)
+        {
+            case WallState.Hidden:
+                // 플레이어가 가까우면 솟아오름
+                if (distanceToPlayer < triggerDistance)
+                {
+                    currentState = WallState.Rising;
+                }
+                break;
+
+            case WallState.Rising:
+                // 위로 이동
+                transform.position = Vector3.MoveTowards(transform.position, visiblePosition, riseSpeed * Time.deltaTime);
+                if (Vector3.Distance(transform.position, visiblePosition) < 0.1f)
+                {
+                    currentState = WallState.Visible;
+                    currentStayTime = 0f;
+                }
+                break;
+
+            case WallState.Visible:
+                // 위에서 대기
+                currentStayTime += Time.deltaTime;
+                if (currentStayTime >= stayDuration)
+                {
+                    currentState = WallState.Falling;
+                }
+                break;
+
+            case WallState.Falling:
+                // 아래로 이동
+                transform.position = Vector3.MoveTowards(transform.position, hiddenPosition, fallSpeed * Time.deltaTime);
+                if (Vector3.Distance(transform.position, hiddenPosition) < 0.1f)
+                {
+                    currentState = WallState.Hidden;
+                }
+                break;
+        }
+    }
+
+    // Scene 뷰에서 감지 거리 시각화
+    void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, triggerDistance);
+    }
+}
+```
+
+**스크립트 추가:**
+- Add Component → Popup Wall Controller
+- Inspector 설정:
+  ```
+  Rise Height: 4
+  Rise Speed: 8
+  Stay Duration: 2
+  Fall Speed: 4
+  Trigger Distance: 10
+  Player Transform: Player 드래그 (또는 자동 탐색)
+  ```
+
+**Step 6: Prefab 저장**
+- Obstacle_PopupWall을 `Assets/Prefabs/Obstacles/`로 드래그
+- Hierarchy에서 삭제
+
+---
+
+### 10.3.2 Popup Wall 배치
+
+Popup Wall은 **자동 생성이 아닌 수동 배치**를 권장합니다.
+
+**배치 방법:**
+1. 트랙 세그먼트의 특정 위치에 Obstacle_PopupWall 프리팹 배치
+2. Position Y: -2 (바닥 아래)
+3. 플레이어가 접근하면 자동으로 솟아오름
+
+**배치 예시:**
+```
+TrackSegment_02
+└─ ObstacleRoot
+    ├─ Obstacle_PopupWall_1 (Position: 0, -2, 30)
+    ├─ Obstacle_PopupWall_2 (Position: 0, -2, 60)
+    └─ Obstacle_PopupWall_3 (Position: 0, -2, 90)
+```
+
+**테스트:**
+- Play 모드 → 플레이어가 가까이 가면 벽이 솟아오름
+- 2초 후 다시 내려감
+- 점프로 넘어가야 통과 가능
+
+---
+
+## 10.4 ⭐ 3가지 장애물 타입 비교 및 사용법
+
+### 📊 장애물 타입 비교표
+
+| 타입 | 특징 | 생성 방식 | 난이도 | 회피 방법 |
+|------|------|----------|--------|----------|
+| **Lane** | 레인 돌진 | 자동 (LaneObstacleSpawner) | ⭐⭐ | 좌우 이동 |
+| **Projectile** | 직선 발사 | 자동 (ProjectileSpawner) | ⭐⭐⭐ | 좌우 이동 + 점프 |
+| **Popup Wall** | 솟구치는 벽 | 수동 배치 | ⭐⭐⭐⭐ | 점프 |
+
+---
+
+### 10.4.1 난이도별 배치 전략
+
+**🟢 쉬움 (초보자용)**
+```
+구간: 0~200m
+- Lane: Spawn Interval 3.0, Single 패턴만
+- Projectile: 간헐적 배치 (50m마다)
+- Popup: 없음
+```
+
+**🟡 보통**
+```
+구간: 200~400m
+- Lane: Spawn Interval 2.5, Single + Double 패턴
+- Projectile: 2초 간격
+- Popup: 드물게 배치 (100m마다)
+```
+
+**🔴 어려움**
+```
+구간: 400m 이상
+- Lane: Spawn Interval 2.0, 모든 패턴
+- Projectile: 1.5초 간격, 십자 발사
+- Popup: 자주 배치 (50m마다)
 ```
 
 ---
 
-### 10.15 RepeatingProjectile 설정 ⭐ (반복 발사 장애물)
+### 10.4.2 장애물 조합 예시
 
-**역할:** 배치한 위치에서 일정 간격으로 복제본을 발사하는 장애물
-
-#### 10.15.1 사용 방법
-1. **기존 장애물 프리팹 선택** (예: Obstacle_Box)
-2. **Add Component → Repeating Projectile**
-3. **ObstacleController 설정** (Fly Mode 등)
-
-#### 10.15.2 Inspector 설정
-**Repeat Settings:**
+**조합 1: Lane + Projectile (동시 공격)**
 ```
-Enable Repeat: ✓
-Repeat Interval: 2.0 (반복 간격, 초)
-Start Delay: 0
-Max Repeats: -1 (무제한, 또는 특정 횟수)
-Projectile Lifetime: 5 (발사체 생존 시간)
+LaneObstacleSpawner (Z=100)
+└─ 중앙 레인에 장애물 생성
+
+ProjectileSpawner (Z=105, X=5)
+└─ 왼쪽에서 발사체 발사
+
+→ 플레이어는 오른쪽 레인으로 이동해야 함
 ```
 
-#### 10.15.3 동작 원리
-1. **원본 오브젝트**: 렌더링/콜라이더 비활성화 (발사기 역할만)
-2. **복제본 생성**: 일정 간격으로 복제본 생성 및 발사
-3. **자동 삭제**: 복제본은 Lifetime 후 자동 삭제
-
-#### 10.15.4 사용 예시
-**직선 발사:**
+**조합 2: Popup + Lane (연속 회피)**
 ```
-ObstacleController:
-  Fly Mode: Projectile
-  Fly Direction: (0, 0, 1)
-  Fly Speed: 8
+PopupWall (Z=150)
+└─ 플레이어 접근 시 솟아오름
+└─ 점프로 넘어감
 
-RepeatingProjectile:
-  Repeat Interval: 1.5
-  Max Repeats: 10
+LaneObstacleSpawner (Z=160)
+└─ 착지 직후 레인 장애물 돌진
+
+→ 점프 → 착지 → 즉시 좌우 이동
 ```
 
-**플레이어 추적 발사:**
+**조합 3: 3개 동시 (최고 난이도)**
 ```
-ObstacleController:
-  Fly Mode: TargetPlayer
-  Fly Speed: 10
+PopupWall (Z=200)
+LaneObstacleSpawner (Z=210) - 좌/우 레인
+ProjectileSpawner (Z=205) - 십자 발사
 
-RepeatingProjectile:
-  Repeat Interval: 2.0
-  Start Delay: 1.0
+→ 점프 + 중앙 레인 유지 + 발사체 회피
 ```
 
 ---
 
-### 10.16 AutoTiling 사용법 ⭐ (텍스처 타일링)
+## 10.5 ⭐ 장애물 시스템 최종 설정
 
-**역할:** Scale 변경 시 Material Tiling 자동 조정 (텍스처가 늘어나지 않고 반복됨)
+### 10.5.1 Hierarchy 구조 예시
 
-#### 10.16.1 사용 방법
-1. **타일링이 필요한 오브젝트 선택** (예: Ground, Wall)
-2. **Add Component → Auto Tiling**
-
-#### 10.16.2 Inspector 설정
-**Auto Detect 모드 (권장):**
 ```
-Mode: Auto Detect
-Base Tiling: (1, 1) (Material의 기본 Tiling)
-Reference Scale: (1, 1, 1)
-```
-
-**Manual Mapping 모드 (고급):**
-```
-Mode: Manual Mapping
-Scale X Multiplier: (1, 0) - X축 → Tiling U
-Scale Y Multiplier: (0, 1) - Y축 → Tiling V
-Scale Z Multiplier: (0, 0) - Z축 → 사용 안 함
+TrackObjects (빈 오브젝트)
+├─ LaneObstacleSpawner (자동 생성, Z=100)
+├─ ProjectileSpawner_Left (Z=150, X=5)
+├─ ProjectileSpawner_Right (Z=180, X=-5)
+│
+└─ ManualObstacles (빈 오브젝트)
+   ├─ Obstacle_PopupWall_1 (Z=50)
+   ├─ Obstacle_PopupWall_2 (Z=120)
+   └─ Obstacle_PopupWall_3 (Z=200)
 ```
 
-#### 10.16.3 프리셋 사용
-**Context Menu에서 선택:**
-- **Preset: Floor/Ceiling** - X=Width, Z=Depth
-- **Preset: Wall** - X=Width, Y=Height
-- **Preset: Long Wall** - Z=Length, Y=Height
+---
 
-#### 10.16.4 프리팹 제작 시 주의사항
-1. **Tiling 조정 완료 후**
-2. **Context Menu → Bake Material**
-3. Material이 Assets/Materials/AutoTiled/에 저장됨
-4. **AutoTiling 컴포넌트 제거**
-5. **프리팹으로 저장**
+### 10.5.2 난이도 조절 팁
+
+**Lane Obstacle 난이도 조절:**
+```
+쉬움:
+├─ Spawn Interval: 3.0
+├─ Rush Speed: 10
+└─ Min/Max Lanes: 1, 1
+
+어려움:
+├─ Spawn Interval: 1.5
+├─ Rush Speed: 25
+└─ Min/Max Lanes: 2, 3
+```
+
+**Projectile 난이도 조절:**
+```
+쉬움:
+├─ Spawn Interval: 3.0
+├─ Speed: 5
+└─ Spawn Points: 1
+
+어려움:
+├─ Spawn Interval: 1.0
+├─ Speed: 12
+└─ Spawn Points: 4 (십자)
+```
+
+**Popup Wall 난이도 조절:**
+```
+쉬움:
+├─ Trigger Distance: 15 (멀리서 미리 경고)
+├─ Rise Speed: 4 (천천히 올라옴)
+└─ Stay Duration: 1 (빨리 내려감)
+
+어려움:
+├─ Trigger Distance: 5 (갑자기 솟음)
+├─ Rise Speed: 15 (빠르게 올라옴)
+└─ Stay Duration: 3 (오래 막음)
+```
+
+---
+
+## 10.6 ⭐ 테스트 체크리스트
+
+### Lane Obstacle 테스트
+- [ ] LaneObstacleSpawner가 2.5초마다 장애물 생성
+- [ ] 장애물이 플레이어를 향해 돌진 (속도: 15)
+- [ ] 패턴에 따라 1~2개 레인에 생성
+- [ ] 플레이어 뒤로 20m 지나면 자동 제거
+- [ ] 충돌 시 게임오버 또는 체력 감소
+
+### Projectile 테스트
+- [ ] ProjectileSpawner가 2초마다 발사체 생성
+- [ ] 발사체가 설정한 방향으로 직선 비행
+- [ ] 5초 후 자동 삭제
+- [ ] 충돌 시 게임오버 또는 체력 감소
+
+### Popup Wall 테스트
+- [ ] 플레이어 접근 시 (10m) 벽이 솟아오름
+- [ ] 2초간 위에서 유지
+- [ ] 다시 내려감
+- [ ] 점프로 넘어갈 수 있음
+- [ ] Scene 뷰에서 노란색 감지 거리 표시
+
+---
+
+## 10.7 ⭐ 문제 해결
+
+### ❌ Lane Obstacle이 생성되지 않음
+✅ **해결:**
+- LaneObstacleSpawner의 Auto Spawn 체크
+- Obstacle Prefab 연결 확인
+- Prefab에 ObstacleController 컴포넌트 있는지 확인
+
+### ❌ Projectile이 발사되지 않음
+✅ **해결:**
+- ProjectileSpawner의 Auto Spawn 체크
+- Projectile Prefab 연결 확인
+- Spawn Points 배열이 비어있지 않은지 확인
+- Direction이 (0,0,0)이 아닌지 확인
+
+### ❌ Popup Wall이 솟아오르지 않음
+✅ **해결:**
+- PopupWallController 스크립트 확인
+- Player Transform 연결 확인 (또는 자동 탐색 확인)
+- Trigger Distance 확인 (10m)
+- Player Tag가 "Player"인지 확인
+
+### ❌ 장애물이 플레이어를 따라다님
+✅ **해결:**
+- LaneObstacleSpawner의 Use Player Position = false로 설정
+- 고정 위치 생성 모드 사용
+
+### ❌ 장애물이 너무 많이 쌓임
+✅ **해결:**
+- Cleanup Distance From Spawner 값 줄이기 (50~70)
+- Spawn Probability 값 줄이기 (0.5~0.6)
+- Spawn Interval 값 늘리기 (3.0~4.0)
 
 ---
 

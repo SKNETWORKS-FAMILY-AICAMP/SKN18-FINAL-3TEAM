@@ -20,7 +20,7 @@ namespace minji_run
 
         [Header("Obstacle Prefab")]
         [SerializeField] private GameObject obstaclePrefab;              // 장애물 프리팹
-        [SerializeField] private float obstacleRushSpeed = 15f;          // 장애물 돌진 속도
+        [SerializeField] private float obstacleRushSpeed = 15f;          // 장애물 돌진 속도 (ObstacleController의 rushSpeed로 전달됨)
 
         [Header("Lane Settings")]
         [SerializeField] private float laneWidth = 3f;                   // 레인 간격
@@ -30,6 +30,9 @@ namespace minji_run
         [Header("Pattern Settings")]
         [SerializeField] private bool usePatterns = true;                // 패턴 사용 여부
         [SerializeField] private SpawnPattern[] spawnPatterns;           // 생성 패턴들
+
+        [Header("Cleanup Settings")]
+        [SerializeField] private float cleanupDistanceFromSpawner = 100f;  // Spawner로부터 몇 미터 멀어지면 제거
 
         private float spawnTimer = 0f;
         private Transform playerTransform;
@@ -251,8 +254,8 @@ namespace minji_run
 
             Debug.Log($"[LaneObstacleSpawner] Creating obstacle at Lane {laneIndex}, Position: {spawnPosition}");
 
-            // 장애물 생성
-            GameObject obstacle = Instantiate(obstaclePrefab, spawnPosition, Quaternion.identity);
+            // 장애물 생성 (Prefab의 원래 Rotation 사용)
+            GameObject obstacle = Instantiate(obstaclePrefab, spawnPosition, obstaclePrefab.transform.rotation);
             obstacle.name = $"ObstacleRush_Lane{laneIndex}";
             obstacle.transform.SetParent(transform);
 
@@ -275,7 +278,7 @@ namespace minji_run
         }
 
         /// <summary>
-        /// 뒤로 지나간 장애물 정리
+        /// Spawner로부터 일정 거리 이상 멀어진 장애물 정리
         /// </summary>
         private void CleanupObstacles()
         {
@@ -284,15 +287,13 @@ namespace minji_run
                 if (spawnedObstacles[i] == null)
                 {
                     spawnedObstacles.RemoveAt(i);
+                    continue;
                 }
-                else if (playerTransform != null && spawnedObstacles[i].transform.position.z < playerTransform.position.z - 20f)
+
+                // Spawner로부터 일정 거리 이상 멀어지면 제거
+                float distanceFromSpawner = Vector3.Distance(spawnedObstacles[i].transform.position, transform.position);
+                if (distanceFromSpawner > cleanupDistanceFromSpawner)
                 {
-                    Destroy(spawnedObstacles[i]);
-                    spawnedObstacles.RemoveAt(i);
-                }
-                else if (playerTransform == null && Vector3.Distance(spawnedObstacles[i].transform.position, transform.position) > 100f)
-                {
-                    // 플레이어 없으면 Spawner 기준으로 100m 이상 멀어지면 삭제
                     Destroy(spawnedObstacles[i]);
                     spawnedObstacles.RemoveAt(i);
                 }
