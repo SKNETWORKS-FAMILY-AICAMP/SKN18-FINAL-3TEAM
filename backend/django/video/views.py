@@ -4,6 +4,8 @@ import time
 import glob
 import subprocess
 import requests
+import shutil  # 하이재킹용 추가
+import traceback # 디버깅용 추가
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -64,7 +66,7 @@ class IsAdminUser(BasePermission):
         return request.user.is_authenticated and getattr(request.user, 'permission', '') == 'admin'
 
 # ============================================
-# [핵심] 유니티 시나리오 생성 (VP8 가공 통합)
+# [통합 완료] 유니티 시나리오 생성 (가공 + 하이재킹)
 # ============================================
 @csrf_exempt
 async def generate_scenario(request):
@@ -76,15 +78,16 @@ async def generate_scenario(request):
         data = json.loads(body_unicode)
         topic = data.get('topic', '')
         
-        # 1. LangGraph 실행
+        # 1. LangGraph 실행 (dev의 asset_context 로직 적용)
+        asset_context_prompt = load_asset_context()
         app = create_graph_flow()
-        initial_state = {"query": topic, "asset_context": load_asset_context(), "tag": "video"}
+        initial_state = {"query": topic, "asset_context": asset_context_prompt, "tag": "video"}
+        
         print("🔹 [1/4] LangGraph 실행 중...")
         result = await app.ainvoke(initial_state)
         final_script = result.get('scene_script')
 
-        # 2. 가공 대상 영상 주소 추출 (더 넓은 범위 탐색)
-        # [views.py] generate_scenario 함수 내 추출 로직 보강
+        # 2. 가공 대상 영상 주소 추출 (사용자님의 정밀 탐색 로직)
         candidate_video = (
             result.get('video_url') or 
             result.get('background_video_url') or 
@@ -93,14 +96,9 @@ async def generate_scenario(request):
             final_script.get('background_url')
         )
 
-        # 🔴 [추가] 만약 위에서 못 찾았다면, 첫 번째 씬의 location을 확인
         if not candidate_video and 'scenes' in final_script and len(final_script['scenes']) > 0:
             candidate_video = final_script['scenes'][0].get('location')
             print(f"🔍 [Notice] 씬 데이터에서 주소 발견: {candidate_video}")
-        
-        print(f"DEBUG: result keys = {result.keys()}")
-        print(f"DEBUG: final_script keys = {final_script.keys() if final_script else 'None'}")
-        print(f"DEBUG: candidate_video value = '{candidate_video}'")
         
         print(f"🔍 [2/4] 가공 대상 후보 확인: {candidate_video}")
 
@@ -109,7 +107,6 @@ async def generate_scenario(request):
         if candidate_video and any(ext in str(candidate_video).lower() for ext in [".mp4", ".webm", ".mov"]):
             original_url = str(candidate_video)
             try:
-                # 🔴 원본은 격리된 temp_raw 폴더에 저장 (유니티 접근 불가)
                 temp_raw_dir = os.path.join(settings.MEDIA_ROOT, 'temp_raw')
                 bg_final_dir = os.path.join(settings.MEDIA_ROOT, 'backgrounds')
                 os.makedirs(temp_raw_dir, exist_ok=True)
@@ -122,12 +119,11 @@ async def generate_scenario(request):
 
                 print(f"🎬 [3/4] 가공 시작: {original_url} -> {output_name}")
 
-                # 원본 다운로드
                 r = requests.get(original_url, stream=True, timeout=30)
                 with open(raw_path, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=8192): f.write(chunk)
 
-                # FFmpeg 세탁 (VP8 변환 + 메타데이터 삭제)
+                # FFmpeg 세탁 (인코딩 및 에러 처리 보강)
                 cmd = [
                     'ffmpeg', '-y', '-i', raw_path,
                     '-map_metadata', '-1',
@@ -135,18 +131,12 @@ async def generate_scenario(request):
                     '-c:a', 'libvorbis',
                     local_output
                 ]
-                process = subprocess.run(
-                    cmd, 
-                    capture_output=True, 
-                    encoding='utf-8',   # 🔴 명시적으로 UTF-8 지정
-                    errors='ignore'     # 🔴 해독 안되는 문자는 무시
-                )
+                process = subprocess.run(cmd, capture_output=True, encoding='utf-8', errors='ignore')
 
                 if process.returncode == 0:
                     ngrok_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
                     target_url = f"{ngrok_url}{settings.MEDIA_URL}backgrounds/{output_name}"
                     print(f"✅ [Success] 가공 완료: {target_url}")
-                    # 원본 임시 파일 삭제 (용량 관리)
                     if os.path.exists(raw_path): os.remove(raw_path)
                 else:
                     print(f"❌ FFmpeg 에러: {process.stderr}")
@@ -155,34 +145,26 @@ async def generate_scenario(request):
                 print(f"❌ 가공 중 예외 발생: {e}")
                 target_url = original_url
         else:
-            print("⚠️ 가공 대상을 찾지 못했거나 영상 형식이 아님.")
-            target_url = candidate_video
+            target_url = candidate_video or (final_script.get('background_url') if final_script else "")
 
-        # 4. 🔴 모든 가공이 끝난 '후에' JSON 대본을 업데이트하고 저장
-        if target_url and 'scenes' in final_script:
+        # 4. JSON 대본 업데이트 및 하이재킹 저장
+        if target_url and final_script and 'scenes' in final_script:
             final_script['background_url'] = target_url
             for scene in final_script['scenes']:
                 scene['location'] = target_url
 
-        # 경로 설정
         save_dir = os.path.join(settings.MEDIA_ROOT, 'pending_scripts')
         hijack_dir = os.path.join(settings.MEDIA_ROOT, 'script_logs')
-
-        # 폴더가 없으면 생성
         os.makedirs(save_dir, exist_ok=True)
         os.makedirs(hijack_dir, exist_ok=True)
 
-        # 파일명 생성 및 전체 경로 정의 (변수 미정의 에러 해결)
         filename = f"{time.strftime('%Y%m%d_%H%M%S')}_script.json"
-        full_path = os.path.join(save_dir, filename)      # 유니티가 가져갈 경로
-        hijack_path = os.path.join(hijack_dir, filename)  # 우리가 하이재킹할 로그 경로
+        full_path = os.path.join(save_dir, filename)
+        hijack_path = os.path.join(hijack_dir, filename)
 
-        # 1. 유니티 폴링용 폴더에 먼저 저장
         with open(full_path, 'w', encoding='utf-8') as f:
             json.dump(final_script, f, indent=4, ensure_ascii=False)
 
-        # 2. 🔴 하이재킹: 로그 폴더로 복사 (유니티가 가져가도 원본 보존)
-        import shutil
         try:
             shutil.copy(full_path, hijack_path)
             print(f"📄 [4/4] 대본 생성 및 하이재킹 성공: {hijack_path}")
@@ -192,14 +174,12 @@ async def generate_scenario(request):
         return JsonResponse({'message': 'Queued', 'file_name': filename}, status=200)
 
     except Exception as e:
-        # 가공 과정이나 저장 과정 중 어디서 터졌는지 추적
-        import traceback
         print(f"🔥 [Critical] 전체 프로세스 실패: {e}")
-        traceback.print_exc() # 상세 에러 스택 출력
+        traceback.print_exc()
         return JsonResponse({'error': str(e)}, status=500)
 
 # ============================================
-# 비디오 생성 (팀원 번역 통합)
+# 비디오 생성 (dev의 Celery 로직 통합)
 # ============================================
 @csrf_exempt
 async def create_video_from_langgraph(request):
@@ -216,16 +196,31 @@ async def create_video_from_langgraph(request):
         try: title = GoogleTranslator(source="en", target="ko").translate(title)
         except: pass
 
-    payload = {"title": title, "video_url": body.get("video_url", ""), "tags": result_state.get("video_tags") or [], "thumbnail_url": body.get("thumbnail_url")}
-    #여기를 "video_url": body.get("video_url", "https://skn18-3-dev-temp.s3.amazonaws.com/background_scene_1_video.mp4"), 이걸로 바꾼다는데?
+    thumbnail_url = result_state.get("thumbnail_url") or body.get("thumbnail_url")
+    
+    payload = {
+        "title": title, 
+        "video_url": body.get("video_url", "https://skn18-3-dev-temp.s3.amazonaws.com/background_scene_1_video.mp4"), 
+        "tags": result_state.get("video_tags") or [], 
+        "thumbnail_url": thumbnail_url
+    }
     serializer = VideoCreateSerializer(data=payload)
     await sync_to_async(serializer.is_valid)(raise_exception=True)
     video = await sync_to_async(serializer.save)()
+
+    # ========== 영상 키워드 생성 Task 등록 (dev 기능 유지) ==========
+    from backend.langgraph_recommendation.tasks import generate_video_keywords_task
+    try:
+        task = generate_video_keywords_task.delay(video.id, title, description)
+        print(f"✓ 키워드 생성 Task 등록 완료: video_id={video.id}, task_id={task.id}")
+    except Exception as e:
+        print(f"⚠️ Celery Task 등록 실패: {e}")
+
     serialized = await sync_to_async(lambda: VideoSerializer(video).data)()
     return JsonResponse({"data": serialized}, status=201)
 
 # ============================================
-# [유니티 폴링 API] (Ngrok 세탁 유지)
+# [유니티 폴링 API] (기존 유지)
 # ============================================
 class PendingScriptView(APIView):
     permission_classes = [AllowAny]
@@ -246,7 +241,7 @@ class PendingScriptView(APIView):
         return Response(data, status=200)
 
 # ============================================
-# [복구 완본] VideoUploadView (물리적 파일 저장 로직)
+# VideoUploadView 및 기타 CRUD (기존 유지)
 # ============================================
 class VideoUploadView(CreateAPIView):
     queryset = Video.objects.all()
@@ -258,7 +253,6 @@ class VideoUploadView(CreateAPIView):
         video_url = None
         ngrok_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
 
-        # 1. 썸네일 파일 저장
         if 'thumbnail_file' in request.FILES:
             thumb = request.FILES['thumbnail_file']
             t_dir = 'thumbnails'
@@ -267,7 +261,6 @@ class VideoUploadView(CreateAPIView):
             t_path = default_storage.save(os.path.join(t_dir, t_name), thumb)
             thumbnail_url = f"{ngrok_url}{settings.MEDIA_URL}{t_path}"
 
-        # 2. 비디오 파일 저장 (여기가 구버전에서 가져온 핵심!)
         if 'video_file' in request.FILES:
             video = request.FILES['video_file']
             v_dir = 'videos'
@@ -275,7 +268,6 @@ class VideoUploadView(CreateAPIView):
             v_name = f"{int(time.time())}_{video.name}"
             v_path = default_storage.save(os.path.join(v_dir, v_name), video)
             video_url = f"{ngrok_url}{settings.MEDIA_URL}{v_path}"
-            print(f"🎬 [Local Save] 영상이 media/videos 폴더에 저장되었습니다: {v_name}")
 
             data = {
                 'title': request.data.get('title'),
@@ -287,13 +279,11 @@ class VideoUploadView(CreateAPIView):
             data = request.data.copy()
             if thumbnail_url: data['thumbnail_url'] = thumbnail_url
 
-        # DB 저장
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response({'data': VideoSerializer(serializer.instance).data, 'message': 'ok'}, status=201)
 
-# ... (이하 ListView, DetailView 등 기타 CRUD는 기존 유지)
 class VideoListView(ListAPIView):
     queryset = Video.objects.all()
     serializer_class = VideoSerializer
@@ -315,10 +305,12 @@ class VideoDeleteView(DestroyAPIView):
     queryset = Video.objects.all()
     permission_classes = [IsAuthenticated, IsAdminUser]
 
-class PopularVideosView(ListAPIView):
-    serializer_class = VideoSerializer
+class PopularVideosView(APIView):
     permission_classes = [AllowAny]
-    def get_queryset(self): return Video.objects.all().order_by('-likes_count', '-comments_count')[:20]
+    def get(self, request):
+        videos = Video.objects.all().order_by('-likes_count', '-comments_count')[:20]
+        serializer = VideoSerializer(videos, many=True)
+        return Response({'data': serializer.data, 'message': 'ok'})
 
 class PopularTagsView(APIView):
     permission_classes = [AllowAny]

@@ -144,7 +144,7 @@ def background_gen_node(state: GraphState) -> GraphState:
     
     # [삭제됨] 로컬에 대본 저장하는 코드는 제거했습니다. (views.py가 담당)
 
+    # 병렬 실행 시 LangGraph 오류 방지: 업데이트하는 키만 반환
     return {
-        **state,
-        "scene_script": script_json, 
+        "scene_script": script_json,
     }

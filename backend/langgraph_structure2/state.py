@@ -38,3 +38,8 @@ class GraphState(TypedDict):
     # Scene 분할 결과
     scenes: NotRequired[List[Dict[str, Any]]]
 
+
+#--------------------------------
+    t0: NotRequired[float]
+
+    neo4j_candidates: NotRequired[List[Dict[str, Any]]]
