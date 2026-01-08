@@ -76,57 +76,126 @@ async def generate_scenario(request):
         data = json.loads(body_unicode)
         topic = data.get('topic', '')
         
-        asset_context_prompt = load_asset_context()
+        # 1. LangGraph 실행
         app = create_graph_flow()
-        initial_state = {"query": topic, "asset_context": asset_context_prompt, "tag": "video"}
-
-        print("🔹 [View] LangGraph 실행...")
+        initial_state = {"query": topic, "asset_context": load_asset_context(), "tag": "video"}
+        print("🔹 [1/4] LangGraph 실행 중...")
         result = await app.ainvoke(initial_state)
         final_script = result.get('scene_script')
 
-        # VP8 가공 로직
-        candidate_video = (result.get('video_url') or result.get('background_video_url') or 
-                           result.get('video_path') or final_script.get('background_video_url'))
-        
-        target_url = ""
-        if candidate_video and (".mp4" in str(candidate_video) or ".webm" in str(candidate_video)):
-            original_url = str(candidate_video)
-            print(f"🎬 [Process] VP8 가공 시작: {original_url}")
-            try:
-                bg_dir = os.path.join(settings.MEDIA_ROOT, 'backgrounds')
-                os.makedirs(bg_dir, exist_ok=True)
-                file_id = int(time.time())
-                raw_path = os.path.join(bg_dir, f"raw_{file_id}.mp4")
-                output_name = f"unity_{file_id}.webm"
-                local_output = os.path.join(bg_dir, output_name)
+        # 2. 가공 대상 영상 주소 추출 (더 넓은 범위 탐색)
+        # [views.py] generate_scenario 함수 내 추출 로직 보강
+        candidate_video = (
+            result.get('video_url') or 
+            result.get('background_video_url') or 
+            result.get('video_path') or 
+            final_script.get('background_video_url') or
+            final_script.get('background_url')
+        )
 
-                r = requests.get(original_url, stream=True)
+        # 🔴 [추가] 만약 위에서 못 찾았다면, 첫 번째 씬의 location을 확인
+        if not candidate_video and 'scenes' in final_script and len(final_script['scenes']) > 0:
+            candidate_video = final_script['scenes'][0].get('location')
+            print(f"🔍 [Notice] 씬 데이터에서 주소 발견: {candidate_video}")
+        
+        print(f"DEBUG: result keys = {result.keys()}")
+        print(f"DEBUG: final_script keys = {final_script.keys() if final_script else 'None'}")
+        print(f"DEBUG: candidate_video value = '{candidate_video}'")
+        
+        print(f"🔍 [2/4] 가공 대상 후보 확인: {candidate_video}")
+
+        target_url = ""
+        # 3. 가공 로직 (성공해야만 target_url이 .webm으로 바뀜)
+        if candidate_video and any(ext in str(candidate_video).lower() for ext in [".mp4", ".webm", ".mov"]):
+            original_url = str(candidate_video)
+            try:
+                # 🔴 원본은 격리된 temp_raw 폴더에 저장 (유니티 접근 불가)
+                temp_raw_dir = os.path.join(settings.MEDIA_ROOT, 'temp_raw')
+                bg_final_dir = os.path.join(settings.MEDIA_ROOT, 'backgrounds')
+                os.makedirs(temp_raw_dir, exist_ok=True)
+                os.makedirs(bg_final_dir, exist_ok=True)
+
+                file_id = int(time.time())
+                raw_path = os.path.join(temp_raw_dir, f"raw_{file_id}.mp4")
+                output_name = f"unity_{file_id}.webm"
+                local_output = os.path.join(bg_final_dir, output_name)
+
+                print(f"🎬 [3/4] 가공 시작: {original_url} -> {output_name}")
+
+                # 원본 다운로드
+                r = requests.get(original_url, stream=True, timeout=30)
                 with open(raw_path, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=8192): f.write(chunk)
 
-                cmd = ['ffmpeg', '-y', '-i', raw_path, '-c:v', 'libvpx', '-b:v', '2M', '-crf', '10', '-c:a', 'libvorbis', local_output]
-                subprocess.run(cmd, check=True, capture_output=True)
+                # FFmpeg 세탁 (VP8 변환 + 메타데이터 삭제)
+                cmd = [
+                    'ffmpeg', '-y', '-i', raw_path,
+                    '-map_metadata', '-1',
+                    '-c:v', 'libvpx', '-b:v', '2M', '-crf', '10',
+                    '-c:a', 'libvorbis',
+                    local_output
+                ]
+                process = subprocess.run(
+                    cmd, 
+                    capture_output=True, 
+                    encoding='utf-8',   # 🔴 명시적으로 UTF-8 지정
+                    errors='ignore'     # 🔴 해독 안되는 문자는 무시
+                )
 
-                ngrok_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
-                target_url = f"{ngrok_url}{settings.MEDIA_URL}backgrounds/{output_name}"
+                if process.returncode == 0:
+                    ngrok_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
+                    target_url = f"{ngrok_url}{settings.MEDIA_URL}backgrounds/{output_name}"
+                    print(f"✅ [Success] 가공 완료: {target_url}")
+                    # 원본 임시 파일 삭제 (용량 관리)
+                    if os.path.exists(raw_path): os.remove(raw_path)
+                else:
+                    print(f"❌ FFmpeg 에러: {process.stderr}")
+                    target_url = original_url
             except Exception as e:
-                print(f"❌ 가공 실패: {e}")
+                print(f"❌ 가공 중 예외 발생: {e}")
                 target_url = original_url
         else:
-            target_url = result.get('background_url') or final_script.get('background_url')
+            print("⚠️ 가공 대상을 찾지 못했거나 영상 형식이 아님.")
+            target_url = candidate_video
 
+        # 4. 🔴 모든 가공이 끝난 '후에' JSON 대본을 업데이트하고 저장
         if target_url and 'scenes' in final_script:
             final_script['background_url'] = target_url
-            for scene in final_script['scenes']: scene['location'] = target_url
+            for scene in final_script['scenes']:
+                scene['location'] = target_url
 
+        # 경로 설정
         save_dir = os.path.join(settings.MEDIA_ROOT, 'pending_scripts')
+        hijack_dir = os.path.join(settings.MEDIA_ROOT, 'script_logs')
+
+        # 폴더가 없으면 생성
         os.makedirs(save_dir, exist_ok=True)
+        os.makedirs(hijack_dir, exist_ok=True)
+
+        # 파일명 생성 및 전체 경로 정의 (변수 미정의 에러 해결)
         filename = f"{time.strftime('%Y%m%d_%H%M%S')}_script.json"
-        with open(os.path.join(save_dir, filename), 'w', encoding='utf-8') as f:
+        full_path = os.path.join(save_dir, filename)      # 유니티가 가져갈 경로
+        hijack_path = os.path.join(hijack_dir, filename)  # 우리가 하이재킹할 로그 경로
+
+        # 1. 유니티 폴링용 폴더에 먼저 저장
+        with open(full_path, 'w', encoding='utf-8') as f:
             json.dump(final_script, f, indent=4, ensure_ascii=False)
-            
+
+        # 2. 🔴 하이재킹: 로그 폴더로 복사 (유니티가 가져가도 원본 보존)
+        import shutil
+        try:
+            shutil.copy(full_path, hijack_path)
+            print(f"📄 [4/4] 대본 생성 및 하이재킹 성공: {hijack_path}")
+        except Exception as copy_e:
+            print(f"⚠️ 하이재킹 복사 실패: {copy_e}")
+
         return JsonResponse({'message': 'Queued', 'file_name': filename}, status=200)
+
     except Exception as e:
+        # 가공 과정이나 저장 과정 중 어디서 터졌는지 추적
+        import traceback
+        print(f"🔥 [Critical] 전체 프로세스 실패: {e}")
+        traceback.print_exc() # 상세 에러 스택 출력
         return JsonResponse({'error': str(e)}, status=500)
 
 # ============================================
