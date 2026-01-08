@@ -56,11 +56,7 @@ class Video(models.Model):
 
     class Meta:
         db_table = 'video'
-<<<<<<< HEAD
-        managed = True  # init.sql에서 테이블 생성
-=======
         managed = True  # Django가 테이블 생성 및 마이그레이션 관리
->>>>>>> dev
         ordering = ['-upload_date']
         verbose_name = '영상'
         verbose_name_plural = '영상들'
