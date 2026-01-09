@@ -220,7 +220,7 @@ async def create_video_from_langgraph(request):
     return JsonResponse({"data": serialized}, status=201)
 
 # ============================================
-# [유니티 폴링 API] (기존 유지)
+# [유니티 폴링 API] (기존 유지) -> 얘가 대본 보내기 담당!
 # ============================================
 class PendingScriptView(APIView):
     permission_classes = [AllowAny]
@@ -241,7 +241,7 @@ class PendingScriptView(APIView):
         return Response(data, status=200)
 
 # ============================================
-# VideoUploadView 및 기타 CRUD (기존 유지)
+# VideoUploadView 및 기타 CRUD (기존 유지) -> 얘가 동영상 받기 담당!
 # ============================================
 class VideoUploadView(CreateAPIView):
     queryset = Video.objects.all()

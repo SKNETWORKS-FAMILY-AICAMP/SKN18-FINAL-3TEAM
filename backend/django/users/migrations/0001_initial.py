@@ -33,7 +33,7 @@ class Migration(migrations.Migration):
                 'verbose_name': '사용자',
                 'verbose_name_plural': '사용자들',
                 'db_table': 'user',
-                'managed': False,
+                'managed': True,
             },
         ),
     ]
