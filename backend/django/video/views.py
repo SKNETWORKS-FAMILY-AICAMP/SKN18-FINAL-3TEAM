@@ -38,6 +38,9 @@ load_dotenv()
 from backend.langgraph_structure1.graph import create_graph_flow
 from backend.langgraph_structure1.state import GraphState
 
+# 이 놈이 나중에 ALB IP로 바뀌어야 하는 그놈이에요!
+SITE_URL = "https://tara-multiflorous-frowsily.ngrok-free.dev"
+
 # ============================================
 # 유니티 에셋 로드 (기존 유지)
 # ============================================
@@ -134,8 +137,7 @@ async def generate_scenario(request):
                 process = subprocess.run(cmd, capture_output=True, encoding='utf-8', errors='ignore')
 
                 if process.returncode == 0:
-                    ngrok_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
-                    target_url = f"{ngrok_url}{settings.MEDIA_URL}backgrounds/{output_name}"
+                    target_url = f"{SITE_URL}{settings.MEDIA_URL}backgrounds/{output_name}"
                     print(f"✅ [Success] 가공 완료: {target_url}")
                     if os.path.exists(raw_path): os.remove(raw_path)
                 else:
@@ -233,8 +235,7 @@ class PendingScriptView(APIView):
         with open(target_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        ngrok_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
-        json_str = json.dumps(data, ensure_ascii=False).replace("http://127.0.0.1:8000", ngrok_url).replace("http://localhost:8000", ngrok_url)
+        json_str = json.dumps(data, ensure_ascii=False).replace("http://127.0.0.1:8000", SITE_URL).replace("http://localhost:8000", SITE_URL)
         data = json.loads(json_str)
         
         os.remove(target_file)
@@ -251,7 +252,6 @@ class VideoUploadView(CreateAPIView):
     def create(self, request, *args, **kwargs):
         thumbnail_url = None
         video_url = None
-        ngrok_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
 
         if 'thumbnail_file' in request.FILES:
             thumb = request.FILES['thumbnail_file']
@@ -259,7 +259,7 @@ class VideoUploadView(CreateAPIView):
             os.makedirs(os.path.join(settings.MEDIA_ROOT, t_dir), exist_ok=True)
             t_name = f"{int(time.time())}_thumb{os.path.splitext(thumb.name)[1]}"
             t_path = default_storage.save(os.path.join(t_dir, t_name), thumb)
-            thumbnail_url = f"{ngrok_url}{settings.MEDIA_URL}{t_path}"
+            thumbnail_url = f"{SITE_URL}{settings.MEDIA_URL}{t_path}"
 
         if 'video_file' in request.FILES:
             video = request.FILES['video_file']
@@ -267,7 +267,7 @@ class VideoUploadView(CreateAPIView):
             os.makedirs(os.path.join(settings.MEDIA_ROOT, v_dir), exist_ok=True)
             v_name = f"{int(time.time())}_{video.name}"
             v_path = default_storage.save(os.path.join(v_dir, v_name), video)
-            video_url = f"{ngrok_url}{settings.MEDIA_URL}{v_path}"
+            video_url = f"{SITE_URL}{settings.MEDIA_URL}{v_path}"
 
             data = {
                 'title': request.data.get('title'),
