@@ -34,13 +34,17 @@ urlpatterns = [
     path('api/chatbot/', include('chatbot.urls')),
     path('api/chat/', include('chatbot.urls')),
 
+    # MinjiRun WebGL 게임
+    path('game/', include('game.urls')),
+
     # API 문서화
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
-    
+
 ]
 
-# 개발 환경에서 media 파일 서빙
+# 개발 환경에서 media 및 static 파일 서빙
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

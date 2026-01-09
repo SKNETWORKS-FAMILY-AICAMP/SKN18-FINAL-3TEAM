@@ -147,6 +147,7 @@ INSTALLED_APPS = [
     'activity',      # 검색 + 시청 기록
     'community',     # 댓글 + 답글 + 좋아요
     'chatbot',       # 챗봇
+    'game',          # MinjiRun WebGL 게임
 ]
 
 SITE_ID = 1
@@ -276,6 +277,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # collectstatic 실행 시 수집 위치 (배포용)
+
+# 개발 중 static 파일 위치
+STATICFILES_DIRS = [
+    BASE_DIR / 'game' / 'static',
+]
 
 # Media files (User uploads)
 MEDIA_URL = '/media/'
@@ -383,3 +390,34 @@ if sys.platform == "darwin":  # macOS
     CELERY_WORKER_POOL = "solo"  # 또는 "threads"
 else:
     CELERY_WORKER_POOL = "prefork"  # Linux에서는 prefork 사용 가능
+
+# ============================================
+# AWS S3 설정 (프로덕션 배포용)
+# ============================================
+USE_S3 = os.getenv('USE_S3', 'False') == 'True'
+
+if USE_S3:
+    # AWS S3 자격증명
+    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+    AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'ap-northeast-2')  # 서울 리전
+
+    # S3 커스텀 도메인 설정
+    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
+
+    # Static 파일 설정
+    STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
+    STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+    # Media 파일 설정
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+    # S3 설정
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400',  # 1일 캐싱
+    }
+    AWS_DEFAULT_ACL = 'public-read'  # 파일을 공개로 설정
+    AWS_S3_FILE_OVERWRITE = False  # 같은 이름 파일 덮어쓰기 방지
+    AWS_QUERYSTRING_AUTH = False  # URL에 인증 쿼리스트링 제거
