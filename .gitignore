@@ -344,4 +344,9 @@ concept_board/
 
 celery.pid
 
+# AWS 설정 파일
+ecs-params.txt
+ssm-params.yaml
+ssm-values.txt
+
 ##

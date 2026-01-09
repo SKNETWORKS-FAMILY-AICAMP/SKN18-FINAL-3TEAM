@@ -2,6 +2,7 @@ from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from rest_framework_simplejwt.tokens import RefreshToken
 from urllib.parse import urlencode
+import os
 
 
 class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
@@ -10,16 +11,22 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
     Generates JWT tokens and redirects to React frontend with tokens as URL parameters.
     """
 
-    def authentication_error(
-        self, request, provider_id, error=None, exception=None, extra_context=None
+    def on_authentication_error(
+        self, request, provider, error=None, exception=None, extra_context=None
     ):
         """
         OAuth 인증 실패 시 처리 (취소 버튼 클릭, 에러 발생 등)
         기본 에러 페이지 대신 프론트엔드로 리다이렉트
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"[OAuth] Authentication error - provider: {provider}, error: {error}, exception: {exception}, extra_context: {extra_context}")
+
         # 프론트엔드 메인 페이지로 리다이렉트 (에러 파라미터 없이)
         from django.shortcuts import redirect
-        return redirect("http://localhost:3000/")
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        logger.info(f"[OAuth] Redirecting to frontend due to error: {frontend_url}")
+        return redirect(frontend_url)
 
     def populate_user(self, request, sociallogin, data):
         """
@@ -56,39 +63,68 @@ class CustomSocialAccountAdapter(DefaultSocialAccountAdapter):
         """
         Helper method to generate JWT tokens and create redirect URL
         """
-        # Generate JWT refresh token using SimpleJWT
-        refresh = RefreshToken.for_user(user)
+        import logging
+        logger = logging.getLogger(__name__)
 
-        # Extract access and refresh tokens as strings
-        access_token = str(refresh.access_token)
-        refresh_token = str(refresh)
+        try:
+            logger.info(f"[OAuth] Generating tokens for user: {user.email}")
 
-        # React frontend URL
-        frontend_url = "http://localhost:3000/"
+            # Generate JWT refresh token using SimpleJWT
+            refresh = RefreshToken.for_user(user)
 
-        # Encode tokens as URL parameters
-        params = urlencode({
-            'access': access_token,
-            'refresh': refresh_token,
-        })
+            # Extract access and refresh tokens as strings
+            access_token = str(refresh.access_token)
+            refresh_token = str(refresh)
 
-        # Return final redirect URL: http://localhost:3000/?access=xxx&refresh=yyy
-        return f"{frontend_url}?{params}"
+            logger.info(f"[OAuth] Tokens generated successfully")
+
+            # React frontend URL from environment variable
+            frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+            logger.info(f"[OAuth] FRONTEND_URL: {frontend_url}")
+
+            if not frontend_url.endswith('/'):
+                frontend_url += '/'
+
+            # Encode tokens as URL parameters
+            params = urlencode({
+                'access': access_token,
+                'refresh': refresh_token,
+            })
+
+            # Return final redirect URL with tokens
+            redirect_url = f"{frontend_url}?{params}"
+            logger.info(f"[OAuth] Redirect URL generated: {redirect_url[:100]}...")
+            return redirect_url
+        except Exception as exc:
+            logger.error(f"[OAuth] ERROR in _generate_token_redirect_url: {exc}", exc_info=True)
+            raise
 
     def get_login_redirect_url(self, request):
         """
         Called after successful login (existing user)
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[OAuth] get_login_redirect_url called, user authenticated: {request.user.is_authenticated}")
+
         if request.user.is_authenticated:
+            logger.info(f"[OAuth] User is authenticated: {request.user.email}")
             return self._generate_token_redirect_url(request.user)
+        logger.warning(f"[OAuth] User is NOT authenticated, using default redirect")
         return super().get_login_redirect_url(request)
 
     def get_signup_redirect_url(self, request):
         """
         Called after successful signup (new user - 처음 소셜 로그인)
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[OAuth] get_signup_redirect_url called, user authenticated: {request.user.is_authenticated}")
+
         if request.user.is_authenticated:
+            logger.info(f"[OAuth] New user signup: {request.user.email}")
             return self._generate_token_redirect_url(request.user)
+        logger.warning(f"[OAuth] User is NOT authenticated during signup, using default redirect")
         return super().get_signup_redirect_url(request)
 
     def get_connect_redirect_url(self, request, socialaccount):
@@ -131,7 +167,9 @@ class CustomAccountAdapter(DefaultAccountAdapter):
                 "refresh": str(refresh),
             }
         )
-        frontend_url = "http://localhost:3000/"
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        if not frontend_url.endswith('/'):
+            frontend_url += '/'
         return f"{frontend_url}?{params}"
 
     def get_login_redirect_url(self, request):

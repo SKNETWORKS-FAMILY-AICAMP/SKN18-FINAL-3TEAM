@@ -2,7 +2,7 @@
  * 이미지 URL 유틸리티 함수들
  */
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = window.ENV?.API_URL || "http://localhost:8000";
 const MEDIA_URL = `${BACKEND_URL}/media/`;
 
 /**

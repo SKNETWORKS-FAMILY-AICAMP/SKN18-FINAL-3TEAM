@@ -8,10 +8,10 @@ Parameters:
 
   InstanceType:
     Type: String
-    Default: t3.medium
+    Default: t3.xlarge
   DesiredCapacity:
     Type: Number
-    Default: 1
+    Default: 2
   MinSize:
     Type: Number
     Default: 1
@@ -645,6 +645,16 @@ Resources:
               Value: !Ref LangchainProject
             - Name: LANGCHAIN_TRACING_V2
               Value: !Ref LangchainTracingV2
+            - Name: USE_S3
+              Value: "true"
+            - Name: AWS_S3_REGION
+              Value: !Ref AWS::Region
+            - Name: AWS_S3_BUCKET_VIDEOS
+              Value: !Sub "${NamePrefix}-videos"
+            - Name: AWS_S3_BUCKET_THUMBNAILS
+              Value: !Sub "${NamePrefix}-thumbnails"
+            - Name: AWS_S3_BUCKET_PROFILES
+              Value: !Sub "${NamePrefix}-profiles"
           LogConfiguration:
             LogDriver: awslogs
             Options:

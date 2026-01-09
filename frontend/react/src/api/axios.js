@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:8000",
+  baseURL: window.ENV?.API_URL || "http://localhost:8000",
   withCredentials: true,
   timeout: 200000, // 2000초 (LangGraph 실행 시간 고려)
 });
@@ -95,7 +95,7 @@ api.interceptors.response.use(
 
           // Refresh 토큰으로 새로운 Access 토큰 요청
           const response = await axios.post(
-            "http://localhost:8000/api/token/refresh/",
+            `${window.ENV?.API_URL || "http://localhost:8000"}/api/token/refresh/`,
             {
               refresh: refreshToken,
             }

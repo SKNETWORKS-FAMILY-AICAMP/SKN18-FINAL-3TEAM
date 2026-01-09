@@ -59,6 +59,24 @@ Resources:
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${NamePrefix}-s3-access"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::${NamePrefix}-videos"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-videos/*"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-thumbnails"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-thumbnails/*"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-profiles"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-profiles/*"
 
   ServiceDiscoveryNamespaceResource:
     Type: AWS::ServiceDiscovery::PrivateDnsNamespace

@@ -29,6 +29,9 @@ from deep_translator import GoogleTranslator
 from .models import Video
 from .serializers import VideoSerializer, VideoDetailSerializer, VideoCreateSerializer
 
+# S3 Storage
+from config.storage_backends import upload_video, upload_thumbnail
+
 # .env 파일 로드
 load_dotenv()
 
@@ -196,7 +199,7 @@ class PendingScriptView(APIView):
         return Response(data, status=200)
 
 # ============================================
-# [복구 완본] VideoUploadView (물리적 파일 저장 로직)
+# [복구 완본] VideoUploadView (S3 또는 로컬 저장)
 # ============================================
 class VideoUploadView(CreateAPIView):
     queryset = Video.objects.all()
@@ -206,26 +209,57 @@ class VideoUploadView(CreateAPIView):
     def create(self, request, *args, **kwargs):
         thumbnail_url = None
         video_url = None
-        ngrok_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
+        use_s3 = getattr(settings, 'USE_S3', False)
+
+        # S3 사용 시 S3 URL 기본 도메인, 로컬 시 ngrok URL
+        if use_s3:
+            base_url = ""  # S3 URL은 전체 URL이 반환됨
+        else:
+            base_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
 
         # 1. 썸네일 파일 저장
         if 'thumbnail_file' in request.FILES:
             thumb = request.FILES['thumbnail_file']
-            t_dir = 'thumbnails'
-            os.makedirs(os.path.join(settings.MEDIA_ROOT, t_dir), exist_ok=True)
-            t_name = f"{int(time.time())}_thumb{os.path.splitext(thumb.name)[1]}"
-            t_path = default_storage.save(os.path.join(t_dir, t_name), thumb)
-            thumbnail_url = f"{ngrok_url}{settings.MEDIA_URL}{t_path}"
 
-        # 2. 비디오 파일 저장 (여기가 구버전에서 가져온 핵심!)
+            if use_s3:
+                # S3에 업로드
+                s3_url = upload_thumbnail(thumb, thumb.name)
+                if s3_url:
+                    thumbnail_url = s3_url
+                else:
+                    print("⚠️ S3 썸네일 업로드 실패, 로컬 저장으로 fallback")
+                    use_s3 = False  # fallback to local
+
+            if not use_s3 or not thumbnail_url:
+                # 로컬 저장
+                t_dir = 'thumbnails'
+                os.makedirs(os.path.join(settings.MEDIA_ROOT, t_dir), exist_ok=True)
+                t_name = f"{int(time.time())}_thumb{os.path.splitext(thumb.name)[1]}"
+                t_path = default_storage.save(os.path.join(t_dir, t_name), thumb)
+                thumbnail_url = f"{base_url}{settings.MEDIA_URL}{t_path}"
+
+        # 2. 비디오 파일 저장
         if 'video_file' in request.FILES:
             video = request.FILES['video_file']
-            v_dir = 'videos'
-            os.makedirs(os.path.join(settings.MEDIA_ROOT, v_dir), exist_ok=True)
-            v_name = f"{int(time.time())}_{video.name}"
-            v_path = default_storage.save(os.path.join(v_dir, v_name), video)
-            video_url = f"{ngrok_url}{settings.MEDIA_URL}{v_path}"
-            print(f"🎬 [Local Save] 영상이 media/videos 폴더에 저장되었습니다: {v_name}")
+
+            if use_s3:
+                # S3에 업로드
+                s3_url = upload_video(video, video.name)
+                if s3_url:
+                    video_url = s3_url
+                    print(f"🎬 [S3] 영상이 S3에 저장되었습니다: {s3_url}")
+                else:
+                    print("⚠️ S3 영상 업로드 실패, 로컬 저장으로 fallback")
+                    use_s3 = False  # fallback to local
+
+            if not use_s3 or not video_url:
+                # 로컬 저장
+                v_dir = 'videos'
+                os.makedirs(os.path.join(settings.MEDIA_ROOT, v_dir), exist_ok=True)
+                v_name = f"{int(time.time())}_{video.name}"
+                v_path = default_storage.save(os.path.join(v_dir, v_name), video)
+                video_url = f"{base_url}{settings.MEDIA_URL}{v_path}"
+                print(f"🎬 [Local Save] 영상이 media/videos 폴더에 저장되었습니다: {v_name}")
 
             data = {
                 'title': request.data.get('title'),
@@ -235,7 +269,8 @@ class VideoUploadView(CreateAPIView):
             }
         else:
             data = request.data.copy()
-            if thumbnail_url: data['thumbnail_url'] = thumbnail_url
+            if thumbnail_url:
+                data['thumbnail_url'] = thumbnail_url
 
         # DB 저장
         serializer = self.get_serializer(data=data)
