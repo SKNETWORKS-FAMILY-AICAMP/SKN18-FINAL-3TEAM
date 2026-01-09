@@ -1,0 +1,45 @@
+{
+    "actors": [
+        "Minji",
+        "Minseok"
+    ],
+    "action_groups": [
+        {
+            "mood": "JOY",
+            "tags": [
+                "Happy Idle", "Belly Dance", "Happy Walk", "Laughing", "Victory"
+            ]
+        },
+        {
+            "mood": "SADNESS",
+            "tags": [
+                "Sad Idle", "Thoughtful Head Nod", "Crying", "Dancing Maraschino Step", "Defeat"
+            ]
+        },
+        {
+            "mood": "REACTION",
+            "tags": [
+                "Surprised", "Thinking"
+            ]
+        },
+        {
+            "mood": "ACTION",
+            "tags": [
+                "Walking", "Pushing", "Goofy Running", "Joyful Jump", "RunningWithCarrige"
+            ]
+        },
+        {
+            "mood": "NEUTRAL",
+            "tags": [
+                "Idle", "Salsa Dancing", "Quick Formal Bow", "Rumba Dancing", 
+                "Standing Using Touchscreen Tablet", "Talking", "Thoughtful Head Shake", 
+                "Waving", "Writing", "Angry", "Bellydancing", "Carrying", 
+                "Dismissing Gesture", "Dwarf Idle", "Excited", "Focus", 
+                "Getting Smashed", "Jogging", "Look Around", "Praying", 
+                "Reacting", "Sword And Shield Slash", "Yelling Out"
+            ]
+        }
+    ],
+    "bgm_files": [], 
+    "sfx_files": []
+}
