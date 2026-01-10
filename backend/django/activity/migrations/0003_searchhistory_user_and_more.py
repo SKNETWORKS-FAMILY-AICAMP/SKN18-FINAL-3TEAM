@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('activity', '0002_alter_searchhistory_options_and_more'),
-        ('video', '0004_video_recommended_keyword_video_thumbnail_url_and_more'),
+        ('video', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

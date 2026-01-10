@@ -8,6 +8,7 @@ from frontend.video_pipeline.services import (
     generate_image_with_gemini,
     create_video_from_image_fal 
 )
+
 # 영상 생성 시 대본 전체를 주면 사람이 배경에 튀어 나오므로 대본이 아니라 분위기만 주기 위한 다중 if문 함수
 def get_video_style_prompt(scene_text: str) -> str:
     """
@@ -68,8 +69,7 @@ def background_gen_node(state: GraphState) -> GraphState:
     script_json = state.get("scene_script", {})
     scenes = script_json.get("scenes", [])
     
-    # [수정 1] 타임스탬프를 루프 돌기 '전'에 미리 만들어둡니다. (파일 이름에 붙이기 위해)
-    # 예: 20251218_103055
+    # 타임스탬프 (배경 파일 이름용)
     current_time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # 저장할 기본 경로 (Django media/backgrounds)
@@ -84,8 +84,7 @@ def background_gen_node(state: GraphState) -> GraphState:
             print(f"⚠️ Scene {scene_id}: image_prompt 없음. 스킵.")
             continue
             
-        # [수정 2] 파일 이름에 시간(current_time_str)을 추가해서 절대 안 겹치게 만듦!
-        # 결과 예: bg_gen_0_20251218_103055.png
+        # 파일 이름 생성 (중복 방지)
         query_type = state.get('query_type', 'gen')
         
         image_file_name = f"bg_{query_type}_{scene_id}_{current_time_str}.png"
@@ -143,26 +142,9 @@ def background_gen_node(state: GraphState) -> GraphState:
             import traceback
             print(traceback.format_exc())
     
-    # 대본 저장 로직 (이미 위에서 타임스탬프를 만들었으니 재활용)
-    try:
-        base_dir = getattr(settings, 'BASE_DIR', os.getcwd())
-        log_dir = os.path.join(base_dir, "Created_Acts")
-        os.makedirs(log_dir, exist_ok=True)
+    # [삭제됨] 로컬에 대본 저장하는 코드는 제거했습니다. (views.py가 담당)
 
-        # 위에서 만든 시간 값 사용
-        q_type = state.get("query_type", "unknown")
-        filename = f"script_{current_time_str}_{q_type}.json"
-        filepath = os.path.join(log_dir, filename)
-
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(script_json, f, indent=4, ensure_ascii=False)
-            
-        print(f"📂 [DEBUG] 대본 파일 저장됨: {filepath}")
-        
-    except Exception as e:
-        print(f"⚠️ 대본 저장 중 에러 발생: {e}")
-
+    # 병렬 실행 시 LangGraph 오류 방지: 업데이트하는 키만 반환
     return {
-        **state,
-        "scene_script": script_json, 
+        "scene_script": script_json,
     }

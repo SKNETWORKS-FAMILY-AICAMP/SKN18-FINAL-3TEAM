@@ -1037,11 +1037,27 @@ const EvidencePathView = ({ evidences = [] }) => {
   // 컨테이너 크기 상태 추가
   const [containerSize, setContainerSize] = useState({
     width: 800,
-    height: 400,
+    height: 280, // 높이를 400px에서 280px로 감소
   });
 
   // 컨테이너 크기 측정
   useEffect(() => {
+    const updateSize = () => {
+      const graphContainer = containerRef.current?.querySelector(
+        "[data-graph-container]"
+      );
+      if (graphContainer) {
+        const rect = graphContainer.getBoundingClientRect();
+        setContainerSize({
+          width: Math.max(rect.width || 800, 400),
+          height: Math.max(rect.height || 280, 250), // 높이를 280px로 감소, 최소값 250px
+        });
+      }
+    };
+
+    // 초기 크기 설정
+    updateSize();
+
     const graphContainer = containerRef.current?.querySelector(
       "[data-graph-container]"
     );
@@ -1171,7 +1187,7 @@ const EvidencePathView = ({ evidences = [] }) => {
                 scrollableParent.scrollTop +
                 containerRect.top -
                 parentRect.top -
-                50; // 여백 증가 (50px → 150px) - 더 많이 스크롤
+                30; // 여백 증가 (50px → 150px) - 더 많이 스크롤
               scrollableParent.scrollTo({
                 top: scrollTop,
                 behavior: "smooth",
@@ -1484,7 +1500,7 @@ const EvidencePathView = ({ evidences = [] }) => {
             style={{
               width: "100%",
               maxWidth: "100%",
-              height: "400px", // 높이 감소 (600px → 400px)
+              height: "280px", // 높이 감소 (400px → 280px)
               backgroundColor: COLORS.white,
               borderRadius: "8px",
               border: `1px solid ${COLORS.border}`,
@@ -1562,8 +1578,8 @@ const EvidencePathView = ({ evidences = [] }) => {
                 <ForceGraph2D
                   ref={graphRef}
                   graphData={graphData}
-                  width={containerSize.width}
-                  height={containerSize.height}
+                  width={containerSize.width || 800}
+                  height={containerSize.height || 280} // 높이를 280px로 감소
                   nodeLabel="name"
                   nodeColor={getNodeColor}
                   nodeRelSize={getNodeSize}

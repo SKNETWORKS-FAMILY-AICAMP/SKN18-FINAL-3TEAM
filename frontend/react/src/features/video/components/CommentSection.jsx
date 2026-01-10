@@ -273,7 +273,7 @@ const CommentSection = ({
                 minHeight: "32px",
                 borderRadius: "50%",
                 backgroundColor: (isLoggedIn && commentText.trim())
-                  ? COLORS.primary
+                  ? COLORS.jadePale
                   : COLORS.lightGray,
                 border: "none",
                 cursor: (isLoggedIn && commentText.trim()) ? "pointer" : "not-allowed",

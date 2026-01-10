@@ -20,9 +20,98 @@ import EvidencePathView from "../components/common/EvidencePathView";
 import ThinkingMode from "../components/common/ThinkingMode/ThinkingMode";
 import { useBackgroundTask } from "../contexts/BackgroundTaskContext";
 
+// 환영 메시지 컴포넌트 (스트리밍 애니메이션)
+const WelcomeMessage = ({ nickname }) => {
+  const [displayedName, setDisplayedName] = useState("");
+  const [displayedQuestion, setDisplayedQuestion] = useState("");
+
+  useEffect(() => {
+    const nameText = `${nickname}님,`;
+    const questionText = "조선역사에 대해서 궁금하신게 있으신가요?";
+
+    // 초기화
+    setDisplayedName("");
+    setDisplayedQuestion("");
+
+    // 이름 텍스트 스트리밍
+    let nameIndex = 0;
+    const nameInterval = setInterval(() => {
+      if (nameIndex < nameText.length) {
+        setDisplayedName(nameText.slice(0, nameIndex + 1));
+        nameIndex++;
+      } else {
+        clearInterval(nameInterval);
+        // 이름이 완성되면 질문 텍스트 스트리밍 시작
+        let questionIndex = 0;
+        const questionInterval = setInterval(() => {
+          if (questionIndex < questionText.length) {
+            setDisplayedQuestion(questionText.slice(0, questionIndex + 1));
+            questionIndex++;
+          } else {
+            clearInterval(questionInterval);
+          }
+        }, 50);
+        return () => clearInterval(questionInterval);
+      }
+    }, 100);
+    return () => clearInterval(nameInterval);
+  }, [nickname]);
+
+  return (
+    <>
+      <div
+        style={{
+          fontFamily: "'Noto Serif KR', serif",
+          fontSize: "clamp(28px, 4vw, 36px)",
+          fontWeight: "700",
+          color: COLORS.white,
+          margin: 0,
+          lineHeight: "1.4",
+          marginBottom: "0.5rem",
+        }}
+      >
+        {displayedName}
+        {displayedName.length < `${nickname}님,`.length && (
+          <span style={{ opacity: 0.5 }}>|</span>
+        )}
+      </div>
+      <div
+        style={{
+          fontFamily: "'Noto Serif KR', serif",
+          fontSize: "clamp(18px, 2.5vw, 24px)",
+          fontWeight: "300",
+          color: COLORS.white,
+          margin: 0,
+          lineHeight: "1.5",
+          opacity: 0.9,
+        }}
+      >
+        {displayedQuestion}
+        {displayedQuestion.length <
+          "조선역사에 대해서 궁금하신게 있으신가요?".length && (
+          <span style={{ opacity: 0.5 }}>|</span>
+        )}
+      </div>
+    </>
+  );
+};
+
 const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
   const { showToast } = useBackgroundTask();
   const [isOnChatbotPage, setIsOnChatbotPage] = useState(true);
+
+  // 비회원 접근 차단
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    if (!token || !user) {
+      // 비회원이면 메인 페이지로 리다이렉트
+      if (onNavigate) {
+        onNavigate("main");
+      } else {
+        window.location.hash = "#main";
+      }
+    }
+  }, [user, onNavigate]);
 
   // 페이지 마운트/언마운트 감지
   useEffect(() => {
@@ -291,7 +380,19 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
   }, [messages.length]);
 
   useEffect(() => {
-    if (containerRef.current && messages.length > 0) {
+    // 메시지, 스트리밍 텍스트, 또는 Thinking 이벤트가 변경될 때마다 맨 아래로 스크롤
+    if (messagesEndRef.current) {
+      // 약간의 지연을 두어 DOM이 완전히 렌더링된 후 스크롤
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "end",
+          });
+        }
+      }, 100);
+    } else if (containerRef.current && messages.length > 0) {
+      // fallback: messagesEndRef가 없을 경우 containerRef 사용
       requestAnimationFrame(() => {
         if (containerRef.current) {
           containerRef.current.scrollTop = containerRef.current.scrollHeight;
@@ -311,7 +412,12 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
     const userMessage = message.trim();
     setMessage("");
 
+    // 스트리밍 텍스트 초기화 (thinking 모드에서도 스트리밍이 작동하도록)
+    setStreamingText("");
     // Thinking 모드는 이벤트를 초기화하지 않음 (재질문 후 이벤트 누적)
+    if (!isThinkingMode) {
+      setCurrentThinkingEvents([]);
+    }
 
     setMessages((prev) => [...prev, { type: "user", text: userMessage }]);
 
@@ -507,10 +613,41 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
       }
 
       console.error("질문 전송 실패:", error);
+      console.error("에러 상세:", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        stack: error.stack,
+      });
 
       let errorMessage = "죄송합니다. 오류가 발생했습니다. 다시 시도해주세요.";
 
-      if (error.response?.status === 404) {
+      if (
+        error.message === "Authentication required" ||
+        error.message === "Authentication expired"
+      ) {
+        errorMessage = "로그인이 필요합니다. 다시 로그인해주세요.";
+        localStorage.clear();
+        const frontendUrl =
+          window.location.port === "8000" ||
+          window.location.hostname.includes("8000")
+            ? "http://localhost:3000/"
+            : `${window.location.origin}/`;
+        window.location.href = frontendUrl;
+        return;
+      } else if (error.message?.includes("HTTP error")) {
+        if (error.message.includes("404")) {
+          errorMessage =
+            "채팅 API가 아직 구현되지 않았습니다. 백엔드 개발자에게 문의해주세요.";
+        } else if (error.message.includes("500")) {
+          errorMessage = "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+        } else if (error.message.includes("503")) {
+          errorMessage =
+            "OpenAI API 연결에 실패했습니다. 환경변수(OPENAI_API_KEY, OPENAI_MODEL) 설정을 확인해주세요.";
+        } else {
+          errorMessage = `서버 오류가 발생했습니다. (${error.message})`;
+        }
+      } else if (error.response?.status === 404) {
         errorMessage =
           "채팅 API가 아직 구현되지 않았습니다. 백엔드 개발자에게 문의해주세요.";
       } else if (error.response?.status === 500) {
@@ -520,6 +657,8 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
           "OpenAI API 연결에 실패했습니다. 환경변수(OPENAI_API_KEY, OPENAI_MODEL) 설정을 확인해주세요.";
       } else if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
       }
 
       simulateStreamingResponse(errorMessage);
@@ -576,10 +715,10 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
     // Thinking 모드일 때는 선택된 카드 표시, 일반 모드일 때는 기존대로 처리
     if (isThinkingMode) {
       // ThinkingMode에서 선택된 카드를 강조 표시 (카드 유지)
-      setCurrentClarification(prev => ({
+      setCurrentClarification((prev) => ({
         ...prev,
         isSelected: true,
-        selectedId: directionId
+        selectedId: directionId,
       }));
     } else {
       // 일반 모드: 재질문 카드를 비활성화하고 사용자 선택을 메시지에 추가
@@ -595,7 +734,12 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
 
     setIsSubmitting(true);
 
+    // 스트리밍 텍스트 초기화 (thinking 모드에서도 스트리밍이 작동하도록)
+    setStreamingText("");
     // Thinking 모드는 이벤트를 초기화하지 않음 (재질문 후 이벤트 누적)
+    if (!isThinkingMode) {
+      setCurrentThinkingEvents([]);
+    }
 
     // AbortController 생성
     abortControllerRef.current = new AbortController();
@@ -766,6 +910,12 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
     }
   }, [messages.length]);
 
+  // 비회원일 경우 렌더링하지 않음
+  const token = localStorage.getItem("access_token");
+  if (!token || !user) {
+    return null;
+  }
+
   return (
     <div
       style={{
@@ -814,7 +964,7 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
               height="81"
               viewBox="0 0 24 24"
               fill="none"
-              stroke={COLORS.dark}
+              stroke={COLORS.jade}
               strokeWidth="4"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -1223,13 +1373,16 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
 
       {/* 메인 컨텐츠 */}
       <div
+        className={messages.length > 0 ? "chat-main" : ""}
         style={{
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          padding: messages.length > 0 ? "40px 60px" : "40px 60px",
+          padding: messages.length > 0 ? "0" : "40px 60px",
           position: "relative",
           overflow: "hidden",
+          backgroundColor:
+            messages.length > 0 ? "var(--cream)" : COLORS.background,
         }}
       >
         {/* Thinking 상태 표시 */}
@@ -1291,11 +1444,12 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
               flex: 1,
               display: "flex",
               flexDirection: "column",
-              maxWidth: "900px",
+              maxWidth: "900px", // 전체 창 폭을 좁게 조정
               width: "100%",
               marginLeft: "auto",
               marginRight: "auto",
-              paddingLeft: showHistory ? "340px" : "60px", // 사이드바 너비 + 여백, 닫혀있을 때도 토글 버튼 공간 확보
+              paddingLeft: showHistory ? "340px" : "40px", // 사이드바 너비 + 여백, 닫혀있을 때도 토글 버튼 공간 확보
+              paddingRight: "40px",
               height: "100%",
               minHeight: 0,
               position: "relative",
@@ -1304,16 +1458,15 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
             {/* 대화 목록 */}
             <div
               ref={containerRef}
+              className="chat-messages"
               style={{
                 flex: 1,
                 overflowY: "auto",
                 overflowX: "hidden",
-                paddingTop: "40px", // 상단 패딩 증가로 위 내용이 가려지지 않도록
-                paddingRight: "16px",
-                paddingLeft: "16px",
-                paddingBottom: "100px", // 마지막 대화와 입력창 사이 간격 조정
+                padding: "2rem 2.5rem 1rem 2.5rem", // 하단 패딩 줄임 (입력창 공간 확보), 좌우 패딩 조정
                 touchAction: "pan-y",
                 WebkitOverflowScrolling: "touch",
+                minHeight: 0,
               }}
               onWheel={(e) => {
                 e.stopPropagation();
@@ -1353,24 +1506,12 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
                         alignItems: "flex-start",
                         gap: "12px",
                         padding: "0 8px",
+                        width: "100%",
                       }}
                     >
                       {msg.type === "user" ? (
-                        <div
-                          style={{
-                            marginBottom: "8px",
-                            padding: "12px 16px",
-                            backgroundColor: COLORS.lightGray,
-                            borderRadius: "12px",
-                            fontSize: "14px",
-                            color: COLORS.dark,
-                            display: "inline-block",
-                            maxWidth: "68%",
-                            wordWrap: "break-word",
-                            lineHeight: "1.5",
-                          }}
-                        >
-                          {msg.text}
+                        <div className="chat-message user">
+                          <div className="chat-message-bubble">{msg.text}</div>
                         </div>
                       ) : msg.type === "clarification" ? (
                         <>
@@ -1576,21 +1717,10 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
                           </div>
                         </>
                       ) : (
-                        <>
-                          <div
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              borderRadius: "50%",
-                              backgroundColor: COLORS.primary,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                              marginTop: "2px",
-                            }}
-                          >
-                            <ChatIcon size={18} color={COLORS.dark} />
+                        <div className="chat-message bot">
+                          <div className="chat-message-header">
+                            <div className="chat-message-avatar">秀</div>
+                            <span className="chat-message-name">아가씨</span>
                           </div>
                           <div
                             style={{
@@ -1604,20 +1734,21 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
                             }}
                           >
                             {/* Thinking Mode 컴포넌트 (메시지에 thinking 이벤트가 있을 때만 표시) */}
-                            {msg.thinkingEvents && msg.thinkingEvents.length > 0 && (
-                              <div style={{ marginBottom: "16px" }}>
-                                <ThinkingMode
-                                  thinkingEvents={msg.thinkingEvents}
-                                  isComplete={true}
-                                />
-                              </div>
-                            )}
+                            {msg.thinkingEvents &&
+                              msg.thinkingEvents.length > 0 && (
+                                <div style={{ marginBottom: "16px" }}>
+                                  <ThinkingMode
+                                    thinkingEvents={msg.thinkingEvents}
+                                    isComplete={true}
+                                  />
+                                </div>
+                              )}
                             <MarkdownRenderer content={msg.text} />
                             {msg.evidences && msg.evidences.length > 0 && (
                               <EvidencePathView evidences={msg.evidences} />
                             )}
                           </div>
-                        </>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1647,50 +1778,51 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
                     >
                       <ChatIcon size={18} color={COLORS.dark} />
                     </div>
-                    <div
-                      style={{
-                        fontSize: "14px",
-                        color: COLORS.gray,
-                        lineHeight: "1.5",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "2px",
-                        paddingTop: "2px",
-                      }}
-                    >
-                      <span
+                    <div className="chat-message-bubble">
+                      <div
                         style={{
-                          display: "inline-block",
-                          width: "6px",
-                          height: "6px",
-                          borderRadius: "50%",
-                          backgroundColor: COLORS.gray,
-                          animation: "dotBounce 1.4s infinite ease-in-out",
-                          animationDelay: "0s",
+                          fontSize: "14px",
+                          color: "var(--gray)",
+                          lineHeight: "1.5",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "2px",
                         }}
-                      />
-                      <span
-                        style={{
-                          display: "inline-block",
-                          width: "6px",
-                          height: "6px",
-                          borderRadius: "50%",
-                          backgroundColor: COLORS.gray,
-                          animation: "dotBounce 1.4s infinite ease-in-out",
-                          animationDelay: "0.2s",
-                        }}
-                      />
-                      <span
-                        style={{
-                          display: "inline-block",
-                          width: "6px",
-                          height: "6px",
-                          borderRadius: "50%",
-                          backgroundColor: COLORS.gray,
-                          animation: "dotBounce 1.4s infinite ease-in-out",
-                          animationDelay: "0.4s",
-                        }}
-                      />
+                      >
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: "6px",
+                            height: "6px",
+                            borderRadius: "50%",
+                            backgroundColor: COLORS.gray,
+                            animation: "dotBounce 1.4s infinite ease-in-out",
+                            animationDelay: "0s",
+                          }}
+                        />
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: "6px",
+                            height: "6px",
+                            borderRadius: "50%",
+                            backgroundColor: COLORS.gray,
+                            animation: "dotBounce 1.4s infinite ease-in-out",
+                            animationDelay: "0.2s",
+                          }}
+                        />
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: "6px",
+                            height: "6px",
+                            borderRadius: "50%",
+                            backgroundColor: COLORS.gray,
+                            animation: "dotBounce 1.4s infinite ease-in-out",
+                            animationDelay: "0.4s",
+                          }}
+                        />
+                      </div>
                       <style>{`
                         @keyframes dotBounce {
                           0%, 60%, 100% {
@@ -1745,40 +1877,19 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
 
                 {/* 텍스트 스트리밍 */}
                 {streamingText && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: "12px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "50%",
-                        backgroundColor: COLORS.primary,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                        marginTop: "2px",
-                      }}
-                    >
-                      <ChatIcon size={18} color={COLORS.dark} />
+                  <div className="chat-message bot">
+                    <div className="chat-message-header">
+                      <div className="chat-message-avatar">秀</div>
+                      <span className="chat-message-name">아가씨</span>
                     </div>
-                    <div
-                      style={{
-                        flex: 1,
-                      }}
-                    >
+                    <div className="chat-message-bubble">
                       <MarkdownRenderer content={streamingText} />
                       <span
                         style={{
                           display: "inline-block",
                           width: "2px",
                           height: "16px",
-                          backgroundColor: COLORS.dark,
+                          backgroundColor: "var(--black)",
                           marginLeft: "2px",
                           animation: "blink 1s infinite",
                         }}
@@ -1798,175 +1909,185 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
               </div>
             </div>
 
-            {/* 입력 영역 */}
+            {/* 입력창 (메시지가 있을 때 하단 고정) */}
             <div
               style={{
-                position: "fixed",
-                bottom: "40px",
-                left: showHistory ? "calc(50% + 170px)" : "calc(50% + 30px)", // 사이드바 상태에 따른 중앙 조정
-                transform: "translateX(-50%)",
-                width: "100%",
-                maxWidth: "900px",
-                marginLeft: "auto",
-                marginRight: "auto",
-                zIndex: 998,
-                transition: "left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                padding: "1rem 2.5rem 2rem 2.5rem",
+                backgroundColor: "var(--cream)",
+                borderTop: `1px solid ${COLORS.border}`,
               }}
             >
-              <form
-                onSubmit={handleSubmit}
-                style={{
-                  position: "relative",
-                  display: "flex",
-                  alignItems: "center",
-                  width: "100%",
-                }}
-              >
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="질문을 입력하세요..."
-                  disabled={isSubmitting}
-                  style={{
-                    flex: 1,
-                    padding: "12px 100px 12px 20px",
-                    border: `1.5px solid ${
-                      message.trim() ? COLORS.primary : "#ddd"
-                    }`,
-                    borderRadius: "24px",
-                    fontSize: "14px",
-                    backgroundColor: COLORS.white,
-                    color: COLORS.dark,
-                    outline: "none",
-                    transition: "border-color 0.2s",
-                    opacity: isSubmitting ? 0.6 : 1,
-                    cursor: isSubmitting ? "not-allowed" : "text",
-                  }}
-                  onFocus={(e) => {
-                    if (!isSubmitting) {
-                      e.target.style.borderColor = COLORS.primary;
-                    }
-                  }}
-                  onBlur={(e) => (e.target.style.borderColor = "#ddd")}
-                />
+              <form onSubmit={handleSubmit}>
                 <div
                   style={{
-                    position: "absolute",
-                    right: "8px",
+                    position: "relative",
+                    backgroundColor: COLORS.white,
+                    borderRadius: "16px",
+                    border: `2px solid ${
+                      message.trim() ? COLORS.primary : "#ddd"
+                    }`,
+                    padding: "20px 100px 20px 20px",
+                    transition: "border-color 0.2s",
+                    minHeight: "80px",
                     display: "flex",
-                    gap: "8px",
-                    alignItems: "center",
+                    alignItems: "flex-start",
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={handleThinkingClick}
+                  <textarea
+                    ref={inputRef}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="질문을 입력하세요..."
+                    disabled={isSubmitting}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      padding: "6px 12px",
-                      backgroundColor: isThinkingMode
-                        ? COLORS.primary
-                        : COLORS.white,
-                      border: `1.5px solid ${
-                        isThinkingMode ? COLORS.primary : "#ddd"
-                      }`,
-                      borderRadius: "16px",
-                      cursor: "pointer",
-                      transition: "all 0.2s",
-                      fontSize: "13px",
-                      fontWeight: "500",
+                      width: "100%",
+                      border: "none",
+                      outline: "none",
+                      fontSize: "16px",
                       color: COLORS.dark,
+                      backgroundColor: "transparent",
+                      resize: "none",
+                      fontFamily: "inherit",
+                      lineHeight: "1.5",
+                      minHeight: "40px",
+                      paddingTop: 0,
+                      opacity: isSubmitting ? 0.6 : 1,
+                      cursor: isSubmitting ? "not-allowed" : "text",
                     }}
-                    onMouseEnter={(e) => {
-                      if (!isThinkingMode) {
-                        e.currentTarget.style.borderColor = COLORS.primary;
-                        e.currentTarget.style.backgroundColor = COLORS.tertiary;
+                    rows={1}
+                    onInput={(e) => {
+                      e.target.style.height = "auto";
+                      e.target.style.height =
+                        Math.max(40, e.target.scrollHeight) + "px";
+                      const container = e.target
+                        .closest("form")
+                        .querySelector("div");
+                      if (container) {
+                        container.style.minHeight =
+                          Math.max(80, e.target.scrollHeight + 40) + "px";
                       }
                     }}
-                    onMouseLeave={(e) => {
-                      if (!isThinkingMode) {
-                        e.currentTarget.style.borderColor = "#ddd";
-                        e.currentTarget.style.backgroundColor = COLORS.white;
-                      }
+                  />
+
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: "12px",
+                      right: "12px",
+                      display: "flex",
+                      gap: "8px",
+                      alignItems: "center",
                     }}
                   >
-                    {isThinkingMode ? (
-                      <CloseIcon size={14} color={COLORS.dark} />
-                    ) : (
-                      <ThinkingIcon size={16} color={COLORS.dark} />
-                    )}
-                    <span>Thinking</span>
-                  </button>
-
-                  {isSubmitting ? (
                     <button
                       type="button"
-                      onClick={handleStopSubmit}
+                      onClick={handleThinkingClick}
                       style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "8px",
-                        backgroundColor: COLORS.cardSky,
-                        border: "none",
-                        cursor: "pointer",
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "center",
-                        transition: "all 0.2s",
-                        padding: 0,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = "scale(1.05)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "scale(1)";
-                      }}
-                    >
-                      <StopIcon
-                        size={16}
-                        color={COLORS.cardSky}
-                        fillColor={COLORS.sub_color}
-                      />
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      disabled={!message.trim()}
-                      style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "8px",
-                        backgroundColor: message.trim()
+                        gap: "6px",
+                        padding: "6px 12px",
+                        backgroundColor: isThinkingMode
                           ? COLORS.primary
-                          : COLORS.lightGray,
-                        border: "none",
-                        cursor: message.trim() ? "pointer" : "not-allowed",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                          : COLORS.white,
+                        border: `1.5px solid ${
+                          isThinkingMode ? COLORS.primary : "#ddd"
+                        }`,
+                        borderRadius: "16px",
+                        cursor: "pointer",
                         transition: "all 0.2s",
-                        padding: 0,
+                        fontSize: "13px",
+                        fontWeight: "500",
+                        color: COLORS.dark,
                       }}
                       onMouseEnter={(e) => {
-                        if (message.trim()) {
-                          e.currentTarget.style.transform = "scale(1.05)";
+                        if (!isThinkingMode) {
+                          e.currentTarget.style.borderColor = COLORS.primary;
+                          e.currentTarget.style.backgroundColor =
+                            COLORS.tertiary;
                         }
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "scale(1)";
+                        if (!isThinkingMode) {
+                          e.currentTarget.style.borderColor = "#ddd";
+                          e.currentTarget.style.backgroundColor = COLORS.white;
+                        }
                       }}
                     >
-                      <SendIcon
-                        size={16}
-                        color={message.trim() ? COLORS.dark : COLORS.gray}
-                      />
+                      {isThinkingMode ? (
+                        <CloseIcon size={14} color={COLORS.dark} />
+                      ) : (
+                        <ThinkingIcon size={16} color={COLORS.dark} />
+                      )}
+                      <span>Thinking</span>
                     </button>
-                  )}
+
+                    {isSubmitting ? (
+                      <button
+                        type="button"
+                        onClick={handleStopSubmit}
+                        style={{
+                          width: "32px",
+                          height: "32px",
+                          borderRadius: "8px",
+                          backgroundColor: COLORS.cardSky,
+                          border: "none",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          transition: "all 0.2s",
+                          padding: 0,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "scale(1.05)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "scale(1)";
+                        }}
+                      >
+                        <StopIcon
+                          size={16}
+                          color={COLORS.cardSky}
+                          fillColor={COLORS.sub_color}
+                        />
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={!message.trim()}
+                        style={{
+                          width: "32px",
+                          height: "32px",
+                          borderRadius: "8px",
+                          backgroundColor: message.trim()
+                            ? COLORS.primary
+                            : COLORS.lightGray,
+                          border: "none",
+                          cursor: message.trim() ? "pointer" : "not-allowed",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          transition: "all 0.2s",
+                          padding: 0,
+                        }}
+                        onMouseEnter={(e) => {
+                          if (message.trim()) {
+                            e.currentTarget.style.transform = "scale(1.05)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "scale(1)";
+                        }}
+                      >
+                        <SendIcon
+                          size={16}
+                          color={message.trim() ? COLORS.dark : COLORS.gray}
+                        />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </form>
             </div>
@@ -1976,9 +2097,6 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
           <div
             style={{
               width: "100%",
-              maxWidth: "900px",
-              marginLeft: "auto",
-              marginRight: "auto",
               marginTop: "-40px",
               display: "flex",
               flexDirection: "column",
@@ -1986,34 +2104,25 @@ const Chatbot = ({ onNavigate, user, newChatTrigger, initialSessionId }) => {
               justifyContent: "center",
               flex: 1,
               gap: "32px",
-              paddingLeft: showHistory ? "340px" : "60px",
+              paddingLeft: showHistory ? "340px" : "40px",
+              paddingRight: "40px",
               transition: "padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
             }}
           >
             <div
               style={{
                 textAlign: "center",
+                width: "100%",
+                maxWidth: "800px",
               }}
             >
-              <h1
-                style={{
-                  fontFamily: "'SB 어그로', 'Pretendard', sans-serif",
-                  fontSize: "clamp(32px, 5vw, 40px)",
-                  fontWeight: "500",
-                  color: "#effd9a",
-                  margin: 0,
-                  lineHeight: "1.2",
-                }}
-              >
-                {`${nickname}님, 조선역사에 대해서 궁금하신게 있으신가요?`}
-              </h1>
+              <WelcomeMessage nickname={nickname} />
             </div>
 
             <div
               style={{
                 width: "100%",
                 maxWidth: "900px",
-                margin: "0 auto",
               }}
             >
               <form onSubmit={handleSubmit}>

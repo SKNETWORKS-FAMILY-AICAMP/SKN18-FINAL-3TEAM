@@ -7,7 +7,9 @@ from .views import (
     VideoUpdateView,
     VideoDeleteView,
     PopularVideosView,
-    PopularTagsView
+    PopularTagsView,
+    ConnectionTestView,
+    PendingScriptView
 )
 
 # Video app URLs
@@ -41,4 +43,10 @@ urlpatterns = [
 
     # GET /api/video/tags/popular/ - 인기 태그 조회
     path('tags/popular/', PopularTagsView.as_view(), name='popular-tags'),
+    
+    #서버 연결 테스트용 임시
+    path('test/', ConnectionTestView.as_view(), name='connection_test'),
+
+    #유니티로 대본 폴링용
+    path('pending/', PendingScriptView.as_view(), name='pending-script'),
 ]

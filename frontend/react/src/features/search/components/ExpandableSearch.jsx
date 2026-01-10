@@ -35,7 +35,7 @@ const ExpandableSearch = ({
   const [searchHistory, setSearchHistory] = useState([]); // {id, search_query} 객체 배열
   const [hiddenHistoryIds, setHiddenHistoryIds] = useState(() => {
     // localStorage에서 숨긴 검색 기록 ID 목록 가져오기
-    const stored = localStorage.getItem('hiddenSearchHistory');
+    const stored = localStorage.getItem("hiddenSearchHistory");
     return stored ? JSON.parse(stored) : [];
   });
   const [recommendedTags, setRecommendedTags] = useState([]); // 태그 (아이콘으로 표시)
@@ -73,10 +73,12 @@ const ExpandableSearch = ({
           const historyResponse = await getSearchHistory();
           if (historyResponse?.data) {
             // {id, search_query} 형태로 저장
-            setSearchHistory(historyResponse.data.map((h) => ({
-              id: h.id,
-              search_query: h.search_query
-            })));
+            setSearchHistory(
+              historyResponse.data.map((h) => ({
+                id: h.id,
+                search_query: h.search_query,
+              }))
+            );
           }
         }
 
@@ -110,7 +112,7 @@ const ExpandableSearch = ({
     if (!isOpen) return;
 
     const searchQuery = searchValue.trim();
-    
+
     // 검색어가 없으면 인기 영상 로드
     if (!searchQuery) {
       const fetchPopular = async () => {
@@ -139,7 +141,14 @@ const ExpandableSearch = ({
     setIsSearching(true);
     const debounceTimer = setTimeout(async () => {
       try {
-        const response = await searchVideos(searchQuery, "relevance", 1, 12, [], false);
+        const response = await searchVideos(
+          searchQuery,
+          "relevance",
+          1,
+          12,
+          [],
+          false
+        );
         if (response?.data?.results) {
           setSuggestedVideos(
             response.data.results.map((v) => ({
@@ -176,9 +185,15 @@ const ExpandableSearch = ({
         const response = await createSearchHistory(searchQuery);
         // 검색 기록 업데이트 (최대 10개)
         if (response?.data) {
-          const newHistory = { id: response.data.id, search_query: searchQuery };
+          const newHistory = {
+            id: response.data.id,
+            search_query: searchQuery,
+          };
           setSearchHistory((prev) =>
-            [newHistory, ...prev.filter((h) => h.search_query !== searchQuery)].slice(0, 10)
+            [
+              newHistory,
+              ...prev.filter((h) => h.search_query !== searchQuery),
+            ].slice(0, 10)
           );
         }
       } catch (error) {
@@ -194,7 +209,7 @@ const ExpandableSearch = ({
     } else {
       console.warn("onSearch 콜백이 제공되지 않았습니다.");
     }
-    
+
     // 입력창 초기화 및 검색창 닫기
     setSearchValue("");
     onClose();
@@ -242,7 +257,10 @@ const ExpandableSearch = ({
     const updatedHiddenIds = [...hiddenHistoryIds, historyId];
     setHiddenHistoryIds(updatedHiddenIds);
     // localStorage에 저장
-    localStorage.setItem('hiddenSearchHistory', JSON.stringify(updatedHiddenIds));
+    localStorage.setItem(
+      "hiddenSearchHistory",
+      JSON.stringify(updatedHiddenIds)
+    );
   };
 
   // 숨기지 않은 검색 기록만 필터링
@@ -553,7 +571,7 @@ const ExpandableSearch = ({
                         gap: "8px",
                         maxHeight: "200px",
                         overflowY: "auto",
-                        paddingRight: "8px"
+                        paddingRight: "8px",
                       }}
                     >
                       {recommendedTags.length === 0 &&
@@ -576,8 +594,8 @@ const ExpandableSearch = ({
                               }}
                               style={{
                                 padding: "8px 16px",
-                                backgroundColor: COLORS.sub_color, // 연노랑색
-                                border: `1.5px solid ${COLORS.sub_color}`,
+                                backgroundColor: COLORS.jadePale, // 밝은 제이드
+                                border: `1.5px solid ${COLORS.jadePale}`,
                                 borderRadius: "20px",
                                 color: COLORS.dark, // 블랙
                                 fontSize: "12px",
@@ -592,13 +610,17 @@ const ExpandableSearch = ({
                                 transitionDelay: `${0.2 + idx * 0.025}s`,
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = COLORS.sky; // 하늘색
-                                e.currentTarget.style.borderColor = COLORS.sky;
+                                e.currentTarget.style.backgroundColor =
+                                  COLORS.jadeLight; // 제이드 라이트
+                                e.currentTarget.style.borderColor =
+                                  COLORS.jadeLight;
                                 e.currentTarget.style.color = COLORS.dark; // 블랙 유지
                               }}
                               onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = COLORS.sub_color; // 연노랑색
-                                e.currentTarget.style.borderColor = COLORS.sub_color;
+                                e.currentTarget.style.backgroundColor =
+                                  COLORS.jadePale; // 밝은 제이드
+                                e.currentTarget.style.borderColor =
+                                  COLORS.jadePale;
                                 e.currentTarget.style.color = COLORS.dark; // 블랙
                               }}
                             >
@@ -635,17 +657,21 @@ const ExpandableSearch = ({
                                     ? "translateY(0)"
                                     : "translateY(8px)",
                                 transitionDelay: `${
-                                  0.2 + (recommendedKeywords.length + idx) * 0.025
+                                  0.2 +
+                                  (recommendedKeywords.length + idx) * 0.025
                                 }s`,
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = COLORS.sky; // 하늘색
+                                e.currentTarget.style.backgroundColor =
+                                  COLORS.sky; // 하늘색
                                 e.currentTarget.style.borderColor = COLORS.sky;
                                 e.currentTarget.style.color = COLORS.dark; // 블랙 유지
                               }}
                               onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = COLORS.sub_color; // 연노랑색
-                                e.currentTarget.style.borderColor = COLORS.sub_color;
+                                e.currentTarget.style.backgroundColor =
+                                  COLORS.sub_color; // 연노랑색
+                                e.currentTarget.style.borderColor =
+                                  COLORS.sub_color;
                                 e.currentTarget.style.color = COLORS.dark; // 블랙
                               }}
                             >
@@ -670,7 +696,11 @@ const ExpandableSearch = ({
                     marginBottom: "16px",
                   }}
                 >
-                  {searchValue ? `"${searchValue}" 관련 영상` : (isLoggedIn ? "인기 영상" : "")}
+                  {searchValue
+                    ? `"${searchValue}" 관련 영상`
+                    : isLoggedIn
+                    ? "인기 영상"
+                    : ""}
                 </h3>
 
                 {/* 로그인: 항상 영상 표시, 비회원: 검색시에만 표시 */}
@@ -689,7 +719,11 @@ const ExpandableSearch = ({
                       </p>
                     ) : suggestedVideos.length === 0 ? (
                       <p style={{ fontSize: "13px", color: COLORS.gray }}>
-                        {searchValue ? "검색 결과가 없습니다." : (isLoggedIn ? "인기 영상이 없습니다." : "")}
+                        {searchValue
+                          ? "검색 결과가 없습니다."
+                          : isLoggedIn
+                          ? "인기 영상이 없습니다."
+                          : ""}
                       </p>
                     ) : (
                       suggestedVideos.map((video, idx) => (

@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': '댓글들',
                 'db_table': 'comment',
                 'ordering': ['-created_at'],
-                'managed': False,
+                'managed': True,
             },
         ),
         migrations.CreateModel(
@@ -40,7 +40,7 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': '좋아요들',
                 'db_table': 'likes',
                 'ordering': ['-created_at'],
-                'managed': False,
+                'managed': True,
             },
         ),
         migrations.CreateModel(
@@ -55,7 +55,7 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': '답글들',
                 'db_table': 'reply',
                 'ordering': ['created_at'],
-                'managed': False,
+                'managed': True,
             },
         ),
         migrations.CreateModel(
@@ -73,7 +73,7 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': '영상들',
                 'db_table': 'video',
                 'ordering': ['-upload_date'],
-                'managed': False,
+                'managed': True,
             },
         ),
         migrations.CreateModel(
@@ -89,7 +89,7 @@ class Migration(migrations.Migration):
                 'verbose_name_plural': '시청 기록들',
                 'db_table': 'watching_history',
                 'ordering': ['-created_at'],
-                'managed': False,
+                'managed': True,
             },
         ),
     ]

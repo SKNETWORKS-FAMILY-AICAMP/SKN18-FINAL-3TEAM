@@ -46,3 +46,6 @@ class GraphState(TypedDict):
 
     # video tag 추출 결과
     video_tags: NotRequired[List[str]]
+    
+    # thumbnail URL (첫 번째 scene의 이미지를 썸네일로 사용)
+    thumbnail_url: NotRequired[str]
