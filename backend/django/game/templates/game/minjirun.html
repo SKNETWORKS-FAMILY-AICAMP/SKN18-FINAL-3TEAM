@@ -45,14 +45,14 @@
             width: 400px;
             height: 18px;
             margin-top: 10px;
-            background: url('{% static "game/webgl/TemplateData/progress-bar-empty-dark.png" %}') no-repeat center;
+            background: url('{% static "TemplateData/progress-bar-empty-dark.png" %}') no-repeat center;
         }
 
         #unity-progress-bar-full {
             width: 0%;
             height: 18px;
             margin-top: 10px;
-            background: url('{% static "game/webgl/TemplateData/progress-bar-full-dark.png" %}') no-repeat center;
+            background: url('{% static "TemplateData/progress-bar-full-dark.png" %}') no-repeat center;
         }
 
         #unity-footer {
@@ -64,7 +64,7 @@
         #unity-fullscreen-button {
             width: 38px;
             height: 38px;
-            background: url('{% static "game/webgl/TemplateData/fullscreen-button.png" %}') no-repeat center;
+            background: url('{% static "TemplateData/fullscreen-button.png" %}') no-repeat center;
             background-size: contain;
             border: none;
             cursor: pointer;
@@ -115,14 +115,14 @@
         <p>키보드 화살표 또는 WASD로 이동, 스페이스바로 점프</p>
     </div>
 
-    <script src="{% static 'game/webgl/Build/WebGL.loader.js' %}"></script>
+    <script src="{% static 'Build/webgl.loader.js' %}"></script>
     <script>
-        var buildUrl = "{% static 'game/webgl/Build' %}";
-        var loaderUrl = buildUrl + "/WebGL.loader.js";
+        var buildUrl = "{% static 'Build' %}";
+        var loaderUrl = buildUrl + "/webgl.loader.js";
         var config = {
-            dataUrl: buildUrl + "/WebGL.data.br",
-            frameworkUrl: buildUrl + "/WebGL.framework.js.br",
-            codeUrl: buildUrl + "/WebGL.wasm.br",
+            dataUrl: buildUrl + "/webgl.data.unityweb",
+            frameworkUrl: buildUrl + "/webgl.framework.js.unityweb",
+            codeUrl: buildUrl + "/webgl.wasm.unityweb",
             streamingAssetsUrl: "StreamingAssets",
             companyName: "SKN18-FINAL-3TEAM",
             productName: "MinjiRun",

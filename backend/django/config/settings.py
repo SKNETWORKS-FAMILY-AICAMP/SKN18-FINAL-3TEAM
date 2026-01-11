@@ -281,7 +281,8 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'  # collectstatic 실행 시 수집 위치
 
 # 개발 중 static 파일 위치
 STATICFILES_DIRS = [
-    BASE_DIR / 'game' / 'static',
+    BASE_DIR / 'game' / 'static',  # 기본 static 파일
+    BASE_DIR / 'game' / 'webgl',   # Unity WebGL 빌드 파일
 ]
 
 # Media files (User uploads)
