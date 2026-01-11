@@ -12,28 +12,36 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='User',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('password', models.CharField(max_length=128, verbose_name='password')),
-                ('last_login', models.DateTimeField(blank=True, null=True, verbose_name='last login')),
-                ('is_superuser', models.BooleanField(default=False, help_text='Designates that this user has all permissions without explicitly assigning them.', verbose_name='superuser status')),
-                ('nickname', models.CharField(blank=True, max_length=30, null=True, unique=True, verbose_name='닉네임')),
-                ('profile_image', models.CharField(blank=True, max_length=100, null=True, verbose_name='프로필 이미지 URL')),
-                ('sign_up_date', models.DateTimeField(auto_now_add=True, verbose_name='가입일')),
-                ('email', models.EmailField(max_length=255, unique=True, verbose_name='이메일')),
-                ('permission', models.CharField(choices=[('user', 'User'), ('admin', 'Admin')], default='user', max_length=50, verbose_name='권한')),
-                ('gender', models.BooleanField(blank=True, null=True, verbose_name='성별')),
-                ('age', models.IntegerField(blank=True, null=True, validators=[django.core.validators.MinValueValidator(0), django.core.validators.MaxValueValidator(120)], verbose_name='나이')),
-                ('is_active', models.BooleanField(default=True, verbose_name='활성화 여부')),
-                ('is_staff', models.BooleanField(default=False, verbose_name='스태프 여부')),
+        # init.sql에서 이미 user 테이블이 생성되어 있으므로, 모델 상태만 업데이트
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                # 데이터베이스에는 이미 테이블이 있으므로 아무 작업도 하지 않음
             ],
-            options={
-                'verbose_name': '사용자',
-                'verbose_name_plural': '사용자들',
-                'db_table': 'user',
-                'managed': True,
-            },
+            state_operations=[
+                migrations.CreateModel(
+                    name='User',
+                    fields=[
+                        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                        ('password', models.CharField(max_length=128, verbose_name='password')),
+                        ('last_login', models.DateTimeField(blank=True, null=True, verbose_name='last login')),
+                        ('is_superuser', models.BooleanField(default=False, help_text='Designates that this user has all permissions without explicitly assigning them.', verbose_name='superuser status')),
+                        ('nickname', models.CharField(blank=True, max_length=30, null=True, unique=True, verbose_name='닉네임')),
+                        ('profile_image', models.CharField(blank=True, max_length=100, null=True, verbose_name='프로필 이미지 URL')),
+                        ('sign_up_date', models.DateTimeField(auto_now_add=True, verbose_name='가입일')),
+                        ('email', models.EmailField(max_length=255, unique=True, verbose_name='이메일')),
+                        ('permission', models.CharField(choices=[('user', 'User'), ('admin', 'Admin')], default='user', max_length=50, verbose_name='권한')),
+                        ('gender', models.BooleanField(blank=True, null=True, verbose_name='성별')),
+                        ('age', models.IntegerField(blank=True, null=True, validators=[django.core.validators.MinValueValidator(0), django.core.validators.MaxValueValidator(120)], verbose_name='나이')),
+                        ('is_active', models.BooleanField(default=True, verbose_name='활성화 여부')),
+                        ('is_staff', models.BooleanField(default=False, verbose_name='스태프 여부')),
+                    ],
+                    options={
+                        'verbose_name': '사용자',
+                        'verbose_name_plural': '사용자들',
+                        'db_table': 'user',
+                        'managed': True,
+                    },
+                ),
+            ],
         ),
     ]

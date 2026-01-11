@@ -13,83 +13,91 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='Comment',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('comment_content', models.TextField(verbose_name='댓글 내용')),
-                ('comment_likes_count', models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='좋아요 수')),
-                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='작성일')),
+        # init.sql에서 이미 테이블들이 생성되어 있으므로, 모델 상태만 업데이트
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                # 데이터베이스에는 이미 테이블이 있으므로 아무 작업도 하지 않음
             ],
-            options={
-                'verbose_name': '댓글',
-                'verbose_name_plural': '댓글들',
-                'db_table': 'comment',
-                'ordering': ['-created_at'],
-                'managed': True,
-            },
-        ),
-        migrations.CreateModel(
-            name='Likes',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='생성일')),
+            state_operations=[
+                migrations.CreateModel(
+                    name='Comment',
+                    fields=[
+                        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                        ('comment_content', models.TextField(verbose_name='댓글 내용')),
+                        ('comment_likes_count', models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='좋아요 수')),
+                        ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='작성일')),
+                    ],
+                    options={
+                        'verbose_name': '댓글',
+                        'verbose_name_plural': '댓글들',
+                        'db_table': 'comment',
+                        'ordering': ['-created_at'],
+                        'managed': True,
+                    },
+                ),
+                migrations.CreateModel(
+                    name='Likes',
+                    fields=[
+                        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                        ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='생성일')),
+                    ],
+                    options={
+                        'verbose_name': '좋아요',
+                        'verbose_name_plural': '좋아요들',
+                        'db_table': 'likes',
+                        'ordering': ['-created_at'],
+                        'managed': True,
+                    },
+                ),
+                migrations.CreateModel(
+                    name='Reply',
+                    fields=[
+                        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                        ('reply_content', models.TextField(verbose_name='답글 내용')),
+                        ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='작성일')),
+                    ],
+                    options={
+                        'verbose_name': '답글',
+                        'verbose_name_plural': '답글들',
+                        'db_table': 'reply',
+                        'ordering': ['created_at'],
+                        'managed': True,
+                    },
+                ),
+                migrations.CreateModel(
+                    name='Video',
+                    fields=[
+                        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                        ('title', models.CharField(max_length=255, verbose_name='영상 제목')),
+                        ('upload_date', models.DateTimeField(auto_now_add=True, verbose_name='업로드일')),
+                        ('tags', django.contrib.postgres.fields.ArrayField(base_field=models.TextField(), blank=True, null=True, size=None, verbose_name='태그')),
+                        ('likes_count', models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='좋아요 수')),
+                        ('comments_count', models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='댓글 수')),
+                    ],
+                    options={
+                        'verbose_name': '영상',
+                        'verbose_name_plural': '영상들',
+                        'db_table': 'video',
+                        'ordering': ['-upload_date'],
+                        'managed': True,
+                    },
+                ),
+                migrations.CreateModel(
+                    name='WatchingHistory',
+                    fields=[
+                        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                        ('tags', django.contrib.postgres.fields.ArrayField(base_field=models.TextField(), blank=True, null=True, size=None, verbose_name='태그')),
+                        ('watched_seconds', models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='시청 위치(초)')),
+                        ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='시청일')),
+                    ],
+                    options={
+                        'verbose_name': '시청 기록',
+                        'verbose_name_plural': '시청 기록들',
+                        'db_table': 'watching_history',
+                        'ordering': ['-created_at'],
+                        'managed': True,
+                    },
+                ),
             ],
-            options={
-                'verbose_name': '좋아요',
-                'verbose_name_plural': '좋아요들',
-                'db_table': 'likes',
-                'ordering': ['-created_at'],
-                'managed': True,
-            },
-        ),
-        migrations.CreateModel(
-            name='Reply',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('reply_content', models.TextField(verbose_name='답글 내용')),
-                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='작성일')),
-            ],
-            options={
-                'verbose_name': '답글',
-                'verbose_name_plural': '답글들',
-                'db_table': 'reply',
-                'ordering': ['created_at'],
-                'managed': True,
-            },
-        ),
-        migrations.CreateModel(
-            name='Video',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('title', models.CharField(max_length=255, verbose_name='영상 제목')),
-                ('upload_date', models.DateTimeField(auto_now_add=True, verbose_name='업로드일')),
-                ('tags', django.contrib.postgres.fields.ArrayField(base_field=models.TextField(), blank=True, null=True, size=None, verbose_name='태그')),
-                ('likes_count', models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='좋아요 수')),
-                ('comments_count', models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='댓글 수')),
-            ],
-            options={
-                'verbose_name': '영상',
-                'verbose_name_plural': '영상들',
-                'db_table': 'video',
-                'ordering': ['-upload_date'],
-                'managed': True,
-            },
-        ),
-        migrations.CreateModel(
-            name='WatchingHistory',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('tags', django.contrib.postgres.fields.ArrayField(base_field=models.TextField(), blank=True, null=True, size=None, verbose_name='태그')),
-                ('watched_seconds', models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='시청 위치(초)')),
-                ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='시청일')),
-            ],
-            options={
-                'verbose_name': '시청 기록',
-                'verbose_name_plural': '시청 기록들',
-                'db_table': 'watching_history',
-                'ordering': ['-created_at'],
-                'managed': True,
-            },
         ),
     ]
