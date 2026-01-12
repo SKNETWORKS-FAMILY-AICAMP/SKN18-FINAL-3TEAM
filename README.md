@@ -1,232 +1,329 @@
-# SKN18-FINAL-3TEAM
-## AI 기반 인플루언서
+# HisToK - Learn Korean History through an AI Influencer
 
-## 프로젝트 구조
+> LLM 활용 인공지능 인플루언서 기반 한국사 학습 플랫폼
 
-```text
-SKN18-FINAL-3TEAM/
-├─ backend/                    # 서버/데이터 파이프라인 코드
-│  ├─ db_pipeline/             # 데이터 적재·임베딩 ETL (neo4j, vectordb)
-│  ├─ django/                  # REST API (activity, community, search, users, video)
-│  ├─ inference_engine/        # 규칙 기반 추론 엔진
-│  ├─ langgraph_fuseki/        # KG+LangGraph 워크플로우
-│  ├─ langgraph_structure1/    # LangGraph 실험 구조 1
-│  ├─ langgraph_structure2/    # LangGraph 실험 구조 2
-│  ├─ llm_fine_tuning/         # LLM 파인튜닝 산출물/실험
-│  └─ ragas/                   # RAG 평가 스크립트
-├─ frontend/                   # 클라이언트 자산
-│  ├─ 3d_modeling/             # Unity 3D 프로젝트
-│  ├─ react/                   # Vite+React 웹 앱
-│  └─ video_pipeline/          # 영상 생성 파이프라인
-├─ infra/                      # 로컬/배포 인프라
-│  ├─ docker-compose.yml       # DB/서비스 컨테이너 오케스트레이션
-│  ├─ init.sql                 # DB 초기화 스크립트
-│  └─ nginx.conf               # 리버스 프록시 설정
-├─ main.py                     # 로컬 실행/유틸 스크립트
-├─ pyproject.toml              # 파이썬 프로젝트 설정
-├─ requirements.txt            # 공용 파이썬 의존성
-└─ .env.example                # 환경 변수 예시
-```
+**SKN 18기 3TEAM** | Members: 이상효, 박세영, 김영우, 양진아, 안시현, 장이건
 
-# Frontend
+---
 
-## react (Vite)
-- `/src/api` : `axios.js` 기반 공용 클라이언트, activity/admin/auth/community/video API 래퍼.
-- `/src/components` : `common`(GlassSurface, Icons 등), `layout`(Header 등 전역 레이아웃).
-- `/src/constants` : 테마/색상 상수(`theme.js`).
-- `/src/features` : 도메인 묶음(search/user/video). 하위 `components`로 UI 구성.
-- `/src/pages` : `MainPage`, `MyPage`, `VideoDetailPage`, `AllCommentsPage`, `ProfileEditPage`.
-- `/src/shared` : 재사용 헤더(`Header.tsx`, 스타일) 등 공용 컴포넌트.
-- `/src/utils` : 이미지 처리 유틸(`imageUtils.js`).
-- 빌드/설정: `vite.config.js`, `eslint.config.js`, `package.json`.
+## 📋 Table of Contents
 
-# Backend
+1. [프로젝트 개요](#프로젝트-개요)
+2. [서비스 전체 구조](#서비스-전체-구조)
+3. [데이터 아키텍처](#데이터-아키텍처)
+4. [RAG 그래프 시스템](#rag-그래프-시스템)
+5. [서비스 구현](#서비스-구현)
+6. [기술 스택](#기술-스택)
+7. [결론 및 향후 계획](#결론-및-향후-계획)
 
-## django (REST API)
-- 도메인 앱:
-  - `activity` : 검색 기록·시청 기록 조회/적재(ListCreate API).
-  - `community` : 영상 댓글/대댓글/좋아요, 작성자·관리자 삭제 권한 포함.
-  - `search` : 스켈레톤(모델만 존재, 뷰 TODO).
-  - `users` : 인증 상태 확인, 로그아웃/회원탈퇴, 프로필 조회·수정, 관리자용 회원 관리.
-  - `video` : 영상 목록/상세 조회, OpenAI 기반 시나리오 생성 API(`generate_scenario`, 더미 응답 지원).
-- 공통 설정: `config/settings.py`, `config/urls.py`; 관리 스크립트 `manage.py`.
-- 각 앱별 `models.py`, `serializers.py`, `views.py`, `urls.py`로 CRUD/비즈니스 로직 구현.
+---
 
-### API 구현 현황 
+## 프로젝트 개요
 
-- **회원/인증 (`users`)**
-  - 인증 상태 확인 `GET /api/users/check-auth/`(JWT 또는 세션) → `check_auth`.
-  - 로그아웃 `POST /api/users/logout/`(세션 로그아웃) → `logout_view`.
-  - 회원탈퇴 `DELETE /api/users/delete-account/`(Google 토큰 revoke 후 삭제) → `delete_account`.
-  - JWT 발급/리프레시/검증 `POST /api/users/token/`, `/token/refresh/`, `/token/verify/` (SimpleJWT 기본 뷰).
-  - 프로필 조회/수정 `GET|PATCH /api/users/profile/`(Redis 캐시), 프로필 이미지 업로드/삭제 `POST|DELETE /api/users/profile/image/`.
-  - 관리자: 회원 목록/상세/수정/삭제 `GET /api/users/admin/`, `GET /api/users/admin/<id>/`, `PATCH /api/users/admin/<id>/update/`, `DELETE /api/users/admin/<id>/delete/` (권한 `permission='admin'`).
-- **활동 (`activity`)**
-  - 검색 기록 조회/적재 `GET|POST /api/activity/search-logs/`(사용자별 `search_history`).
-  - 시청 기록 조회/적재 `GET|POST /api/activity/watch-logs/`(비디오 FK, 태그, 시청 위치 포함).
-- **커뮤니티 (`community`)**
-  - 댓글 목록/작성 `GET|POST /api/community/videos/<video_id>/comments/`.
-  - 댓글 수정/삭제 `PATCH /api/community/comments/<comment_id>/`, `DELETE /api/community/comments/<comment_id>/delete/` (작성자 또는 관리자).
-  - 답글 목록/작성 `GET|POST /api/community/comments/<comment_id>/replies/`; 
-  - 답글 삭제 `DELETE /api/community/replies/<reply_id>/` (작성자 또는 관리자).  
-  - 답글 수정(`PATCH /api/community/replies/<reply_id>/update/`).
-  - 좋아요: 영상 `POST|DELETE /api/community/videos/<video_id>/like/`, 댓글 `POST|DELETE /api/community/comments/<comment_id>/like/`, 답글 `POST|DELETE /api/community/replies/<reply_id>/like/`.
-  - 내 활동 내역 `GET /api/community/me/activities/`(내 댓글·답글·좋아요 묶음).
-- **영상 (`video`)**
-  - 목록/상세 `GET /api/video/list/`(기본 최신순, `sort=comments` 지원, `tag` 필터) / `GET /api/video/<id>/`.
-  - 시나리오 생성 `POST /api/video/generate/` → OpenAI(`gpt-4o-mini`) 호출 또는 `CHAT_USE_FAKE_COMPILE=True` 시 더미 JSON 저장·반환. GET은 허용하지 않음.
-- **검색 (`search`)**
-  - URL 스켈레톤만 존재, 실제 API 뷰는 아직 없음.
+### 배경 및 동기
 
-  ## 향후 계획 
-  - 스케쥴러를 이용한 DB 적재 블랙리스트 토큰 관리 방식 구현
-  - 검색 기능 추가 예정
-  - 
+K-콘텐츠의 글로벌 흥행이 단순한 엔터테인먼트 소비를 넘어 한국의 전통문화와 역사적 배경에 대한 능동적인 탐구로 확장되고 있습니다. 한국 역사 검색량이 185% 이상 증가하고, 국립중앙박물관 외국인 관람객이 급증하는 등 한국 역사에 대한 글로벌 관심이 폭발적으로 성장하고 있습니다.
 
-## db_pipeline (ETL)
-- `common/` : `config.py` 설정, `embedding_model.py`, `transform.py`, `load_raw_data.py`.
-- `data/` : 전처리 데이터(`encykorea_cleaned6.csv`, `transformed_chunks.json`).
-- `neo4j/`, `vectordb/` : 그래프/벡터 DB 적재 ETL 및 서비스 코드.
+![국립중앙박물관 외국인 관람객 추이](docs/NationalMuseum_graph.png)
 
-## inference_engine
-- 규칙 기반 추론 엔진; `rules/`(all_rules.rules 등)와 `reasoner/` 자바 기반 실행(pom.xml, run_reasoner.sh).
+### 문제 정의
 
-## langgraph_fuseki
-- LangGraph 워크플로우 + Fuseki KG.
-- `nodes/` : classify, generate, semantic/entity expander 등 노드 구현.
-- `docs/` : 온톨로지/쿼리 가이드, README, SETUP.
-- `ontology/` : KG 스키마/인스턴스, 스크립트.
-- `utils/` : triple generator 등 유틸.
+그러나 K-콘텐츠의 성공 이면에는 심각한 문제들이 존재합니다.
 
-## langgraph_structure1 / langgraph_structure2
-- LangGraph 대안 구조 실험 (Neo4j, RAG). `graphdb/`, `nodes/`, `rag/`, `state.py` 등으로 구성.
+**문화 공정(Cultural Appropriation)**: 중국의 '동북공정'과 연계하여 한복을 한푸(Hanfu)의 아류로 주장하는 등 조직적인 역사 왜곡 시도가 지속되고 있습니다. 아마존 등 글로벌 플랫폼에서 중국 의상이 'Hanbok'으로 판매되거나 혼용 표기되어 외국인에게 잘못된 인식을 심어주고 있습니다.
 
-## llm_fine_tuning
-- LLM 말투/영어 파인튜닝 산출물/실험 공간.
+|     2022 베이징 올림픽 한복 논란     |        아마존 한복 오표기 사례         |
+| :----------------------------------: | :------------------------------------: |
+| ![올림픽 한복 논란](docs/china.jpeg) | ![아마존 한복 오표기](docs/amazon.png) |
 
-## ragas
-- RAG 품질 평가 스크립트(`build_queries_persona.py`, `neo4j/ragas_eval.py` 등).
+**외국인 학습자의 3가지 핵심 장벽**:
 
-# LangGraph
-- Graph db를 보완하기 위해 vectordb 사용함
-- Graph db를 탐색이 되면면 확실히 답변의 품질은 좋은데 잘 탐색이 잘 되지 않음
+- **긴 영상 & 낮은 흥미도**: 기존 YouTube 역사 콘텐츠는 20~60분의 긴 호흡으로 숏폼에 익숙한 외국인 학습자에게 높은 진입 장벽
+- **오번역**: "Japan's Dog(일본의 앞잡이)", "Qing→King" 등 심각한 오번역 정보가 필터링 없이 노출
+- **콘텐츠 발견의 어려움**: 언어 장벽과 정보 과잉 속에서 양질의 역사 콘텐츠를 발견하기 어려움
 
-- 우리가 hybrid 구조를 택한 이유
-Vectordb와 Graph db를 따로 사용해봤더니 
-상호 보완적인 결과가 나와 하이브리드로 사용.
+### 프로젝트 지향점
 
-<img src="./vector_graph.png"/>
+| 문제                  | 해결책                                                                   |
+| --------------------- | ------------------------------------------------------------------------ |
+| 긴 영상 / 낮은 몰입도 | **숏폼 & AI 인플루언서** - 친숙한 AI 캐릭터와 트렌디한 숏폼 포맷 도입    |
+| 역사 왜곡 / 오역      | **영어 표기 파인튜닝** - 고유명사 및 역사적 용어의 정확한 영문 표기 학습 |
+| 콘텐츠 발견 어려움    | **RAG 시스템 & Ontology 추론** - 근거 기반 답변 생성 및 사실 검증 강화   |
+| 수동적 학습           | **게이미피케이션** - Unity 3D 기반 인터랙티브 퀴즈 게임                  |
 
+---
 
+## 서비스 전체 구조
 
-## 전체적인 Langgrph 구조
+### 핵심 기능 Overview
 
-- 각 그래프의 classify가 다름 
-a = 병렬 그래프, hybrid 또는 end 로 가는 역할
-b = vector로 갈지 graph, end 로 갈지 정하는 역할 - 간단한 질의에 대해서는 vector, 인물 관계, 연대기 등은 graph로 감 
+HisToK는 4가지 핵심 축으로 사용자 경험을 완성합니다.
 
-a는 비동기 병렬로 가서 답변 생성 단계에서 유사도 점수로 sorting 하고
-b는  vectordb 에서 filtered_k = 5 추출 후 cos 유사도 점수 기준으로 걸러낸 청크에서 top k=3만 추출 evaluation 단계에서 llm 으로 청크를 평가, 기준 미만시 graph db 노드로 이동
+![서비스 기능 Overview](docs/service_architecture.png)
 
-공통 : vector db 이전에 질의를 임베딩 하는데 kiwi로 키워드 추출 후에 함께 임베딩, 다중 키워드 추출 시 and 조건으로 둘 다 해당해야 답변 뽑히도록
+- **AI 영상 생성**: Graph 1(Hybrid) 기반으로 역사적 사실을 고증한 대본을 자동 생성하고, Unity 3D 엔진으로 실감나는 역사 해설 영상을 제공합니다.
+- **통합 대화 시스템**: 질문 의도와 복잡도에 따라 최적의 모델이 자동 선택되어 응답하는 다층적 엔진입니다. 일반 챗봇과 Thinking 챗봇을 Graph 1+2와 Celery를 통해 구현합니다.
+- **맞춤 추천 시스템**: Ontology 추론을 활용하여 단순 키워드 매칭을 넘어, 의미적으로 연결된 심층 콘텐츠를 정밀하게 추천합니다.
+- **역사 퀴즈 게임**: 학습한 역사 지식을 Unity 3D 환경의 인터랙티브 퀴즈 게임을 통해 자연스럽게 복습하고 체득합니다.
 
-graphdb로 가면 neo4j를 위한 cypher 생성, neo4j 테스트를 거쳐 2-3hop
-5 hop 까지 테스트를 함 ,각 hop 마다 시간 평균/ 토큰 평균 이 나옴 
+### 시스템 아키텍처
 
-| hop 개수 | relevancy | faithfulness | Time_avg | Time_stv | Token_avg | Token_stv |
-|----------|-----------|--------------|----------|----------|-----------|-----------|
-| 1hop     | 0.842     | 0.879        | 34.706   | 46.07    | 3674.982  | 1358.303  |
-| 2hop     | 0.915     | 0.835        | 24.924   | 9.672    | 3742.2    | 1076.428  |
-| 3hop     | 0.859     | 0.845        | 21.87    | 8.68     | 4333.95   | 999.47    |
-| 4hop     | 0.861     | 0.849        | 29.032   | 12.464   | 4101.725  | 1323.323  |
-| 5hop     | 0.883     | 0.859        | 25.932   | 25.09    | 3970.9    | 1221.093  |
+![전체 시스템 아키텍처](docs/architecture.png)
 
+### 사용자 여정 (User Journey)
 
-hop를 너무 늘리면 데이터가 많아서 할루시네이션도 생김
---> 일정 이상 늘리면 시간도 줄어듦
---> hop이 적어도 데이터가 너무 적어서 그 안에서 답을 내려고 시간이 걸림
---> hop이 너무 많으면 데이터가 많어서 요약하는 데에 시간이 걸림
+1. **Discover**: 숏폼 영상이나 추천 피드를 통해 흥미로운 한국 역사 콘텐츠 발견
+2. **Ask**: 궁금한 점을 AI 챗봇에게 질문하여 즉각적인 답변 획득
+3. **Explore**: 답변의 근거(Evidence)와 연관 지식을 통해 심층 학습
+4. **Engage**: 학습 내용을 바탕으로 퀴즈 게임 참여 및 커뮤니티 활동
+5. **Explore More**: 확장된 지식 검색을 통해 체계적인 역사 지식 구축
 
-테스트 결과가 2-3hop이 가장 좋아서 지금 1hop으로 랭그래프 구현되어있는 것을 2-3hop으로 변경 예정 
+---
 
-생성된 답변 바탕으로 llm 챗봇 답변과 영상 스크립트 생성 진행 
--> state 에 tag를 달아서 tag가 chat 일때 챗봇으로 , tag가 video일때 영상 스크립트 노드까지 진행
+## 데이터 아키텍처
 
+### Why RAG?
 
- 
+LLM만으로는 조선왕조실록 등 방대한 기록의 디테일한 정보가 부족하고, 모르는 사실을 그럴듯하게 지어내는 Hallucination 위험이 있습니다. RAG 도입을 통해 검증된 역사 DB(한국민족문화대백과사전)를 검색하여 답변을 생성함으로써 정확도를 보장합니다.
 
+### Why Graph DB?
 
-# Unity
-## 2. 시스템 아키텍처 (System Architecture)
+역사적 사건은 독립적으로 존재하지 않습니다. 인물, 사건, 배경, 시간의 흐름이 복잡하게 얽힌 거대한 지식 네트워크입니다. Vector DB만으로는 텍스트의 의미적 유사성만 판단할 뿐, 명확한 사실 관계나 논리적 연결 고리를 이해하지 못합니다.
 
-LLM 서버로부터 받은 비정형 텍스트 데이터를 구조화된 JSON으로 변환하여 유니티 클라이언트가 해석하는 구조입니다.
+Graph DB는 Node(개체)와 Edge(관계)를 통해 단편적 사실을 넘어 지식을 무한히 확장적으로 탐색하고, Multi-hop 검색을 통해 직접적인 언급이 없어도 연결된 인물/사건을 추론하여 탐색할 수 있습니다.
 
-```
-graph TD
-    User[사용자 입력] -->|send_topic| Client[LLMClient (Unity)]
-    Client -->|api_request| Server[LangGraph Server]
-    Server -->|generate_json| Client
-    Client -->|scenario_data| Director[Director Controller]
-    
-    subgraph UnityPresentationLayer["Unity Presentation Layer"]
-        Director -->|action_gaze| Actor[Actor Controller]
-        Director -->|pitch_variation| Audio[Audio Manager]
-        Director -->|camera_shot| Cam[Camera Manager]
-    end
-```
-## System Architecture
+![역사는 연결된 네트워크](docs/reason_graph.png)
 
-본 시스템은 LLM 서버로부터 생성된 비정형 텍스트 응답을  
-구조화된 JSON 형태로 변환하고, 이를 Unity 클라이언트가 해석하여  
-캐릭터의 행동, 시선, 음성, 카메라 연출로 표현하는 구조입니다.
+### 기술 스택 비교 및 선택
 
-### Flow Overview
+| 기술         | 접근 방식          | 쿼리 언어 | 강점                                     | HisToK 적용                                        |
+| ------------ | ------------------ | --------- | ---------------------------------------- | -------------------------------------------------- |
+| **Neo4j**    | 관계형 그래프      | Cypher    | 직관적 관계 표현, 다양한 그래프 알고리즘 | 영상 대본 인물-사건 관계 탐색, 챗봇/댓글 빠른 답변 |
+| **Fuseki**   | 시맨틱 웹 (Triple) | SPARQL    | 논리적 추론, 지식의 표준화/재사용        | Thinking 챗봇 모호한 질문 처리, 추천 시스템        |
+| **pgvector** | 벡터 유사도        | SQL (Ext) | 빠른 검색 속도, 의미적 유사성 파악       | 초기 필터링, Hybrid Search                         |
 
-- 사용자는 Unity 클라이언트를 통해 자연어 입력을 전달합니다.
-- Unity 클라이언트는 입력된 주제를 LLM 서버(LangGraph Server)로 전송합니다.
-- LLM 서버는 응답을 시나리오용 JSON 데이터로 생성하여 반환합니다.
-- Unity의 Director Controller는 해당 JSON을 해석하여 연출 흐름을 제어합니다.
-- 각 Controller는 역할에 따라 캐릭터, 오디오, 카메라를 개별적으로 제어합니다.
+### 벡터DB & 청킹 전략 실험
 
-### Unity Presentation Layer
+**벡터DB 선정**: pgvector 채택 (Hybrid Search 지원 및 단일 인프라 효율성)
 
-- **Actor Controller**: 캐릭터의 행동 및 시선 제어
-- **Audio Manager**: 음성 톤 및 피치 변화 처리
-- **Camera Manager**: 카메라 샷 및 시점 연출
+**청킹 전략 실험 결과**:
 
+- Plan A (Length-based): 800자/600자/500자 실험 → 문맥 절단 현상 발생
+- Plan B (LLM Summary): 문맥을 보존하며 요약 후 임베딩하는 2단계 프로세스 채택
 
-## 3. 핵심 기술 구현 (Core Technical Implementation)
+**Plan B 성능 개선 (vs Plan A)**:
 
-A. 생성형 AI 연동 및 데이터 캐싱 (LLMClient)
-서버 비용 절감과 사용자 경험(UX) 개선을 위해 스마트 캐싱 및 리플레이 시스템을 구축했습니다.
+- Answer Relevancy: ▲ 1.9% (0.836 → 0.852)
+- 응답 시간: ▼ 48.2% (23.18s → 11.99s)
 
-- 구현 내용: LLMClient는 서버로부터 받은 시나리오 JSON을 로컬 메모리에 캐싱합니다. 사용자가 내용을 다시 보고 싶을 때, 서버에 재요청하지 않고 캐싱된 데이터를 DirectorController에 즉시 주입하여 대기 시간 없는 리플레이를 구현했습니다.
+### pgvector 데이터베이스 구성
 
-- Context Injection: 현재 클라이언트가 보유한 에셋 정보(Context)를 요청 시 함께 전송하여, LLM이 존재하지 않는 리소스를 호출하는 환각 현상을 1차적으로 억제했습니다.
+| 항목                | 값                     |
+| ------------------- | ---------------------- |
+| Total Documents     | 10,353                 |
+| Embedding Model     | text-embedding-3-small |
+| Embedding Dimension | 1,536 dims             |
+| Index Type          | HNSW                   |
+| Similarity Metric   | Cosine Similarity      |
 
-B. LLM 환각(Hallucination) 방지 알고리즘 (DirectorController)
-LLM이 사전 정의된 태그(예: Joy) 대신 유사한 단어(예: Joyful, Happy)를 출력하거나 오타를 냈을 때, 연극이 멈추지 않도록 **이중 안전장치(Fail-safe)**를 구현했습니다.
+### Neo4j 최종 설계
 
-- Levenshtein Distance (편집 거리 알고리즘): 입력된 태그와 가장 철자가 비슷한 애니메이션을 찾아 자동으로 연결합니다.
+| 항목        | 값                                                                                                                           |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Total Nodes | 10,666                                                                                                                       |
+| Total Edges | 109,527                                                                                                                      |
+| Node Types  | Event, Person, Organization, Heritage, Concept, System, Document, Object, Clothing, Policy, Work, Ritual, Place, Year (14종) |
+| Properties  | Title, Year, Summary (w/ Embedding)                                                                                          |
 
-- Keyword Fallback: 유사도 검색도 실패할 경우, 단어에 포함된 감정 키워드(Smile, Angry 등)를 분석해 해당 감정의 대표 동작으로 매핑합니다.
+![Neo4j Interactive Schema Graph](docs/neo4j_schema.png)
 
+### Neo4j 최적화 실험
 
-C. 자연스러운 시선 처리를 위한 S-Curve IK (ActorController)
-캐릭터가 로봇처럼 딱딱하게 고개를 돌리는 'Uncanny Valley' 현상을 해결하기 위해, AnimationCurve를 활용한 S-Curve 시선 제어 시스템을 개발했습니다.
+**중간 hop 노드 포함 실험**: ct_mid(중간 정보 저장) 방식이 no_mid 대비 Answer Relevancy 약 9.3% 향상 (0.837 → 0.915)
 
-- 구현 내용: 단순히 Lerp로 시선을 이동하는 대신, Slow-Fast-Slow 형태의 가속도가 적용된 커브를 사용하여 사람처럼 자연스러운 눈동자와 머리의 움직임을 구현했습니다. 또한 고개 회전 각도가 한계치(Clamp)를 넘으면 몸통(Body)이 함께 회전하도록 하여 사실감을 높였습니다.
+**Hop 수 최적화**: 2-3 Hop 구간이 최적 (1 Hop은 정보 부족, 4-5 Hop은 노이즈 증가)
 
+| Hop   | Relevancy | Faithfulness | Time (s)  |
+| ----- | --------- | ------------ | --------- |
+| 1     | 0.842     | 0.879        | 34.70     |
+| **2** | **0.915** | 0.835        | 24.92     |
+| **3** | 0.859     | 0.845        | **21.87** |
+| 4     | 0.861     | 0.849        | 29.03     |
+| 5     | 0.883     | 0.859        | 25.93     |
 
-D. "동물의 숲" 스타일 오디오 시스템 (AudioManager)
-TTS(Text-to-Speech) 도입의 비용 문제와 어색함을 해결하고 게임적 허용(Game Feel)을 살리기 위해, 텍스트 출력 시 Pitch Randomization 기법을 적용했습니다.
+---
 
-- 구현 내용: 캐릭터별로 고유한 기본 음역대(Base Pitch)를 설정하고, 대사가 출력될 때마다 미세한 난수(Variance)를 더해 매번 조금씩 다른 톤의 비프음을 재생합니다. 이를 통해 지루하지 않고 리듬감 있는 대화 사운드를 구현했습니다.
+## RAG 그래프 시스템
 
+### Hybrid Search Strategy
 
-## 4. 비주얼 및 에셋 파이프라인 (Visual Polish)
-- Character Pipeline: Vroid Studio 모델링 → Blender (ShapeKey/Mesh 최적화) → Unity FBX 임포트
+두 가지 전략을 비교 실험하였습니다.
 
-- Physics: UnityChan SpringBone을 적용하여 머리카락과 의복의 자연스러운 흔들림 구현 및 콜라이더 설정을 통한 클리핑 방지.
+**Intent Router**: 의도 기반 경로 분기 (Simple → pgvector, Relation → Neo4j)
+**Parallel Hybrid**: 병렬 실행 및 점수 통합
 
-- Expression: AutoBlink 시스템을 통해 대기 상태에서도 눈을 깜빡이게 하여 생동감 부여. DirectorController에서 표정 레이어(Layer 1)와 동작 레이어(Layer 0)를 혼합(Mixing)하여 동작 중에도 표정이 유지되도록 구현.
+| 구분              | Answer Relevancy | Time_avg (sec) | Time_std (sec) |
+| ----------------- | ---------------- | -------------- | -------------- |
+| 의도기반 Fallback | 0.829            | 16.177         | 7.998          |
+| **병렬 Hybrid**   | **0.852**        | 19.592         | **3.714**      |
+
+→ 안정성이 더 높은 **병렬 그래프(Parallel Hybrid)** 채택
+
+### Hybrid RAG의 한계와 Ontology 솔루션
+
+**Q: "정흠지가 형조판서와 중추원사를 하면서 정치에 어떤 변화가 있었어?"**
+
+| 방식             | 응답 특성          | 한계                                   |
+| ---------------- | ------------------ | -------------------------------------- |
+| LLM Only         | 일반적 서술        | 구체적 사건 연결 고리 부재             |
+| Hybrid RAG       | 문서 의존적        | 직접 매칭 문서 부재 시 답변 회피       |
+| **Ontology RAG** | 입체적 관계망 추론 | 인물-직위-제도 간 심층적 인과관계 도출 |
+
+**온톨로지 설계 차별점**:
+
+- **Semantic Expansion (의미 확장)**: 명성황후 → 을미사변 → 갑오개혁 → 동학농민운동 → 청일전쟁
+- **Convergence (수렴 및 연결)**: 정약용 ↔ 거중기 ↔ 화성 ↔ 정조 (화성이 중심 수렴 노드)
+
+### Fuseki Triple Structure
+
+| 항목          | 값      |
+| ------------- | ------- |
+| Total Triples | 188,995 |
+| Total Edges   | 73,548  |
+| Total Nodes   | 48,444  |
+
+비정형 텍스트를 Subject-Predicate-Object의 정형화된 트리플 구조로 변환하여 기계가 이해 가능한 지식으로 저장합니다.
+
+예: "세종대왕은 1443년에 훈민정음을 창제했다." → `세종대왕 - authored - 훈민정음`
+
+### Ontology Pipeline 5 Stages
+
+![Ontology Pipeline 5 Stages](docs/ontology_graph.png)
+
+1. **의도 파악 (Intent Analysis)**: 사용자 질문 의도 분류, 핵심 키워드 추출, 초기 엔티티 탐색
+2. **지식 확장 (Expansion)**: 시간 관계 확장, 인과 관계 확장, 벡터 유사도 확장 (병렬 처리)
+3. **Fuseki 검색 (Search)**: 5가지 검색 방식 적용, 논리적 관계 탐색, 주체/객체/속성 검색
+4. **가중치 부여 (Weighting)**: 질문 타입별 분류, 컴포넌트별 가중치 계산
+5. **스토리 작성 (Generation)**: Evidence 개수 최적화, LLM 기여도 점수 반영, 최종 답변 생성
+
+**Query-Type별 가중치 최적화**:
+
+| Query Type    | Thread | Entity | Semantic | 특성           |
+| ------------- | ------ | ------ | -------- | -------------- |
+| Factual       | 0.60   | 0.30   | 0.10     | 정확성 우선    |
+| Causal        | 0.45   | 0.20   | 0.35     | 인과 맥락 탐색 |
+| Comparative   | 0.65   | 0.20   | 0.15     | 속성/관계 비교 |
+| Deep Analysis | 0.35   | 0.25   | 0.40     | 넓은 지식 탐색 |
+
+### Fine-tuning & Post-Processing
+
+**영어 표기 파인튜닝**: 일반 LLM의 불규칙한 로마자 표기 문제 해결
+
+- Before: "Lee Sun-shin made the Turtle Boat in 1592."
+- After: "General Yi Sun-sin built the Geobukseon."
+
+**파인튜닝 실험 과정**:
+
+| 시도 | 모델          | 데이터                               | 결과              |
+| ---- | ------------- | ------------------------------------ | ----------------- |
+| 1st  | gemma-3-1b-it | 용어 정의 학습 (33,814 rows)         | 과적합, 환각 발생 |
+| 2nd  | gemma-3-4b-it | 카테고리별 규칙 기반 (114,526 pairs) | 부분적 개선       |
+| 3rd  | gemma-3-4b-it | RAG 구조 + Distractor (50,257 sets)  | 최종 채택         |
+
+---
+
+## 서비스 구현
+
+### 비디오 파이프라인
+
+![비디오 파이프라인](docs/video_pipeline.png)
+
+1. **Script Generation**: RAG 기반 역사적 사실을 반영한 시나리오 작성
+2. **Parallel Processing**: Background Gen (Nano Banana/FAL.AI), Tag Gen, Thumbnail Gen 동시 생성
+3. **Character Motion**: 감정/행동 태그에 맞춰 51가지 프리셋 모션 매핑 (Blender Asset), Lip-sync & AutoBlink 적용
+4. **Final Render**: Unity Engine으로 캐릭터, 배경, 음성 합성하여 실시간 렌더링
+
+### 추천시스템 파이프라인
+
+Celery 비동기 처리 및 Ontology 관계 기반 키워드 확장 시스템
+
+1. **초기 비디오 키워드 (Kiwi)**: 형태소 분석 → TTL 검증 → 비디오 키워드 저장
+2. **Ontology 관계 기반 추천**: Entity 간 관계만 탐색 → 연관 Entity를 추천 키워드로 확보
+3. **사용자별 추천 및 노출**: 시청 기록 기반 개인별 키워드 저장 → 매칭 시 노출
+
+### 챗봇 시스템 답변 비교
+
+**Q: "사화가 조선 정치에 미친 영향은?"**
+
+![챗봇 시스템 답변 비교](docs/chat_compartive.png)
+
+| Hybrid RAG                   | Ontology Graph                                               |
+| ---------------------------- | ------------------------------------------------------------ |
+| 단순 서술 위주의 일반적 설명 | 구조적 인과 분석 (무오사화 → 갑자사화 → 중종반정 → 을사사화) |
+| 시간순 나열                  | 관계망 기반의 입체적 분석                                    |
+
+---
+
+## 기술 스택
+
+### Comprehensive Tech Stack
+
+| Layer        | Technology                            |
+| ------------ | ------------------------------------- |
+| **Frontend** | React + Vite, Unity WebGL             |
+| **Backend**  | Django REST, Celery Workers           |
+| **AI/LLM**   | LangGraph, RAGAS, Fine-tuning         |
+| **Data**     | PostgreSQL w/ pgvector, Neo4j, Fuseki |
+| **Infra**    | Docker, Nginx, AWS                    |
+
+### AWS Infrastructure Architecture
+
+![AWS Infrastructure Architecture](docs/AWS_architecture.jpg)
+
+**데이터 흐름**:
+
+1. **사용자 요청 수신**: User → ALB → VPC 진입
+2. **서비스 라우팅**: ECS/EC2 Container → Django (Backend) / Unity (Client)
+3. **RAG 및 검색 처리**: PostgreSQL (Vector) + Neo4j (Knowledge Graph) 병렬 검색
+4. **비동기 작업 처리**: Lambda + S3 + EventBridge → Celery Queue → Redis
+5. **응답 반환 및 로깅**: 최종 답변 생성 + CloudWatch 로깅
+
+---
+
+## 결론 및 향후 계획
+
+### 프로젝트 회고
+
+| 이슈                | 상태     | 분석                                    | 해결/계획                                                          |
+| ------------------- | -------- | --------------------------------------- | ------------------------------------------------------------------ |
+| TTS 애니메이션 연동 | DEFERRED | Unity WebGL 환경에서 립싱크 동기화 지연 | 서버 사이드 파형 분석 도입, Viseme JSON 전송 방식                  |
+| 파인튜닝 전략       | PIVOTED  | sLLM '용어 설명' 역할 시 환각 발생      | sLLM 역할을 '어려운 용어 선정'으로 축소, 설명은 Dictionary DB 활용 |
+
+### 서비스 범위 확대 로드맵
+
+현재 서비스는 조선시대(Joseon Dynasty)에 집중되어 있으며, 한국 역사 전체로 확장 예정입니다.
+
+- **Phase 1**: 근현대사 (Modern History)
+- **Phase 2**: 삼국시대 (Three Kingdoms)
+- **Phase 3**: 고려시대 (Goryeo Dynasty)
+
+시대별 특화 데이터셋 및 Multi-Persona 구축 예정
+
+---
+
+## Team Members & Roles
+
+| 이름   | 역할           | 담당                                   |
+| ------ | -------------- | -------------------------------------- |
+| 이상효 | PM             | Neo4j Architecture, Project Management |
+| 박세영 | APM            | Hybrid LangGraph, AWS                  |
+| 김영우 | Data Engineer  | Fine-tuning, Data Preprocessing        |
+| 양진아 | Frontend       | Ontology Design, React Frontend        |
+| 안시현 | Backend        | Django Backend, Unity Integration      |
+| 장이건 | Video Pipeline | Unity Game Build, Blender & Video Gen  |
+
+---
+
+## 📎 Links
+
+- **GitHub Repository**: [SKN18-FINAL-3TEAM](https://github.com/SKNETWORKS-FAMILY-AICAMP/SKN18-FINAL-3TEAM)
