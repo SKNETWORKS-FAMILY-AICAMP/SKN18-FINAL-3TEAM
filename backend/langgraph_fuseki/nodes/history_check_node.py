@@ -11,6 +11,7 @@ from pathlib import Path
 from langchain_openai import ChatOpenAI
 
 from backend.langgraph_fuseki.state import GraphState
+from backend.langgraph_fuseki.utils.token_utils import extract_and_accumulate_tokens
 
 
 def history_check_node(state: GraphState) -> GraphState:
@@ -26,10 +27,19 @@ def history_check_node(state: GraphState) -> GraphState:
     node_start = time.time()
 
     query = state.get("query", "")
+    thinking_callback = state.get("thinking_callback")
+
+    # 🎯 Thinking 이벤트: 역사 관련 여부 체크 시작
+    if thinking_callback:
+        thinking_callback("history_check_started", {
+            "title": "역사 관련 여부 체크 시작",
+            "stage": "Stage 0: History Check",
+            "query": query
+        })
 
     # LLM 초기화
     llm = ChatOpenAI(
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        model=os.getenv("OPENAI_MODEL"),
         temperature=0
     )
 
@@ -74,6 +84,11 @@ def history_check_node(state: GraphState) -> GraphState:
 
     try:
         response = llm.invoke(history_check_prompt)
+        
+        # 토큰 사용량 추출 및 state에 누적
+        token_update = extract_and_accumulate_tokens(state, response)
+        state.update(token_update)
+        
         content = response.content.strip()
 
         # JSON 파싱
@@ -85,12 +100,32 @@ def history_check_node(state: GraphState) -> GraphState:
         result = json.loads(content)
         is_historical = result.get("is_historical", True)
 
-        print(f"✅ [0단계] 역사 관련 여부: {'역사 질문' if is_historical else '비역사 질문 (조기 종료)'}")
+        print(f"\n{'='*70}")
+        print(f"[Stage 0/6] 역사 관련 여부 체크 (History Check)")
+        print(f"{'='*70}")
+        print(f"  └─ 결과: {'[INFO] 역사 질문' if is_historical else '[WARN] 비역사 질문 (조기 종료)'}")
+
+        # 🎯 Thinking 이벤트: 역사 관련 여부 체크 완료
+        if thinking_callback:
+            thinking_callback("history_check_completed", {
+                "title": "역사 관련 여부 체크 완료",
+                "is_historical": is_historical,
+                "result": "역사 질문" if is_historical else "비역사 질문 (조기 종료)",
+                "next_action": "Query Classifier로 진행" if is_historical else "조기 종료"
+            })
 
     except Exception as e:
-        print(f"⚠️ 역사 관련 여부 판단 실패: {e}")
+        print(f"[ERROR] 역사 관련 여부 판단 실패: {e}")
         # 오류 시 안전하게 True로 처리 (정상 플로우 진행)
         is_historical = True
+
+        # 🎯 Thinking 이벤트: 오류 발생
+        if thinking_callback:
+            thinking_callback("history_check_error", {
+                "title": "역사 관련 여부 체크 오류",
+                "error": str(e),
+                "fallback_action": "안전하게 역사 질문으로 처리하여 정상 플로우 진행"
+            })
 
     # 실행 시간 측정
     node_end = time.time()

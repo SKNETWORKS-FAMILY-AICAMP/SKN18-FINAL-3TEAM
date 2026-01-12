@@ -270,11 +270,11 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
           border: "none",
           cursor: "pointer",
           fontSize: "14px",
-          color: COLORS.dark,
+          color: COLORS.textPrimary,
           marginBottom: "40px",
         }}
       >
-        <ArrowLeftIcon size={18} color={COLORS.dark} />
+        <ArrowLeftIcon size={18} color={COLORS.textPrimary} />
         마이페이지로 돌아가기
       </button>
 
@@ -283,7 +283,7 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
           style={{
             fontSize: "32px",
             fontWeight: "800",
-            color: COLORS.dark,
+            color: COLORS.textPrimary,
             marginBottom: "50px",
           }}
         >
@@ -342,7 +342,7 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
               <CameraIcon size={20} color={COLORS.dark} />
             </label>
           </div>
-          <span style={{ fontSize: "13px", color: COLORS.dark }}>
+          <span style={{ fontSize: "13px", color: COLORS.textPrimary }}>
             프로필 사진 변경
           </span>
         </div>
@@ -355,7 +355,7 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
                 display: "block",
                 fontSize: "14px",
                 fontWeight: "700",
-                color: COLORS.dark,
+                color: COLORS.textPrimary,
                 marginBottom: "10px",
               }}
             >
@@ -393,7 +393,7 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
                 display: "block",
                 fontSize: "14px",
                 fontWeight: "700",
-                color: COLORS.dark,
+                color: COLORS.textPrimary,
                 marginBottom: "10px",
               }}
             >
@@ -425,7 +425,7 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
                 display: "block",
                 fontSize: "14px",
                 fontWeight: "700",
-                color: COLORS.dark,
+                color: COLORS.textPrimary,
                 marginBottom: "10px",
               }}
             >
@@ -444,7 +444,8 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
                   fontSize: "16px",
                   backgroundColor:
                     formData.gender === true ? COLORS.primary : "transparent",
-                  color: COLORS.dark,
+                  color:
+                    formData.gender === true ? COLORS.white : COLORS.textPrimary,
                   cursor: "pointer",
                   fontWeight: formData.gender === true ? "700" : "500",
                 }}
@@ -465,7 +466,8 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
                   fontSize: "16px",
                   backgroundColor:
                     formData.gender === false ? COLORS.primary : "transparent",
-                  color: COLORS.dark,
+                  color:
+                    formData.gender === false ? COLORS.white : COLORS.textPrimary,
                   cursor: "pointer",
                   fontWeight: formData.gender === false ? "700" : "500",
                 }}
@@ -484,7 +486,8 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
                   fontSize: "16px",
                   backgroundColor:
                     formData.gender === null ? COLORS.primary : "transparent",
-                  color: COLORS.dark,
+                  color:
+                    formData.gender === null ? COLORS.white : COLORS.textPrimary,
                   cursor: "pointer",
                   fontWeight: formData.gender === null ? "700" : "500",
                 }}
@@ -501,7 +504,7 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
                 display: "block",
                 fontSize: "14px",
                 fontWeight: "700",
-                color: COLORS.dark,
+                color: COLORS.textPrimary,
                 marginBottom: "10px",
               }}
             >
@@ -551,7 +554,7 @@ const ProfileEditPage = ({ onNavigate, user: initialUser, onUserUpdate }) => {
               fontSize: "16px",
               fontWeight: "600",
               cursor: "pointer",
-              color: COLORS.dark,
+              color: COLORS.textPrimary,
             }}
           >
             취소

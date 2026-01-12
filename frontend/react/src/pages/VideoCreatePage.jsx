@@ -4,6 +4,81 @@ import { SendIcon } from "../components/common/Icons";
 import { createVideo } from "../api/videoApi";
 import VideoPlayer from "../features/video/components/VideoPlayer";
 import { getVideoUrl } from "../utils/imageUtils";
+import { useBackgroundTask } from "../contexts/BackgroundTaskContext";
+
+// 환영 메시지 컴포넌트 (스트리밍 애니메이션)
+const VideoCreateWelcomeMessage = ({ nickname }) => {
+  const [displayedName, setDisplayedName] = useState("");
+  const [displayedQuestion, setDisplayedQuestion] = useState("");
+  const nameText = `${nickname}님,`;
+  const questionText = "어떤 이야기를 들려드릴까요?";
+
+  useEffect(() => {
+    // 초기화
+    setDisplayedName("");
+    setDisplayedQuestion("");
+
+    // 이름 텍스트 스트리밍
+    let nameIndex = 0;
+    const nameInterval = setInterval(() => {
+      if (nameIndex < nameText.length) {
+        setDisplayedName(nameText.slice(0, nameIndex + 1));
+        nameIndex++;
+      } else {
+        clearInterval(nameInterval);
+        // 이름이 완성되면 질문 텍스트 스트리밍 시작
+        let questionIndex = 0;
+        const questionInterval = setInterval(() => {
+          if (questionIndex < questionText.length) {
+            setDisplayedQuestion(questionText.slice(0, questionIndex + 1));
+            questionIndex++;
+          } else {
+            clearInterval(questionInterval);
+          }
+        }, 50);
+        return () => clearInterval(questionInterval);
+      }
+    }, 100);
+    return () => clearInterval(nameInterval);
+  }, [nickname]);
+
+  return (
+    <>
+      <div
+        style={{
+          fontFamily: "'Noto Serif KR', serif",
+          fontSize: "clamp(28px, 4vw, 36px)",
+          fontWeight: "700",
+          color: COLORS.white,
+          margin: 0,
+          lineHeight: "1.4",
+          marginBottom: "0.5rem",
+        }}
+      >
+        {displayedName}
+        {displayedName.length < `${nickname}님,`.length && (
+          <span style={{ opacity: 0.5 }}>|</span>
+        )}
+      </div>
+      <div
+        style={{
+          fontFamily: "'Noto Serif KR', serif",
+          fontSize: "clamp(18px, 2.5vw, 24px)",
+          fontWeight: "300",
+          color: COLORS.white,
+          margin: 0,
+          lineHeight: "1.5",
+          opacity: 0.9,
+        }}
+      >
+        {displayedQuestion}
+        {displayedQuestion.length < "어떤 이야기를 들려드릴까요?".length && (
+          <span style={{ opacity: 0.5 }}>|</span>
+        )}
+      </div>
+    </>
+  );
+};
 
 const VideoCreatePage = ({ onNavigate, user }) => {
   const [message, setMessage] = useState("");
@@ -12,6 +87,7 @@ const VideoCreatePage = ({ onNavigate, user }) => {
   const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef(null);
   const containerRef = useRef(null);
+  const { registerTask } = useBackgroundTask();
 
   const nickname =
     user?.nickname ||
@@ -67,22 +143,50 @@ const VideoCreatePage = ({ onNavigate, user }) => {
       }, 50);
     });
 
-    try {
-      const response = await createVideo(userMessage);
+    // 백그라운드 작업으로 등록
+    const videoCreationPromise = createVideo(userMessage)
+      .then((response) => {
+        // API 응답에서 video_url을 받아서 처리
+        if (response.video_url) {
+          // video_url이 있으면 영상만 표시 (메시지 없음)
+          setMessages((prev) => [
+            ...prev,
+            {
+              type: "assistant",
+              video_url: response.video_url,
+            },
+          ]);
+          return { success: true, video_url: response.video_url };
+        } else {
+          // video_url이 없으면 에러 메시지 표시
+          let errorMessage = "영상 생성에 실패했습니다. 다시 시도해주세요.";
+          setMessages((prev) => [
+            ...prev,
+            {
+              type: "assistant",
+              error: errorMessage,
+            },
+          ]);
+          throw new Error(errorMessage);
+        }
+      })
+      .catch((error) => {
+        console.error("영상 생성 실패:", error);
 
-      // API 응답에서 video_url을 받아서 처리
-      if (response.video_url) {
-        // video_url이 있으면 영상만 표시 (메시지 없음)
-        setMessages((prev) => [
-          ...prev,
-          {
-            type: "assistant",
-            video_url: response.video_url,
-          },
-        ]);
-      } else {
-        // video_url이 없으면 에러 메시지 표시
-        let errorMessage = "영상 생성에 실패했습니다. 다시 시도해주세요.";
+        let errorMessage =
+          "죄송합니다. 오류가 발생했습니다. 다시 시도해주세요.";
+
+        if (error.response?.status === 404) {
+          errorMessage =
+            "영상 만들기 API가 아직 구현되지 않았습니다. 백엔드 개발자에게 문의해주세요.";
+        } else if (error.response?.status === 500) {
+          errorMessage = "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+        } else if (error.response?.data?.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
         setMessages((prev) => [
           ...prev,
           {
@@ -90,34 +194,18 @@ const VideoCreatePage = ({ onNavigate, user }) => {
             error: errorMessage,
           },
         ]);
-      }
-    } catch (error) {
-      console.error("영상 생성 실패:", error);
 
-      let errorMessage = "죄송합니다. 오류가 발생했습니다. 다시 시도해주세요.";
+        throw error;
+      })
+      .finally(() => {
+        setTimeout(() => {
+          setIsSubmitting(false);
+          setIsLoading(false);
+        }, 300);
+      });
 
-      if (error.response?.status === 404) {
-        errorMessage =
-          "영상 만들기 API가 아직 구현되지 않았습니다. 백엔드 개발자에게 문의해주세요.";
-      } else if (error.response?.status === 500) {
-        errorMessage = "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
-      } else if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          type: "assistant",
-          error: errorMessage,
-        },
-      ]);
-    }
-
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsLoading(false);
-    }, 300);
+    // 백그라운드 작업으로 등록
+    registerTask("영상 생성", videoCreationPromise);
   };
 
   const handleKeyDown = (e) => {
@@ -159,10 +247,12 @@ const VideoCreatePage = ({ onNavigate, user }) => {
 
   return (
     <div
+      className={messages.length > 0 ? "chat-page" : ""}
       style={{
         height: "calc(100vh - 76px)",
         maxHeight: "calc(100vh - 76px)",
-        backgroundColor: COLORS.background,
+        backgroundColor:
+          messages.length > 0 ? "var(--cream)" : COLORS.background,
         display: "flex",
         flexDirection: "row",
         padding: 0,
@@ -173,11 +263,12 @@ const VideoCreatePage = ({ onNavigate, user }) => {
     >
       {/* 메인 컨텐츠 */}
       <div
+        className={messages.length > 0 ? "chat-main" : ""}
         style={{
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          padding: messages.length > 0 ? "40px 60px" : "40px 60px",
+          padding: messages.length > 0 ? "0" : "40px 60px",
           position: "relative",
           overflow: "hidden",
         }}
@@ -201,12 +292,12 @@ const VideoCreatePage = ({ onNavigate, user }) => {
             {/* 대화 목록 */}
             <div
               ref={containerRef}
+              className={messages.length > 0 ? "chat-messages" : ""}
               style={{
                 flex: 1,
                 overflowY: "auto",
                 overflowX: "hidden",
-                paddingRight: "8px",
-                paddingBottom: "120px",
+                padding: messages.length > 0 ? "2rem 4rem" : "0 8px 120px 0",
                 touchAction: "pan-y",
                 WebkitOverflowScrolling: "touch",
               }}
@@ -229,68 +320,49 @@ const VideoCreatePage = ({ onNavigate, user }) => {
                 {messages.map((msg, index) => (
                   <div key={index}>
                     {msg.type === "user" && (
-                      <div
-                        style={{
-                          marginBottom: "16px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            padding: "12px 16px",
-                            backgroundColor: COLORS.lightGray,
-                            borderRadius: "12px",
-                            fontSize: "14px",
-                            color: COLORS.dark,
-                            display: "inline-block",
-                            maxWidth: "70%",
-                            wordWrap: "break-word",
-                          }}
-                        >
-                          {msg.text}
-                        </div>
+                      <div className="chat-message user">
+                        <div className="chat-message-bubble">{msg.text}</div>
                       </div>
                     )}
 
                     {msg.type === "assistant" && (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "16px",
-                        }}
-                      >
-                        {/* 영상이 있으면 VideoPlayer 표시 */}
-                        {msg.video_url && (
-                          <div
-                            style={{
-                              width: "100%",
-                              maxWidth: "100%",
-                            }}
-                          >
-                            <VideoPlayer
-                              videoUrl={
-                                getVideoUrl(msg.video_url) || msg.video_url
-                              }
-                            />
-                          </div>
-                        )}
-                        {/* 에러가 있으면 표시 (에러 상황일 때만) */}
-                        {msg.error && (
-                          <div
-                            style={{
-                              fontSize: "14px",
-                              color: "#e63946",
-                              lineHeight: "1.8",
-                              whiteSpace: "pre-wrap",
-                              wordWrap: "break-word",
-                              padding: "12px 16px",
-                              backgroundColor: "#ffe5e5",
-                              borderRadius: "8px",
-                            }}
-                          >
-                            {msg.error}
-                          </div>
-                        )}
+                      <div className="chat-message bot">
+                        <div className="chat-message-header">
+                          <div className="chat-message-avatar">秀</div>
+                          <span className="chat-message-name">아가씨</span>
+                        </div>
+                        <div className="chat-message-bubble">
+                          {/* 영상이 있으면 VideoPlayer 표시 */}
+                          {msg.video_url && (
+                            <div
+                              style={{
+                                width: "100%",
+                                maxWidth: "100%",
+                                marginBottom: "1rem",
+                              }}
+                            >
+                              <VideoPlayer
+                                videoUrl={
+                                  getVideoUrl(msg.video_url) || msg.video_url
+                                }
+                              />
+                            </div>
+                          )}
+                          {/* 에러가 있으면 표시 (에러 상황일 때만) */}
+                          {msg.error && (
+                            <div
+                              style={{
+                                fontSize: "14px",
+                                color: "#e63946",
+                                lineHeight: "1.8",
+                                whiteSpace: "pre-wrap",
+                                wordWrap: "break-word",
+                              }}
+                            >
+                              {msg.error}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -313,105 +385,159 @@ const VideoCreatePage = ({ onNavigate, user }) => {
 
             {/* 입력 영역 */}
             <div
-              style={{
-                position: "fixed",
-                bottom: "40px",
-                left: "50%",
-                transform: "translateX(-50%)",
-                width: "calc(100% - 120px)",
-                maxWidth: "1200px",
-                zIndex: 998,
-              }}
-            >
-              <form
-                onSubmit={handleSubmit}
-                style={{
-                  position: "relative",
-                  display: "flex",
-                  alignItems: "center",
-                  width: "100%",
-                }}
-              >
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="영상에 대한 설명을 입력하세요..."
-                  disabled={isSubmitting}
-                  style={{
-                    flex: 1,
-                    padding: "12px 60px 12px 20px",
-                    border: `1.5px solid ${
-                      message.trim() ? COLORS.primary : "#ddd"
-                    }`,
-                    borderRadius: "24px",
-                    fontSize: "14px",
-                    backgroundColor: COLORS.white,
-                    color: COLORS.dark,
-                    outline: "none",
-                    transition: "border-color 0.2s",
-                    opacity: isSubmitting ? 0.6 : 1,
-                    cursor: isSubmitting ? "not-allowed" : "text",
-                  }}
-                  onFocus={(e) => {
-                    if (!isSubmitting) {
-                      e.target.style.borderColor = COLORS.primary;
+              className={messages.length > 0 ? "chat-input-area" : ""}
+              style={
+                messages.length > 0
+                  ? {}
+                  : {
+                      position: "fixed",
+                      bottom: "40px",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      width: "calc(100% - 120px)",
+                      maxWidth: "1200px",
+                      zIndex: 998,
                     }
-                  }}
-                  onBlur={(e) => (e.target.style.borderColor = "#ddd")}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    right: "8px",
-                    display: "flex",
-                    gap: "8px",
-                    alignItems: "center",
-                  }}
-                >
-                  <button
-                    type="submit"
-                    disabled={!message.trim() || isSubmitting}
-                    style={{
-                      width: "32px",
-                      height: "32px",
-                      borderRadius: "8px",
-                      backgroundColor:
-                        message.trim() && !isSubmitting
-                          ? COLORS.primary
-                          : COLORS.lightGray,
-                      border: "none",
-                      cursor:
-                        message.trim() && !isSubmitting
-                          ? "pointer"
-                          : "not-allowed",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      transition: "all 0.2s",
-                      padding: 0,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (message.trim() && !isSubmitting) {
-                        e.currentTarget.style.transform = "scale(1.05)";
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "scale(1)";
-                    }}
-                  >
-                    <SendIcon
-                      size={16}
-                      color={
-                        message.trim() && !isSubmitting
-                          ? COLORS.dark
-                          : COLORS.gray
-                      }
+              }
+            >
+              <form onSubmit={handleSubmit}>
+                {messages.length > 0 ? (
+                  <div className="chat-input-wrapper">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      className="chat-input"
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="영상에 대한 설명을 입력하세요..."
+                      disabled={isSubmitting}
                     />
-                  </button>
-                </div>
+                    <button
+                      type="submit"
+                      disabled={!message.trim() || isSubmitting}
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "8px",
+                        backgroundColor:
+                          message.trim() && !isSubmitting
+                            ? COLORS.primary
+                            : COLORS.lightGray,
+                        border: "none",
+                        cursor:
+                          message.trim() && !isSubmitting
+                            ? "pointer"
+                            : "not-allowed",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.2s",
+                        padding: 0,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (message.trim() && !isSubmitting) {
+                          e.currentTarget.style.transform = "scale(1.05)";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "scale(1)";
+                      }}
+                    >
+                      <SendIcon
+                        size={16}
+                        color={
+                          message.trim() && !isSubmitting
+                            ? COLORS.dark
+                            : COLORS.gray
+                        }
+                      />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="영상에 대한 설명을 입력하세요..."
+                      disabled={isSubmitting}
+                      style={{
+                        flex: 1,
+                        padding: "12px 60px 12px 20px",
+                        border: `1.5px solid ${
+                          message.trim() ? COLORS.primary : "#ddd"
+                        }`,
+                        borderRadius: "24px",
+                        fontSize: "14px",
+                        backgroundColor: COLORS.white,
+                        color: COLORS.dark,
+                        outline: "none",
+                        transition: "border-color 0.2s",
+                        opacity: isSubmitting ? 0.6 : 1,
+                        cursor: isSubmitting ? "not-allowed" : "text",
+                      }}
+                      onFocus={(e) => {
+                        if (!isSubmitting) {
+                          e.target.style.borderColor = COLORS.primary;
+                        }
+                      }}
+                      onBlur={(e) => (e.target.style.borderColor = "#ddd")}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        right: "8px",
+                        display: "flex",
+                        gap: "8px",
+                        alignItems: "center",
+                      }}
+                    >
+                      <button
+                        type="submit"
+                        disabled={!message.trim() || isSubmitting}
+                        style={{
+                          width: "32px",
+                          height: "32px",
+                          borderRadius: "8px",
+                          backgroundColor:
+                            message.trim() && !isSubmitting
+                              ? COLORS.primary
+                              : COLORS.lightGray,
+                          border: "none",
+                          cursor:
+                            message.trim() && !isSubmitting
+                              ? "pointer"
+                              : "not-allowed",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          transition: "all 0.2s",
+                          padding: 0,
+                        }}
+                        onMouseEnter={(e) => {
+                          if (message.trim() && !isSubmitting) {
+                            e.currentTarget.style.transform = "scale(1.05)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "scale(1)";
+                        }}
+                      >
+                        <SendIcon
+                          size={16}
+                          color={
+                            message.trim() && !isSubmitting
+                              ? COLORS.dark
+                              : COLORS.gray
+                          }
+                        />
+                      </button>
+                    </div>
+                  </>
+                )}
               </form>
             </div>
           </div>
@@ -435,20 +561,11 @@ const VideoCreatePage = ({ onNavigate, user }) => {
             <div
               style={{
                 textAlign: "center",
+                width: "100%",
+                maxWidth: "800px",
               }}
             >
-              <h1
-                style={{
-                  fontFamily: "'SB 어그로', 'Pretendard', sans-serif",
-                  fontSize: "clamp(32px, 5vw, 40px)",
-                  fontWeight: "500",
-                  color: "#effd9a",
-                  margin: 0,
-                  lineHeight: "1.2",
-                }}
-              >
-                {`${nickname}님, 어떤 영상을 만들어드릴까요?`}
-              </h1>
+              <VideoCreateWelcomeMessage nickname={nickname} />
             </div>
 
             <div

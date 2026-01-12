@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Q
+from django.contrib.postgres.search import TrigramSimilarity
 from video.models import Video
 from activity.models import SearchHistory
 from .serializers import VideoSearchSerializer
@@ -34,9 +35,9 @@ class VideoSearchView(APIView):
         if page_size < 1 or page_size > 50:
             page_size = 12
 
-        # 검색어가 없으면 인기 영상 반환
+        # 검색어가 없으면 전체 영상 반환
         if not query:
-            videos = Video.objects.all().order_by('-likes_count', '-comments_count')
+            videos = Video.objects.all()
         else:
             # 검색어 길이 검증
             if len(query) < 2:
@@ -47,28 +48,48 @@ class VideoSearchView(APIView):
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            # 검색 기록 저장 (로그인한 경우)
-            if request.user.is_authenticated:
-                try:
-                    SearchHistory.objects.create(
-                        user=request.user,
-                        search_query=query
+            # 검색 기록 저장은 프론트엔드에서 처리하므로 백엔드에서는 저장하지 않음
+            # 검색창에서 엔터를 눌렀을 때만 프론트엔드에서 createSearchHistory API를 호출함
+
+            # 검색 쿼리 (제목 + 태그 + video_keyword)
+            # 제목 검색 또는 태그 배열의 각 요소에 대한 부분 일치 검색
+            # video_keyword 필드도 검색에 포함
+            # EXISTS를 사용하여 각 태그를 개별적으로 검색
+            print(f"🔍 검색어: '{query}'")
+
+            videos = Video.objects.extra(
+                where=["""
+                    title ILIKE %s OR
+                    video_keyword ILIKE %s OR
+                    EXISTS (
+                        SELECT 1 FROM unnest(tags) AS tag
+                        WHERE tag ILIKE %s
                     )
-                except Exception as e:
-                    # 검색 기록 저장 실패는 무시
-                    pass
+                """],
+                params=[f'%{query}%', f'%{query}%', f'%{query}%']
+            )
 
-            # 검색 쿼리 (제목 + 태그)
-            search_filter = Q(title__icontains=query) | Q(tags__icontains=query)
-            videos = Video.objects.filter(search_filter)
+            print(f"🔍 검색 결과 개수: {videos.count()}")
 
-        # 태그 필터링
+            # 디버깅: 처음 5개 영상의 제목, 태그, video_keyword 출력
+            for v in videos[:5]:
+                print(f"  - ID:{v.id}, 제목:{v.title}, 태그:{v.tags}, 키워드:{v.video_keyword}")
+
+        # 태그 필터링 (부분 일치 지원)
         if tags_param:
             tag_list = [tag.strip() for tag in tags_param.split(',') if tag.strip()]
             if tag_list:
-                # 모든 태그를 포함하는 영상만 필터링
+                # 각 태그를 부분 일치로 필터링
                 for tag in tag_list:
-                    videos = videos.filter(tags__icontains=tag)
+                    videos = videos.extra(
+                        where=["""
+                            EXISTS (
+                                SELECT 1 FROM unnest(tags) AS t
+                                WHERE t ILIKE %s
+                            )
+                        """],
+                        params=[f'%{tag}%']
+                    )
 
         # 정렬
         if sort_by == 'latest':

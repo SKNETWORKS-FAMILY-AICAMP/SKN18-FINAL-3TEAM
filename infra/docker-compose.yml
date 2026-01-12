@@ -82,6 +82,36 @@ services:
       timeout: 5s
       retries: 5
 
+  # Django Backend
+  web:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: django_web
+    env_file:
+      - ../.env
+    environment:
+      # Docker 환경에서 Fuseki 서비스 이름으로 접근
+      - FUSEKI_URL=http://fuseki:3030/korean-history
+      - DOCKER_ENV=true
+    command:
+      [
+        "/app/backend/django/entrypoint.sh",
+        "python",
+        "manage.py",
+        "runserver",
+        "0.0.0.0:8000",
+      ]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app/backend
+    depends_on:
+      - postgres
+      - redis
+      - neo4j
+      - fuseki
+
 volumes:
   fuseki-data:
     driver: local

@@ -1,3 +1,6 @@
+/* Noto Serif KR 폰트 (Google Fonts) */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200;300;400;500;600;700;900&display=swap");
+
 @font-face {
   font-family: "SB 어그로";
   src: url("/fonts/sb-aggro-bold.otf") format("opentype");
@@ -25,13 +28,13 @@
 }
 
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+  font-family: "Noto Serif KR", serif;
+  line-height: 1.6;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: dark;
+  color: #fafaf8;
+  background-color: #0a0a0a;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -53,6 +56,8 @@ html {
   padding: 0;
   width: 100%;
   overflow-x: hidden;
+  font-size: 16px;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -62,6 +67,9 @@ body {
   min-width: 320px;
   min-height: 100vh;
   overflow-x: hidden;
+  font-family: "Noto Serif KR", serif;
+  background: #0a0a0a;
+  color: #fafaf8;
 }
 
 #root {

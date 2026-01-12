@@ -2,6 +2,10 @@ from backend.langgraph_structure1.state import GraphState
 from langgraph.graph import END
 from backend.langgraph_structure1.utils import create_model
 from deep_translator import GoogleTranslator
+from celery.utils.log import get_task_logger
+logger = get_task_logger(__name__)
+
+import time
 
 def is_korean(text: str) -> bool:
     """텍스트에 한글이 하나라도 포함되어 있는지 간단 체크."""
@@ -28,6 +32,8 @@ def translate_en_to_ko_if_needed(text: str) -> tuple[str, str]:
 
 def classify_node(state: GraphState) -> GraphState:
     query = state.get("query")
+    # 전체 시작 시간
+    total_start_time = time.perf_counter()
 
     if not query:
         raise ValueError("classify_node: 'query' 값이 state에 없습니다.")
@@ -88,10 +94,11 @@ def classify_node(state: GraphState) -> GraphState:
     )
 
     query_type = response.choices[0].message.content.strip()
-    print(f"[DEBUG] src_lang={src_lang}, query_type={query_type!r}")
+    logger.warning("[DEBUG] src_lang=%s, query_type=%r, tag=%s", src_lang, query_type, state.get("tag"))
 
     return {
         **state,
+        "t0":total_start_time,
         "detect_lang": src_lang,
         "translated_query": translated_query,
         "query_type": query_type,
@@ -107,7 +114,7 @@ def route_classify(state: GraphState) -> str:
     if query_type == "hybrid":
         return "hybrid_node"
     elif query_type == "no_related":
-        return END
+        return "reaction_node"
     else:
         raise ValueError(f"지원하지 않는 query_type={query_type}")
 

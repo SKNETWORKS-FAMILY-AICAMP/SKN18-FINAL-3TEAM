@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 from rest_framework.generics import DestroyAPIView, UpdateAPIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
+from celery.result import AsyncResult
+from community.background_task import generate_reply_for_comment
 from video.models import Video
 from .models import Comment, Reply, Likes
 from .serializers import (
@@ -24,15 +26,6 @@ from .serializers import (
 # 커스텀 권한 클래스
 # ============================================
 from rest_framework.permissions import BasePermission
-
-
-class IsAdminUser(BasePermission):
-    """관리자(permission='admin')만 접근 가능"""
-    def has_permission(self, request, view):
-        return (
-            request.user.is_authenticated and
-            request.user.permission == 'admin'
-        )
 
 
 class IsOwnerOrAdmin(BasePermission):
@@ -105,8 +98,13 @@ class VideoCommentView(APIView):
 
         if serializer.is_valid():
             serializer.save(user=request.user, video=video)
+
+            # 댓글 저장 후 인플루언서 답글 자동 생성(백그라운드 동작)
+            task = generate_reply_for_comment.delay(serializer.instance.id)
+
             return Response({
                 'data': CommentSerializer(serializer.instance, context={'request': request}).data,
+                'task_id': task.id,  # Celery task ID 반환
                 'message': '댓글이 작성되었습니다.'
             }, status=status.HTTP_201_CREATED)
 
@@ -491,3 +489,26 @@ class UserActivityView(APIView):
             'data': serializer.data,
             'message': 'ok'
         })
+
+
+
+# ============================================
+# Celery Task 상태 확인 API
+# ============================================
+
+@api_view(["GET"])
+def check_task_status(request, task_id):
+    """
+    Celery task 상태 확인
+
+    GET /api/community/tasks/<task_id>/status/
+    """
+    task_result = AsyncResult(task_id)
+    
+    return Response({
+        "task_id": task_id,
+        "status": task_result.status,  # PENDING, STARTED, SUCCESS, FAILURE
+        "result": task_result.result if task_result.successful() else None,
+        "error": str(task_result.result) if task_result.failed() else None,
+    })
+

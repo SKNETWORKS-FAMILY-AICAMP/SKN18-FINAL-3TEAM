@@ -67,3 +67,11 @@ deep_translator==1.11.4
 drf-spectacular==0.29.0
 
 ragas==0.2.15
+
+# 백그라운드 태스크 처리
+celery==5.6.0
+
+gunicorn==23.0.0
+
+# Elasticsearch
+elasticsearch

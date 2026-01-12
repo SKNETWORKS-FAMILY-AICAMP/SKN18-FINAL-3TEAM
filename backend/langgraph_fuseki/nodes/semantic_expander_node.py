@@ -607,6 +607,13 @@ def semantic_expander_node(state: GraphState) -> GraphState:
             all_expanded.append(entity)
 
     # 확장된 엔티티 추가 (관련도 순)
+    # 원본 엔티티의 keyword_trace 정보를 맵으로 저장 (확장 엔티티에 상속하기 위해)
+    entity_keyword_trace_map = {}
+    for entity in extracted_entities:
+        entity_name = entity.get("name", "")
+        if entity_name:
+            entity_keyword_trace_map[entity_name] = entity.get("keyword_trace", {})
+    
     for expanded_list in [causal_expanded, temporal_expanded, category_expanded, pgvector_expanded]:
         for entity in expanded_list:
             uri = entity.get("uri") or entity.get("name")
@@ -616,6 +623,23 @@ def semantic_expander_node(state: GraphState) -> GraphState:
                 seen_uris.add(uri)
                 if name:
                     seen_names.add(name)
+                
+                # ⭐ 확장된 엔티티에 keyword_trace 정보 추가
+                expansion_method = entity.get("expansion_method", "")
+                expansion_source = entity.get("expansion_source", "")
+                
+                # 원본 엔티티의 keyword_trace 정보 상속
+                source_keyword_trace = entity_keyword_trace_map.get(expansion_source, {})
+                
+                # keyword_trace 정보 구성
+                entity["keyword_trace"] = {
+                    "matched_keyword": source_keyword_trace.get("matched_keyword", ""),
+                    "is_from_expansion": source_keyword_trace.get("is_from_expansion", False),
+                    "expansion_method": expansion_method,  # semantic_expander의 확장 방법
+                    "source": "semantic_expansion",  # 지식 확장임을 표시
+                    "expansion_source_entity": expansion_source  # 어떤 엔티티에서 확장되었는지
+                }
+                
                 all_expanded.append(entity)
 
     # TTL 매칭 (Milvus에서 온 엔티티는 URI 없음)

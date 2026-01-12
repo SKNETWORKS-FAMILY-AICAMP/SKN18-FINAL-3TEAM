@@ -1,347 +1,325 @@
-from django.shortcuts import render
 import json
-import os, time
+import os
+import time
+import glob
+import subprocess
+import requests
+import shutil  # 하이재킹용 추가
+import traceback # 디버깅용 추가
+from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
+from django.core.files.storage import default_storage
+
+# Rest Framework 임포트
 from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated, BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.generics import ListAPIView, RetrieveAPIView, CreateAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView, CreateAPIView, UpdateAPIView, DestroyAPIView
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
 from openai import OpenAI
 from dotenv import load_dotenv
+from asgiref.sync import sync_to_async
 
+# 팀원 추가 라이브러리: 번역기
+from deep_translator import GoogleTranslator
+
+# 모델 및 시리얼라이저
 from .models import Video
 from .serializers import VideoSerializer, VideoDetailSerializer, VideoCreateSerializer
 
 # .env 파일 로드
 load_dotenv()
 
+# LangGraph 임포트
+from backend.langgraph_structure1.graph import create_graph_flow
+from backend.langgraph_structure1.state import GraphState
 
 # ============================================
-# 커스텀 권한 클래스
+# 유니티 에셋 로드 (기존 유지)
 # ============================================
-from rest_framework.permissions import BasePermission
-
+def load_asset_context():
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        file_path = os.path.join(current_dir, 'unityassets.json')
+        if not os.path.exists(file_path):
+            return "No asset file found."
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        actors = ", ".join(data.get('actors', []))
+        bgms = ", ".join(data.get('bgm_files', []))
+        sfxs = ", ".join(data.get('sfx_files', []))
+        actions_str = ""
+        for group in data.get('action_groups', []):
+            mood = group.get('mood', 'General')
+            tags = ", ".join(group.get('tags', []))
+            actions_str += f"- [{mood}]: {tags}\n"
+        return f"[Assets] Characters: {actors}, BGM: {bgms}, SFX: {sfxs}\n{actions_str}"
+    except Exception as e:
+        return f"Error: {e}"
 
 class IsAdminUser(BasePermission):
-    """관리자(permission='admin')만 접근 가능"""
     def has_permission(self, request, view):
-        return (
-            request.user.is_authenticated and
-            request.user.permission == 'admin'
+        return request.user.is_authenticated and getattr(request.user, 'permission', '') == 'admin'
+
+# ============================================
+# [통합 완료] 유니티 시나리오 생성 (가공 + 하이재킹)
+# ============================================
+@csrf_exempt
+async def generate_scenario(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST only'}, status=405)
+
+    try:
+        body_unicode = request.body.decode('utf-8')
+        data = json.loads(body_unicode)
+        topic = data.get('topic', '')
+        
+        # 1. LangGraph 실행 (dev의 asset_context 로직 적용)
+        asset_context_prompt = load_asset_context()
+        app = create_graph_flow()
+        initial_state = {"query": topic, "asset_context": asset_context_prompt, "tag": "video"}
+        
+        print("🔹 [1/4] LangGraph 실행 중...")
+        result = await app.ainvoke(initial_state)
+        final_script = result.get('scene_script')
+
+        # 2. 가공 대상 영상 주소 추출 (사용자님의 정밀 탐색 로직)
+        candidate_video = (
+            result.get('video_url') or 
+            result.get('background_video_url') or 
+            result.get('video_path') or 
+            final_script.get('background_video_url') or
+            final_script.get('background_url')
         )
 
-
-# ============================================
-# 비디오 API
-# ============================================
-
-class VideoListView(ListAPIView):
-    """
-    영상 목록 API
-    
-    GET /api/video/list/
-    - 전체 영상 목록 조회 (최신순)
-    - 조회수순 정렬 가능
-    """
-    queryset = Video.objects.all()
-    serializer_class = VideoSerializer
-    permission_classes = [AllowAny]
-    
-    def get_queryset(self):
-        queryset = super().get_queryset()
+        if not candidate_video and 'scenes' in final_script and len(final_script['scenes']) > 0:
+            candidate_video = final_script['scenes'][0].get('location')
+            print(f"🔍 [Notice] 씬 데이터에서 주소 발견: {candidate_video}")
         
-        # 정렬
-        sort = self.request.query_params.get('sort', 'latest')
-        if sort == 'comments':
-            queryset = queryset.order_by('-comments_count', '-upload_date')
+        print(f"🔍 [2/4] 가공 대상 후보 확인: {candidate_video}")
+
+        target_url = ""
+        # 3. 가공 로직 (성공해야만 target_url이 .webm으로 바뀜)
+        if candidate_video and any(ext in str(candidate_video).lower() for ext in [".mp4", ".webm", ".mov"]):
+            original_url = str(candidate_video)
+            try:
+                temp_raw_dir = os.path.join(settings.MEDIA_ROOT, 'temp_raw')
+                bg_final_dir = os.path.join(settings.MEDIA_ROOT, 'backgrounds')
+                os.makedirs(temp_raw_dir, exist_ok=True)
+                os.makedirs(bg_final_dir, exist_ok=True)
+
+                file_id = int(time.time())
+                raw_path = os.path.join(temp_raw_dir, f"raw_{file_id}.mp4")
+                output_name = f"unity_{file_id}.webm"
+                local_output = os.path.join(bg_final_dir, output_name)
+
+                print(f"🎬 [3/4] 가공 시작: {original_url} -> {output_name}")
+
+                r = requests.get(original_url, stream=True, timeout=30)
+                with open(raw_path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192): f.write(chunk)
+
+                # FFmpeg 세탁 (인코딩 및 에러 처리 보강)
+                cmd = [
+                    'ffmpeg', '-y', '-i', raw_path,
+                    '-map_metadata', '-1',
+                    '-c:v', 'libvpx', '-b:v', '2M', '-crf', '10',
+                    '-c:a', 'libvorbis',
+                    local_output
+                ]
+                process = subprocess.run(cmd, capture_output=True, encoding='utf-8', errors='ignore')
+
+                if process.returncode == 0:
+                    ngrok_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
+                    target_url = f"{ngrok_url}{settings.MEDIA_URL}backgrounds/{output_name}"
+                    print(f"✅ [Success] 가공 완료: {target_url}")
+                    if os.path.exists(raw_path): os.remove(raw_path)
+                else:
+                    print(f"❌ FFmpeg 에러: {process.stderr}")
+                    target_url = original_url
+            except Exception as e:
+                print(f"❌ 가공 중 예외 발생: {e}")
+                target_url = original_url
         else:
-            queryset = queryset.order_by('-upload_date')
-        
-        # 태그 필터
-        tag = self.request.query_params.get('tag', '')
-        if tag:
-            queryset = queryset.filter(tags__contains=[tag])
-        
-        return queryset
+            target_url = candidate_video or (final_script.get('background_url') if final_script else "")
+
+        # 4. JSON 대본 업데이트 및 하이재킹 저장
+        if target_url and final_script and 'scenes' in final_script:
+            final_script['background_url'] = target_url
+            for scene in final_script['scenes']:
+                scene['location'] = target_url
+
+        save_dir = os.path.join(settings.MEDIA_ROOT, 'pending_scripts')
+        hijack_dir = os.path.join(settings.MEDIA_ROOT, 'script_logs')
+        os.makedirs(save_dir, exist_ok=True)
+        os.makedirs(hijack_dir, exist_ok=True)
+
+        filename = f"{time.strftime('%Y%m%d_%H%M%S')}_script.json"
+        full_path = os.path.join(save_dir, filename)
+        hijack_path = os.path.join(hijack_dir, filename)
+
+        with open(full_path, 'w', encoding='utf-8') as f:
+            json.dump(final_script, f, indent=4, ensure_ascii=False)
+
+        try:
+            shutil.copy(full_path, hijack_path)
+            print(f"📄 [4/4] 대본 생성 및 하이재킹 성공: {hijack_path}")
+        except Exception as copy_e:
+            print(f"⚠️ 하이재킹 복사 실패: {copy_e}")
+
+        return JsonResponse({'message': 'Queued', 'file_name': filename}, status=200)
+
+    except Exception as e:
+        print(f"🔥 [Critical] 전체 프로세스 실패: {e}")
+        traceback.print_exc()
+        return JsonResponse({'error': str(e)}, status=500)
+
+# ============================================
+# 비디오 생성 (dev의 Celery 로직 통합)
+# ============================================
+@csrf_exempt
+async def create_video_from_langgraph(request):
+    if request.method != "POST": return JsonResponse({"error": "POST only"}, status=405)
+    body = json.loads(request.body.decode("utf-8"))
+    description = body.get("description", "")
+    app = create_graph_flow()
+    initial_state = {"query": description, "tag": "video"}
+    result_state = await app.ainvoke(initial_state)
+    script_json = result_state.get("scene_script") or {}
+    title = script_json.get("title") or description[:50]
+
+    if title:
+        try: title = GoogleTranslator(source="en", target="ko").translate(title)
+        except: pass
+
+    thumbnail_url = result_state.get("thumbnail_url") or body.get("thumbnail_url")
     
-    def list(self, request, *args, **kwargs):
-        response = super().list(request, *args, **kwargs)
-        return Response({
-            'data': response.data,
-            'message': 'ok'
-        })
+    payload = {
+        "title": title, 
+        "video_url": body.get("video_url", "https://skn18-3-dev-temp.s3.amazonaws.com/background_scene_1_video.mp4"), 
+        "tags": result_state.get("video_tags") or [], 
+        "thumbnail_url": thumbnail_url
+    }
+    serializer = VideoCreateSerializer(data=payload)
+    await sync_to_async(serializer.is_valid)(raise_exception=True)
+    video = await sync_to_async(serializer.save)()
 
+    # ========== 영상 키워드 생성 Task 등록 (dev 기능 유지) ==========
+    from backend.langgraph_recommendation.tasks import generate_video_keywords_task
+    try:
+        task = generate_video_keywords_task.delay(video.id, title, description)
+        print(f"✓ 키워드 생성 Task 등록 완료: video_id={video.id}, task_id={task.id}")
+    except Exception as e:
+        print(f"⚠️ Celery Task 등록 실패: {e}")
 
+    serialized = await sync_to_async(lambda: VideoSerializer(video).data)()
+    return JsonResponse({"data": serialized}, status=201)
 
-class VideoDetailView(RetrieveAPIView):
-    """
-    영상 상세 API
-    
-    GET /api/video/<id>/
-    - 특정 영상 상세 조회
-    """
-    queryset = Video.objects.all()
-    serializer_class = VideoDetailSerializer
+# ============================================
+# [유니티 폴링 API] (기존 유지) -> 얘가 대본 보내기 담당!
+# ============================================
+class PendingScriptView(APIView):
     permission_classes = [AllowAny]
-    
-    def retrieve(self, request, *args, **kwargs):
-        response = super().retrieve(request, *args, **kwargs)
-        return Response({
-            'data': response.data,
-            'message': 'ok'
-        })
+    def get(self, request):
+        save_dir = os.path.join(settings.MEDIA_ROOT, 'pending_scripts')
+        files = glob.glob(os.path.join(save_dir, "*.json"))
+        if not files: return Response(status=404)
+        files.sort()
+        target_file = files[0]
+        with open(target_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        ngrok_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
+        json_str = json.dumps(data, ensure_ascii=False).replace("http://127.0.0.1:8000", ngrok_url).replace("http://localhost:8000", ngrok_url)
+        data = json.loads(json_str)
+        
+        os.remove(target_file)
+        return Response(data, status=200)
 
-
+# ============================================
+# VideoUploadView 및 기타 CRUD (기존 유지) -> 얘가 동영상 받기 담당!
+# ============================================
 class VideoUploadView(CreateAPIView):
-    """
-    영상 업로드 API (관리자 전용)
-
-    POST /api/video/upload/
-    - 관리자만 영상 업로드 가능
-    - 파일 업로드 또는 URL 입력 가능
-    """
     queryset = Video.objects.all()
     serializer_class = VideoCreateSerializer
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [AllowAny]
 
     def create(self, request, *args, **kwargs):
-        import os
-        from django.core.files.storage import default_storage
-        from django.conf import settings
+        thumbnail_url = None
+        video_url = None
+        ngrok_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
 
-        # 파일 업로드인 경우
+        if 'thumbnail_file' in request.FILES:
+            thumb = request.FILES['thumbnail_file']
+            t_dir = 'thumbnails'
+            os.makedirs(os.path.join(settings.MEDIA_ROOT, t_dir), exist_ok=True)
+            t_name = f"{int(time.time())}_thumb{os.path.splitext(thumb.name)[1]}"
+            t_path = default_storage.save(os.path.join(t_dir, t_name), thumb)
+            thumbnail_url = f"{ngrok_url}{settings.MEDIA_URL}{t_path}"
+
         if 'video_file' in request.FILES:
-            video_file = request.FILES['video_file']
+            video = request.FILES['video_file']
+            v_dir = 'videos'
+            os.makedirs(os.path.join(settings.MEDIA_ROOT, v_dir), exist_ok=True)
+            v_name = f"{int(time.time())}_{video.name}"
+            v_path = default_storage.save(os.path.join(v_dir, v_name), video)
+            video_url = f"{ngrok_url}{settings.MEDIA_URL}{v_path}"
 
-            # 파일 저장 경로 생성
-            upload_dir = 'videos'
-            os.makedirs(os.path.join(settings.MEDIA_ROOT, upload_dir), exist_ok=True)
-
-            # 파일명 생성 (중복 방지)
-            import time
-            file_extension = os.path.splitext(video_file.name)[1]
-            file_name = f"{int(time.time())}_{video_file.name}"
-            file_path = os.path.join(upload_dir, file_name)
-
-            # 파일 저장
-            saved_path = default_storage.save(file_path, video_file)
-
-            # URL 생성
-            video_url = request.build_absolute_uri(f"{settings.MEDIA_URL}{saved_path}")
-
-            # 데이터 준비
             data = {
                 'title': request.data.get('title'),
                 'video_url': video_url,
-                'tags': request.data.getlist('tags[]') if 'tags[]' in request.data else []
+                'tags': request.data.getlist('tags[]') if 'tags[]' in request.data else [],
+                'thumbnail_url': thumbnail_url
             }
         else:
-            # URL 입력인 경우
-            data = request.data
+            data = request.data.copy()
+            if thumbnail_url: data['thumbnail_url'] = thumbnail_url
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
+        return Response({'data': VideoSerializer(serializer.instance).data, 'message': 'ok'}, status=201)
 
-        return Response({
-            'data': VideoSerializer(serializer.instance).data,
-            'message': '영상이 업로드되었습니다.'
-        }, status=status.HTTP_201_CREATED)
+class VideoListView(ListAPIView):
+    queryset = Video.objects.all()
+    serializer_class = VideoSerializer
+    permission_classes = [AllowAny]
+    def list(self, request, *args, **kwargs):
+        return Response({'data': super().list(request, *args, **kwargs).data})
 
+class VideoDetailView(RetrieveAPIView):
+    queryset = Video.objects.all()
+    serializer_class = VideoDetailSerializer
+    permission_classes = [AllowAny]
 
-# 시스템 프롬프트 (Talchum Comedy / English Mode - Final Structured Version)
-SYSTEM_PROMPT_TEMPLATE = """
-Role: You are an elite Showrunner specializing in satirical, fast-paced shorts. Your goal is to maximize dialogue density and humorous subversion using Unity 3D characters.
-Constraint: The video MUST be 50-60 seconds. Total sequences MUST be MINIMUM 35 (Target 40). You MUST continue the dialogue until specific historical depth is reached.
+class VideoUpdateView(UpdateAPIView):
+    queryset = Video.objects.all()
+    serializer_class = VideoCreateSerializer
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
-[Language Rule]
-- ALL DIALOGUE MUST BE IN ENGLISH.
-- MAXIMUM DIALOGUE LENGTH IS 8 WORDS PER LINE. (Strictly enforced rapid-fire style).
-- Do not use markdown (```json). Output raw JSON only.
+class VideoDeleteView(DestroyAPIView):
+    queryset = Video.objects.all()
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
-[Characters & Persona - TALCHUM DYNAMIC]
-1. Lady Minji: Haughty, demanding, easily frustrated. Dialogue MUST be short and emotional. (e.g., "Minseok, get to the point!", "Are you mocking me?")
-2. Butler Minseok: Formal, knowledgeable, uses complexity to subtly mock Minji's ignorance.
-   - Sarcasm Style: He praises Minji's ignorance as if it were a virtue. (e.g., "Such a pristine mind, uncluttered by knowledge.", "A truly creative interpretation of history, my Lady.")
+class PopularVideosView(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request):
+        videos = Video.objects.all().order_by('-likes_count', '-comments_count')[:20]
+        serializer = VideoSerializer(videos, many=True)
+        return Response({'data': serializer.data, 'message': 'ok'})
 
-[Script Structure - 4 ACTS (STRICTLY FOLLOW THIS)]
-1. INTRO (Seq 1-6): Minji sees something relatable (money, weather, object) and asks a misconception question based on modern logic.
-2. CONFLICT (Seq 7-18): Minseok explains using overly academic jargon. Minji gets annoyed/bored. Minseok apologizes but subtly insults her intelligence.
-3. CLIMAX (Seq 19-24): Minseok reveals a "Shocking TMI Fact" or a historical Twist that surprises Minji.
-4. OUTRO (Seq 25-30): Minji completely misunderstands the lesson or draws a selfish conclusion. Minseok sighs or gives up.
+class PopularTagsView(APIView):
+    permission_classes = [AllowAny]
+    def get(self, request):
+        from collections import Counter
+        tags = []
+        for v in Video.objects.exclude(tags__isnull=True): tags.extend(v.tags)
+        return Response({'data': [{'tag': k, 'count': v} for k, v in Counter(tags).most_common(10)]})
 
-[Scripting Rules - RAPID FIRE]
-1. All topics must be fun facts from Korean history, explained for non-Korean viewers.
-2. TIKI-TAKA PRIORITY: Every conversation turn must be quick and responsive.
-3. REACTION FIRST: Place an [Animation] sequence with 'is_parallel: true' immediately BEFORE the [Talk] sequence.
-
-[Camera Direction Rules - STABLE SHOTS]
-- Default framing is "Full".
-- Begin each scene with a single Camera sequence:
-  - "actor": "None", "type": "Camera", "action_tag": "Full", "target_position": "Camera"
-- Do NOT insert a new Camera sequence just because the speaking actor changed. Assume the game engine already handles basic framing on speaker change.
-- Use "CloseUp" only for strong emotional or comedic beats (e.g., Minji explodes, Minseok is smug).
-- When you cut to "CloseUp", keep that shot for 1–2 Talk sequences without inserting another Camera change.
-- After a CloseUp beat, explicitly cut back once to "Full".
-
-[Available Assets]
-1. Locations (Background Images): 
-   {locations}
-   (Use these names to set the scene background in the "location" field.)
-
-2. Actor Actions (EXACT STRING MATCH REQUIRED): 
-   {action_groups}
-   (WARNING: You MUST use the exact string provided above. DO NOT conjugate verbs. "Idle" is correct, "Idling" is WRONG.)
-
-3. Audio: 
-   BGM: {bgm_files}
-   SFX: {sfx_files}
-
-[JSON Format Rule - STRICT]
-You must output a SINGLE JSON object. The root object MUST have "title" and "scenes".
-Field Mapping Rules:
-- Actor Name -> "actor" (Must be exactly "Minji" or "Minseok")
-- Dialogue -> "text"
-- Action Name -> "action_tag" (Must be from Available Assets)
-  - CRITICAL: Do NOT change the tense. Use "Sigh", NOT "Sighing". Use "Run", NOT "Running".
-  - If the provided list says "Idle", output "Idle".
-- Camera Shot -> "action_tag" (e.g., "CloseUp", "Full")
-- Camera Target -> "target_position" (e.g., "Minji", "Minseok", "Camera")
-- Background Rules:
-  - If type is "Background", "target_position" MUST be a filename from [Background Images].
-  - NEVER use "Point_Center", "Point_Left", etc. for Background type.
-
-[Example Output Structure (Follow this schema exactly)]
-{{
-  "title": "Why the Sky is Blue",
-  "scenes": [
-    {{
-      "scene_id": 1,
-      "location": "Point_Center",
-      "sequences": [
-        {{ "order": 1, "actor": "None",   "type": "Camera",    "action_tag": "Full",    "target_position": "Camera", "duration": 0.1, "is_parallel": false }},
-
-        {{ "order": 2, "actor": "Minseok","type": "Animation", "action_tag": "Quick Formal Bow", "duration": 0.0, "is_parallel": true }},
-        {{ "order": 3, "actor": "Minseok","type": "Talk",      "text": "My Lady, regarding light scattering...", "duration": 2.0, "is_parallel": false }},
-
-        {{ "order": 4, "actor": "Minji",  "type": "Animation", "action_tag": "Annoyed", "duration": 0.0, "is_parallel": true }},
-        {{ "order": 5, "actor": "Minji",  "type": "Talk",      "text": "Again, stop speaking like a book.", "duration": 1.8, "is_parallel": false }},
-
-        {{ "order": 6, "actor": "None",   "type": "Camera",    "action_tag": "CloseUp", "target_position": "Minji",   "duration": 0.1, "is_parallel": false }},
-        {{ "order": 7, "actor": "Minji",  "type": "Animation", "action_tag": "Angry",   "duration": 0.0, "is_parallel": true }},
-        {{ "order": 8, "actor": "Minji",  "type": "Talk",      "text": "Explain it like I am five!", "duration": 2.0, "is_parallel": false }},
-
-        {{ "order": 9, "actor": "None",   "type": "Camera",    "action_tag": "Full",    "target_position": "Camera", "duration": 0.1, "is_parallel": false }},
-        {{ "order": 10,"actor": "Minseok","type": "Animation", "action_tag": "Thinking","duration": 0.0, "is_parallel": true }},
-        {{ "order": 11,"actor": "Minseok","type": "Talk",      "text": "In simplest terms, sky is scattered blue.", "duration": 2.2, "is_parallel": false }}
-      ]
-    }}
-  ]
-}}
-IMPORTANT:
-- Root object must be {{ "title": "...", "scenes": [...] }}
-- Use "actor", "type", "action_tag", "text" fields exactly as shown in the example.
-- Do NOT use "character" or "line".
-"""
-# 유니티 같은 외부 클라이언트에서 오는 요청에 CSRF 토큰 요구 안 하게 함 -> 배포시에 수정 필수
-@csrf_exempt
-def generate_scenario(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Only POST method allowed'}, status=405)
-
-    try:
-        # 1. 유니티에서 보낸 데이터 뜯기
-        data = json.loads(request.body)
-        topic = data.get('topic', '')
-        asset_info = data.get('asset_info', {})
-
-        print(f"🔹 [Director] 주제 수신: {topic}")
-
-        # 2. Fake 모드 체크 (API 키 없을 때 테스트용)
-        # .env에 CHAT_USE_FAKE_COMPILE=True 로 되어있거나 키가 없으면 작동
-        use_fake = os.getenv('CHAT_USE_FAKE_COMPILE', 'False') == 'True'
-        api_key = os.getenv('OPENAI_API_KEY')
-
-        if use_fake or not api_key:
-            print("🔸 [Director] Fake 모드로 더미 데이터 반환")
-            return JsonResponse(get_dummy_json(topic), safe=False)
-
-        # 3. 프롬프트 조립 (자산 정보 주입)
-        actors = ", ".join(asset_info.get('actors', []))
-        locations = ", ".join(asset_info.get('locations', []))
-        bgms = ", ".join(asset_info.get('bgm_files', []))
-        sfxs = ", ".join(asset_info.get('sfx_files', []))
-        
-        # 동작 그룹 포맷팅
-        actions_str = ""
-        for group in asset_info.get('action_groups', []):
-            actions_str += f"- [{group['mood']}]: {', '.join(group['tags'])}\n"
-
-        final_system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
-            actors=actors,
-            locations=locations,
-            bgm_files=bgms,
-            sfx_files=sfxs,
-            action_groups=actions_str
-        )
-
-        # 4. OpenAI GPT 호출
-        client = OpenAI(api_key=api_key)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": final_system_prompt},
-                {"role": "user", "content": f"Topic: {topic}"}
-            ],
-            response_format={"type": "json_object"} # JSON 모드 강제
-        )
-
-        result_json_str = response.choices[0].message.content
-        result_data = json.loads(result_json_str)
-
-        # 1. VSCode 터미널에 예쁘게 출력 (디버깅용)
-        print("\n" + "="*50)
-        print(f"🎬 생성된 시나리오: [{topic}]")
-        print("="*50)
-        # ensure_ascii=False가 있어야 한글이 깨지지 않고 나옵니다.
-        print(json.dumps(result_data, indent=4, ensure_ascii=False)) 
-        print("="*50 + "\n")
-
-        # 2. (선택사항) 파일로 따로 저장해두기 (나중에 다시 보려고)
-        save_dir = "saved_scenarios"
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-        
-        # 파일명: topic_날짜시간.json
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        safe_topic = "".join(c for c in topic if c.isalnum() or c in (' ', '_')).rstrip()
-        filename = f"{save_dir}/{safe_topic}_{timestamp}.json"
-
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(result_data, f, indent=4, ensure_ascii=False)
-            print(f"💾 대본 파일 저장 완료: {filename}")
-
-        print("✅ [Director] 생성 완료!")
-        return JsonResponse(result_data)
-
-    except Exception as e:
-        print(f"❌ [Error] {e}")
-        return JsonResponse({'error': str(e)}, status=500)
-
-def get_dummy_json(topic):
-    # API 키 없을 때 유니티로 보낼 테스트용 가짜 데이터
-    return {
-        "title": f"Fake Scenario: {topic}",
-        "scenes": [
-            {
-                "scene_id": 1,
-                "location": "Stage",
-                "sequences": [
-                    { "order": 1, "actor": "Minji", "type": "Talk", "text": f"서버가 '{topic}' 주제를 잘 받았대!", "duration": 3.0, "is_parallel": False },
-                    { "order": 2, "actor": "Minseok", "type": "Talk", "text": "하지만 API 키가 없어서 가짜 응답을 보냈어.", "duration": 3.0, "is_parallel": False }
-                ]
-            }
-        ]
-    }
+class ConnectionTestView(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request): return Response({"message": "Success"}, status=200)

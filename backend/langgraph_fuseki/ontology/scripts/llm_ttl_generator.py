@@ -560,12 +560,12 @@ def main():
 
     if "--all" in sys.argv:
         limit = None
-        print("🚀 전체 데이터 TTL 생성 시작...")
+        print("[INFO] 전체 데이터 TTL 생성 시작...")
     else:
         for i, arg in enumerate(sys.argv):
             if arg == "--limit" and i + 1 < len(sys.argv):
                 limit = int(sys.argv[i + 1])
-        print(f"🚀 TTL 생성 시작 (limit={limit})...")
+        print(f"[INFO] TTL 생성 시작 (limit={limit})...")
 
     if "--no-resume" in sys.argv:
         resume = False

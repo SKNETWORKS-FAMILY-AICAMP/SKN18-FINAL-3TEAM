@@ -1,70 +1,50 @@
 """
-Entity Expander Node
+Entity Expander Node (Stage 2)
 
-질문에서 핵심 엔티티 추출 및 TTL 데이터 매칭:
-1. 형태소 분석기(kiwipiepy)로 명사 추출
-2. 키워드 확장 (classify_node에서 처리된 확장된 키워드 사용)
-3. TTL 정확 매칭 (확장된 키워드 + 원본 키워드 모두 사용)
-4. pgvector 제목 임베딩 유사도 검색 (fallback)
-5. LLM 엔티티 추출 (최종 fallback)
-6. 엔티티 URI 반환
-
-+ 추출된 엔티티 타입에 맞는 온톨로지 스키마 정보 제공
-
-주의: Fuseki 검색은 제거되었으며, TTL 파일에서 직접 매칭합니다.
+키워드 확장 + 엔티티 추출 통합:
+1. 사용자 선택 방향 기반 키워드 확장 (LLM)
+2. TTL 정확 매칭 (확장된 키워드 + 원본 키워드)
+3. pgvector 유사도 검색 (fallback)
+4. SPARQL 기반 엔티티 스코어링
+5. 상위 30개 엔티티 선택
 """
 
 import os
-import sys
-import re
 import json
-import requests
-from dotenv import load_dotenv
+import time
+import re
 from langchain_openai import ChatOpenAI
 
-# 한국어 형태소 분석기 (조사/어미 자동 제거)
-try:
-    from kiwipiepy import Kiwi
-    _kiwi = Kiwi()
-    USE_KIWI = True
-    print("✅ kiwipiepy 형태소 분석기 로드 완료")
-except ImportError:
-    _kiwi = None
-    USE_KIWI = False
-    print("⚠️ kiwipiepy 미설치 - 규칙 기반 조사 제거 사용")
-
-# config.py에서 환경변수 자동 로드
 from backend.langgraph_fuseki.config import TTL_PATH, USE_PGVECTOR
 from backend.langgraph_fuseki.state import GraphState
-from backend.langgraph_fuseki.ontology_schema import get_schema_summary
+from backend.langgraph_fuseki.utils.fuseki_client import execute_sparql_query
 
-# pgvector 제목 임베딩 서비스 import (선택적)
+# TTL 데이터 캐시
+_ttl_cache = None
+_ttl_cache_mtime = None
+
+# pgvector 서비스 (lazy loading)
 _title_vector_service = None
+
 
 def get_title_vector_service():
     """제목 임베딩 pgvector 서비스 lazy loading"""
     global _title_vector_service
     if _title_vector_service is None and USE_PGVECTOR:
         try:
-            # load_title_embeddings.py와 동일한 import 방식 사용
-            from backend.db_pipeline.vectordb.services.title_vector_service import TitleVectorService
+            from backend.db_pipeline.postgres.services.title_vector_service import TitleVectorService
             _title_vector_service = TitleVectorService()
-            print("✅ 제목 임베딩 pgvector 서비스 초기화 완료")
+            print("  pgvector 서비스 초기화 완료")
         except ImportError:
-            print("⚠️ 제목 임베딩 pgvector 서비스 import 실패 - TTL 매칭만 사용")
+            print("  pgvector 서비스 import 실패 - TTL 매칭만 사용")
         except Exception as e:
-            print(f"⚠️ 제목 임베딩 pgvector 초기화 실패: {e}")
+            print(f"  pgvector 초기화 실패: {e}")
     return _title_vector_service
-
-
-# TTL 데이터 캐시 (매번 파일 읽지 않도록)
-_ttl_cache = None
-_ttl_cache_mtime = None
 
 
 def load_ttl_entities() -> dict:
     """
-    TTL 파일에서 모든 엔티티와 label 로드 (캐싱 적용)
+    TTL 파일에서 모든 엔티티와 label 로드 (캐싱)
     
     Returns:
         {
@@ -74,20 +54,21 @@ def load_ttl_entities() -> dict:
     """
     global _ttl_cache, _ttl_cache_mtime
     
-    # 캐시 유효성 검사 (파일 수정 시간 비교)
+    # 캐시 유효성 검사
     if os.path.exists(TTL_PATH):
         current_mtime = os.path.getmtime(TTL_PATH)
         if _ttl_cache is not None and _ttl_cache_mtime == current_mtime:
-            return _ttl_cache  # 캐시 반환 (파일 I/O 생략)
+            return _ttl_cache
     
     label_to_uri = {}
     uri_to_type = {}
     
     if not os.path.exists(TTL_PATH):
-        print(f"⚠️ TTL 파일이 없습니다: {TTL_PATH}")
+        print(f"  TTL 파일이 없습니다: {TTL_PATH}")
         return {"label_to_uri": {}, "uri_to_type": {}}
     
     try:
+        start_time = time.time()
         with open(TTL_PATH, 'r', encoding='utf-8') as f:
             content = f.read()
         
@@ -116,10 +97,11 @@ def load_ttl_entities() -> dict:
                 if base_label:
                     label_to_uri[base_label] = uri
         
-        print(f"📂 TTL 엔티티 로드 완료: {len(label_to_uri)}개 라벨, {len(uri_to_type)}개 타입")
+        load_time = time.time() - start_time
+        print(f"  TTL 엔티티 로드 완료: {len(label_to_uri)}개 라벨, {len(uri_to_type)}개 타입 ({load_time:.2f}초)")
         
     except Exception as e:
-        print(f"⚠️ TTL 파일 로드 실패: {e}")
+        print(f"  TTL 파일 로드 실패: {e}")
     
     # 캐시 저장
     result = {"label_to_uri": label_to_uri, "uri_to_type": uri_to_type}
@@ -129,535 +111,157 @@ def load_ttl_entities() -> dict:
     return result
 
 
-def match_entities_with_ttl(entities: list, ttl_data: dict) -> list:
+def expand_keywords_with_direction(query: str, basic_keywords: list, description: str, property_groups: list) -> dict:
     """
-    추출된 엔티티를 TTL 데이터와 매칭
+    사용자 선택 방향을 기반으로 키워드 확장
     
     Args:
-        entities: LLM이 추출한 엔티티 리스트
-        ttl_data: load_ttl_entities() 결과
+        query: 원본 질문
+        basic_keywords: 기본 키워드 (Stage 1에서 제공)
+        description: 선택된 방향의 설명
+        property_groups: 선택된 프로퍼티 그룹
     
     Returns:
-        매칭된 엔티티 리스트 (URI 포함)
+        확장된 키워드 딕셔너리
     """
-    label_to_uri = ttl_data["label_to_uri"]
-    uri_to_type = ttl_data["uri_to_type"]
+    llm = ChatOpenAI(
+        model=os.getenv("OPENAI_MODEL"),
+        temperature=0.3
+    )
     
-    # 동의어 매핑 (질문에서 자주 사용되는 변형)
-    SYNONYMS = {
-        "복원": "복위",
-        "복위": "복원",
-        "역모": "역모사건",
-        "사건": "",
-        "의 난": "의난",
-    }
+    keywords_text = ", ".join(basic_keywords)
     
-    matched_entities = []
+    expansion_prompt = f"""당신은 역사 키워드를 확장하는 전문가입니다.
+
+## 원본 질문
+{query}
+
+## 사용자가 선택한 답변 방향
+**설명**: {description}
+**관련 프로퍼티 그룹**: {', '.join(property_groups)}
+
+## 추출된 기본 키워드
+{keywords_text}
+
+## 작업
+사용자가 선택한 답변 방향을 고려하여, 기본 키워드와 관련된 구체적인 역사적 인스턴스를 확장하세요.
+
+**확장 규칙:**
+- 사용자가 선택한 방향의 설명과 프로퍼티 그룹을 중심으로 확장
+- 기본 키워드 중 일반명사나 추상적 개념을 구체적인 인스턴스로 확장
+- 선택된 방향과 관련성이 높은 인스턴스 우선 선택
+- 최대 5-10개의 구체적 인스턴스로 확장
+- **중요: "조선", "조선시대", "조선왕조"는 확장하지 마세요**
+
+**키워드 확장 예시:**
+- "궁궐" → ["경복궁", "창덕궁", "경덕궁", "창경궁"]
+- "왕" → ["태조", "세종", "숙종", "영조"]
+- "사건" → ["임진왜란", "정유재란", "갑자사화"]
+- "제도" → ["의금부", "비변사", "경국대전"]
+
+**중요:** 
+- 선택된 방향과 관련 없는 키워드는 확장하지 마세요
+- 확장할 키워드가 없으면 빈 객체를 출력하세요
+
+## 출력 형식 (JSON만)
+{{
+  "expanded_keywords": {{"궁궐": ["경복궁", "창덕궁"], "왕": ["태조", "세종"]}}
+}}
+
+또는 확장 없는 경우:
+{{
+  "expanded_keywords": {{}}
+}}
+"""
     
-    for entity in entities:
-        name = entity.get("name") or entity.get("value", "")
-        entity_type = entity.get("type", "")
-        
-        # 1. 정확한 라벨 매칭
-        if name in label_to_uri:
-            uri = label_to_uri[name]
-            matched_entities.append({
-                "type": uri_to_type.get(uri, entity_type),
-                "name": name,
-                "uri": uri,
-                "matched": True
-            })
-            continue
-        
-        # 2. 공백 제거 후 매칭
-        clean_name = re.sub(r'\s+', '', name)
-        if clean_name in label_to_uri:
-            uri = label_to_uri[clean_name]
-            matched_entities.append({
-                "type": uri_to_type.get(uri, entity_type),
-                "name": name,
-                "uri": uri,
-                "matched": True
-            })
-            continue
-        
-        # 3. 동의어 변환 후 매칭
-        found = False
-        normalized_name = clean_name
-        for old, new in SYNONYMS.items():
-            normalized_name = normalized_name.replace(old, new)
-        
-        if normalized_name in label_to_uri:
-            uri = label_to_uri[normalized_name]
-            matched_entities.append({
-                "type": uri_to_type.get(uri, entity_type),
-                "name": name,
-                "uri": uri,
-                "matched": True,
-                "original_label": normalized_name
-            })
-            continue
-        
-        # 4. 부분 매칭 (라벨에 name이 포함된 경우)
-        for label, uri in label_to_uri.items():
-            if name in label or label in name:
-                matched_entities.append({
-                    "type": uri_to_type.get(uri, entity_type),
-                    "name": name,
-                    "uri": uri,
-                    "matched": True,
-                    "original_label": label
-                })
-                found = True
-                break
-        
-        if found:
-            continue
-        
-        # 5. 키워드 기반 매칭 (핵심 키워드로 검색)
-        # "민비복원 사건" → "민비", "복원" → "민비복위" 매칭
-        keywords = re.findall(r'[가-힣]{2,}', clean_name)
-        best_match = None
-        best_score = 0
-        
-        for label, uri in label_to_uri.items():
-            score = 0
-            label_clean = re.sub(r'\s+', '', label)
-            
-            # 키워드 매칭 점수 계산
-            for kw in keywords:
-                if kw in label_clean:
-                    score += len(kw)
-                # 동의어 변환 후 매칭
-                for old, new in SYNONYMS.items():
-                    kw_syn = kw.replace(old, new)
-                    if kw_syn != kw and kw_syn in label_clean:
-                        score += len(kw_syn)
-            
-            # 라벨의 핵심 키워드가 검색어에 있는지
-            label_keywords = re.findall(r'[가-힣]{2,}', label_clean)
-            for lkw in label_keywords:
-                if lkw in clean_name:
-                    score += len(lkw)
-            
-            if score > best_score:
-                best_score = score
-                best_match = (label, uri)
-        
-        # 최소 점수 이상이면 매칭
-        if best_match and best_score >= 4:  # 최소 4글자 이상 매칭
-            label, uri = best_match
-            matched_entities.append({
-                "type": uri_to_type.get(uri, entity_type),
-                "name": name,
-                "uri": uri,
-                "matched": True,
-                "original_label": label,
-                "match_score": best_score
-            })
-            continue
-        
-        # 6. 매칭 실패 시에도 엔티티 유지 (SPARQL에서 label로 검색)
-        matched_entities.append({
-            "type": entity_type,
-            "name": name,
-            "uri": None,
-            "matched": False
-        })
+    response = llm.invoke(expansion_prompt)
+    content = response.content.strip()
     
-    return matched_entities
+    # JSON 파싱
+    if "```" in content:
+        content = content.split("```")[1]
+        if content.startswith("json"):
+            content = content[4:]
+    
+    return json.loads(content)
 
 
-# ⚠️ DEPRECATED: kiwipiepy 형태소 분석기 사용으로 더 이상 필요 없음
-# kiwipiepy가 없을 때만 fallback으로 사용 (현재는 사용 안 함)
-def remove_particles(word: str) -> str:
+def select_property_groups_with_llm(query: str, keywords: list, available_groups: list) -> list:
     """
-    [DEPRECATED] 한국어 조사/어미 제거 (하드코딩 규칙)
-    
-    ⚠️ kiwipiepy 형태소 분석기를 사용하므로 이 함수는 더 이상 사용되지 않습니다.
-    kiwipiepy가 없을 때만 fallback으로 사용됩니다.
-    """
-    # 간단한 fallback (kiwipiepy 없을 때만)
-    if USE_KIWI:
-        return word  # kiwipiepy 있으면 그대로 반환 (이미 처리됨)
-    
-    # 기본 조사만 제거 (최소한의 fallback)
-    particles = ['을', '를', '이', '가', '은', '는', '에', '의', '와', '과', '로', '도', '만', '들']
-    for p in particles:
-        if word.endswith(p) and len(word) > len(p):
-            return word[:-len(p)]
-    return word
-
-
-def extract_nouns_with_kiwi(query: str) -> list:
-    """
-    kiwipiepy 형태소 분석기로 명사만 추출
-    
-    품사 태그:
-    - NNG: 일반명사
-    - NNP: 고유명사 (인물, 지명 등)
-    - NNB: 의존명사 (것, 수, 등)
+    LLM을 사용하여 질문과 키워드에 적합한 프로퍼티 그룹 선택
     
     Args:
-        query: 사용자 질문
-        
-    Returns:
-        명사 리스트 (고유명사 우선)
-    """
-    if not USE_KIWI or _kiwi is None:
-        return []
-    
-    try:
-        tokens = _kiwi.tokenize(query)
-        
-        # 명사만 추출 (NNG: 일반명사, NNP: 고유명사)
-        # 의존명사(NNB)는 제외 (것, 수, 등)
-        nouns = []
-        for token in tokens:
-            if token.tag in ('NNG', 'NNP') and len(token.form) >= 2:
-                nouns.append(token.form)
-        
-        return nouns
-    except Exception as e:
-        print(f"⚠️ kiwipiepy 분석 실패: {e}")
-        return []
-
-
-def extract_keywords_from_query(query: str, for_vector_search: bool = False) -> list:
-    """
-    질문에서 키워드 추출 (kiwipiepy 형태소 분석기 사용)
-    
-    1. kiwipiepy 형태소 분석기로 명사 추출 (조사/어미 자동 제거)
-    2. 불용어 제거
-    3. 중복 제거
-    
-    Args:
-        query: 사용자 질문
-        for_vector_search: True면 벡터 검색용 (조선시대/조선 제외)
+        query: 원본 질문
+        keywords: 추출된 키워드
+        available_groups: 선택 가능한 프로퍼티 그룹 목록
     
     Returns:
-        키워드 리스트
+        선택된 프로퍼티 그룹 리스트 (3-5개)
     """
-    # 불용어 (동사성 명사, 일반 명사)
-    stopwords = {
-        # 의문사/대명사
-        '무엇', '누구', '어디', '언제', '무슨', '어떤',
-        # 동사성 명사 (검색 노이즈)
-        '건축', '건설', '설립', '창건', '조성', '설치', '시행', '실시',
-        # 의존명사/일반명사
-        '것', '수', '등', '때', '중', '후', '전', '이', '그', '저',
-        '사실', '이유', '내용', '설명', '정보', '관련', '대해',
-        # 시간 관련 (너무 일반적)
-        '시대', '시기', '당시', '역사', '년', '월', '일',
-        # 너무 일반적인 키워드 (모든 데이터에 포함됨)
-        '조선', '조선시대', '조선왕조', '한국', '우리나라'
-    }
+    llm = ChatOpenAI(
+        model=os.getenv("OPENAI_MODEL"),
+        temperature=0.3
+    )
     
-    # 벡터 검색용 추가 필터 (모든 데이터가 조선시대라서 유사도가 다 높게 나옴)
-    vector_search_exclude = {
-        '조선', '조선시대', '조선왕조'
-    }
+    keywords_text = ", ".join(keywords) if keywords else "없음"
+    groups_text = ", ".join(available_groups)
     
-    # ========================================
-    # kiwipiepy 형태소 분석기로 명사 추출
-    # ========================================
-    if USE_KIWI:
-        nouns = extract_nouns_with_kiwi(query)
-        if nouns:
-            # 불용어 제거
-            keywords = [n for n in nouns if n not in stopwords]
-            
-            # 중복 제거 (순서 유지)
-            seen = set()
-            unique_keywords = []
-            for kw in keywords:
-                if kw not in seen:
-                    seen.add(kw)
-                    unique_keywords.append(kw)
-            
-            # 벡터 검색용 필터링
-            if for_vector_search:
-                unique_keywords = [w for w in unique_keywords if w not in vector_search_exclude]
-            
-            return unique_keywords
-    
-    # ========================================
-    # Fallback: kiwipiepy 없을 때만 (최소한의 처리)
-    # ========================================
-    print("⚠️ kiwipiepy 미설치 - 기본 키워드 추출 사용 (정확도 낮음)")
-    
-    # 한글 단어 추출 (2글자 이상)
-    raw_words = re.findall(r'[가-힣]{2,}', query)
-    
-    # 간단한 조사 제거 (최소한)
-    words_cleaned = [remove_particles(w) for w in raw_words]
-    
-    # 불용어 제거 + 1글자 제거
-    keywords = [w for w in words_cleaned if w not in stopwords and len(w) >= 2]
-    
-    # 중복 제거
-    seen = set()
-    unique_keywords = []
-    for kw in keywords:
-        if kw not in seen:
-            seen.add(kw)
-            unique_keywords.append(kw)
-    
-    # 벡터 검색용 필터링
-    if for_vector_search:
-        unique_keywords = [w for w in unique_keywords if w not in vector_search_exclude]
-    
-    return unique_keywords
-
-
-def extract_historical_keywords_with_llm(query: str, include_query_type: bool = False) -> dict:
-    """
-    LLM으로 역사적 키워드 + 질문 유형을 한 번에 추출 (LLM 호출 최적화)
-    
-    조사, 동사, 일반 단어를 제외하고 역사적 인물/사건/제도/장소만 추출
-    
-    Args:
-        query: 사용자 질문
-        include_query_type: True면 질문 유형도 함께 분류 (query_classifier 통합)
-    
-    Returns:
-        {"keywords": [...], "query_type": "causal"} (include_query_type=True 시)
-        또는 [...] (include_query_type=False 시)
-    """
-    try:
-        llm = ChatOpenAI(
-            model=os.getenv("OPENAI_MODEL"),
-            temperature=0
-        )
-        
-        # 질문 유형 분류 포함 여부에 따라 프롬프트 분기
-        if include_query_type:
-            prompt = f"""다음 질문을 분석하세요.
+    selection_prompt = f"""당신은 역사 지식 그래프 전문가입니다.
 
 ## 질문
 {query}
 
-## 작업 1: 역사적 키워드 추출
-- 역사적 인물명, 사건명, 제도/기관명, 장소명, 시대명만 추출
-- 조사/동사/의문사/일반 단어 제외
+## 추출된 키워드
+{keywords_text}
 
-## 작업 2: 질문 유형 분류
-- causal: 인과관계/패턴 ("왜?", "영향은?", "결과는?", "패턴은?")
-- deep_analysis: 심화 분석 ("진짜 이유?", "숨은 의도?", "이면에는?")
+## 사용 가능한 프로퍼티 그룹
+{groups_text}
 
-## 출력 형식 (JSON만, 다른 설명 없이)
-{{"keywords": ["키워드1", "키워드2"], "query_type": "causal"}}
+## 작업
+위 질문과 키워드에 가장 적합한 프로퍼티 그룹 3-5개를 선택하세요.
 
-키워드가 없으면 빈 배열로 출력"""
-        else:
-            prompt = f"""다음 질문에서 **역사적 키워드만** 추출하세요.
+**선택 기준:**
+- 질문의 핵심 의도와 관련된 그룹을 우선 선택
+- 키워드와 직접적으로 연결된 그룹 선택
+- 질문 유형에 따른 선택:
+  - "왜/이유/원인" → 인과관계, 외교, 통치
+  - "누구/인물" → 직위, 참여, 소속
+  - "언제/시기" → 연도, 시기, 기간중
+  - "어떻게/과정" → 시행, 참여, 법률
+  - "결과/영향" → 변경, 인과관계, 법률
 
-## 질문
-{query}
-
-## 추출 규칙
-1. 역사적 인물명 (예: 숙종, 명성황후, 이성계)
-2. 역사적 사건명 (예: 경신환국, 왕자의 난, 을미사변)
-3. 역사적 제도/기관명 (예: 비변사, 의금부)
-4. 역사적 장소명 (예: 경덕궁, 경복궁)
-5. 시대명/왕조명 (예: 조선시대, 고려)
-
-## 제외 항목 (절대 추출하지 마세요)
-- 조사: 의, 에, 를, 을, 은, 는, 이, 가, 대해서, 관련
-- 동사: 알려줘, 있어, 했다, 되었다
-- 의문사: 왜, 어떻게, 무엇, 언제
-- 일반 단어: 사실, 이유, 진짜, 정말
-
-## 출력 형식
-쉼표로 구분된 키워드만 출력 (다른 설명 없이)
-예: 명성황후, 을미사변, 경복궁
-
-키워드가 없으면 빈 문자열 출력"""
-
-        response = llm.invoke(prompt)
-        content = response.content.strip()
-        
-        # 파싱
-        if include_query_type:
-            # JSON 파싱
-            import json
-            try:
-                # JSON 추출 (코드블록 제거)
-                if "```" in content:
-                    content = content.split("```")[1]
-                    if content.startswith("json"):
-                        content = content[4:]
-                
-                result = json.loads(content)
-                keywords = result.get("keywords", [])
-                query_type = result.get("query_type", "causal")
-                
-                # 검증
-                if query_type not in ["causal", "deep_analysis"]:
-                    query_type = "causal"
-                
-                return {"keywords": keywords, "query_type": query_type}
-            except json.JSONDecodeError:
-                # JSON 파싱 실패 시 기본값
-                return {"keywords": extract_keywords_from_query(query), "query_type": "causal"}
-        else:
-            if not content or content == "없음" or content == "없습니다":
-                return []
-            
-            keywords = [kw.strip() for kw in content.split(',') if kw.strip()]
-            
-            # 추가 필터링 (혹시 모를 일반 단어 제거)
-            stopwords = {'대해서', '대해', '관해서', '관해', '관련', '사실', '이유', 
-                         '진짜', '정말', '어떻게', '무엇', '왜', '있어', '없어', 
-                         '알려줘', '알려주세요', '알려', '하다', '되다'}
-            keywords = [kw for kw in keywords if kw not in stopwords and len(kw) >= 2]
-            
-            return keywords
-        
-    except Exception as e:
-        print(f"⚠️ LLM 키워드 추출 실패: {e}")
-        # 실패 시 기본 키워드 추출 사용
-        if include_query_type:
-            return {"keywords": extract_keywords_from_query(query), "query_type": "causal"}
-        return extract_keywords_from_query(query)
-
-
-def get_ttl_labels_by_type(ttl_data: dict) -> dict:
-    """
-    TTL 데이터에서 타입별 label 목록 추출 (LLM 프롬프트용)
+## 출력 형식 (JSON만)
+{{
+  "selected_groups": ["그룹1", "그룹2", "그룹3"]
+}}
+"""
     
-    Returns:
-        {"Person": ["숙종", "정조", ...], "Event": ["민비복위", ...], ...}
-    """
-    uri_to_type = ttl_data["uri_to_type"]
-    label_to_uri = ttl_data["label_to_uri"]
+    response = llm.invoke(selection_prompt)
+    content = response.content.strip()
     
-    labels_by_type = {}
-    for label, uri in label_to_uri.items():
-        entity_type = uri_to_type.get(uri, "Unknown")
-        if entity_type not in labels_by_type:
-            labels_by_type[entity_type] = []
-        labels_by_type[entity_type].append(label)
+    # JSON 파싱
+    if "```" in content:
+        content = content.split("```")[1]
+        if content.startswith("json"):
+            content = content[4:]
     
-    return labels_by_type
-
-
-def expand_keywords_with_llm(keywords: list, query: str) -> list:
-    """
-    LLM으로 키워드를 구체적인 인스턴스로 확장
+    result = json.loads(content)
+    selected = result.get("selected_groups", [])
     
-    예: "궁궐" → ["경복궁", "창덕궁", "경덕궁", "창경궁"]
-    예: "환국" → ["갑술환국", "기사환국", "경신환국"]
+    # 유효한 그룹만 필터링
+    valid_groups = [g for g in selected if g in available_groups]
     
-    Args:
-        keywords: 추출된 키워드 리스트
-        query: 원본 질문 (맥락 제공)
+    if not valid_groups:
+        # 기본 그룹 반환
+        valid_groups = ["속성", "인과관계", "참여", "변경"]
+        print(f"  ⚠️ LLM 선택 그룹이 없어 기본값 사용: {valid_groups}")
     
-    Returns:
-        확장된 키워드 리스트 (원본 + 확장)
-    """
-    if not keywords:
-        return []
-    
-    # 일반명사 감지 (TTL에 없는 키워드)
-    general_nouns = []
-    ttl_data = load_ttl_entities()
-    
-    for kw in keywords:
-        # TTL에 정확히 매칭되지 않는 키워드만 확장
-        if kw not in ttl_data["label_to_uri"]:
-            # 부분 매칭도 확인
-            matched = any(kw in label for label in ttl_data["label_to_uri"].keys())
-            if not matched:
-                general_nouns.append(kw)
-    
-    if not general_nouns:
-        return keywords  # 확장할 키워드 없음
-    
-    try:
-        llm = ChatOpenAI(
-            model=os.getenv("OPENAI_MODEL"),
-            temperature=0
-        )
-        
-        prompt = f"""다음 질문에서 추출된 일반명사를 구체적인 역사적 인스턴스로 확장하세요.
-
-## 질문
-{query}
-
-## 일반명사 (확장 필요)
-{', '.join(general_nouns)}
-
-## 확장 규칙
-- "궁궐" → 경복궁, 창덕궁, 경덕궁, 창경궁, 경희궁 등
-- "환국" → 갑술환국, 기사환국, 경신환국, 갑인환국 등
-- "왕" → 태조, 세종, 숙종, 정조 등 (질문 맥락에 맞는 왕들)
-- "사건" → 질문 맥락에 맞는 구체적 사건명
-- **중요: "조선", "조선시대", "조선왕조"는 확장하지 마세요. 모든 데이터가 조선 데이터이므로 의미가 없습니다.**
-
-## 출력 형식
-JSON 형식으로 출력하세요:
-{{"expanded": {{"궁궐": ["경복궁", "창덕궁"], "환국": ["갑술환국", "기사환국"]}}}}
-
-확장할 수 없으면 빈 객체로 출력하세요."""
-        
-        response = llm.invoke(prompt)
-        content = response.content.strip()
-        
-        # JSON 파싱
-        if "```" in content:
-            content = content.split("```")[1]
-            if content.startswith("json"):
-                content = content[4:]
-        
-        result = json.loads(content)
-        expanded_dict = result.get("expanded", {})
-        
-        # "조선" 관련 키워드는 제외 (모든 데이터가 조선 데이터이므로)
-        joseon_keywords = {'조선', '조선시대', '조선왕조', '한국', '우리나라'}
-        
-        # 확장된 키워드 추가
-        expanded_keywords = list(keywords)  # 원본 유지
-        
-        for general_noun, instances in expanded_dict.items():
-            # "조선" 관련 키워드는 확장하지 않음
-            if general_noun not in joseon_keywords:
-                # 확장된 인스턴스에서도 "조선" 관련 항목 제거
-                filtered_instances = [inst for inst in instances if inst not in joseon_keywords]
-                if filtered_instances:
-                    if general_noun in expanded_keywords:
-                        # 일반명사 제거하고 구체적 인스턴스 추가
-                        expanded_keywords.remove(general_noun)
-                    expanded_keywords.extend(filtered_instances)
-        
-        print(f"   🔄 키워드 확장: {general_nouns} → {sum(len(v) for v in expanded_dict.values())}개 인스턴스")
-        return expanded_keywords
-        
-    except Exception as e:
-        print(f"⚠️ 키워드 확장 실패: {e}")
-        return keywords  # 실패 시 원본 반환
-
-
-# ⚠️ DEPRECATED: Fuseki 검색 제거됨 (TTL 매칭만 사용)
-# def search_fuseki_with_keywords(keywords: list) -> list:
-#     """
-#     [DEPRECATED] Fuseki 검색 기능 제거됨
-#     TTL 정확 매칭만 사용하여 엔티티 추출
-#     """
-#     pass
+    return valid_groups
 
 
 def search_entities_with_pgvector(keywords: list, ttl_data: dict, top_k: int = 5) -> list:
     """
-    pgvector 제목 임베딩 유사도 검색으로 엔티티 찾기
-
-    Args:
-        keywords: 검색할 키워드 리스트
-        ttl_data: TTL 데이터 (URI 매핑용)
-        top_k: 키워드당 최대 결과 수
-
-    Returns:
-        매칭된 엔티티 리스트
+    pgvector 제목 임베딩 유사도 검색으로 엔티티 찾기 (fallback)
     """
     title_vector_service = get_title_vector_service()
     if title_vector_service is None:
@@ -667,10 +271,10 @@ def search_entities_with_pgvector(keywords: list, ttl_data: dict, top_k: int = 5
     seen_titles = set()
 
     try:
-        # TitleVectorService 연결 확인 (lazy connection)
+        # TitleVectorService 연결 확인
         if not title_vector_service.conn:
             if not title_vector_service.connect():
-                print("⚠️ 제목 임베딩 pgvector 연결 실패")
+                print("  pgvector 연결 실패")
                 return []
 
         # 키워드로 벡터 검색
@@ -685,7 +289,7 @@ def search_entities_with_pgvector(keywords: list, ttl_data: dict, top_k: int = 5
 
             # TTL에서 URI 찾기
             uri = ttl_data["label_to_uri"].get(title)
-            entity_type = "Event"  # 기본값
+            entity_type = "Event"
 
             if uri:
                 entity_type = ttl_data["uri_to_type"].get(uri, "Event")
@@ -716,424 +320,446 @@ def search_entities_with_pgvector(keywords: list, ttl_data: dict, top_k: int = 5
         entities.sort(key=lambda x: x.get("pgvector_score", 0), reverse=True)
 
     except Exception as e:
-        print(f"⚠️ 제목 임베딩 pgvector 검색 실패: {e}")
+        print(f"  pgvector 검색 실패: {e}")
 
     return entities
 
 
-def entity_expander_node(state: GraphState) -> GraphState:
+def calculate_entity_score_with_connections(entity, keywords, ttl_data):
     """
-    질문에서 핵심 엔티티 추출 (하이브리드 방식)
-
-    키워드 추출 + pgvector 제목 임베딩 유사도 검색을 병렬로 수행
-    - 1단계: 키워드 추출 (kiwipiepy)
-    - 2단계: 키워드 확장 (classify_node에서 처리된 확장된 키워드 사용)
-    - 3단계: TTL 정확 매칭 (확장된 키워드 + 원본 키워드 모두 사용)
-    - 4단계: pgvector 제목 임베딩 유사도 검색 (fallback)
-    - 5단계: LLM 엔티티 추출 (최종 fallback - 결과 부족 시만)
-
-    의도 파악: classify_node에서 이미 처리됨 (query_intent)
+    엔티티와 키워드의 연관성 점수 계산 (SPARQL 기반)
     """
+    # 기본 점수
+    match_method = entity.get("match_method", "exact")
+    base_score = {
+        "exact": 1.0,
+        "partial": 0.7,
+        "pgvector": entity.get("pgvector_score", 0.5),
+        "llm": 0.3
+    }.get(match_method, 0.5)
 
-    import time
-    node_start = time.time()
+    # 이름에 키워드 포함 점수
+    name = entity.get("name", "").lower()
+    name_match_score = sum(0.5 for kw in keywords if kw.lower() in name)
 
-    query = state.get("query", "")
+    # 연결된 노드에 키워드 포함 점수 (SPARQL 기반)
+    connected_score = 0.0
+    uri = entity.get("uri")
 
-    print(f"\n{'='*70}")
-    print(f"[2/6] 엔티티 추출 (Entity Extractor)")
-    print(f"{'='*70}")
+    if uri and uri in ttl_data.get("uri_to_type", {}):
+        # URI 형식 변환
+        full_uri = uri.replace("hist:", "http://www.example.org/korean-history#")
+        
+        sparql_query = f"""
+            PREFIX hist: <http://www.example.org/korean-history#>
+            PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+            PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 
-    # 1. TTL 데이터 로드 (캐싱됨)
-    ttl_data = load_ttl_entities()
-
-    # 2. 키워드 추출 (kiwipiepy) - classify_node에서 이미 추출됨, 재사용 가능
-    query_keywords = extract_keywords_from_query(query, for_vector_search=False)
-
-    # 3. 키워드 확장 (classify_node에서 이미 확장된 키워드 사용)
-    expanded_keywords_from_classify = state.get("expanded_keywords", [])
-    expanded_keywords_dict = state.get("expanded_keywords_dict", {})
-
-    if expanded_keywords_from_classify:
-        # classify_node에서 이미 확장됨 (README 플로우 준수)
-        expanded_keywords = expanded_keywords_from_classify
-    else:
-        # fallback: 직접 확장 (classify_node가 실패한 경우)
-        expanded_keywords = expand_keywords_with_llm(query_keywords, query)
-
-    # 원본 키워드와 확장된 키워드 병합
-    all_keywords = list(set(query_keywords + expanded_keywords))
-
-    # query_type은 query_classifier_node에서 이미 설정됨
-    current_query_type = state.get("query_type", "causal")
-
-    matched_entities = []
-    seen = set()
-
-    # 키워드 기반 엔티티 점수 계산을 위한 함수
-    def calculate_entity_score_with_connections(entity, keywords, ttl_data):
+            SELECT DISTINCT ?connectedLabel WHERE {{
+                {{
+                    <{full_uri}> ?p ?connected .
+                    ?connected rdfs:label ?connectedLabel .
+                    FILTER(?p != rdf:type)
+                    FILTER(?p != rdfs:label)
+                }}
+                UNION
+                {{
+                    ?connected ?p <{full_uri}> .
+                    ?connected rdfs:label ?connectedLabel .
+                    FILTER(?p != rdf:type)
+                    FILTER(?p != rdfs:label)
+                }}
+            }} LIMIT 50
         """
-        엔티티와 키워드의 연관성 점수 계산
 
-        점수 구성:
-        1. 매칭 방법 기본 점수: exact(1.0), partial(0.7), milvus(유사도), llm(0.3)
-        2. 엔티티 이름에 키워드 포함: +0.5/keyword
-        3. 연결된 노드에 키워드 포함: +0.1/connection (최대 0.3)
-        """
-        # 1. 기본 점수
-        match_method = entity.get("match_method", "exact")
-        base_score = {
-            "exact": 1.0,
-            "partial": 0.7,
-            "llm": 0.3
-        }.get(match_method, entity.get("milvus_score", 0.5))
-
-        # 2. 이름에 키워드 포함 점수
-        name = entity.get("name", "").lower()
-        name_match_score = sum(0.5 for kw in keywords if kw.lower() in name)
-
-        # 3. 연결된 노드에 키워드 포함 점수 (SPARQL 기반)
-        connected_score = 0.0
-        uri = entity.get("uri")
-        sparql_executed = False
-        connection_count = 0
-
-        if uri and uri in ttl_data.get("uri_to_type", {}):
-            # SPARQL로 이 엔티티와 연결된 모든 엔티티의 label 조회
-            # (양방향: 나가는 관계 + 들어오는 관계)
-            sparql_query = f"""
-                PREFIX hist: <http://www.example.org/korean-history#>
-                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-                PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-
-                SELECT DISTINCT ?connectedLabel WHERE {{
-                    {{
-                        # 나가는 관계 (이 엔티티 → 다른 엔티티)
-                        <{uri}> ?p ?connected .
-                        ?connected rdfs:label ?connectedLabel .
-                        FILTER(?p != rdf:type)
-                        FILTER(?p != rdfs:label)
-                    }}
-                    UNION
-                    {{
-                        # 들어오는 관계 (다른 엔티티 → 이 엔티티)
-                        ?connected ?p <{uri}> .
-                        ?connected rdfs:label ?connectedLabel .
-                        FILTER(?p != rdf:type)
-                        FILTER(?p != rdfs:label)
-                    }}
-                }} LIMIT 50
-            """
-
-            try:
-                fuseki_url = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
-                response = requests.post(
-                    f"{fuseki_url}/sparql",
-                    data={"query": sparql_query},
-                    headers={"Accept": "application/sparql-results+json"},
-                    timeout=2  # 2초 타임아웃 (성능 최적화)
-                )
-
-                if response.status_code == 200:
-                    sparql_executed = True
-                    results = response.json()
-                    bindings = results.get("results", {}).get("bindings", [])
-                    connection_count = len(bindings)
-
-                    # 연결된 엔티티의 label에 키워드가 있는지 확인
-                    matched_connections = []
-                    has_keyword_match = False  # 키워드 매칭 여부 플래그
-                    for binding in bindings:
-                        connected_label = binding.get("connectedLabel", {}).get("value", "")
-                        if connected_label:
-                            for kw in keywords:
-                                if kw.lower() in connected_label.lower():
-                                    connected_score += 0.1
-                                    matched_connections.append(connected_label)
-                                    has_keyword_match = True  # 키워드 매칭 발견
-                                    if connected_score >= 0.3:  # 최대값 도달
-                                        break
-
+        try:
+            fuseki_url = os.getenv("FUSEKI_URL", "http://localhost:3030/korean-history")
+            results = execute_sparql_query(fuseki_url, sparql_query, timeout=5)
+            
+            if results:
+                bindings = results.get("results", {}).get("bindings", [])
+                
+                # 연결된 엔티티의 label에 키워드가 있는지 확인
+                for binding in bindings:
+                    connected_label = binding.get("connectedLabel", {}).get("value", "")
+                    if connected_label:
+                        for kw in keywords:
+                            if kw.lower() in connected_label.lower():
+                                connected_score += 0.1
+                                if connected_score >= 0.3:  # 최대값
+                                    break
                         if connected_score >= 0.3:
                             break
 
-                    # 연결 노드 분석 결과 저장
-                    entity["sparql_connections"] = connection_count
-                    entity["matched_connections"] = len(matched_connections)
-                    entity["has_keyword_in_connections"] = has_keyword_match  # 우선순위 정렬용 플래그
+        except Exception as e:
+            print(f"    SPARQL 예외: {entity.get('name')} - {str(e)}")
 
-            except Exception as e:
-                # SPARQL 실패 시 조용히 무시 (점수만 0으로 유지)
-                pass
+    total_score = base_score + name_match_score + min(connected_score, 0.3)
+    entity["relevance_score"] = total_score
+    return total_score
 
-        # 디버깅 정보 저장
-        entity["sparql_executed"] = sparql_executed
-        
-        # 연결된 노드에 키워드가 없는 경우 플래그 설정
-        if "has_keyword_in_connections" not in entity:
-            entity["has_keyword_in_connections"] = False
 
-        total_score = base_score + name_match_score + min(connected_score, 0.3)
-        entity["relevance_score"] = total_score
-        return total_score
+def entity_expander_node(state: GraphState) -> GraphState:
+    """
+    Stage 2: Entity Expander - 키워드 확장 + 엔티티 추출 통합
     
-    # ========================================
-    # TTL 정확 매칭 (Fuseki 검색 제거)
-    # ========================================
+    작업:
+    1. 사용자 선택 방향 기반 키워드 확장 (LLM)
+    2. TTL 정확 매칭
+    3. pgvector 유사도 검색 (fallback)
+    4. SPARQL 기반 엔티티 스코어링
+    5. 상위 30개 엔티티 선택
+    """
+    node_start = time.time()
     
-    # 벡터 검색용 키워드 (조선시대/조선 제외)
-    vector_keywords = extract_keywords_from_query(query, for_vector_search=True)
+    query = state.get("query", "")
+    user_selected_direction = state.get("user_selected_direction")
+    expansion_directions = state.get("expansion_directions", [])
+    basic_keywords = state.get("basic_keywords", [])
+    thinking_callback = state.get("thinking_callback")
     
-    # --- TTL 정확 매칭 (확장된 키워드 + 원본 키워드 사용) ---
-    print(f"  ├─ TTL 매칭 중...")
-    ttl_matched = 0
-
-    # 모든 키워드로 TTL 매칭 (확장된 키워드 + 원본 키워드)
-    for keyword in all_keywords:
-        # 정확한 라벨 매칭
-        if keyword in ttl_data["label_to_uri"]:
-            uri = ttl_data["label_to_uri"][keyword]
-            entity_type = ttl_data["uri_to_type"].get(uri, "Event")
-            key = uri or keyword
-            if key not in seen:
-                seen.add(key)
-                matched_entities.append({
-                    "type": entity_type,
-                    "name": keyword,
-                    "uri": uri,
-                    "matched": True,
-                    "match_method": "exact"
-                })
-                ttl_matched += 1
-
-        # 부분 매칭 (키워드가 라벨에 포함된 경우) - 최대 3개, 최소 길이 3글자
-        # "조선" 같은 일반 키워드 필터링 강화
-        if len(keyword) >= 3:  # 3글자 이상만 부분 매칭
-            partial_count = 0
-            for label, uri in ttl_data["label_to_uri"].items():
-                if keyword in label:
-                    key = uri or label
-                    if key not in seen:
-                        seen.add(key)
-                        entity_type = ttl_data["uri_to_type"].get(uri, "Event")
-                        matched_entities.append({
-                            "type": entity_type,
-                            "name": label,
-                            "uri": uri,
-                            "matched": True,
-                            "match_method": "partial",
-                            "matched_keyword": keyword
-                        })
-                        ttl_matched += 1
-                        partial_count += 1
-                        if partial_count >= 3:  # 키워드당 최대 3개 부분 매칭 (성능 최적화)
-                            break
-
-    print(f"     └─ TTL 매칭: {ttl_matched}개")
-
-    # --- pgvector 제목 임베딩 유사도 검색 (규칙 기반 키워드 사용) ---
-    # ⚡ 리팩토링: LLM 대신 규칙 기반 키워드로 벡터 검색
-    # - "조선시대/조선" 제외 (모든 데이터가 조선시대라서)
-    # - 조사/동사 제거된 명확한 단어만 사용
-    pgvector_added = 0
-    if USE_PGVECTOR and vector_keywords:
-        print(f"  ├─ pgvector 제목 임베딩 벡터 검색 중...")
-
-        # 동적 top_k: 키워드 수에 따라 조절
-        dynamic_top_k = max(3, min(10, 15 // max(len(vector_keywords), 1)))
-
-        # 규칙 기반으로 추출된 키워드로 pgvector 검색
-        pgvector_entities = search_entities_with_pgvector(
-            vector_keywords,  # 조선시대/조선 제외된 키워드
-            ttl_data,
-            top_k=dynamic_top_k
-        )
-
-        # 기존에 없는 엔티티만 추가
-        for e in pgvector_entities:
-            key = e.get("uri") or e.get("name")
-            if key not in seen:
-                seen.add(key)
-                e["match_method"] = "pgvector"
-                matched_entities.append(e)
-                pgvector_added += 1
-
-        print(f"     └─ pgvector 추가: {pgvector_added}개")
+    print(f"\n{'='*70}")
+    print(f"[Stage 2] Entity Expander (키워드 확장 + 엔티티 추출)")
+    print(f"{'='*70}")
+    print(f"  질문: '{query}'")
+    print(f"  선택된 방향: {user_selected_direction}")
+    print(f"  ★ basic_keywords 수: {len(basic_keywords)}개")
+    print(f"  ★ basic_keywords 내용: {basic_keywords}")
+    print(f"  ★ expansion_directions 수: {len(expansion_directions)}개")
     
-    # ========================================
-    # 3단계: LLM 엔티티 추출 (결과가 부족할 때만)
-    # ========================================
-    if len(matched_entities) < 3:
-        print(f"\n  ├─ LLM 엔티티 추출 중...")
+    if not query:
+        print(f"  ERROR: query가 비어있습니다!")
+        return state
+    
+    if not basic_keywords:
+        print(f"  ⚠️ WARNING: basic_keywords가 비어있습니다! 세션 복원 확인 필요")
+    
+
+    # ========== 1. 사용자 선택 방향 정보 조회 ==========
+    selected_direction_info = None
+    if user_selected_direction and expansion_directions:
+        for direction in expansion_directions:
+            if direction.get("direction_id") == user_selected_direction:
+                selected_direction_info = direction
+                break
+
+        if not selected_direction_info:
+            print(f"  ⚠️ 경고: direction_id '{user_selected_direction}'를 expansion_directions에서 찾을 수 없음")
+            print(f"  expansion_directions 수: {len(expansion_directions)}")
+
+    # 🎯 Thinking 이벤트: Entity Expander 시작
+    if thinking_callback:
+        thinking_callback("entity_expansion_started", {
+            "title": "엔티티 확장 시작",
+            "stage": "Stage 2: Entity Expander",
+            "basic_keywords": basic_keywords,
+            "selected_direction": selected_direction_info  # 전체 방향 정보 전송
+        })
+    
+    expanded_keywords = basic_keywords.copy()
+    expanded_keywords_dict = {}
+    selected_property_groups = []
+    selected_properties = []
+    
+    # ========== 2. LLM 키워드 확장 (항상 실행) ==========
+    if basic_keywords:
+        # 방향 정보에서 description과 property_groups 가져오기
+        if selected_direction_info:
+            description = selected_direction_info.get("description", "")
+            property_groups = selected_direction_info.get("property_groups", [])
+            
+            print(f"  ★ 선택된 방향 정보 발견!")
+            print(f"  선택된 방향: {selected_direction_info.get('title', '')}")
+            print(f"  설명: {description}")
+            print(f"  프로퍼티 그룹: {property_groups}")
+        else:
+            # 방향 정보 없으면 기본값 사용
+            description = "역사적 맥락에서 관련 키워드 확장"
+            property_groups = []
+            print(f"  ⚠️ 선택된 방향 정보 없음, 기본 맥락으로 확장")
+            print(f"  기본 키워드: {basic_keywords}")
+
+        # 🎯 Thinking 이벤트: 키워드 확장 시작
+        if thinking_callback:
+            thinking_callback("keyword_expansion_started", {
+                "title": "LLM 키워드 확장 시작",
+                "direction_title": selected_direction_info.get('title', '역사적 맥락') if selected_direction_info else "역사적 맥락",
+                "direction_description": description,
+                "property_groups": property_groups,
+                "basic_keywords": basic_keywords
+            })
         
-        # TTL label 목록 준비
-        labels_by_type = get_ttl_labels_by_type(ttl_data)
-        
-        # 키워드와 관련된 label만 필터링
-        relevant_labels = {}
-        for entity_type, labels in labels_by_type.items():
-            filtered = [label for label in labels 
-                       if any(kw in label for kw in query_keywords)]
-            if not filtered:
-                filtered = labels[:15]
-            else:
-                filtered = filtered[:20]
-            relevant_labels[entity_type] = filtered
-        
-        # TTL label 목록 문자열 생성
-        ttl_label_list = []
-        for entity_type in ["Event", "Person", "Institution", "Document", "Battle", "Place"]:
-            labels = relevant_labels.get(entity_type, [])
-            if labels:
-                ttl_label_list.append(f"[{entity_type}] {', '.join(labels[:10])}")
-        
-        ttl_labels_str = "\n".join(ttl_label_list)
-        
-        llm = ChatOpenAI(
-            model=os.getenv("OPENAI_MODEL"),
-            temperature=0
-        )
-
-        extraction_prompt = f"""당신은 조선시대 역사 데이터에서 엔티티를 추출하는 전문가입니다.
-
-## 실제 데이터베이스에 존재하는 엔티티 목록:
-{ttl_labels_str}
-
-## 질문:
-{query}
-
-## 작업:
-1. 위 질문에서 언급된 역사적 엔티티를 추출하세요
-2. **반드시 위 "실제 데이터베이스" 목록에서 가장 유사한 엔티티명을 선택**하세요
-
-## 출력 형식 (JSON 배열만):
-[{{"type": "Event", "name": "엔티티명"}}]
-
-## 규칙:
-- 목록에 있는 정확한 이름 사용
-- 관련 엔티티가 없으면 빈 배열 [] 반환
-- JSON만 출력"""
-
+        # ★ LLM 키워드 확장 (항상 실행)
         try:
-            response = llm.invoke(extraction_prompt)
-            content = response.content.strip()
+            print(f"  ★ LLM 키워드 확장 시작...")
+            expanded_result = expand_keywords_with_direction(
+                query, basic_keywords, description, property_groups
+            )
+            expanded_keywords_dict = expanded_result.get("expanded_keywords", {})
             
-            # JSON 파싱
-            if "```" in content:
-                match = re.search(r'```(?:json)?\s*(.*?)\s*```', content, re.DOTALL)
-                if match:
-                    content = match.group(1).strip()
+            # 확장된 키워드를 기본 키워드에 추가
+            for keyword, instances in expanded_keywords_dict.items():
+                expanded_keywords.extend(instances)
             
-            json_match = re.search(r'\[.*\]', content, re.DOTALL)
-            if json_match:
-                content = json_match.group(0)
+            # 중복 제거
+            expanded_keywords = list(set(expanded_keywords))
             
-            llm_entities = json.loads(content)
-            
-            if isinstance(llm_entities, list):
-                for e in llm_entities:
-                    if isinstance(e, dict) and e.get("name"):
-                        name = e["name"]
-                        uri = ttl_data["label_to_uri"].get(name)
-                        entity_type = e.get("type", "Event")
-                        
-                        if uri:
-                            entity_type = ttl_data["uri_to_type"].get(uri, entity_type)
-                        
-                        key = uri or name
-                        if key not in seen:
-                            seen.add(key)
-                            matched_entities.append({
-                                "type": entity_type,
-                                "name": name,
-                                "uri": uri,
-                                "matched": uri is not None,
-                                "match_method": "llm"
-                            })
-            
-            print(f"      → LLM 추가: {len(llm_entities)}개")
+            print(f"  ★ LLM 확장된 키워드: {len(expanded_keywords)}개")
+            print(f"  확장 매핑: {expanded_keywords_dict}")
+
+            # 🎯 Thinking 이벤트: 키워드 확장 완료
+            if thinking_callback:
+                thinking_callback("keyword_expansion_completed", {
+                    "title": "LLM 키워드 확장 완료",
+                    "expanded_keywords": expanded_keywords,
+                    "expansion_mapping": expanded_keywords_dict,
+                    "total_keywords": len(expanded_keywords)
+                })
             
         except Exception as e:
-            print(f"      ⚠️ LLM 추출 실패: {e}")
+            print(f"  ⚠️ LLM 키워드 확장 실패: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # ========== 3. 프로퍼티 그룹 선택 (항상 실행) ==========
+        from backend.langgraph_fuseki.nodes.classify_node import load_property_groups
+        all_groups = load_property_groups()
+        
+        if property_groups:
+            # 방향 정보에서 프로퍼티 그룹 사용
+            for group_name in property_groups:
+                if group_name in all_groups:
+                    selected_properties.extend(all_groups[group_name])
+            
+            selected_property_groups = property_groups
+            print(f"  ★ 방향 기반 프로퍼티 그룹: {property_groups}")
+        else:
+            # ★ 방향 정보 없으면 LLM으로 프로퍼티 그룹 선택
+            print(f"  ★ LLM 기반 프로퍼티 그룹 선택 시작...")
+            try:
+                selected_property_groups = select_property_groups_with_llm(
+                    query, basic_keywords, list(all_groups.keys())
+                )
+                
+                for group_name in selected_property_groups:
+                    if group_name in all_groups:
+                        selected_properties.extend(all_groups[group_name])
+                
+                print(f"  ★ LLM 선택 프로퍼티 그룹: {selected_property_groups}")
+            except Exception as e:
+                print(f"  ⚠️ LLM 프로퍼티 그룹 선택 실패: {e}, 기본 그룹 사용")
+                # 기본 그룹 사용
+                selected_property_groups = ["속성", "인과관계", "참여", "변경"]
+                for group_name in selected_property_groups:
+                    if group_name in all_groups:
+                        selected_properties.extend(all_groups[group_name])
+        
+        selected_properties = list(set(selected_properties))
+        print(f"  ★ 선택된 프로퍼티: {len(selected_properties)}개")
     
-    # ========================================
-    # 엔티티 점수 계산 및 정렬
-    # ========================================
-    print(f"  ├─ SPARQL 기반 스코어링 중...")
-
-    # 모든 엔티티에 대해 점수 계산
-    sparql_count = 0
-    total_connections = 0
-    total_matched_connections = 0
-
-    for entity in matched_entities:
-        calculate_entity_score_with_connections(entity, all_keywords, ttl_data)
-        if entity.get("sparql_executed"):
-            sparql_count += 1
-            total_connections += entity.get("sparql_connections", 0)
-            total_matched_connections += entity.get("matched_connections", 0)
-
-    # SPARQL 스코어링 통계 출력
-    if sparql_count > 0:
-        avg_connections = total_connections / sparql_count if sparql_count > 0 else 0
-        print(f"     └─ SPARQL 스코어링: {sparql_count}개 엔티티, 평균 연결노드 {avg_connections:.1f}개, 키워드 매칭 {total_matched_connections}개")
     else:
-        print(f"     └─ SPARQL 스코어링: 실행되지 않음")
+        print(f"  ⚠️ basic_keywords가 비어있어 키워드 확장 및 프로퍼티 선택 불가")
 
-    # 정렬: 키워드가 연결된 노드에 있는 엔티티를 우선적으로, 그 다음 점수 기준
-    # 1순위: has_keyword_in_connections (True가 먼저)
-    # 2순위: relevance_score (높은 점수 우선)
-    matched_entities.sort(
-        key=lambda x: (
-            not x.get("has_keyword_in_connections", False),  # False가 먼저 오도록 (True를 우선)
-            -x.get("relevance_score", 0)  # 내림차순 정렬을 위해 음수
-        )
-    )
+    # 🎯 Thinking 이벤트: TTL 매칭 시작
+    if thinking_callback:
+        thinking_callback("ttl_matching_started", {
+            "title": "TTL 데이터 매칭 시작",
+            "keywords_to_match": expanded_keywords,
+            "matching_methods": ["정확 매칭", "부분 매칭"]
+        })
+    
+    # ========== 2. TTL 데이터 로드 및 엔티티 매칭 ==========
+    ttl_data = load_ttl_entities()
+    
+    # 모든 키워드로 엔티티 매칭
+    all_keywords = expanded_keywords
+    matched_entities = []
+    seen_uris = set()
+    
+    # TTL 정확 매칭
+    ttl_matched = 0
+    # 초기 키워드와 확장 키워드 구분
+    initial_keywords_set = set(basic_keywords)
+    
+    for keyword in all_keywords:
+        # 키워드 출처 확인: 초기 키워드인지 LLM 확장 키워드인지
+        is_from_expansion = keyword not in initial_keywords_set
+        
+        # 정확한 라벨 매칭
+        if keyword in ttl_data.get("label_to_uri", {}):
+            uri = ttl_data["label_to_uri"][keyword]
+            if uri not in seen_uris:
+                seen_uris.add(uri)
+                entity_type = ttl_data["uri_to_type"].get(uri, "Event")
+                matched_entities.append({
+                    "uri": uri,
+                    "name": keyword,
+                    "type": entity_type,
+                    "match_method": "exact",
+                    "relevance_score": 1.0,
+                    "matched_keyword": keyword,
+                    # 키워드 추적 정보 추가
+                    "keyword_trace": {
+                        "matched_keyword": keyword,
+                        "is_from_expansion": is_from_expansion,
+                        "expansion_method": "none",  # entity_expander 단계에서는 지식 확장 없음
+                        "source": "llm_expansion" if is_from_expansion else "initial_keyword"
+                    }
+                })
+                ttl_matched += 1
+        
+        # 부분 매칭 (최대 3개)
+        if len(keyword) >= 3:
+            partial_count = 0
+            for label, uri in ttl_data.get("label_to_uri", {}).items():
+                if keyword in label and uri not in seen_uris:
+                    seen_uris.add(uri)
+                    entity_type = ttl_data["uri_to_type"].get(uri, "Event")
+                    # 키워드 출처 확인
+                    is_from_expansion = keyword not in initial_keywords_set
+                    
+                    matched_entities.append({
+                        "uri": uri,
+                        "name": label,
+                        "type": entity_type,
+                        "match_method": "partial",
+                        "relevance_score": 0.7,
+                        "matched_keyword": keyword,
+                        # 키워드 추적 정보 추가
+                        "keyword_trace": {
+                            "matched_keyword": keyword,
+                            "is_from_expansion": is_from_expansion,
+                            "expansion_method": "none",
+                            "source": "llm_expansion" if is_from_expansion else "initial_keyword"
+                        }
+                    })
+                    ttl_matched += 1
+                    partial_count += 1
+                    if partial_count >= 3:
+                        break
+    
+    print(f"  TTL 매칭 결과: {ttl_matched}개")
 
-    # 상위 30개만 선택 (너무 많으면 성능 저하)
-    matched_entities = matched_entities[:30]
+    # 🎯 Thinking 이벤트: TTL 매칭 완료
+    if thinking_callback:
+        thinking_callback("ttl_matching_completed", {
+            "title": "TTL 매칭 완료",
+            "matched_entities": ttl_matched,
+            "exact_matches": len([e for e in matched_entities if e.get("match_method") == "exact"]),
+            "partial_matches": len([e for e in matched_entities if e.get("match_method") == "partial"])
+        })
+    
+    # ========== 3. pgvector 유사도 검색 (fallback) ==========
+    pgvector_added = 0
+    if len(matched_entities) < 20 and USE_PGVECTOR:
+        # 🎯 Thinking 이벤트: pgvector 검색 시작
+        if thinking_callback:
+            thinking_callback("pgvector_search_started", {
+                "title": "pgvector 유사도 검색 시작",
+                "reason": f"TTL 매칭 결과 부족 ({len(matched_entities)}개 < 20개)",
+                "search_keywords": expanded_keywords
+            })
 
-    # ========================================
-    # 결과 정리
-    # ========================================
-    ontology_schema = get_schema_summary()
+        try:
+            vector_results = search_entities_with_pgvector(
+                expanded_keywords, ttl_data, top_k=15
+            )
+            
+            for result in vector_results:
+                uri = result.get("uri")
+                if uri and uri not in seen_uris:
+                    seen_uris.add(uri)
+                    result["match_method"] = "pgvector"
+                    # 키워드 추적 정보 추가 (pgvector는 확장 키워드에서 주로 나옴)
+                    matched_keyword = result.get("matched_keyword", "")
+                    is_from_expansion = matched_keyword not in initial_keywords_set if matched_keyword else True
+                    result["keyword_trace"] = {
+                        "matched_keyword": matched_keyword,
+                        "is_from_expansion": is_from_expansion,
+                        "expansion_method": "none",
+                        "source": "llm_expansion" if is_from_expansion else "initial_keyword"
+                    }
+                    matched_entities.append(result)
+                    pgvector_added += 1
+            
+            print(f"  pgvector 추가 결과: {pgvector_added}개")
 
-    # 추출된 엔티티 상세 목록 (상위 10개)
-    if matched_entities:
-        print(f"\n      [추출된 엔티티 상세]")
-        for i, entity in enumerate(matched_entities[:10], 1):
+            # 🎯 Thinking 이벤트: pgvector 검색 완료
+            if thinking_callback:
+                thinking_callback("pgvector_search_completed", {
+                    "title": "pgvector 검색 완료",
+                    "added_entities": pgvector_added,
+                    "total_entities": len(matched_entities)
+                })
+
+        except Exception as e:
+            print(f"  pgvector 검색 실패: {e}")
+    
+    # ========== 4. SPARQL 기반 엔티티 스코어링 ==========
+    print(f"  SPARQL 기반 스코어링 중...")
+
+    # 🎯 Thinking 이벤트: SPARQL 스코어링 시작
+    if thinking_callback:
+        thinking_callback("sparql_scoring_started", {
+            "title": "SPARQL 기반 스코어링 시작",
+            "entities_to_score": len(matched_entities),
+            "scoring_factors": ["기본 점수", "이름 매칭", "연결 노드 매칭"]
+        })
+    
+    for entity in matched_entities:
+        try:
+            score = calculate_entity_score_with_connections(
+                entity, all_keywords, ttl_data
+            )
+            entity["final_score"] = score
+        except Exception as e:
+            entity["final_score"] = entity.get("relevance_score", 0.5)
+    
+    # ========== 5. 상위 30개 엔티티 선택 ==========
+    matched_entities.sort(key=lambda x: x.get("final_score", 0), reverse=True)
+    top_entities = matched_entities[:30]
+    
+    print(f"  최종 선택된 엔티티: {len(top_entities)}개")
+    
+    # 상위 10개 엔티티 출력
+    if top_entities:
+        print(f"  상위 엔티티:")
+        for i, entity in enumerate(top_entities[:10], 1):
             name = entity.get("name", "")
             entity_type = entity.get("type", "Unknown")
             method = entity.get("match_method", "")
-            relevance_score = entity.get("relevance_score", 0)
-            milvus_score = entity.get("milvus_score")
+            score = entity.get("final_score", 0)
+            print(f"    {i:2d}. [{method:7s}] [{entity_type:12s}] {name} (점수: {score:.2f})")
 
-            # 매칭 방법 레이블
-            method_label = "[정확]" if method == "exact" else "[부분]" if method == "partial" else "[벡터]" if method in ["milvus", "pgvector"] else "[LLM]"
-
-            # 점수 표시 (연관성 점수 우선, Milvus 점수는 참고용)
-            if milvus_score:
-                score_str = f" (점수: {relevance_score:.2f}, 벡터: {milvus_score:.2f})"
-            else:
-                score_str = f" (점수: {relevance_score:.2f})"
-
-            print(f"      {i:2d}. {method_label:6s} [{entity_type:12s}] {name}{score_str}")
-
-        if len(matched_entities) > 10:
-            print(f"      ... 외 {len(matched_entities) - 10}개")
-
-    node_elapsed = time.time() - node_start
-    print(f"  └─ 완료: {len(matched_entities)}개 엔티티 추출 (TTL: {ttl_matched}, pgvector: {pgvector_added}) ({node_elapsed:.2f}초)")
-    print()
-
-    # 노드 실행 시간 기록
+    # 🎯 Thinking 이벤트: Entity Expander 완료
+    if thinking_callback:
+        top_entity_names = [e.get("name", "") for e in top_entities[:10]]
+        thinking_callback("entity_expansion_completed", {
+            "title": "엔티티 확장 완료",
+            "final_entity_count": len(top_entities),
+            "top_entities": top_entity_names,
+            "processing_summary": {
+                "ttl_matches": ttl_matched,
+                "pgvector_additions": pgvector_added,
+                "final_selection": len(top_entities)
+            }
+        })
+    
+    # 실행 시간 계산
+    node_end = time.time()
+    execution_time = node_end - node_start
     node_times = state.get("node_execution_times", {})
-    node_times["entity_expander"] = node_elapsed
-
+    node_times["entity_expander"] = execution_time
+    
+    print(f"  실행 시간: {execution_time:.2f}초")
+    
     return {
         **state,
-        "extracted_entities": matched_entities,
-        "ontology_schema": ontology_schema,
+        "expanded_keywords": expanded_keywords,
+        "expanded_keywords_dict": expanded_keywords_dict,
+        "selected_property_groups": selected_property_groups,
+        "selected_properties": selected_properties,
+        "extracted_entities": top_entities,
         "ttl_data": ttl_data,
         "executed_nodes": state.get("executed_nodes", []) + ["entity_expander"],
         "node_execution_times": node_times

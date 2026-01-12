@@ -1,4 +1,5 @@
 # Generate된 답변의 말투 교정하는 노드
+from langgraph.graph import END
 from backend.langgraph_structure1.state import GraphState
 from backend.langgraph_structure1.utils import create_model
 
@@ -58,10 +59,27 @@ def tone_adjust_node(state: GraphState) -> GraphState:
 
     tranformed_text = response.choices[0].message.content.strip()
 
+    # 결과 터미널 출력
+    print(f"[DEBUG] tone_adjust_node - Transformed Text:\n{tranformed_text}")
+    print("-" * 60)
+
     return {
         **state,
         "tone_corrected_answer": tranformed_text,
     }
+
+def route_tone_adjust_node(state: GraphState) -> str:
+    """
+    tone_adjust_node에서 라우팅하는 함수
+    """
+
+    tag = state.get("tag", "")
+    if tag == "chat" or tag == "reply":
+        return END
+    elif tag == "video":
+        return "scene_split_node"
+    # 방어: 알 수 없는 태그는 종료
+    return END
 
 
 if __name__ == "__main__":

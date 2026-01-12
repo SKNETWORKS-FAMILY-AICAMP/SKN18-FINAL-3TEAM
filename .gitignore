@@ -32,6 +32,7 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 media
+Created_Acts
 
 # If your build process includes running collectstatic, then you probably don't need or want to include staticfiles/
 # in your Git repository. Update and uncomment the following line accordingly.
@@ -336,3 +337,11 @@ infra/database/
 .bak
 
 backend/ragas/data/
+backend/ragas/ontology_evaluate/data/
+backend/langgraph_fuseki/log/
+frontend/react/public/assets/
+concept_board/
+
+celery.pid
+
+##

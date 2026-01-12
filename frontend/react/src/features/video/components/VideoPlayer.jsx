@@ -67,7 +67,14 @@ const FullscreenExitIcon = ({ size = 24, color = "#fff" }) => (
   </svg>
 );
 
-const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
+const VideoPlayer = ({
+  videoUrl = "/videos/test-video.mp4",
+  initialTime = 0,
+  onPlayStart,
+  onTimeUpdate,
+  onPause,
+  onEnded,
+}) => {
   const [playing, setPlaying] = useState(false);
   const [played, setPlayed] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -78,6 +85,8 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
   const playerRef = useRef(null);
   const containerRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
+  const hasPlayedRef = useRef(false); // 재생 이벤트 중복 방지
+  const hasAppliedInitialTimeRef = useRef(false);
 
   // videoUrl이 변경되면 에러 상태 초기화
   useEffect(() => {
@@ -85,6 +94,8 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
     setPlaying(false); // 재생 중단
     setPlayed(0);
     setDuration(0);
+    hasPlayedRef.current = false; // 재생 플래그 초기화
+    hasAppliedInitialTimeRef.current = false;
   }, [videoUrl]);
 
   // playing 상태에 따라 video 재생/일시정지
@@ -97,15 +108,27 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
         console.error("재생 실패:", err);
         setPlaying(false);
       });
+
+      // 최초 재생 시 onPlayStart 콜백 호출 (한 번만)
+      if (!hasPlayedRef.current && onPlayStart) {
+        hasPlayedRef.current = true;
+        onPlayStart();
+      }
     } else {
       video.pause();
     }
-  }, [playing]);
+  }, [playing, onPlayStart]);
 
   const handlePlayPause = () => {
     // 에러가 있으면 재생하지 않음
     if (error) return;
     setPlaying(!playing);
+  };
+
+  const handlePlayStart = () => {
+    if (typeof onPlayStart === "function") {
+      onPlayStart();
+    }
   };
 
   const handleSkipBackward = () => {
@@ -199,9 +222,18 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
 
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
-      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
-      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
-      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        handleFullscreenChange
+      );
+      document.removeEventListener(
+        "mozfullscreenchange",
+        handleFullscreenChange
+      );
+      document.removeEventListener(
+        "MSFullscreenChange",
+        handleFullscreenChange
+      );
     };
   }, []);
 
@@ -233,12 +265,34 @@ const VideoPlayer = ({ videoUrl = "/videos/test-video.mp4" }) => {
         }}
         playsInline
         preload="metadata"
+        onPlay={handlePlayStart}
+        onPause={() => {
+          if (typeof onPause === "function") {
+            onPause();
+          }
+        }}
+        onEnded={() => {
+          if (typeof onEnded === "function") {
+            onEnded();
+          }
+        }}
         onLoadedMetadata={(e) => {
           setError(null);
           const dur = e.target.duration;
           setDuration(dur);
+          if (!hasAppliedInitialTimeRef.current && initialTime > 0) {
+            const safeTime = Math.min(initialTime, dur || initialTime);
+            e.target.currentTime = safeTime;
+            if (dur > 0) {
+              setPlayed(safeTime / dur);
+            }
+            hasAppliedInitialTimeRef.current = true;
+          }
         }}
         onTimeUpdate={(e) => {
+          if (typeof onTimeUpdate === "function") {
+            onTimeUpdate(e.target.currentTime);
+          }
           if (!seeking && duration > 0) {
             setPlayed(e.target.currentTime / duration);
           }

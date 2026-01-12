@@ -15,6 +15,8 @@ import {
   unlikeComment,
   deleteReply,
   updateReply,
+  likeReply,
+  unlikeReply,
 } from "../../../api/communityApi";
 import { getProfileImageUrl } from "../../../utils/imageUtils";
 
@@ -172,8 +174,19 @@ const ReplyItem = ({
   };
 
   const handleLike = async () => {
-    setLiked(!liked);
-    setLikesCount(liked ? likesCount - 1 : likesCount + 1);
+    try {
+      if (liked) {
+        await unlikeReply(reply.id);
+        setLiked(false);
+        setLikesCount(likesCount - 1);
+      } else {
+        await likeReply(reply.id);
+        setLiked(true);
+        setLikesCount(likesCount + 1);
+      }
+    } catch (error) {
+      console.error("좋아요 처리 실패:", error);
+    }
   };
 
   const profileSize = 24;
@@ -384,7 +397,7 @@ const ReplyItem = ({
                     padding: "6px 12px",
                     border: "none",
                     borderRadius: "4px",
-                    backgroundColor: editText.trim() ? COLORS.primary : COLORS.lightGray,
+                    backgroundColor: editText.trim() ? COLORS.jadePale : COLORS.lightGray,
                     color: COLORS.dark,
                     fontSize: "11px",
                     fontWeight: "600",
@@ -525,7 +538,7 @@ const ReplyItem = ({
                   minWidth: "32px",
                   minHeight: "32px",
                   borderRadius: "50%",
-                  backgroundColor: replyText.trim() && !isSubmitting ? COLORS.primary : COLORS.lightGray,
+                  backgroundColor: replyText.trim() && !isSubmitting ? COLORS.jadePale : COLORS.lightGray,
                   border: "none",
                   cursor: replyText.trim() && !isSubmitting ? "pointer" : "not-allowed",
                   display: "flex",
@@ -1064,7 +1077,7 @@ const Comment = ({
                     minWidth: "32px",
                     minHeight: "32px",
                     borderRadius: "50%",
-                    backgroundColor: replyText.trim() && !isSubmittingReply ? COLORS.primary : COLORS.lightGray,
+                    backgroundColor: replyText.trim() && !isSubmittingReply ? COLORS.jadePale : COLORS.lightGray,
                     border: "none",
                     cursor: replyText.trim() && !isSubmittingReply ? "pointer" : "not-allowed",
                     display: "flex",

@@ -6,6 +6,7 @@ from .scene_parser import parse_scenes, separate_scene_and_camera
 from .scene_enhancement import enhance_scene_with_era_details
 from .image_generation import generate_image_with_gemini, COMMON_STYLE
 from .video_conversion import create_video_from_image_fal
+from .historical_prompt_enhancer import process_scene_prompt
 
 __all__ = [
     'parse_scenes',
@@ -14,5 +15,6 @@ __all__ = [
     'generate_image_with_gemini',
     'COMMON_STYLE',
     'create_video_from_image_fal',
+    'process_scene_prompt',
 ]
 

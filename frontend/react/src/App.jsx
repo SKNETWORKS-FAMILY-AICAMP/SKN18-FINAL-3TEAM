@@ -3,26 +3,46 @@ import { COLORS } from "./constants/theme";
 import Header from "./components/layout/Header";
 import ExpandableSearch from "./features/search/components/ExpandableSearch";
 import MainPage from "./pages/MainPage";
+import AboutPage from "./pages/AboutPage";
 import VideoDetailPage from "./pages/VideoDetailPage";
+import SearchResultPage from "./pages/SearchResultPage";
 import MyPage from "./pages/MyPage";
 import AllCommentsPage from "./pages/AllCommentsPage";
 import ProfileEditPage from "./pages/ProfileEditPage";
 import AdminPage from "./pages/AdminPage";
+import VideoEditPage from "./pages/admin/VideoEditPage";
 import Chatbot from "./pages/Chatbot";
 import VideoCreatePage from "./pages/VideoCreatePage";
+import PlayPage from "./pages/PlayPage";
 import ChatbotButton from "./components/common/ChatbotButton";
 import {
   checkAuth,
   getGoogleLoginUrl,
   logout as apiLogout,
 } from "./api/authApi";
+import { BackgroundTaskProvider } from "./contexts/BackgroundTaskContext";
 
 const App = () => {
   // URL에서 초기 페이지 상태 읽기
   const getInitialPage = () => {
     const hash = window.location.hash.replace("#", "");
     if (hash) {
-      const [page, param] = hash.split("/");
+      const parts = hash.split("/");
+      const [page, param, subPage, subParam] = parts;
+
+      // 영상 편집 페이지 (#admin/video/edit/123)
+      if (
+        page === "admin" &&
+        param === "video" &&
+        subPage === "edit" &&
+        subParam
+      ) {
+        return {
+          page: "admin-video-edit",
+          videoId: parseInt(subParam),
+          searchQuery: "",
+        };
+      }
 
       // 영상 상세 페이지
       if (page === "video" && param) {
@@ -42,6 +62,16 @@ const App = () => {
         };
       }
 
+      // 챗봇 세션 페이지 (#question/session/123)
+      if (page === "question" && param === "session" && subPage) {
+        return {
+          page: "question",
+          videoId: null,
+          searchQuery: "",
+          sessionId: parseInt(subPage),
+        };
+      }
+
       return {
         page: page || "main",
         videoId: null,
@@ -55,11 +85,15 @@ const App = () => {
   const [currentPage, setCurrentPage] = useState(initial.page);
   const [selectedVideoId, setSelectedVideoId] = useState(initial.videoId);
   const [searchQuery, setSearchQuery] = useState(initial.searchQuery || "");
+  const [initialSessionId, setInitialSessionId] = useState(
+    initial.sessionId || null
+  );
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [newChatTrigger, setNewChatTrigger] = useState(0);
 
   // URL 변경 감지 (뒤로가기/앞으로가기 지원)
   useEffect(() => {
@@ -68,6 +102,7 @@ const App = () => {
       setCurrentPage(initial.page);
       setSelectedVideoId(initial.videoId);
       setSearchQuery(initial.searchQuery || "");
+      setInitialSessionId(initial.sessionId || null);
     };
 
     window.addEventListener("hashchange", handleHashChange);
@@ -98,6 +133,25 @@ const App = () => {
           // 네트워크 에러는 조용히 처리 (비로그인 상태로 설정)
           setIsLoggedIn(false);
           setUser(null);
+        } else if (
+          error.response?.status === 401 ||
+          error.response?.status === 403
+        ) {
+          // 401/403 에러는 토큰 만료 또는 인증 실패
+          // axios 인터셉터에서 이미 처리했지만, 여기서도 상태 초기화
+          console.warn("⚠️ 인증 실패. 로그아웃 처리...");
+          localStorage.clear();
+          setIsLoggedIn(false);
+          setUser(null);
+          // 강제 새로고침 (프론트엔드 URL로 리다이렉트)
+          setTimeout(() => {
+            const frontendUrl =
+              window.location.port === "8000" ||
+              window.location.hostname.includes("8000")
+                ? "http://localhost:3000/"
+                : `${window.location.origin}/`;
+            window.location.href = frontendUrl;
+          }, 100);
         } else {
           // 기타 에러는 콘솔에 표시
           console.error("인증 확인 실패:", error);
@@ -181,6 +235,8 @@ const App = () => {
         "profile-edit",
         "all-comments",
         "admin",
+        "question",
+        "video-create",
       ];
       if (authRequiredPages.includes(currentPage)) {
         setCurrentPage("main");
@@ -200,6 +256,8 @@ const App = () => {
         "profile-edit",
         "all-comments",
         "admin",
+        "question",
+        "video-create",
       ];
       if (authRequiredPages.includes(currentPage)) {
         setCurrentPage("main");
@@ -214,13 +272,20 @@ const App = () => {
     setUser(updatedUser);
   }, []);
 
-  const handleNavigate = (page, videoId = null) => {
+  const handleNavigate = (page, videoId = null, options = {}) => {
+    if (!isLoggedIn && (page === "question" || page === "video-create")) {
+      return;
+    }
+    if (options.newChat) {
+      setNewChatTrigger((prev) => prev + 1);
+    }
     setCurrentPage(page);
     updateURL(page, videoId);
     // 페이지 전환 시 스크롤을 맨 위로 이동
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   };
 
+  // 검색 결과 페이지로 이동 (로그인 여부와 관계없이 모든 사용자에게 허용)
   const handleSearch = (query) => {
     setSearchQuery(query);
     setCurrentPage("search");
@@ -229,28 +294,16 @@ const App = () => {
   };
 
   return (
-    <>
-      <style>{`
-        ::selection {
-          background-color: #c2e0f6;
-          color: #effd9a;
-        }
-        ::-moz-selection {
-          background-color: #c2e0f6;
-          color: #effd9a;
-        }
-      `}</style>
-
+    <BackgroundTaskProvider>
       <div
         style={{
-          fontFamily:
-            "'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif",
+          fontFamily: "'Noto Serif KR', serif",
           backgroundColor: COLORS.background,
           minHeight: "100vh",
           width: "100%",
           margin: 0,
           padding: 0,
-          color: COLORS.dark,
+          color: COLORS.white,
           overflowX: "hidden",
         }}
       >
@@ -266,6 +319,7 @@ const App = () => {
           onLogout={handleLogout}
           onAdminClick={handleAdminClick}
           currentPage={currentPage}
+          onNavigate={handleNavigate}
         />
 
         <ExpandableSearch
@@ -281,11 +335,21 @@ const App = () => {
             <MainPage isLoggedIn={isLoggedIn} onVideoClick={handleVideoClick} />
           )}
 
+          {currentPage === "about" && <AboutPage onNavigate={handleNavigate} />}
+
           {currentPage === "video" && (
             <VideoDetailPage
               videoId={selectedVideoId}
               isLoggedIn={isLoggedIn}
               user={user}
+            />
+          )}
+
+          {currentPage === "search" && (
+            <SearchResultPage
+              query={searchQuery}
+              onVideoClick={handleVideoClick}
+              isLoggedIn={isLoggedIn}
             />
           )}
 
@@ -309,21 +373,34 @@ const App = () => {
             <AdminPage onNavigate={handleNavigate} user={user} />
           )}
 
+          {currentPage === "admin-video-edit" && (
+            <VideoEditPage videoId={selectedVideoId} />
+          )}
+
           {currentPage === "question" && (
             <div style={{ overflow: "hidden", height: "calc(100vh - 76px)" }}>
-              <Chatbot onNavigate={handleNavigate} user={user} />
+              <Chatbot
+                onNavigate={handleNavigate}
+                user={user}
+                newChatTrigger={newChatTrigger}
+                initialSessionId={initialSessionId}
+              />
             </div>
           )}
 
           {currentPage === "video-create" && (
             <VideoCreatePage onNavigate={handleNavigate} user={user} />
           )}
+
+          {currentPage === "play" && (
+            <PlayPage onNavigate={handleNavigate} />
+          )}
         </div>
 
-        {/* 챗봇 버튼 (모든 페이지에서 표시) */}
-        <ChatbotButton onNavigate={handleNavigate} />
+        {/* 챗봇 버튼 (로그인 시에만 표시) */}
+        {isLoggedIn && <ChatbotButton onNavigate={handleNavigate} />}
       </div>
-    </>
+    </BackgroundTaskProvider>
   );
 };
 
