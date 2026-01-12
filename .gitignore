@@ -353,3 +353,5 @@ ssm-values.txt
 # Windows reserved device files
 nul
 
+# AWS SSM params
+infra/aws/cloudformation/params/ssm-values.txt
