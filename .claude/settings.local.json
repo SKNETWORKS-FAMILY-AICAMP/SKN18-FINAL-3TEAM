@@ -25,7 +25,12 @@
       "Bash(aws ec2 describe-instances:*)",
       "Bash(aws autoscaling terminate-instance-in-auto-scaling-group:*)",
       "Bash(aws autoscaling set-desired-capacity:*)",
-      "Bash(aws autoscaling describe-auto-scaling-groups:*)"
+      "Bash(aws autoscaling describe-auto-scaling-groups:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(MSYS_NO_PATHCONV=1 docker run:*)",
+      "Bash(tee:*)",
+      "Bash(docker run:*)",
+      "Bash(docker pull:*)"
     ]
   }
 }

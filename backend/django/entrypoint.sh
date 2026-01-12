@@ -30,14 +30,17 @@ with connection.cursor() as cursor:
     cursor.execute("SELECT to_regclass('public.user')")
     exists = cursor.fetchone()[0] is not None
 
-if not exists:
-    # Migrations may be marked applied without the table existing.
-    # Reset users app migrations so the table can be created.
+if exists:
+    # Table already exists (created by init.sql), fake the migration
     import subprocess
-    subprocess.check_call(["python", "manage.py", "migrate", "users", "zero", "--fake"])
+    subprocess.check_call(["python", "manage.py", "migrate", "users", "--fake-initial", "--noinput"])
+    subprocess.check_call(["python", "manage.py", "migrate", "--fake-initial", "--noinput"])
+else:
+    # Table doesn't exist, run migrations normally
+    import subprocess
+    subprocess.check_call(["python", "manage.py", "migrate", "users", "--noinput"])
+    subprocess.check_call(["python", "manage.py", "migrate", "--noinput"])
 PY
-python manage.py migrate users --noinput
-python manage.py migrate --noinput
 
 # Log current tables to help debug migration state.
 python - <<'PY'
@@ -355,33 +358,98 @@ fuseki_password = os.getenv("FUSEKI_PASSWORD") or os.getenv("FUSEKI_ADMIN_PASSWO
 auth = (fuseki_user, fuseki_password)
 force_reload = os.getenv("FORCE_DATA_RELOAD", "false").lower() == "true"
 
+# 디버깅: 환경 변수 확인
+print(f"  └─ [DEBUG] FUSEKI_URL: {fuseki_base_url}")
+print(f"  └─ [DEBUG] FUSEKI_USER: {fuseki_user}")
+print(f"  └─ [DEBUG] FUSEKI_PASSWORD exists: {bool(fuseki_password)}")
+print(f"  └─ [DEBUG] Auth: ({fuseki_user}, {'***' if fuseki_password else 'None'})")
+
 ttl_path = Path("/app/backend/langgraph_fuseki/ontology/instances/korean_history_normalized.ttl")
 
 def upload_ttl_direct(fuseki_url, dataset, ttl_file, auth):
     """TTL 파일을 Fuseki에 직접 업로드"""
     try:
         with open(ttl_file, 'rb') as f:
+            file_content = f.read()
+
+        # 먼저 인증 없이 시도
+        response = requests.post(
+            f"{fuseki_url}/{dataset}/data",
+            headers={'Content-Type': 'text/turtle'},
+            data=file_content,
+            timeout=300
+        )
+
+        # 401이면 인증 추가해서 재시도
+        if response.status_code == 401:
             response = requests.post(
                 f"{fuseki_url}/{dataset}/data",
                 auth=auth,
                 headers={'Content-Type': 'text/turtle'},
-                data=f,
+                data=file_content,
                 timeout=300
             )
+
         return response.status_code, response.text
     except Exception as e:
         return 0, str(e)
 
 try:
-    # SPARQL 쿼리로 트리플 수 확인
+    # SPARQL 쿼리로 트리플 수 확인 (GET 방식)
     query = "SELECT (COUNT(*) as ?count) WHERE { ?s ?p ?o }"
-    response = requests.post(
+
+    # 먼저 인증 없이 시도
+    response = requests.get(
         f"{fuseki_base_url}/{dataset}/sparql",
-        auth=auth,
-        data={'query': query},
+        params={'query': query},
         headers={'Accept': 'application/sparql-results+json'},
         timeout=10
     )
+
+    # 401이면 인증 추가해서 재시도
+    if response.status_code == 401:
+        response = requests.get(
+            f"{fuseki_base_url}/{dataset}/sparql",
+            auth=auth,
+            params={'query': query},
+            headers={'Accept': 'application/sparql-results+json'},
+            timeout=10
+        )
+
+    # 404면 dataset 생성 시도
+    if response.status_code == 404:
+        print(f"  └─ Dataset '{dataset}' 없음, 생성 시도...")
+        print(f"  └─ [DEBUG] POST {fuseki_base_url}/$/datasets")
+        # Dataset 생성 (TDB2 타입으로)
+        create_response = requests.post(
+            f"{fuseki_base_url}/$/datasets",
+            data={'dbName': dataset, 'dbType': 'tdb2'},
+            timeout=30
+        )
+        print(f"  └─ [DEBUG] 인증 없이 시도: {create_response.status_code}")
+        if create_response.status_code == 401:
+            print(f"  └─ [DEBUG] 인증 추가 재시도 (user={fuseki_user})")
+            create_response = requests.post(
+                f"{fuseki_base_url}/$/datasets",
+                auth=auth,
+                data={'dbName': dataset, 'dbType': 'tdb2'},
+                timeout=30
+            )
+            print(f"  └─ [DEBUG] 인증 후: {create_response.status_code}")
+            if create_response.status_code == 401:
+                print(f"  └─ [DEBUG] Response: {create_response.text[:200]}")
+
+        if create_response.status_code in [200, 201]:
+            print(f"  └─ ✓ Dataset '{dataset}' 생성 완료")
+            # 생성 후 다시 쿼리
+            response = requests.get(
+                f"{fuseki_base_url}/{dataset}/sparql",
+                params={'query': query},
+                headers={'Accept': 'application/sparql-results+json'},
+                timeout=10
+            )
+        else:
+            print(f"  └─ ✗ Dataset 생성 실패 (HTTP {create_response.status_code})")
 
     if response.status_code == 200:
         result = response.json()

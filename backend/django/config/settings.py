@@ -147,6 +147,7 @@ INSTALLED_APPS = [
     'activity',      # 검색 + 시청 기록
     'community',     # 댓글 + 답글 + 좋아요
     'chatbot',       # 챗봇
+    'game',          # MinjiRun 게임
 ]
 
 SITE_ID = 1
@@ -233,7 +234,7 @@ CACHES = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=120),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,

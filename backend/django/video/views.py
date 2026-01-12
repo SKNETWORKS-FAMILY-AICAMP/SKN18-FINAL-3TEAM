@@ -31,9 +31,6 @@ from deep_translator import GoogleTranslator
 from .models import Video
 from .serializers import VideoSerializer, VideoDetailSerializer, VideoCreateSerializer
 
-# S3 Storage
-from config.storage_backends import upload_video, upload_thumbnail
-
 # .env 파일 로드
 load_dotenv()
 
@@ -111,14 +108,12 @@ async def generate_scenario(request):
             original_url = str(candidate_video)
             try:
                 temp_raw_dir = os.path.join(settings.MEDIA_ROOT, 'temp_raw')
-                bg_final_dir = os.path.join(settings.MEDIA_ROOT, 'backgrounds')
                 os.makedirs(temp_raw_dir, exist_ok=True)
-                os.makedirs(bg_final_dir, exist_ok=True)
 
                 file_id = int(time.time())
                 raw_path = os.path.join(temp_raw_dir, f"raw_{file_id}.mp4")
                 output_name = f"unity_{file_id}.webm"
-                local_output = os.path.join(bg_final_dir, output_name)
+                temp_output = os.path.join(temp_raw_dir, output_name)
 
                 print(f"🎬 [3/4] 가공 시작: {original_url} -> {output_name}")
 
@@ -132,15 +127,24 @@ async def generate_scenario(request):
                     '-map_metadata', '-1',
                     '-c:v', 'libvpx', '-b:v', '2M', '-crf', '10',
                     '-c:a', 'libvorbis',
-                    local_output
+                    temp_output
                 ]
                 process = subprocess.run(cmd, capture_output=True, encoding='utf-8', errors='ignore')
 
                 if process.returncode == 0:
-                    ngrok_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
-                    target_url = f"{ngrok_url}{settings.MEDIA_URL}backgrounds/{output_name}"
-                    print(f"✅ [Success] 가공 완료: {target_url}")
+                    # S3에 업로드
+                    from config.storage_backends import upload_video
+                    from django.core.files import File
+
+                    with open(temp_output, 'rb') as f:
+                        video_file = File(f, name=output_name)
+                        target_url = upload_video(video_file, output_name)
+
+                    # 임시 파일 삭제
                     if os.path.exists(raw_path): os.remove(raw_path)
+                    if os.path.exists(temp_output): os.remove(temp_output)
+
+                    print(f"✅ [Success] 가공 및 S3 업로드 완료: {target_url}")
                 else:
                     print(f"❌ FFmpeg 에러: {process.stderr}")
                     target_url = original_url
@@ -150,29 +154,49 @@ async def generate_scenario(request):
         else:
             target_url = candidate_video or (final_script.get('background_url') if final_script else "")
 
-        # 4. JSON 대본 업데이트 및 하이재킹 저장
+        # 4. JSON 대본 업데이트 및 S3 저장
         if target_url and final_script and 'scenes' in final_script:
             final_script['background_url'] = target_url
             for scene in final_script['scenes']:
                 scene['location'] = target_url
 
-        save_dir = os.path.join(settings.MEDIA_ROOT, 'pending_scripts')
-        hijack_dir = os.path.join(settings.MEDIA_ROOT, 'script_logs')
-        os.makedirs(save_dir, exist_ok=True)
-        os.makedirs(hijack_dir, exist_ok=True)
-
         filename = f"{time.strftime('%Y%m%d_%H%M%S')}_script.json"
-        full_path = os.path.join(save_dir, filename)
-        hijack_path = os.path.join(hijack_dir, filename)
 
-        with open(full_path, 'w', encoding='utf-8') as f:
-            json.dump(final_script, f, indent=4, ensure_ascii=False)
+        # S3에 저장 (pending_scripts 폴더)
+        import boto3
+        s3_client = boto3.client('s3')
+        bucket_name = 'skn18-3-dev-scripts-533124807326'
 
         try:
-            shutil.copy(full_path, hijack_path)
-            print(f"📄 [4/4] 대본 생성 및 하이재킹 성공: {hijack_path}")
-        except Exception as copy_e:
-            print(f"⚠️ 하이재킹 복사 실패: {copy_e}")
+            # pending_scripts 폴더에 저장
+            s3_key_pending = f"pending_scripts/{filename}"
+            s3_client.put_object(
+                Bucket=bucket_name,
+                Key=s3_key_pending,
+                Body=json.dumps(final_script, indent=4, ensure_ascii=False).encode('utf-8'),
+                ContentType='application/json'
+            )
+            print(f"📄 [4/4] S3 pending_scripts 업로드 완료: s3://{bucket_name}/{s3_key_pending}")
+
+            # script_logs 폴더에도 백업
+            s3_key_logs = f"script_logs/{filename}"
+            s3_client.put_object(
+                Bucket=bucket_name,
+                Key=s3_key_logs,
+                Body=json.dumps(final_script, indent=4, ensure_ascii=False).encode('utf-8'),
+                ContentType='application/json'
+            )
+            print(f"📄 [4/4] S3 script_logs 백업 완료: s3://{bucket_name}/{s3_key_logs}")
+
+        except Exception as s3_error:
+            print(f"❌ S3 업로드 실패: {s3_error}")
+            # S3 실패 시 로컬에 fallback
+            save_dir = os.path.join(settings.MEDIA_ROOT, 'pending_scripts')
+            os.makedirs(save_dir, exist_ok=True)
+            full_path = os.path.join(save_dir, filename)
+            with open(full_path, 'w', encoding='utf-8') as f:
+                json.dump(final_script, f, indent=4, ensure_ascii=False)
+            print(f"⚠️ 로컬 저장으로 fallback: {full_path}")
 
         return JsonResponse({'message': 'Queued', 'file_name': filename}, status=200)
 
@@ -200,11 +224,41 @@ async def create_video_from_langgraph(request):
         except: pass
 
     thumbnail_url = result_state.get("thumbnail_url") or body.get("thumbnail_url")
-    
+
+    # ========== S3에 script 저장 (Unity 폴링용) ==========
+    if script_json and 'scenes' in script_json:
+        import boto3
+        s3_client = boto3.client('s3')
+        bucket_name = 'skn18-3-dev-scripts-533124807326'
+        filename = f"{time.strftime('%Y%m%d_%H%M%S')}_script.json"
+
+        try:
+            # pending_scripts 폴더에 저장
+            s3_key_pending = f"pending_scripts/{filename}"
+            s3_client.put_object(
+                Bucket=bucket_name,
+                Key=s3_key_pending,
+                Body=json.dumps(script_json, indent=4, ensure_ascii=False).encode('utf-8'),
+                ContentType='application/json'
+            )
+            print(f"📄 S3 pending_scripts 업로드 완료: s3://{bucket_name}/{s3_key_pending}")
+
+            # script_logs 폴더에도 백업
+            s3_key_logs = f"script_logs/{filename}"
+            s3_client.put_object(
+                Bucket=bucket_name,
+                Key=s3_key_logs,
+                Body=json.dumps(script_json, indent=4, ensure_ascii=False).encode('utf-8'),
+                ContentType='application/json'
+            )
+            print(f"📄 S3 script_logs 백업 완료: s3://{bucket_name}/{s3_key_logs}")
+        except Exception as s3_error:
+            print(f"❌ S3 업로드 실패: {s3_error}")
+
     payload = {
-        "title": title, 
-        "video_url": body.get("video_url", "https://skn18-3-dev-temp.s3.amazonaws.com/background_scene_1_video.mp4"), 
-        "tags": result_state.get("video_tags") or [], 
+        "title": title,
+        "video_url": body.get("video_url", "https://skn18-3-dev-temp.s3.amazonaws.com/background_scene_1_video.mp4"),
+        "tags": result_state.get("video_tags") or [],
         "thumbnail_url": thumbnail_url
     }
     serializer = VideoCreateSerializer(data=payload)
@@ -223,25 +277,64 @@ async def create_video_from_langgraph(request):
     return JsonResponse({"data": serialized}, status=201)
 
 # ============================================
-# [유니티 폴링 API] (기존 유지) -> 얘가 대본 보내기 담당!
+# [유니티 폴링 API] S3에서 대본 읽기 -> 얘가 대본 보내기 담당!
 # ============================================
 class PendingScriptView(APIView):
     permission_classes = [AllowAny]
     def get(self, request):
-        save_dir = os.path.join(settings.MEDIA_ROOT, 'pending_scripts')
-        files = glob.glob(os.path.join(save_dir, "*.json"))
-        if not files: return Response(status=404)
-        files.sort()
-        target_file = files[0]
-        with open(target_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        ngrok_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
-        json_str = json.dumps(data, ensure_ascii=False).replace("http://127.0.0.1:8000", ngrok_url).replace("http://localhost:8000", ngrok_url)
-        data = json.loads(json_str)
-        
-        os.remove(target_file)
-        return Response(data, status=200)
+        import boto3
+        s3_client = boto3.client('s3')
+        bucket_name = 'skn18-3-dev-scripts-533124807326'
+        prefix = 'pending_scripts/'
+
+        try:
+            # S3에서 pending_scripts 폴더의 파일 목록 조회
+            response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+
+            if 'Contents' not in response or len(response['Contents']) <= 1:
+                # 폴더 자체만 있거나 파일이 없으면 404
+                return Response(status=404)
+
+            # 파일 목록 정렬 (오래된 순)
+            files = [obj for obj in response['Contents'] if obj['Key'] != prefix]
+            if not files:
+                return Response(status=404)
+
+            files.sort(key=lambda x: x['Key'])
+            target_key = files[0]['Key']
+
+            # S3에서 파일 읽기
+            obj = s3_client.get_object(Bucket=bucket_name, Key=target_key)
+            data = json.loads(obj['Body'].read().decode('utf-8'))
+
+            # URL 치환
+            base_url = os.getenv('BASE_URL', 'http://skn18-3-dev-alb-806066579.ap-northeast-2.elb.amazonaws.com')
+            json_str = json.dumps(data, ensure_ascii=False).replace("http://127.0.0.1:8000", base_url).replace("http://localhost:8000", base_url)
+            data = json.loads(json_str)
+
+            # S3에서 파일 삭제
+            s3_client.delete_object(Bucket=bucket_name, Key=target_key)
+            print(f"✅ S3 script 전송 및 삭제 완료: {target_key}")
+
+            return Response(data, status=200)
+
+        except Exception as e:
+            print(f"❌ S3 script 읽기 실패: {e}")
+            # S3 실패 시 로컬 fallback
+            save_dir = os.path.join(settings.MEDIA_ROOT, 'pending_scripts')
+            files = glob.glob(os.path.join(save_dir, "*.json"))
+            if not files: return Response(status=404)
+            files.sort()
+            target_file = files[0]
+            with open(target_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            base_url = os.getenv('BASE_URL', 'http://skn18-3-dev-alb-806066579.ap-northeast-2.elb.amazonaws.com')
+            json_str = json.dumps(data, ensure_ascii=False).replace("http://127.0.0.1:8000", base_url).replace("http://localhost:8000", base_url)
+            data = json.loads(json_str)
+
+            os.remove(target_file)
+            return Response(data, status=200)
 
 # ============================================
 # VideoUploadView 및 기타 CRUD (기존 유지) -> 얘가 동영상 받기 담당!
@@ -252,26 +345,36 @@ class VideoUploadView(CreateAPIView):
     permission_classes = [AllowAny]
 
     def create(self, request, *args, **kwargs):
+        from config.storage_backends import upload_video, upload_thumbnail
+
         thumbnail_url = None
         video_url = None
         use_s3 = getattr(settings, 'USE_S3', False)
-
-        # S3 사용 시 S3 URL 기본 도메인, 로컬 시 ngrok URL
-        if use_s3:
-            base_url = ""  # S3 URL은 전체 URL이 반환됨
-        else:
-            base_url = "https://tara-multiflorous-frowsily.ngrok-free.dev"
+        base_url = os.getenv('BASE_URL', 'http://skn18-3-dev-alb-806066579.ap-northeast-2.elb.amazonaws.com')
 
         if 'thumbnail_file' in request.FILES:
             thumb = request.FILES['thumbnail_file']
 
+            if use_s3:
+                thumbnail_url = upload_thumbnail(thumb, thumb.name)
+            else:
+                t_dir = 'thumbnails'
+                os.makedirs(os.path.join(settings.MEDIA_ROOT, t_dir), exist_ok=True)
+                t_name = f"{int(time.time())}_thumb{os.path.splitext(thumb.name)[1]}"
+                t_path = default_storage.save(os.path.join(t_dir, t_name), thumb)
+                thumbnail_url = f"{base_url}{settings.MEDIA_URL}{t_path}"
+
         if 'video_file' in request.FILES:
             video = request.FILES['video_file']
-            v_dir = 'videos'
-            os.makedirs(os.path.join(settings.MEDIA_ROOT, v_dir), exist_ok=True)
-            v_name = f"{int(time.time())}_{video.name}"
-            v_path = default_storage.save(os.path.join(v_dir, v_name), video)
-            video_url = f"{ngrok_url}{settings.MEDIA_URL}{v_path}"
+
+            if use_s3:
+                video_url = upload_video(video, video.name)
+            else:
+                v_dir = 'videos'
+                os.makedirs(os.path.join(settings.MEDIA_ROOT, v_dir), exist_ok=True)
+                v_name = f"{int(time.time())}_{video.name}"
+                v_path = default_storage.save(os.path.join(v_dir, v_name), video)
+                video_url = f"{base_url}{settings.MEDIA_URL}{v_path}"
 
             data = {
                 'title': request.data.get('title'),
@@ -281,8 +384,7 @@ class VideoUploadView(CreateAPIView):
             }
         else:
             data = request.data.copy()
-            if thumbnail_url:
-                data['thumbnail_url'] = thumbnail_url
+            if thumbnail_url: data['thumbnail_url'] = thumbnail_url
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
@@ -305,6 +407,29 @@ class VideoUpdateView(UpdateAPIView):
     queryset = Video.objects.all()
     serializer_class = VideoCreateSerializer
     permission_classes = [IsAuthenticated, IsAdminUser]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def update(self, request, *args, **kwargs):
+        from config.storage_backends import upload_thumbnail
+
+        instance = self.get_object()
+        data = request.data.copy()
+
+        # 썸네일 파일 업로드 처리 (S3)
+        if 'thumbnail_file' in request.FILES:
+            thumb = request.FILES['thumbnail_file']
+            thumbnail_url = upload_thumbnail(thumb, thumb.name)
+            data['thumbnail_url'] = thumbnail_url
+
+        # tags[] 처리
+        if 'tags[]' in request.data:
+            data['tags'] = request.data.getlist('tags[]')
+
+        serializer = self.get_serializer(instance, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response({'data': VideoSerializer(serializer.instance).data, 'message': 'ok'})
 
 class VideoDeleteView(DestroyAPIView):
     queryset = Video.objects.all()
