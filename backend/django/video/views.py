@@ -283,6 +283,7 @@ class PendingScriptView(APIView):
     permission_classes = [AllowAny]
     def get(self, request):
         import boto3
+        import re
         s3_client = boto3.client('s3')
         bucket_name = 'skn18-3-dev-scripts-533124807326'
         prefix = 'pending_scripts/'
@@ -307,12 +308,81 @@ class PendingScriptView(APIView):
             obj = s3_client.get_object(Bucket=bucket_name, Key=target_key)
             data = json.loads(obj['Body'].read().decode('utf-8'))
 
-            # URL 치환
+            # Presigned URL 변환 함수
+            def convert_to_presigned_url(url_string):
+                """S3 URL을 Presigned URL로 변환"""
+                if not url_string or not isinstance(url_string, str):
+                    return url_string
+
+                # S3 URL 패턴 체크: https://bucket.s3.region.amazonaws.com/key
+                s3_pattern = r'https://([^.]+)\.s3\.([^.]+)\.amazonaws\.com/(.+)'
+                match = re.match(s3_pattern, url_string)
+
+                if match:
+                    bucket, region, key = match.groups()
+                    try:
+                        presigned_url = s3_client.generate_presigned_url(
+                            'get_object',
+                            Params={'Bucket': bucket, 'Key': key},
+                            ExpiresIn=3600  # 1시간
+                        )
+                        print(f"🔗 Presigned URL 생성: {key[:50]}... -> 1시간 유효")
+                        return presigned_url
+                    except Exception as e:
+                        print(f"⚠️ Presigned URL 생성 실패 ({key}): {e}")
+                        return url_string
+
+                return url_string
+
+            # 모든 S3 URL 수집 및 Presigned URL로 변환
+            original_s3_urls = []  # 원본 S3 URL 수집 (삭제용)
+
+            if 'scenes' in data and isinstance(data['scenes'], list):
+                for scene in data['scenes']:
+                    # location (배경 영상) URL 변환
+                    if 'location' in scene:
+                        original_url = scene['location']
+                        if original_url and isinstance(original_url, str) and 's3.amazonaws.com' in original_url:
+                            original_s3_urls.append(original_url)
+                        scene['location'] = convert_to_presigned_url(original_url)
+
+                    # sequences 내부의 URL도 변환 (혹시 오디오/이미지 URL이 있을 경우)
+                    if 'sequences' in scene and isinstance(scene['sequences'], list):
+                        for seq in scene['sequences']:
+                            if 'audio_url' in seq:
+                                original_url = seq['audio_url']
+                                if original_url and isinstance(original_url, str) and 's3.amazonaws.com' in original_url:
+                                    original_s3_urls.append(original_url)
+                                seq['audio_url'] = convert_to_presigned_url(original_url)
+                            if 'image_url' in seq:
+                                original_url = seq['image_url']
+                                if original_url and isinstance(original_url, str) and 's3.amazonaws.com' in original_url:
+                                    original_s3_urls.append(original_url)
+                                seq['image_url'] = convert_to_presigned_url(original_url)
+
+            # URL 치환 (기존 로직 유지)
             base_url = os.getenv('BASE_URL', 'http://skn18-3-dev-alb-806066579.ap-northeast-2.elb.amazonaws.com')
             json_str = json.dumps(data, ensure_ascii=False).replace("http://127.0.0.1:8000", base_url).replace("http://localhost:8000", base_url)
             data = json.loads(json_str)
 
-            # S3에서 파일 삭제
+            # S3 미디어 URL들을 별도 파일로 저장 (나중에 정리용)
+            if original_s3_urls:
+                cleanup_filename = target_key.replace('pending_scripts/', 'cleanup_queue/').replace('.json', '_cleanup.txt')
+                cleanup_content = '\n'.join(original_s3_urls)
+                try:
+                    s3_client.put_object(
+                        Bucket=bucket_name,
+                        Key=cleanup_filename,
+                        Body=cleanup_content.encode('utf-8'),
+                        ContentType='text/plain'
+                    )
+                    print(f"🗂️ 정리 대기 파일 생성: {cleanup_filename} ({len(original_s3_urls)}개 URL)")
+                except Exception as e:
+                    print(f"⚠️ 정리 파일 생성 실패: {e}")
+
+            print(f"📦 수집된 미디어 URL {len(original_s3_urls)}개")
+
+            # S3에서 스크립트 파일 삭제
             s3_client.delete_object(Bucket=bucket_name, Key=target_key)
             print(f"✅ S3 script 전송 및 삭제 완료: {target_key}")
 
@@ -346,6 +416,8 @@ class VideoUploadView(CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         from config.storage_backends import upload_video, upload_thumbnail
+        import boto3
+        import re
 
         thumbnail_url = None
         video_url = None
@@ -385,6 +457,54 @@ class VideoUploadView(CreateAPIView):
         else:
             data = request.data.copy()
             if thumbnail_url: data['thumbnail_url'] = thumbnail_url
+
+        # ========== S3 미디어 파일 정리 (cleanup_queue에서 가장 오래된 항목 처리) ==========
+        try:
+            s3_client = boto3.client('s3')
+            script_bucket = 'skn18-3-dev-scripts-533124807326'
+            cleanup_prefix = 'cleanup_queue/'
+
+            # cleanup_queue에서 가장 오래된 파일 찾기
+            response = s3_client.list_objects_v2(Bucket=script_bucket, Prefix=cleanup_prefix)
+
+            if 'Contents' in response and len(response['Contents']) > 1:
+                cleanup_files = [obj for obj in response['Contents'] if obj['Key'] != cleanup_prefix]
+
+                if cleanup_files:
+                    # 가장 오래된 cleanup 파일 선택
+                    cleanup_files.sort(key=lambda x: x['Key'])
+                    cleanup_key = cleanup_files[0]['Key']
+
+                    # cleanup 파일 읽기
+                    obj = s3_client.get_object(Bucket=script_bucket, Key=cleanup_key)
+                    urls_to_delete = obj['Body'].read().decode('utf-8').strip().split('\n')
+
+                    deleted_count = 0
+                    for url in urls_to_delete:
+                        url = url.strip()
+                        if not url:
+                            continue
+
+                        # S3 URL 파싱
+                        s3_pattern = r'https://([^.]+)\.s3\.([^.]+)\.amazonaws\.com/(.+)'
+                        match = re.match(s3_pattern, url)
+
+                        if match:
+                            bucket, _, key = match.groups()
+                            try:
+                                s3_client.delete_object(Bucket=bucket, Key=key)
+                                deleted_count += 1
+                                print(f"🗑️ S3 미디어 파일 삭제: s3://{bucket}/{key}")
+                            except Exception as e:
+                                print(f"⚠️ S3 파일 삭제 실패 ({key}): {e}")
+
+                    # cleanup 파일도 삭제
+                    s3_client.delete_object(Bucket=script_bucket, Key=cleanup_key)
+                    print(f"✅ 정리 완료: {deleted_count}개 파일 삭제, cleanup 파일 제거: {cleanup_key}")
+
+        except Exception as e:
+            print(f"❌ S3 미디어 정리 중 에러: {e}")
+            # 에러가 나도 비디오 업로드는 계속 진행
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
