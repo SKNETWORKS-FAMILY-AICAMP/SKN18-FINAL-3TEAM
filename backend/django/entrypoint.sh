@@ -228,12 +228,6 @@ PY
     echo "Checking and loading data pipelines..."
     echo "=========================================="
 
-    # FORCE_DATA_RELOAD 환경 변수가 설정되면 모든 데이터 삭제 후 재적재
-    FORCE_RELOAD="${FORCE_DATA_RELOAD:-false}"
-    if [ "$FORCE_RELOAD" = "true" ]; then
-        echo "⚠️  FORCE_DATA_RELOAD=true 설정됨 - 모든 데이터를 삭제하고 재적재합니다"
-    fi
-
     # 1. PostgreSQL title_embeddings 데이터 적재 (엔티티 매칭용)
     echo "[1/4] PostgreSQL title_embeddings 데이터 확인..."
     python - <<PY
@@ -247,8 +241,6 @@ import django
 django.setup()
 
 from django.db import connection
-
-force_reload = os.getenv("FORCE_DATA_RELOAD", "false").lower() == "true"
 
 with connection.cursor() as cursor:
     # title_embeddings 테이블 존재 여부 확인
@@ -267,14 +259,6 @@ with connection.cursor() as cursor:
         count = 0
 
     print(f"  └─ title_embeddings 데이터 수: {count}")
-
-    # 강제 재적재 또는 데이터 없을 때
-    if force_reload and count > 0:
-        print("  └─ FORCE_DATA_RELOAD: 기존 데이터 삭제 중...")
-        cursor.execute("TRUNCATE TABLE title_embeddings CASCADE")
-        connection.commit()
-        print("  └─ ✓ 기존 데이터 삭제 완료")
-        count = 0
 
     if count == 0:
         print("  └─ 데이터 없음, 적재 시작...")
@@ -304,20 +288,10 @@ django.setup()
 
 from django.db import connection
 
-force_reload = os.getenv("FORCE_DATA_RELOAD", "false").lower() == "true"
-
 with connection.cursor() as cursor:
     cursor.execute("SELECT COUNT(*) FROM korean_history")
     count = cursor.fetchone()[0]
     print(f"  └─ korean_history 데이터 수: {count}")
-
-    # 강제 재적재 또는 데이터 없을 때
-    if force_reload and count > 0:
-        print("  └─ FORCE_DATA_RELOAD: 기존 데이터 삭제 중...")
-        cursor.execute("TRUNCATE TABLE korean_history CASCADE")
-        connection.commit()
-        print("  └─ ✓ 기존 데이터 삭제 완료")
-        count = 0
 
     if count == 0:
         print("  └─ 데이터 없음, 적재 시작...")
@@ -341,7 +315,6 @@ sys.path.insert(0, '/app')
 neo4j_uri = os.getenv("NEO4J_URI", "bolt://neo4j:7687")
 neo4j_user = os.getenv("NEO4J_USER", "neo4j")
 neo4j_password = os.getenv("NEO4J_PASSWORD", "password")
-force_reload = os.getenv("FORCE_DATA_RELOAD", "false").lower() == "true"
 
 try:
     from neo4j import GraphDatabase
@@ -351,13 +324,6 @@ try:
         result = session.run("MATCH (n) RETURN count(n) as count")
         count = result.single()["count"]
         print(f"  └─ Neo4j 노드 수: {count}")
-
-        # 강제 재적재 또는 데이터 없을 때
-        if force_reload and count > 0:
-            print("  └─ FORCE_DATA_RELOAD: 기존 노드/엣지 삭제 중...")
-            session.run("MATCH (n) DETACH DELETE n")
-            print("  └─ ✓ 기존 Neo4j 데이터 삭제 완료")
-            count = 0
 
         if count == 0:
             print("  └─ 데이터 없음, 적재 시작...")
@@ -394,7 +360,6 @@ dataset = "korean-history"
 fuseki_user = os.getenv("FUSEKI_USER", "admin")
 fuseki_password = os.getenv("FUSEKI_PASSWORD") or os.getenv("FUSEKI_ADMIN_PASSWORD", "fuseki1234")
 auth = (fuseki_user, fuseki_password)
-force_reload = os.getenv("FORCE_DATA_RELOAD", "false").lower() == "true"
 
 # 디버깅: 환경 변수 확인
 print(f"  └─ [DEBUG] FUSEKI_URL: {fuseki_base_url}")
@@ -493,22 +458,6 @@ try:
         result = response.json()
         count = int(result['results']['bindings'][0]['count']['value'])
         print(f"  └─ Fuseki 트리플 수: {count}")
-
-        # 강제 재적재 또는 데이터 없을 때
-        if force_reload and count > 0:
-            print("  └─ FORCE_DATA_RELOAD: 기존 트리플 삭제 중...")
-            delete_response = requests.post(
-                f"{fuseki_base_url}/{dataset}/update",
-                auth=auth,
-                headers={'Content-Type': 'application/sparql-update'},
-                data='DROP ALL',
-                timeout=30
-            )
-            if delete_response.status_code in [200, 204]:
-                print("  └─ ✓ 기존 Fuseki 데이터 삭제 완료")
-                count = 0
-            else:
-                print(f"  └─ ⚠ Fuseki 데이터 삭제 실패 (HTTP {delete_response.status_code})")
 
         if count == 0:
             print("  └─ 데이터 없음, 적재 시작...")
