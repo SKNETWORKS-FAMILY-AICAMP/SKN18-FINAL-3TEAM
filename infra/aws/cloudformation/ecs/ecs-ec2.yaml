@@ -8,7 +8,7 @@ Parameters:
 
   InstanceType:
     Type: String
-    Default: t3.xlarge
+    Default: t3.2xlarge
   DesiredCapacity:
     Type: Number
     Default: 2
@@ -65,10 +65,10 @@ Parameters:
 
   WebMemory:
     Type: Number
-    Default: 2048
+    Default: 4096
   CeleryMemory:
     Type: Number
-    Default: 2048
+    Default: 8192
 
   DjangoEnv:
     Type: String
@@ -562,14 +562,21 @@ Resources:
             - RepoUri: !ImportValue
                 Fn::Sub: "${NamePrefix}-web-repo-uri"
               Tag: !Ref WebImageTag
+          Cpu: 1024
           Memory: !Ref WebMemory
           PortMappings:
             - ContainerPort: 8000
           Secrets:
             - Name: DJANGO_SECRET_KEY
               ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/DJANGO_SECRET_KEY"
+            - Name: POSTGRES_HOST
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}-rds-endpoint"
             - Name: POSTGRES_PASSWORD
-              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/POSTGRES_PASSWORD"
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}-rds-password"
+            - Name: POSTGRES_USER
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}-rds-username"
+            - Name: POSTGRES_DB
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}-rds-dbname"
             - Name: NEO4J_PASSWORD
               ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/NEO4J_PASSWORD"
             - Name: FUSEKI_ADMIN_PASSWORD
@@ -603,14 +610,8 @@ Resources:
               Value: !Ref AllowedHosts
             - Name: CHAT_USE_FAKE_COMPILE
               Value: !Ref ChatUseFakeCompile
-            - Name: POSTGRES_HOST
-              Value: !Sub "postgres.${ServiceDiscoveryNamespace}"
             - Name: POSTGRES_PORT
               Value: "5432"
-            - Name: POSTGRES_DB
-              Value: !Ref PostgresDb
-            - Name: POSTGRES_USER
-              Value: !Ref PostgresUser
             - Name: NEO4J_URI
               Value: !Sub "bolt://neo4j.${ServiceDiscoveryNamespace}:7687"
             - Name: NEO4J_USER
@@ -706,6 +707,8 @@ Resources:
           Secrets:
             - Name: DJANGO_SECRET_KEY
               ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/DJANGO_SECRET_KEY"
+            - Name: NEO4J_PASSWORD
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/NEO4J_PASSWORD"
             - Name: POSTGRES_PASSWORD
               ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/POSTGRES_PASSWORD"
             - Name: OPENAI_API_KEY
@@ -729,6 +732,10 @@ Resources:
               Value: !Ref PostgresDb
             - Name: POSTGRES_USER
               Value: !Ref PostgresUser
+            - Name: NEO4J_URI
+              Value: !Sub "bolt://neo4j.${ServiceDiscoveryNamespace}:7687"
+            - Name: NEO4J_USER
+              Value: !Ref Neo4jUser
             - Name: CELERY_BROKER_URL
               Value: !Sub "redis://redis.${ServiceDiscoveryNamespace}:6379/0"
             - Name: CELERY_RESULT_BACKEND

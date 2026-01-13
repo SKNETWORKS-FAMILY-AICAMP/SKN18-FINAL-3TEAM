@@ -3,7 +3,7 @@ import axios from "axios";
 const api = axios.create({
   baseURL: window.ENV?.API_URL || "http://localhost:8000",
   withCredentials: true,
-  timeout: 200000, // 2000초 (LangGraph 실행 시간 고려)
+  timeout: 360000, // 6분 (360초) - LangGraph 및 영상 생성 시간 고려
 });
 
 // ============================================

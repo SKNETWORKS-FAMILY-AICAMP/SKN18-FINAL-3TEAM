@@ -73,10 +73,16 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:s3:::${NamePrefix}-videos"
                   - !Sub "arn:aws:s3:::${NamePrefix}-videos/*"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-final-videos"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-final-videos/*"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-temp"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-temp/*"
                   - !Sub "arn:aws:s3:::${NamePrefix}-thumbnails"
                   - !Sub "arn:aws:s3:::${NamePrefix}-thumbnails/*"
                   - !Sub "arn:aws:s3:::${NamePrefix}-profiles"
                   - !Sub "arn:aws:s3:::${NamePrefix}-profiles/*"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-scripts-${AWS::AccountId}"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-scripts-${AWS::AccountId}/*"
 
   ServiceDiscoveryNamespaceResource:
     Type: AWS::ServiceDiscovery::PrivateDnsNamespace
@@ -110,23 +116,3 @@ Outputs:
     Value: !Ref ServiceDiscoveryNamespaceResource
     Export:
       Name: !Sub "${NamePrefix}-sd-namespace-id"
-  WebRepositoryUri:
-    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${NamePrefix}-web"
-    Export:
-      Name: !Sub "${NamePrefix}-web-repo-uri"
-  PostgresRepositoryUri:
-    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${NamePrefix}-postgres"
-    Export:
-      Name: !Sub "${NamePrefix}-postgres-repo-uri"
-  Neo4jRepositoryUri:
-    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${NamePrefix}-neo4j"
-    Export:
-      Name: !Sub "${NamePrefix}-neo4j-repo-uri"
-  FusekiRepositoryUri:
-    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${NamePrefix}-fuseki"
-    Export:
-      Name: !Sub "${NamePrefix}-fuseki-repo-uri"
-  RedisRepositoryUri:
-    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${NamePrefix}-redis"
-    Export:
-      Name: !Sub "${NamePrefix}-redis-repo-uri"
