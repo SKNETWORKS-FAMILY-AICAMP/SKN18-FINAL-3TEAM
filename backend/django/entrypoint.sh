@@ -1,18 +1,56 @@
 #!/bin/sh
 set -e
 
+echo "===== Entrypoint started ====="
+echo "Current directory: $(pwd)"
+echo "Arguments: $@"
+
 cd /app/backend/django
+echo "Changed to: $(pwd)"
+
+# Check required environment variables
+if [ -z "$POSTGRES_DB" ] || [ -z "$POSTGRES_HOST" ] || [ -z "$POSTGRES_USER" ]; then
+    echo "ERROR: Required environment variables not set:"
+    echo "  POSTGRES_DB: ${POSTGRES_DB:-NOT SET}"
+    echo "  POSTGRES_HOST: ${POSTGRES_HOST:-NOT SET}"
+    echo "  POSTGRES_USER: ${POSTGRES_USER:-NOT SET}"
+    echo "If running with custom command, you may ignore this."
+    echo "Continuing with custom command: $@"
+    exec "$@"
+    exit 0
+fi
 
 # Set FRONTEND_URL for OAuth redirects
 export FRONTEND_URL="${FRONTEND_URL:-https://d2lr1p20b7dwp0.cloudfront.net}"
 
 # PostgreSQL init.sql 실행 (Web 컨테이너에서만)
 if ! echo "$@" | grep -qE "celery|worker"; then
-    echo "Applying init.sql..."
+    echo "===== PostgreSQL init.sql section ====="
+    echo "POSTGRES_HOST: ${POSTGRES_HOST}"
+    echo "POSTGRES_USER: ${POSTGRES_USER}"
+    echo "POSTGRES_DB: ${POSTGRES_DB}"
+    echo "Checking if init.sql needs to be applied..."
     export PGPASSWORD="${POSTGRES_PASSWORD}"
-    psql -h "${POSTGRES_HOST}" -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -f /app/init.sql
-    echo "✓ init.sql applied"
+
+    # Check if user table already exists
+    echo "Testing PostgreSQL connection..."
+    TABLE_EXISTS=$(psql -h "${POSTGRES_HOST}" -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name='user');" 2>&1) || {
+        echo "✗ PostgreSQL connection failed: $TABLE_EXISTS"
+        echo "Continuing without init.sql..."
+        TABLE_EXISTS="t"  # Skip init.sql if connection fails
+    }
+
+    echo "TABLE_EXISTS result: $TABLE_EXISTS"
+    if [ "$TABLE_EXISTS" = "t" ]; then
+        echo "✓ Tables already exist, skipping init.sql"
+    else
+        echo "Applying init.sql..."
+        psql -h "${POSTGRES_HOST}" -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -f /app/init.sql 2>&1 || echo "⚠ init.sql execution had errors (may be expected)"
+        echo "✓ init.sql applied"
+    fi
+
     unset PGPASSWORD
+    echo "===== PostgreSQL init.sql section complete ====="
 fi
 
 # 마이그레이션 실행

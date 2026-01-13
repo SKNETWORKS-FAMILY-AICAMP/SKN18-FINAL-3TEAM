@@ -191,7 +191,7 @@ def upload_video(file_obj, filename=None, video_id=None):
     if not getattr(settings, 'USE_S3', False):
         return None
 
-    bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME_VIDEOS', 'skn18-3-dev-videos')
+    bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME_VIDEOS', 'skn18-3-dev-final-videos')
 
     # 파일명 생성
     ext = filename.split('.')[-1].lower() if filename else 'mp4'
@@ -215,7 +215,7 @@ def delete_video(url_or_path):
     if not getattr(settings, 'USE_S3', False):
         return False
 
-    bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME_VIDEOS', 'skn18-3-dev-videos')
+    bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME_VIDEOS', 'skn18-3-dev-final-videos')
     key = extract_s3_key_from_url(url_or_path, bucket_name)
 
     if key:

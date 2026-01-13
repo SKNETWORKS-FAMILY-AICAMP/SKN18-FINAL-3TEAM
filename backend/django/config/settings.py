@@ -415,6 +415,7 @@ USE_S3 = os.getenv('USE_S3', 'False').lower() == 'true'
 if USE_S3:
     # S3 버킷 이름
     AWS_STORAGE_BUCKET_NAME_VIDEOS = os.getenv('AWS_S3_BUCKET_VIDEOS', 'skn18-3-dev-videos')
+    AWS_STORAGE_BUCKET_NAME_FINAL_VIDEOS = os.getenv('AWS_S3_BUCKET_FINAL_VIDEOS', 'skn18-3-dev-final-videos')
     AWS_STORAGE_BUCKET_NAME_THUMBNAILS = os.getenv('AWS_S3_BUCKET_THUMBNAILS', 'skn18-3-dev-thumbnails')
     AWS_STORAGE_BUCKET_NAME_PROFILES = os.getenv('AWS_S3_BUCKET_PROFILES', 'skn18-3-dev-profiles')
 

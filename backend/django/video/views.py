@@ -4,6 +4,7 @@ import time
 import glob
 import subprocess
 import requests
+import re
 import shutil  # 하이재킹용 추가
 import traceback # 디버깅용 추가
 from django.shortcuts import render
@@ -30,6 +31,8 @@ from deep_translator import GoogleTranslator
 # 모델 및 시리얼라이저
 from .models import Video
 from .serializers import VideoSerializer, VideoDetailSerializer, VideoCreateSerializer
+
+import boto3
 
 # .env 파일 로드
 load_dotenv()
@@ -282,29 +285,33 @@ async def create_video_from_langgraph(request):
 class PendingScriptView(APIView):
     permission_classes = [AllowAny]
     def get(self, request):
-        import boto3
-        import re
         s3_client = boto3.client('s3')
         bucket_name = 'skn18-3-dev-scripts-533124807326'
         prefix = 'pending_scripts/'
 
         try:
-            # S3에서 pending_scripts 폴더의 파일 목록 조회
+            # 1. S3 목록 조회
             response = s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
 
-            if 'Contents' not in response or len(response['Contents']) <= 1:
-                # 폴더 자체만 있거나 파일이 없으면 404
-                return Response(status=404)
+            # Contents 키가 아예 없으면 데이터가 하나도 없는 것임
+            if 'Contents' not in response:
+                return Response({"detail": "No scripts found."}, status=404)
 
-            # 파일 목록 정렬 (오래된 순)
-            files = [obj for obj in response['Contents'] if obj['Key'] != prefix]
+            # 2. '폴더명 자체'인 객체 제외하고 실제 파일만 추출
+            # endswith('/')를 체크하여 서브 디렉토리 객체도 필터링하면 더 안전합니다.
+            files = [
+                obj for obj in response['Contents'] 
+                if obj['Key'] != prefix and not obj['Key'].endswith('/')
+            ]
+
+            # 3. 실제 파일이 하나도 없다면 404
             if not files:
-                return Response(status=404)
+                return Response({"detail": "No pending script files found."}, status=404)
 
+            # 4. 파일명 기준 정렬 (오래된 순/이름 순)
             files.sort(key=lambda x: x['Key'])
             target_key = files[0]['Key']
-
-            # S3에서 파일 읽기
+                # S3에서 파일 읽기
             obj = s3_client.get_object(Bucket=bucket_name, Key=target_key)
             data = json.loads(obj['Body'].read().decode('utf-8'))
 
@@ -506,10 +513,43 @@ class VideoUploadView(CreateAPIView):
             print(f"❌ S3 미디어 정리 중 에러: {e}")
             # 에러가 나도 비디오 업로드는 계속 진행
 
-        serializer = self.get_serializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        return Response({'data': VideoSerializer(serializer.instance).data, 'message': 'ok'}, status=201)
+        # video_id가 제공되면 해당 Video 업데이트
+        # 없으면 가장 최근에 생성된 Video를 찾아서 video_url 업데이트
+        video_id = request.data.get('video_id')
+
+        if video_id:
+            try:
+                video = Video.objects.get(id=video_id)
+            except Video.DoesNotExist:
+                return Response({'error': f'Video with id {video_id} not found'}, status=404)
+        else:
+            # video_id가 없으면 가장 최근에 생성된 Video 찾기
+            # video_url이 null이거나 temp 버킷 URL인 Video 찾기
+            video = Video.objects.filter(
+                video_url__isnull=True
+            ).order_by('-upload_date').first()
+
+            if not video:
+                # null인 Video가 없으면 temp URL을 가진 가장 최근 Video 찾기
+                video = Video.objects.filter(
+                    video_url__startswith='https://skn18-3-dev-temp.s3.'
+                ).order_by('-upload_date').first()
+
+            if not video:
+                # 업데이트할 Video가 없으면 새로 생성
+                serializer = self.get_serializer(data=data)
+                serializer.is_valid(raise_exception=True)
+                self.perform_create(serializer)
+                return Response({'data': VideoSerializer(serializer.instance).data, 'message': 'ok'}, status=201)
+
+        # 찾은 Video의 video_url 업데이트
+        if video_url:
+            video.video_url = video_url
+        if thumbnail_url and not video.thumbnail_url:
+            video.thumbnail_url = thumbnail_url
+        video.save()
+
+        return Response({'data': VideoSerializer(video).data, 'message': 'Video updated successfully'}, status=200)
 
 class VideoListView(ListAPIView):
     queryset = Video.objects.all()
