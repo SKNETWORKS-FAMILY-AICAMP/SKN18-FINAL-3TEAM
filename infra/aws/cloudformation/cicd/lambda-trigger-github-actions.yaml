@@ -1,0 +1,192 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Lambda function to trigger GitHub Actions workflow for ECS deployment"
+
+Parameters:
+  NamePrefix:
+    Type: String
+    Default: skn18-3-dev
+
+  GitHubRepo:
+    Type: String
+    Default: "your-github-username/SKN18-FINAL-3TEAM"
+    Description: "GitHub repository in format: owner/repo"
+
+  GitHubToken:
+    Type: String
+    NoEcho: true
+    Description: "GitHub Personal Access Token with repo and workflow permissions"
+
+Resources:
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${NamePrefix}-lambda-github-trigger-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: !Sub "${NamePrefix}-lambda-logs-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${NamePrefix}-github-trigger:*"
+
+  # Lambda Function
+  GitHubTriggerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${NamePrefix}-github-trigger"
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      Environment:
+        Variables:
+          GITHUB_REPO: !Ref GitHubRepo
+          GITHUB_TOKEN: !Ref GitHubToken
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import urllib.request
+          import urllib.error
+          from typing import Dict, Any
+
+          def lambda_handler(event, context):
+              """
+              Lambda handler to trigger GitHub Actions workflow
+
+              Expected event format:
+              {
+                  "service": "web" | "celery" | "all"
+              }
+              """
+
+              # 환경 변수
+              github_repo = os.environ.get('GITHUB_REPO')
+              github_token = os.environ.get('GITHUB_TOKEN')
+
+              # 입력 파라미터 파싱
+              if isinstance(event.get('body'), str):
+                  try:
+                      body = json.loads(event['body'])
+                  except json.JSONDecodeError:
+                      body = event
+              else:
+                  body = event
+
+              service = body.get('service', 'all')
+
+              print(f"Triggering GitHub Actions for service: {service}")
+              print(f"Repository: {github_repo}")
+
+              # 서비스 검증
+              valid_services = ['web', 'celery', 'all']
+              if service not in valid_services:
+                  return {
+                      'statusCode': 400,
+                      'body': json.dumps({
+                          'error': f'Invalid service: {service}',
+                          'valid_services': valid_services
+                      })
+                  }
+
+              # GitHub Actions workflow dispatch API 호출
+              api_url = f"https://api.github.com/repos/{github_repo}/actions/workflows/deploy-ecs.yml/dispatches"
+
+              payload = {
+                  "ref": "main",  # 또는 원하는 브랜치
+                  "inputs": {
+                      "service": service
+                  }
+              }
+
+              headers = {
+                  'Authorization': f'token {github_token}',
+                  'Accept': 'application/vnd.github.v3+json',
+                  'Content-Type': 'application/json'
+              }
+
+              try:
+                  req = urllib.request.Request(
+                      api_url,
+                      data=json.dumps(payload).encode('utf-8'),
+                      headers=headers,
+                      method='POST'
+                  )
+
+                  with urllib.request.urlopen(req) as response:
+                      status_code = response.getcode()
+
+                      if status_code == 204:
+                          print(f"✓ Successfully triggered GitHub Actions workflow for service: {service}")
+                          return {
+                              'statusCode': 200,
+                              'body': json.dumps({
+                                  'message': f'Successfully triggered deployment for {service}',
+                                  'service': service,
+                                  'repository': github_repo
+                              })
+                          }
+                      else:
+                          print(f"✗ Unexpected status code: {status_code}")
+                          return {
+                              'statusCode': status_code,
+                              'body': json.dumps({
+                                  'error': f'Unexpected response: {status_code}'
+                              })
+                          }
+
+              except urllib.error.HTTPError as e:
+                  error_body = e.read().decode('utf-8')
+                  print(f"✗ HTTP Error: {e.code}")
+                  print(f"Error body: {error_body}")
+
+                  return {
+                      'statusCode': e.code,
+                      'body': json.dumps({
+                          'error': f'GitHub API error: {e.code}',
+                          'details': error_body
+                      })
+                  }
+              except Exception as e:
+                  print(f"✗ Exception: {str(e)}")
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps({
+                          'error': 'Internal error',
+                          'details': str(e)
+                      })
+                  }
+
+  # CloudWatch Log Group
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${NamePrefix}-github-trigger"
+      RetentionInDays: 7
+
+Outputs:
+  LambdaFunctionArn:
+    Description: "Lambda function ARN"
+    Value: !GetAtt GitHubTriggerLambda.Arn
+    Export:
+      Name: !Sub "${NamePrefix}-github-trigger-lambda-arn"
+
+  LambdaFunctionName:
+    Description: "Lambda function name"
+    Value: !Ref GitHubTriggerLambda
+    Export:
+      Name: !Sub "${NamePrefix}-github-trigger-lambda-name"

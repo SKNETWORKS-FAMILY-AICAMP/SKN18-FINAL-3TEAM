@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(aws cloudformation describe-stack-events:*)",
+      "Bash(aws ecs list-tasks:*)",
+      "Bash(MSYS_NO_PATHCONV=1 aws logs:*)",
+      "Bash(npm run build:*)",
+      "Bash(aws ecs run-task:*)",
+      "Bash(docker build:*)",
+      "Bash(aws ecs update-service:*)",
+      "Bash(aws ecs describe-services:*)",
+      "Bash(aws ecs describe-tasks:*)",
+      "Bash(aws ecs stop-task:*)",
+      "Bash(curl:*)",
+      "Bash(aws ec2 describe-network-interfaces:*)",
+      "Bash(aws ec2 describe-security-groups:*)",
+      "Bash(aws ec2 describe-subnets:*)",
+      "Bash(aws ec2 describe-route-tables:*)",
+      "Bash(aws ec2 describe-nat-gateways:*)",
+      "Bash(aws ec2 create-route:*)",
+      "Bash(aws ecs describe-task-definition:*)",
+      "Bash(aws elbv2 describe-target-health:*)",
+      "Bash(aws ecs list-clusters:*)",
+      "Bash(aws ecs list-services:*)",
+      "Bash(aws ec2 describe-instances:*)",
+      "Bash(aws autoscaling terminate-instance-in-auto-scaling-group:*)",
+      "Bash(aws autoscaling set-desired-capacity:*)",
+      "Bash(aws autoscaling describe-auto-scaling-groups:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(MSYS_NO_PATHCONV=1 docker run:*)",
+      "Bash(tee:*)",
+      "Bash(docker run:*)",
+      "Bash(docker pull:*)"
+    ]
+  }
+}

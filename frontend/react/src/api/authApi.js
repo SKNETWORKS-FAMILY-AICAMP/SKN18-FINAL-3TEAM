@@ -12,7 +12,7 @@ export const checkAuth = async () => {
 
 // Google 로그인 URL 가져오기
 export const getGoogleLoginUrl = () => {
-  return "http://localhost:8000/accounts/google/login/";
+  return `${window.ENV?.API_URL || "http://localhost:8000"}/accounts/google/login/`;
 };
 
 // 로그아웃

@@ -1,0 +1,204 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "SSM Parameter Store for app secrets (use .env names)"
+
+Parameters:
+  NamePrefix:
+    Type: String
+    Default: skn18-3-dev
+  DjangoSecretKey:
+    Type: String
+    NoEcho: true
+  Neo4jPassword:
+    Type: String
+    NoEcho: true
+  Neo4jAuth:
+    Type: String
+    NoEcho: true
+  PostgresPassword:
+    Type: String
+    NoEcho: true
+  OpenaiApiKey:
+    Type: String
+    NoEcho: true
+  HfApiToken:
+    Type: String
+    NoEcho: true
+  LangchainApiKey:
+    Type: String
+    NoEcho: true
+  GeminiApiKey:
+    Type: String
+    NoEcho: true
+  FalKey:
+    Type: String
+    NoEcho: true
+  GoogleOauthClientSecret:
+    Type: String
+    NoEcho: true
+  GoogleOauthClientId:
+    Type: String
+  FusekiAdminPassword:
+    Type: String
+    NoEcho: true
+  BotPassword:
+    Type: String
+    NoEcho: true
+  BotEmail:
+    Type: String
+
+Resources:
+  DjangoSecretKeyParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${NamePrefix}/DJANGO_SECRET_KEY"
+      Type: String
+      Value: !Ref DjangoSecretKey
+
+  Neo4jPasswordParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${NamePrefix}/NEO4J_PASSWORD"
+      Type: String
+      Value: !Ref Neo4jPassword
+
+  Neo4jAuthParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${NamePrefix}/NEO4J_AUTH"
+      Type: String
+      Value: !Ref Neo4jAuth
+
+  PostgresPasswordParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${NamePrefix}/POSTGRES_PASSWORD"
+      Type: String
+      Value: !Ref PostgresPassword
+
+  OpenaiApiKeyParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${NamePrefix}/OPENAI_API_KEY"
+      Type: String
+      Value: !Ref OpenaiApiKey
+
+  HfApiTokenParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${NamePrefix}/HF_API_TOKEN"
+      Type: String
+      Value: !Ref HfApiToken
+
+  LangchainApiKeyParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${NamePrefix}/LANGCHAIN_API_KEY"
+      Type: String
+      Value: !Ref LangchainApiKey
+
+  GeminiApiKeyParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${NamePrefix}/GEMINI_API_KEY"
+      Type: String
+      Value: !Ref GeminiApiKey
+
+  FalKeyParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${NamePrefix}/FAL_KEY"
+      Type: String
+      Value: !Ref FalKey
+
+  GoogleOauthClientSecretParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${NamePrefix}/GOOGLE_OAUTH_CLIENT_SECRET"
+      Type: String
+      Value: !Ref GoogleOauthClientSecret
+
+  GoogleOauthClientIdParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${NamePrefix}/GOOGLE_OAUTH_CLIENT_ID"
+      Type: String
+      Value: !Ref GoogleOauthClientId
+
+  FusekiAdminPasswordParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${NamePrefix}/FUSEKI_ADMIN_PASSWORD"
+      Type: String
+      Value: !Ref FusekiAdminPassword
+
+  BotPasswordParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${NamePrefix}/BOT_PASSWORD"
+      Type: String
+      Value: !Ref BotPassword
+
+  BotEmailParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub "/${NamePrefix}/BOT_EMAIL"
+      Type: String
+      Value: !Ref BotEmail
+
+Outputs:
+  DjangoSecretKeyParamName:
+    Value: !Ref DjangoSecretKeyParam
+    Export:
+      Name: !Sub "${NamePrefix}-django-secret-key-param"
+  Neo4jPasswordParamName:
+    Value: !Ref Neo4jPasswordParam
+    Export:
+      Name: !Sub "${NamePrefix}-neo4j-password-param"
+  Neo4jAuthParamName:
+    Value: !Ref Neo4jAuthParam
+    Export:
+      Name: !Sub "${NamePrefix}-neo4j-auth-param"
+  PostgresPasswordParamName:
+    Value: !Ref PostgresPasswordParam
+    Export:
+      Name: !Sub "${NamePrefix}-postgres-password-param"
+  OpenaiApiKeyParamName:
+    Value: !Ref OpenaiApiKeyParam
+    Export:
+      Name: !Sub "${NamePrefix}-openai-api-key-param"
+  HfApiTokenParamName:
+    Value: !Ref HfApiTokenParam
+    Export:
+      Name: !Sub "${NamePrefix}-hf-api-token-param"
+  LangchainApiKeyParamName:
+    Value: !Ref LangchainApiKeyParam
+    Export:
+      Name: !Sub "${NamePrefix}-langchain-api-key-param"
+  GeminiApiKeyParamName:
+    Value: !Ref GeminiApiKeyParam
+    Export:
+      Name: !Sub "${NamePrefix}-gemini-api-key-param"
+  FalKeyParamName:
+    Value: !Ref FalKeyParam
+    Export:
+      Name: !Sub "${NamePrefix}-fal-key-param"
+  GoogleOauthClientSecretParamName:
+    Value: !Ref GoogleOauthClientSecretParam
+    Export:
+      Name: !Sub "${NamePrefix}-google-oauth-client-secret-param"
+  GoogleOauthClientIdParamName:
+    Value: !Ref GoogleOauthClientIdParam
+    Export:
+      Name: !Sub "${NamePrefix}-google-oauth-client-id-param"
+  FusekiAdminPasswordParamName:
+    Value: !Ref FusekiAdminPasswordParam
+    Export:
+      Name: !Sub "${NamePrefix}-fuseki-admin-password-param"
+  BotPasswordParamName:
+    Value: !Ref BotPasswordParam
+    Export:
+      Name: !Sub "${NamePrefix}-bot-password-param"
+  BotEmailParamName:
+    Value: !Ref BotEmailParam
+    Export:
+      Name: !Sub "${NamePrefix}-bot-email-param"

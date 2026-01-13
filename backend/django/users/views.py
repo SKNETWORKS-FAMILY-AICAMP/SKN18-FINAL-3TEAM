@@ -27,6 +27,7 @@ from .serializers import (
     AdminUserUpdateSerializer,
 )
 from config.permissions import IsAdminUser
+from config.storage_backends import upload_profile_image, delete_profile_image
 
 
 # ============================================
@@ -260,63 +261,95 @@ class ProfileView(APIView):
 class ProfileImageUploadView(APIView):
     """
     프로필 이미지 업로드 API
-    
+
     POST /api/users/profile/image/
     - 이미지 파일 업로드 (multipart/form-data)
-    - 파일은 media/profiles/ 에 저장
-    - DB에는 경로만 저장
+    - USE_S3=true: S3에 저장, DB에 전체 URL 저장
+    - USE_S3=false: 로컬 media/profiles/에 저장, DB에 상대경로 저장
     """
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
-    
+
     def post(self, request):
         """프로필 이미지 업로드"""
         serializer = ProfileImageSerializer(data=request.data)
-        
+
         if serializer.is_valid():
             image = serializer.validated_data['image']
-            
-            # 파일명 생성 (user_id + uuid + 확장자)
-            ext = image.name.split('.')[-1].lower()
-            filename = f"user_{request.user.id}_{uuid.uuid4().hex[:8]}.{ext}"
-            
-            # 저장 경로
-            upload_dir = os.path.join(settings.MEDIA_ROOT, 'profiles')
-            os.makedirs(upload_dir, exist_ok=True)
-            filepath = os.path.join(upload_dir, filename)
-            
+
             # 기존 이미지 삭제 (있으면)
             if request.user.profile_image:
-                old_path = os.path.join(settings.MEDIA_ROOT, request.user.profile_image)
-                if os.path.exists(old_path):
-                    os.remove(old_path)
-            
-            # 새 이미지 저장
-            with open(filepath, 'wb+') as f:
-                for chunk in image.chunks():
-                    f.write(chunk)
-            
-            # DB에 경로 저장
-            request.user.profile_image = f"profiles/{filename}"
-            request.user.save(update_fields=['profile_image'])
-            
-            # 캐시 무효화
-            cache_key = f'user_profile:{request.user.id}'
-            cache.delete(cache_key)
-            
-            # 전체 URL 반환
-            image_url = request.build_absolute_uri(
-                f"{settings.MEDIA_URL}profiles/{filename}"
-            )
-            
-            return Response({
-                'data': {
-                    'profile_image': request.user.profile_image,
-                    'image_url': image_url,
-                },
-                'message': '프로필 이미지가 업로드되었습니다.'
-            })
-        
+                if getattr(settings, 'USE_S3', False):
+                    # S3에서 삭제
+                    delete_profile_image(request.user.profile_image)
+                else:
+                    # 로컬 파일 삭제
+                    old_path = os.path.join(settings.MEDIA_ROOT, request.user.profile_image)
+                    if os.path.exists(old_path):
+                        os.remove(old_path)
+
+            # S3 사용 여부에 따라 저장 방식 분기
+            if getattr(settings, 'USE_S3', False):
+                # S3에 업로드
+                s3_url = upload_profile_image(image, request.user.id, image.name)
+
+                if s3_url:
+                    # DB에 전체 URL 저장
+                    request.user.profile_image = s3_url
+                    request.user.save(update_fields=['profile_image'])
+
+                    # 캐시 무효화
+                    cache_key = f'user_profile:{request.user.id}'
+                    cache.delete(cache_key)
+
+                    return Response({
+                        'data': {
+                            'profile_image': s3_url,
+                            'image_url': s3_url,
+                        },
+                        'message': '프로필 이미지가 업로드되었습니다.'
+                    })
+                else:
+                    return Response({
+                        'error': {
+                            'code': 'UPLOAD_ERROR',
+                            'message': 'S3 업로드에 실패했습니다.'
+                        }
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            else:
+                # 로컬 저장소에 저장
+                ext = image.name.split('.')[-1].lower()
+                filename = f"user_{request.user.id}_{uuid.uuid4().hex[:8]}.{ext}"
+
+                upload_dir = os.path.join(settings.MEDIA_ROOT, 'profiles')
+                os.makedirs(upload_dir, exist_ok=True)
+                filepath = os.path.join(upload_dir, filename)
+
+                with open(filepath, 'wb+') as f:
+                    for chunk in image.chunks():
+                        f.write(chunk)
+
+                # DB에 경로 저장
+                request.user.profile_image = f"profiles/{filename}"
+                request.user.save(update_fields=['profile_image'])
+
+                # 캐시 무효화
+                cache_key = f'user_profile:{request.user.id}'
+                cache.delete(cache_key)
+
+                # 전체 URL 반환
+                image_url = request.build_absolute_uri(
+                    f"{settings.MEDIA_URL}profiles/{filename}"
+                )
+
+                return Response({
+                    'data': {
+                        'profile_image': request.user.profile_image,
+                        'image_url': image_url,
+                    },
+                    'message': '프로필 이미지가 업로드되었습니다.'
+                })
+
         return Response({
             'error': {
                 'code': 'VALIDATION_ERROR',
@@ -324,28 +357,32 @@ class ProfileImageUploadView(APIView):
                 'fields': serializer.errors
             }
         }, status=status.HTTP_400_BAD_REQUEST)
-    
+
     def delete(self, request):
         """프로필 이미지 삭제"""
         if request.user.profile_image:
-            # 파일 삭제
-            filepath = os.path.join(settings.MEDIA_ROOT, request.user.profile_image)
-            if os.path.exists(filepath):
-                os.remove(filepath)
-            
+            if getattr(settings, 'USE_S3', False):
+                # S3에서 삭제
+                delete_profile_image(request.user.profile_image)
+            else:
+                # 로컬 파일 삭제
+                filepath = os.path.join(settings.MEDIA_ROOT, request.user.profile_image)
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+
             # DB 업데이트
             request.user.profile_image = None
             request.user.save(update_fields=['profile_image'])
-            
+
             # 캐시 무효화
             cache_key = f'user_profile:{request.user.id}'
             cache.delete(cache_key)
-            
+
             return Response({
                 'data': None,
                 'message': '프로필 이미지가 삭제되었습니다.'
             })
-        
+
         return Response({
             'error': {
                 'code': 'NOT_FOUND',

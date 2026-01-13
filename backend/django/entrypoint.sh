@@ -1,17 +1,498 @@
 #!/bin/sh
 set -e
 
-cd /app/backend/django
+echo "===== Entrypoint started ====="
+echo "Current directory: $(pwd)"
+echo "Arguments: $@"
 
+cd /app/backend/django
+echo "Changed to: $(pwd)"
+
+# Check required environment variables
+if [ -z "$POSTGRES_DB" ] || [ -z "$POSTGRES_HOST" ] || [ -z "$POSTGRES_USER" ]; then
+    echo "ERROR: Required environment variables not set:"
+    echo "  POSTGRES_DB: ${POSTGRES_DB:-NOT SET}"
+    echo "  POSTGRES_HOST: ${POSTGRES_HOST:-NOT SET}"
+    echo "  POSTGRES_USER: ${POSTGRES_USER:-NOT SET}"
+    echo "If running with custom command, you may ignore this."
+    echo "Continuing with custom command: $@"
+    exec "$@"
+    exit 0
+fi
+
+# Set FRONTEND_URL for OAuth redirects
+export FRONTEND_URL="${FRONTEND_URL:-https://d2lr1p20b7dwp0.cloudfront.net}"
+
+# PostgreSQL init.sql 실행 (Web 컨테이너에서만)
+if ! echo "$@" | grep -qE "celery|worker"; then
+    echo "===== PostgreSQL init.sql section ====="
+    echo "POSTGRES_HOST: ${POSTGRES_HOST}"
+    echo "POSTGRES_USER: ${POSTGRES_USER}"
+    echo "POSTGRES_DB: ${POSTGRES_DB}"
+    echo "Checking if init.sql needs to be applied..."
+    export PGPASSWORD="${POSTGRES_PASSWORD}"
+
+    # Check if user table already exists
+    echo "Testing PostgreSQL connection..."
+    TABLE_EXISTS=$(psql -h "${POSTGRES_HOST}" -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name='user');" 2>&1) || {
+        echo "✗ PostgreSQL connection failed: $TABLE_EXISTS"
+        echo "Continuing without init.sql..."
+        TABLE_EXISTS="t"  # Skip init.sql if connection fails
+    }
+
+    echo "TABLE_EXISTS result: $TABLE_EXISTS"
+    if [ "$TABLE_EXISTS" = "t" ]; then
+        echo "✓ Tables already exist, skipping init.sql"
+    else
+        echo "Applying init.sql..."
+        psql -h "${POSTGRES_HOST}" -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -f /app/init.sql 2>&1 || echo "⚠ init.sql execution had errors (may be expected)"
+        echo "✓ init.sql applied"
+    fi
+
+    unset PGPASSWORD
+    echo "===== PostgreSQL init.sql section complete ====="
+fi
+
+# 마이그레이션 실행
+echo "Applying migrations..."
+python - <<'PY'
+import os
+import django
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+django.setup()
+
+from django.db import connection
+
+with connection.cursor() as cursor:
+    cursor.execute("SELECT to_regclass('public.user')")
+    exists = cursor.fetchone()[0] is not None
+
+if exists:
+    # Table already exists (created by init.sql), fake the migration
+    import subprocess
+    subprocess.check_call(["python", "manage.py", "migrate", "users", "--fake-initial", "--noinput"])
+    subprocess.check_call(["python", "manage.py", "migrate", "--fake-initial", "--noinput"])
+else:
+    # Table doesn't exist, run migrations normally
+    import subprocess
+    subprocess.check_call(["python", "manage.py", "migrate", "users", "--noinput"])
+    subprocess.check_call(["python", "manage.py", "migrate", "--noinput"])
+PY
+
+# Log current tables to help debug migration state.
+python - <<'PY'
+import os
+import django
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+django.setup()
+
+from django.db import connection
+
+with connection.cursor() as cursor:
+    cursor.execute(
+        "SELECT table_name FROM information_schema.tables "
+        "WHERE table_schema = 'public' ORDER BY table_name"
+    )
+    tables = [row[0] for row in cursor.fetchall()]
+
+print("DB tables:", ", ".join(tables))
+PY
+
+# 봇 유저 생성 (테이블 이름 체크 제거)
+echo "Creating bot user if not exists..."
 python manage.py shell <<'PY'
 import os
+from django.db import connection
 from django.contrib.auth import get_user_model
+from django.db.utils import ProgrammingError
 
 User = get_user_model()
 email = os.environ.get("BOT_EMAIL")
 pwd = os.environ.get("BOT_PASSWORD")
-if email and pwd and not User.objects.filter(email=email).exists():
-    User.objects.create_superuser(email=email, password=pwd, nickname="minji jang")
+
+if email and pwd:
+    try:
+        if not User.objects.filter(email=email).exists():
+            User.objects.create_superuser(email=email, password=pwd, nickname="minji jang")
+            print("Bot user created successfully.")
+    except Exception as exc:
+        # 테이블이 아직 없거나 다른 에러가 나면 그냥 스킵하게 둠
+        print(f"Skip bot user creation: {exc}")
 PY
 
-exec "$@"
+# Django Site 도메인을 HTTPS로 업데이트 (OAuth redirect URI가 HTTPS로 생성되도록)
+# ⚠️ Web 컨테이너에서만 실행 (Celery 컨테이너에서는 스킵)
+if echo "$@" | grep -qE "celery|worker"; then
+    echo "Skipping Site domain setup (running celery worker)"
+else
+    echo "Updating Django Site domain to HTTPS..."
+    python manage.py shell <<'PY'
+import os
+from django.contrib.sites.models import Site
+
+try:
+    site = Site.objects.get(id=1)
+    site.domain = "api.histok.info"
+    site.name = "HistoK API"
+    site.save()
+    print(f"Site domain updated to: {site.domain}")
+except Exception as exc:
+    print(f"Skip site domain update: {exc}")
+PY
+
+    # Google Social App 자동 설정
+    echo "=========================================="
+    echo "Setting up Google Social App..."
+    echo "=========================================="
+    python manage.py shell <<'PY'
+import os
+from django.contrib.sites.models import Site
+from allauth.socialaccount.models import SocialApp
+
+client_id = os.getenv('GOOGLE_OAUTH_CLIENT_ID')
+client_secret = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
+
+# 환경 변수 확인 로그
+print(f"[DEBUG] GOOGLE_OAUTH_CLIENT_ID present: {bool(client_id)}")
+print(f"[DEBUG] GOOGLE_OAUTH_CLIENT_SECRET present: {bool(client_secret)}")
+if client_id:
+    print(f"[DEBUG] Client ID starts with: {client_id[:20]}...")
+if client_secret:
+    print(f"[DEBUG] Client Secret starts with: {client_secret[:10]}...")
+
+if not client_id or not client_secret:
+    print("⚠ WARNING: GOOGLE_OAUTH_CLIENT_ID or GOOGLE_OAUTH_CLIENT_SECRET not set")
+    print("⚠ Social App cannot be created without credentials")
+else:
+    try:
+        # Get or create Google Social App (한 개만 유지)
+        social_apps = SocialApp.objects.filter(provider='google')
+        print(f"[DEBUG] Current Google Social Apps count: {social_apps.count()}")
+
+        if social_apps.count() > 1:
+            deleted_count = social_apps.delete()[0]
+            print(f"✓ Deleted {deleted_count} duplicate Google Social Apps")
+            social_app = None
+        elif social_apps.count() == 1:
+            social_app = social_apps.first()
+            print(f"✓ Found existing Google Social App (ID: {social_app.id})")
+            print(f"[DEBUG] Existing app client_id: {social_app.client_id[:20]}...")
+        else:
+            print(f"[DEBUG] No existing Google Social App found")
+            social_app = None
+
+        if not social_app:
+            social_app = SocialApp.objects.create(
+                provider='google',
+                name='Google',
+                client_id=client_id,
+                secret=client_secret,
+            )
+            print(f"✓ Created NEW Google Social App (ID: {social_app.id})")
+        else:
+            social_app.client_id = client_id
+            social_app.secret = client_secret
+            social_app.save()
+            print(f"✓ Updated existing Google Social App (ID: {social_app.id})")
+
+        # Site 연결 확인
+        site = Site.objects.get(id=1)
+        print(f"[DEBUG] Site domain: {site.domain}")
+        connected_sites = list(social_app.sites.all())
+        print(f"[DEBUG] Social App connected to sites: {[s.domain for s in connected_sites]}")
+
+        if site not in connected_sites:
+            social_app.sites.add(site)
+            print(f"✓ Connected Social App to Site: {site.domain}")
+        else:
+            print(f"✓ Already connected to Site: {site.domain}")
+
+        final_count = SocialApp.objects.filter(provider='google').count()
+        print(f"✓✓✓ FINAL: Total Google Social Apps in DB: {final_count}")
+
+        # 최종 검증
+        if final_count != 1:
+            print(f"⚠⚠⚠ WARNING: Expected 1 Social App but found {final_count}")
+    except Exception as exc:
+        print(f"✗✗✗ ERROR setting up Social App: {exc}")
+        import traceback
+        traceback.print_exc()
+PY
+
+    # ==========================================
+    # 데이터 적재 파이프라인 (PostgreSQL, Neo4j, Fuseki)
+    # ==========================================
+    echo "=========================================="
+    echo "Checking and loading data pipelines..."
+    echo "=========================================="
+
+    # 1. PostgreSQL title_embeddings 데이터 적재 (엔티티 매칭용)
+    echo "[1/4] PostgreSQL title_embeddings 데이터 확인..."
+    python - <<PY
+import os
+import sys
+sys.path.insert(0, '/app')
+
+# Django 설정
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+import django
+django.setup()
+
+from django.db import connection
+
+with connection.cursor() as cursor:
+    # title_embeddings 테이블 존재 여부 확인
+    cursor.execute("""
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables
+            WHERE table_name = 'title_embeddings'
+        )
+    """)
+    table_exists = cursor.fetchone()[0]
+
+    if table_exists:
+        cursor.execute("SELECT COUNT(*) FROM title_embeddings")
+        count = cursor.fetchone()[0]
+    else:
+        count = 0
+
+    print(f"  └─ title_embeddings 데이터 수: {count}")
+
+    if count == 0:
+        print("  └─ 데이터 없음, 적재 시작...")
+        try:
+            from backend.db_pipeline.postgres.ETL.load_title_embeddings import main as load_title
+            load_title()
+            print("  └─ ✓ title_embeddings 데이터 적재 완료")
+        except Exception as e:
+            print(f"  └─ ✗ title_embeddings 데이터 적재 실패: {e}")
+            import traceback
+            traceback.print_exc()
+    else:
+        print("  └─ ✓ 데이터 이미 존재, 스킵")
+PY
+
+    # 2. PostgreSQL korean_history 데이터 적재
+    echo "[2/4] PostgreSQL korean_history 데이터 확인..."
+    python - <<PY
+import os
+import sys
+sys.path.insert(0, '/app')
+
+# Django 설정
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+import django
+django.setup()
+
+from django.db import connection
+
+with connection.cursor() as cursor:
+    cursor.execute("SELECT COUNT(*) FROM korean_history")
+    count = cursor.fetchone()[0]
+    print(f"  └─ korean_history 데이터 수: {count}")
+
+    if count == 0:
+        print("  └─ 데이터 없음, 적재 시작...")
+        try:
+            from backend.db_pipeline.postgres.ETL.load_to_pgvector import run
+            run()
+            print("  └─ ✓ PostgreSQL 데이터 적재 완료")
+        except Exception as e:
+            print(f"  └─ ✗ PostgreSQL 데이터 적재 실패: {e}")
+    else:
+        print("  └─ ✓ 데이터 이미 존재, 스킵")
+PY
+
+    # 3. Neo4j 데이터 적재
+    echo "[3/4] Neo4j 데이터 확인..."
+    python - <<PY
+import os
+import sys
+sys.path.insert(0, '/app')
+
+neo4j_uri = os.getenv("NEO4J_URI", "bolt://neo4j:7687")
+neo4j_user = os.getenv("NEO4J_USER", "neo4j")
+neo4j_password = os.getenv("NEO4J_PASSWORD", "password")
+
+try:
+    from neo4j import GraphDatabase
+    driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_password))
+
+    with driver.session() as session:
+        result = session.run("MATCH (n) RETURN count(n) as count")
+        count = result.single()["count"]
+        print(f"  └─ Neo4j 노드 수: {count}")
+
+        if count == 0:
+            print("  └─ 데이터 없음, 적재 시작...")
+            try:
+                from backend.db_pipeline.neo4j.ETL.load_to_neo4j import run_all
+                run_all()
+                print("  └─ ✓ Neo4j 데이터 적재 완료")
+            except Exception as e:
+                print(f"  └─ ✗ Neo4j 데이터 적재 실패: {e}")
+        else:
+            print("  └─ ✓ 데이터 이미 존재, 스킵")
+
+    driver.close()
+except Exception as e:
+    print(f"  └─ Neo4j 연결 실패 (스킵): {e}")
+PY
+
+    # 4. Fuseki 데이터 적재
+    echo "[4/4] Fuseki 데이터 확인..."
+    python - <<PY
+import os
+import sys
+sys.path.insert(0, '/app')
+
+import requests
+from pathlib import Path
+
+# Fuseki 설정 (환경 변수에서 읽기)
+fuseki_base_url = os.getenv("FUSEKI_URL", "http://fuseki:3030")
+# FUSEKI_URL에서 dataset 부분 분리
+if "/korean-history" in fuseki_base_url:
+    fuseki_base_url = fuseki_base_url.replace("/korean-history", "")
+dataset = "korean-history"
+fuseki_user = os.getenv("FUSEKI_USER", "admin")
+fuseki_password = os.getenv("FUSEKI_PASSWORD") or os.getenv("FUSEKI_ADMIN_PASSWORD", "fuseki1234")
+auth = (fuseki_user, fuseki_password)
+
+# 디버깅: 환경 변수 확인
+print(f"  └─ [DEBUG] FUSEKI_URL: {fuseki_base_url}")
+print(f"  └─ [DEBUG] FUSEKI_USER: {fuseki_user}")
+print(f"  └─ [DEBUG] FUSEKI_PASSWORD exists: {bool(fuseki_password)}")
+print(f"  └─ [DEBUG] Auth: ({fuseki_user}, {'***' if fuseki_password else 'None'})")
+
+ttl_path = Path("/app/backend/langgraph_fuseki/ontology/instances/korean_history_normalized.ttl")
+
+def upload_ttl_direct(fuseki_url, dataset, ttl_file, auth):
+    """TTL 파일을 Fuseki에 직접 업로드"""
+    try:
+        with open(ttl_file, 'rb') as f:
+            file_content = f.read()
+
+        # 먼저 인증 없이 시도
+        response = requests.post(
+            f"{fuseki_url}/{dataset}/data",
+            headers={'Content-Type': 'text/turtle'},
+            data=file_content,
+            timeout=300
+        )
+
+        # 401이면 인증 추가해서 재시도
+        if response.status_code == 401:
+            response = requests.post(
+                f"{fuseki_url}/{dataset}/data",
+                auth=auth,
+                headers={'Content-Type': 'text/turtle'},
+                data=file_content,
+                timeout=300
+            )
+
+        return response.status_code, response.text
+    except Exception as e:
+        return 0, str(e)
+
+try:
+    # SPARQL 쿼리로 트리플 수 확인 (GET 방식)
+    query = "SELECT (COUNT(*) as ?count) WHERE { ?s ?p ?o }"
+
+    # 먼저 인증 없이 시도
+    response = requests.get(
+        f"{fuseki_base_url}/{dataset}/sparql",
+        params={'query': query},
+        headers={'Accept': 'application/sparql-results+json'},
+        timeout=10
+    )
+
+    # 401이면 인증 추가해서 재시도
+    if response.status_code == 401:
+        response = requests.get(
+            f"{fuseki_base_url}/{dataset}/sparql",
+            auth=auth,
+            params={'query': query},
+            headers={'Accept': 'application/sparql-results+json'},
+            timeout=10
+        )
+
+    # 404면 dataset 생성 시도
+    if response.status_code == 404:
+        print(f"  └─ Dataset '{dataset}' 없음, 생성 시도...")
+        print(f"  └─ [DEBUG] POST {fuseki_base_url}/$/datasets")
+        # Dataset 생성 (TDB2 타입으로)
+        create_response = requests.post(
+            f"{fuseki_base_url}/$/datasets",
+            data={'dbName': dataset, 'dbType': 'tdb2'},
+            timeout=30
+        )
+        print(f"  └─ [DEBUG] 인증 없이 시도: {create_response.status_code}")
+        if create_response.status_code == 401:
+            print(f"  └─ [DEBUG] 인증 추가 재시도 (user={fuseki_user})")
+            create_response = requests.post(
+                f"{fuseki_base_url}/$/datasets",
+                auth=auth,
+                data={'dbName': dataset, 'dbType': 'tdb2'},
+                timeout=30
+            )
+            print(f"  └─ [DEBUG] 인증 후: {create_response.status_code}")
+            if create_response.status_code == 401:
+                print(f"  └─ [DEBUG] Response: {create_response.text[:200]}")
+
+        if create_response.status_code in [200, 201]:
+            print(f"  └─ ✓ Dataset '{dataset}' 생성 완료")
+            # 생성 후 다시 쿼리
+            response = requests.get(
+                f"{fuseki_base_url}/{dataset}/sparql",
+                params={'query': query},
+                headers={'Accept': 'application/sparql-results+json'},
+                timeout=10
+            )
+        else:
+            print(f"  └─ ✗ Dataset 생성 실패 (HTTP {create_response.status_code})")
+
+    if response.status_code == 200:
+        result = response.json()
+        count = int(result['results']['bindings'][0]['count']['value'])
+        print(f"  └─ Fuseki 트리플 수: {count}")
+
+        if count == 0:
+            print("  └─ 데이터 없음, 적재 시작...")
+            if not ttl_path.exists():
+                print(f"  └─ ✗ TTL 파일 없음: {ttl_path}")
+            else:
+                status_code, error_text = upload_ttl_direct(fuseki_base_url, dataset, ttl_path, auth)
+                if status_code in [200, 204]:
+                    print("  └─ ✓ Fuseki 데이터 적재 완료")
+                else:
+                    print(f"  └─ ✗ Fuseki 데이터 적재 실패 (HTTP {status_code}): {error_text[:200]}")
+        else:
+            print("  └─ ✓ 데이터 이미 존재, 스킵")
+    else:
+        print(f"  └─ Fuseki 쿼리 실패 (HTTP {response.status_code}), 데이터 적재 시도...")
+        if ttl_path.exists():
+            status_code, error_text = upload_ttl_direct(fuseki_base_url, dataset, ttl_path, auth)
+            if status_code in [200, 204]:
+                print("  └─ ✓ Fuseki 데이터 적재 완료")
+            else:
+                print(f"  └─ ✗ Fuseki 데이터 적재 실패 (HTTP {status_code}): {error_text[:200]}")
+        else:
+            print(f"  └─ ✗ TTL 파일 없음: {ttl_path}")
+except Exception as e:
+    print(f"  └─ Fuseki 연결 실패 (스킵): {e}")
+PY
+
+    echo "=========================================="
+    echo "데이터 적재 파이프라인 완료"
+    echo "=========================================="
+fi
+
+# If no command was passed, default to runserver
+if [ $# -eq 0 ]; then
+    exec python manage.py runserver 0.0.0.0:8000
+else
+    exec "$@"
+fi

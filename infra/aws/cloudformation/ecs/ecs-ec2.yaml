@@ -1,0 +1,772 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "ECS EC2 stack: capacity provider + services (web, celery, redis, postgres, neo4j, fuseki)."
+
+Parameters:
+  NamePrefix:
+    Type: String
+    Default: skn18-3-dev
+
+  InstanceType:
+    Type: String
+    Default: t3.2xlarge
+  DesiredCapacity:
+    Type: Number
+    Default: 2
+  MinSize:
+    Type: Number
+    Default: 1
+  MaxSize:
+    Type: Number
+    Default: 2
+  EcsAmiId:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: /aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id
+  ServiceDiscoveryNamespace:
+    Type: String
+    Default: skn18.local
+
+  WebImageTag:
+    Type: String
+    Default: latest
+  PostgresImageTag:
+    Type: String
+    Default: latest
+  Neo4jImageTag:
+    Type: String
+    Default: latest
+  FusekiImageTag:
+    Type: String
+    Default: latest
+  RedisImageTag:
+    Type: String
+    Default: latest
+  CeleryImageTag:
+    Type: String
+    Default: latest
+
+  WebDesiredCount:
+    Type: Number
+    Default: 1
+  CeleryDesiredCount:
+    Type: Number
+    Default: 1
+  RedisDesiredCount:
+    Type: Number
+    Default: 1
+  PostgresDesiredCount:
+    Type: Number
+    Default: 1
+  Neo4jDesiredCount:
+    Type: Number
+    Default: 1
+  FusekiDesiredCount:
+    Type: Number
+    Default: 1
+
+  WebMemory:
+    Type: Number
+    Default: 4096
+  CeleryMemory:
+    Type: Number
+    Default: 8192
+
+  DjangoEnv:
+    Type: String
+    Default: dev
+  DjangoDebug:
+    Type: String
+    Default: "1"
+  AllowedHosts:
+    Type: String
+    Default: "*"
+  ChatUseFakeCompile:
+    Type: String
+    Default: "false"
+  PostgresDb:
+    Type: String
+    Default: skn18final
+  PostgresUser:
+    Type: String
+    Default: root
+  Neo4jUser:
+    Type: String
+    Default: neo4j
+  LlmProvider:
+    Type: String
+    Default: openai
+  WebPort:
+    Type: Number
+    Default: 8000
+  GenaiApiVersion:
+    Type: String
+    Default: v1
+  ModelImage:
+    Type: String
+    Default: models/imagen-4.0-fast-generate-001
+  OpenaiModel:
+    Type: String
+    Default: gpt-5-nano
+  EmbedModelName:
+    Type: String
+    Default: text-embedding-3-small
+  PgvectorDistance:
+    Type: String
+    Default: cosine
+  LangchainEndpoint:
+    Type: String
+    Default: https://api.smith.langchain.com
+  LangchainProject:
+    Type: String
+    Default: SKN18 3Team Final Project
+  LangchainTracingV2:
+    Type: String
+    Default: "true"
+  RedisDb:
+    Type: String
+    Default: "0"
+
+Resources:
+  EcsInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  EcsInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EcsInstanceRole
+
+  EcsInstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${NamePrefix} ecs instance sg"
+      VpcId: !ImportValue
+        Fn::Sub: "${NamePrefix}-vpc-id"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${NamePrefix} web task sg"
+      VpcId: !ImportValue
+        Fn::Sub: "${NamePrefix}-vpc-id"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          SourceSecurityGroupId: !ImportValue
+            Fn::Sub: "${NamePrefix}-alb-sg-id"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+
+  PostgresSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${NamePrefix} postgres task sg"
+      VpcId: !ImportValue
+        Fn::Sub: "${NamePrefix}-vpc-id"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: !ImportValue
+            Fn::Sub: "${NamePrefix}-vpc-cidr"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+
+  RedisSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${NamePrefix} redis task sg"
+      VpcId: !ImportValue
+        Fn::Sub: "${NamePrefix}-vpc-id"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          CidrIp: !ImportValue
+            Fn::Sub: "${NamePrefix}-vpc-cidr"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+
+  Neo4jSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${NamePrefix} neo4j task sg"
+      VpcId: !ImportValue
+        Fn::Sub: "${NamePrefix}-vpc-id"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 7474
+          ToPort: 7474
+          CidrIp: !ImportValue
+            Fn::Sub: "${NamePrefix}-vpc-cidr"
+        - IpProtocol: tcp
+          FromPort: 7687
+          ToPort: 7687
+          CidrIp: !ImportValue
+            Fn::Sub: "${NamePrefix}-vpc-cidr"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+
+  FusekiSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${NamePrefix} fuseki task sg"
+      VpcId: !ImportValue
+        Fn::Sub: "${NamePrefix}-vpc-id"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3030
+          ToPort: 3030
+          CidrIp: !ImportValue
+            Fn::Sub: "${NamePrefix}-vpc-cidr"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+
+  CelerySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${NamePrefix} celery task sg"
+      VpcId: !ImportValue
+        Fn::Sub: "${NamePrefix}-vpc-id"
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+
+  EcsLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref EcsAmiId
+        InstanceType: !Ref InstanceType
+        IamInstanceProfile:
+          Arn: !GetAtt EcsInstanceProfile.Arn
+        SecurityGroupIds:
+          - !Ref EcsInstanceSecurityGroup
+        UserData:
+          Fn::Base64: !Sub
+            - |
+                #!/bin/bash
+                echo "ECS_CLUSTER=${ClusterName}" >> /etc/ecs/ecs.config
+                echo "ECS_ENABLE_TASK_IAM_ROLE=true" >> /etc/ecs/ecs.config
+                echo "ECS_ENABLE_TASK_IAM_ROLE_NETWORK_HOST=true" >> /etc/ecs/ecs.config
+            - ClusterName: !ImportValue
+                Fn::Sub: "${NamePrefix}-ecs-cluster-name"
+
+  EcsAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      MinSize: !Ref MinSize
+      MaxSize: !Ref MaxSize
+      DesiredCapacity: !Ref DesiredCapacity
+      VPCZoneIdentifier: !Split [",", !ImportValue { "Fn::Sub": "${NamePrefix}-private-subnets" }]
+      LaunchTemplate:
+        LaunchTemplateId: !Ref EcsLaunchTemplate
+        Version: !GetAtt EcsLaunchTemplate.LatestVersionNumber
+      Tags:
+        - Key: Name
+          Value: !Sub "${NamePrefix}-ecs-ec2"
+          PropagateAtLaunch: true
+
+  EcsCapacityProvider:
+    Type: AWS::ECS::CapacityProvider
+    Properties:
+      Name: !Sub "${NamePrefix}-cp"
+      AutoScalingGroupProvider:
+        AutoScalingGroupArn: !Ref EcsAutoScalingGroup
+        ManagedScaling:
+          Status: ENABLED
+          TargetCapacity: 100
+
+  EcsClusterCapacityProviderAssociations:
+    Type: AWS::ECS::ClusterCapacityProviderAssociations
+    Properties:
+      Cluster: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-cluster-arn"
+      CapacityProviders:
+        - !Ref EcsCapacityProvider
+      DefaultCapacityProviderStrategy:
+        - CapacityProvider: !Ref EcsCapacityProvider
+          Weight: 1
+
+  PostgresDiscovery:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: postgres
+      NamespaceId: !ImportValue
+        Fn::Sub: "${NamePrefix}-sd-namespace-id"
+      DnsConfig:
+        DnsRecords:
+          - Type: A
+            TTL: 10
+
+  RedisDiscovery:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: redis
+      NamespaceId: !ImportValue
+        Fn::Sub: "${NamePrefix}-sd-namespace-id"
+      DnsConfig:
+        DnsRecords:
+          - Type: A
+            TTL: 10
+
+  Neo4jDiscovery:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: neo4j
+      NamespaceId: !ImportValue
+        Fn::Sub: "${NamePrefix}-sd-namespace-id"
+      DnsConfig:
+        DnsRecords:
+          - Type: A
+            TTL: 10
+
+  FusekiDiscovery:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: fuseki
+      NamespaceId: !ImportValue
+        Fn::Sub: "${NamePrefix}-sd-namespace-id"
+      DnsConfig:
+        DnsRecords:
+          - Type: A
+            TTL: 10
+
+  PostgresTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${NamePrefix}-postgres"
+      RequiresCompatibilities: [EC2]
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-execution-role-arn"
+      TaskRoleArn: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-task-role-arn"
+      ContainerDefinitions:
+        - Name: postgres
+          Image: !Sub
+            - "${RepoUri}:${Tag}"
+            - RepoUri: !ImportValue
+                Fn::Sub: "${NamePrefix}-postgres-repo-uri"
+              Tag: !Ref PostgresImageTag
+          Memory: 1024
+          PortMappings:
+            - ContainerPort: 5432
+          Secrets:
+            - Name: POSTGRES_PASSWORD
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/POSTGRES_PASSWORD"
+          Environment:
+            - Name: POSTGRES_USER
+              Value: !Ref PostgresUser
+            - Name: POSTGRES_DB
+              Value: !Ref PostgresDb
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue
+                Fn::Sub: "${NamePrefix}-ecs-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: postgres
+
+  PostgresService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${NamePrefix}-postgres"
+      Cluster: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-cluster-arn"
+      DesiredCount: !Ref PostgresDesiredCount
+      LaunchType: EC2
+      TaskDefinition: !Ref PostgresTask
+      ServiceRegistries:
+        - RegistryArn: !GetAtt PostgresDiscovery.Arn
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets: !Split [",", !ImportValue { "Fn::Sub": "${NamePrefix}-private-subnets" }]
+          SecurityGroups:
+            - !Ref PostgresSecurityGroup
+
+  RedisTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${NamePrefix}-redis"
+      RequiresCompatibilities: [EC2]
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-execution-role-arn"
+      ContainerDefinitions:
+        - Name: redis
+          Image: !Sub
+            - "${RepoUri}:${Tag}"
+            - RepoUri: !ImportValue
+                Fn::Sub: "${NamePrefix}-redis-repo-uri"
+              Tag: !Ref RedisImageTag
+          Memory: 512
+          PortMappings:
+            - ContainerPort: 6379
+          Command: ["redis-server", "--appendonly", "yes"]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue
+                Fn::Sub: "${NamePrefix}-ecs-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: redis
+
+  RedisService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${NamePrefix}-redis"
+      Cluster: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-cluster-arn"
+      DesiredCount: !Ref RedisDesiredCount
+      LaunchType: EC2
+      TaskDefinition: !Ref RedisTask
+      ServiceRegistries:
+        - RegistryArn: !GetAtt RedisDiscovery.Arn
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets: !Split [",", !ImportValue { "Fn::Sub": "${NamePrefix}-private-subnets" }]
+          SecurityGroups:
+            - !Ref RedisSecurityGroup
+
+  Neo4jTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${NamePrefix}-neo4j"
+      RequiresCompatibilities: [EC2]
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-execution-role-arn"
+      TaskRoleArn: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-task-role-arn"
+      ContainerDefinitions:
+        - Name: neo4j
+          Image: !Sub
+            - "${RepoUri}:${Tag}"
+            - RepoUri: !ImportValue
+                Fn::Sub: "${NamePrefix}-neo4j-repo-uri"
+              Tag: !Ref Neo4jImageTag
+          Memory: 2048
+          PortMappings:
+            - ContainerPort: 7474
+            - ContainerPort: 7687
+          Secrets:
+            - Name: NEO4J_AUTH
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/NEO4J_AUTH"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue
+                Fn::Sub: "${NamePrefix}-ecs-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: neo4j
+
+  Neo4jService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${NamePrefix}-neo4j"
+      Cluster: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-cluster-arn"
+      DesiredCount: !Ref Neo4jDesiredCount
+      LaunchType: EC2
+      TaskDefinition: !Ref Neo4jTask
+      ServiceRegistries:
+        - RegistryArn: !GetAtt Neo4jDiscovery.Arn
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets: !Split [",", !ImportValue { "Fn::Sub": "${NamePrefix}-private-subnets" }]
+          SecurityGroups:
+            - !Ref Neo4jSecurityGroup
+
+  FusekiTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${NamePrefix}-fuseki"
+      RequiresCompatibilities: [EC2]
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-execution-role-arn"
+      TaskRoleArn: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-task-role-arn"
+      ContainerDefinitions:
+        - Name: fuseki
+          Image: !Sub
+            - "${RepoUri}:${Tag}"
+            - RepoUri: !ImportValue
+                Fn::Sub: "${NamePrefix}-fuseki-repo-uri"
+              Tag: !Ref FusekiImageTag
+          Memory: 1024
+          PortMappings:
+            - ContainerPort: 3030
+          Secrets:
+            - Name: FUSEKI_ADMIN_PASSWORD
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/FUSEKI_ADMIN_PASSWORD"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue
+                Fn::Sub: "${NamePrefix}-ecs-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: fuseki
+
+  FusekiService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${NamePrefix}-fuseki"
+      Cluster: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-cluster-arn"
+      DesiredCount: !Ref FusekiDesiredCount
+      LaunchType: EC2
+      TaskDefinition: !Ref FusekiTask
+      ServiceRegistries:
+        - RegistryArn: !GetAtt FusekiDiscovery.Arn
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets: !Split [",", !ImportValue { "Fn::Sub": "${NamePrefix}-private-subnets" }]
+          SecurityGroups:
+            - !Ref FusekiSecurityGroup
+
+  WebTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${NamePrefix}-web"
+      RequiresCompatibilities: [EC2]
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-execution-role-arn"
+      TaskRoleArn: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-task-role-arn"
+      ContainerDefinitions:
+        - Name: web
+          Image: !Sub
+            - "${RepoUri}:${Tag}"
+            - RepoUri: !ImportValue
+                Fn::Sub: "${NamePrefix}-web-repo-uri"
+              Tag: !Ref WebImageTag
+          Cpu: 1024
+          Memory: !Ref WebMemory
+          PortMappings:
+            - ContainerPort: 8000
+          Secrets:
+            - Name: DJANGO_SECRET_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/DJANGO_SECRET_KEY"
+            - Name: POSTGRES_HOST
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}-rds-endpoint"
+            - Name: POSTGRES_PASSWORD
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}-rds-password"
+            - Name: POSTGRES_USER
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}-rds-username"
+            - Name: POSTGRES_DB
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}-rds-dbname"
+            - Name: NEO4J_PASSWORD
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/NEO4J_PASSWORD"
+            - Name: FUSEKI_ADMIN_PASSWORD
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/FUSEKI_ADMIN_PASSWORD"
+            - Name: BOT_PASSWORD
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/BOT_PASSWORD"
+            - Name: BOT_EMAIL
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/BOT_EMAIL"
+            - Name: OPENAI_API_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/OPENAI_API_KEY"
+            - Name: HF_API_TOKEN
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/HF_API_TOKEN"
+            - Name: LANGCHAIN_API_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/LANGCHAIN_API_KEY"
+            - Name: GEMINI_API_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/GEMINI_API_KEY"
+            - Name: FAL_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/FAL_KEY"
+            - Name: GOOGLE_OAUTH_CLIENT_SECRET
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/GOOGLE_OAUTH_CLIENT_SECRET"
+            - Name: GOOGLE_OAUTH_CLIENT_ID
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/GOOGLE_OAUTH_CLIENT_ID"
+          Environment:
+            - Name: DOCKER_ENV
+              Value: "true"
+            - Name: DJANGO_ENV
+              Value: !Ref DjangoEnv
+            - Name: DJANGO_DEBUG
+              Value: !Ref DjangoDebug
+            - Name: ALLOWED_HOSTS
+              Value: !Ref AllowedHosts
+            - Name: CHAT_USE_FAKE_COMPILE
+              Value: !Ref ChatUseFakeCompile
+            - Name: POSTGRES_PORT
+              Value: "5432"
+            - Name: NEO4J_URI
+              Value: !Sub "bolt://neo4j.${ServiceDiscoveryNamespace}:7687"
+            - Name: NEO4J_USER
+              Value: !Ref Neo4jUser
+            - Name: FUSEKI_URL
+              Value: !Sub "http://fuseki.${ServiceDiscoveryNamespace}:3030/korean-history"
+            - Name: REDIS_HOST
+              Value: !Sub "redis.${ServiceDiscoveryNamespace}"
+            - Name: REDIS_PORT
+              Value: "6379"
+            - Name: REDIS_DB
+              Value: !Ref RedisDb
+            - Name: CELERY_BROKER_URL
+              Value: !Sub "redis://redis.${ServiceDiscoveryNamespace}:6379/0"
+            - Name: CELERY_RESULT_BACKEND
+              Value: !Sub "redis://redis.${ServiceDiscoveryNamespace}:6379/0"
+            - Name: LLM_PROVIDER
+              Value: !Ref LlmProvider
+            - Name: GENAI_API_VERSION
+              Value: !Ref GenaiApiVersion
+            - Name: MODEL_IMAGE
+              Value: !Ref ModelImage
+            - Name: OPENAI_MODEL
+              Value: !Ref OpenaiModel
+            - Name: EMBED_MODEL_NAME
+              Value: !Ref EmbedModelName
+            - Name: PGVECTOR_DISTANCE
+              Value: !Ref PgvectorDistance
+            - Name: LANGCHAIN_ENDPOINT
+              Value: !Ref LangchainEndpoint
+            - Name: LANGCHAIN_PROJECT
+              Value: !Ref LangchainProject
+            - Name: LANGCHAIN_TRACING_V2
+              Value: !Ref LangchainTracingV2
+            - Name: USE_S3
+              Value: "true"
+            - Name: AWS_S3_REGION
+              Value: !Ref AWS::Region
+            - Name: AWS_S3_BUCKET_VIDEOS
+              Value: !Sub "${NamePrefix}-videos"
+            - Name: AWS_S3_BUCKET_THUMBNAILS
+              Value: !Sub "${NamePrefix}-thumbnails"
+            - Name: AWS_S3_BUCKET_PROFILES
+              Value: !Sub "${NamePrefix}-profiles"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue
+                Fn::Sub: "${NamePrefix}-ecs-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: web
+
+  WebService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${NamePrefix}-web"
+      Cluster: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-cluster-arn"
+      DesiredCount: !Ref WebDesiredCount
+      LaunchType: EC2
+      TaskDefinition: !Ref WebTask
+      HealthCheckGracePeriodSeconds: 120
+      LoadBalancers:
+        - TargetGroupArn: !ImportValue
+            Fn::Sub: "${NamePrefix}-alb-tg-arn"
+          ContainerName: web
+          ContainerPort: 8000
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets: !Split [",", !ImportValue { "Fn::Sub": "${NamePrefix}-private-subnets" }]
+          SecurityGroups:
+            - !Ref WebSecurityGroup
+
+  CeleryTask:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${NamePrefix}-celery"
+      RequiresCompatibilities: [EC2]
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-execution-role-arn"
+      TaskRoleArn: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-task-role-arn"
+      ContainerDefinitions:
+        - Name: celery
+          Image: !Sub
+            - "${RepoUri}:${Tag}"
+            - RepoUri: !ImportValue
+                Fn::Sub: "${NamePrefix}-web-repo-uri"
+              Tag: !Ref CeleryImageTag
+          Memory: !Ref CeleryMemory
+          Command: ["celery", "-A", "config", "worker", "--loglevel=info", "--concurrency=1"]
+          Secrets:
+            - Name: DJANGO_SECRET_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/DJANGO_SECRET_KEY"
+            - Name: NEO4J_PASSWORD
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/NEO4J_PASSWORD"
+            - Name: POSTGRES_PASSWORD
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/POSTGRES_PASSWORD"
+            - Name: OPENAI_API_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/OPENAI_API_KEY"
+            - Name: HF_API_TOKEN
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/HF_API_TOKEN"
+            - Name: LANGCHAIN_API_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/LANGCHAIN_API_KEY"
+            - Name: GEMINI_API_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/GEMINI_API_KEY"
+            - Name: FAL_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/FAL_KEY"
+          Environment:
+            - Name: DOCKER_ENV
+              Value: "true"
+            - Name: POSTGRES_HOST
+              Value: !Sub "postgres.${ServiceDiscoveryNamespace}"
+            - Name: POSTGRES_PORT
+              Value: "5432"
+            - Name: POSTGRES_DB
+              Value: !Ref PostgresDb
+            - Name: POSTGRES_USER
+              Value: !Ref PostgresUser
+            - Name: NEO4J_URI
+              Value: !Sub "bolt://neo4j.${ServiceDiscoveryNamespace}:7687"
+            - Name: NEO4J_USER
+              Value: !Ref Neo4jUser
+            - Name: CELERY_BROKER_URL
+              Value: !Sub "redis://redis.${ServiceDiscoveryNamespace}:6379/0"
+            - Name: CELERY_RESULT_BACKEND
+              Value: !Sub "redis://redis.${ServiceDiscoveryNamespace}:6379/0"
+            - Name: FUSEKI_URL
+              Value: !Sub "http://fuseki.${ServiceDiscoveryNamespace}:3030/korean-history"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue
+                Fn::Sub: "${NamePrefix}-ecs-log-group"
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: celery
+
+  CeleryService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${NamePrefix}-celery"
+      Cluster: !ImportValue
+        Fn::Sub: "${NamePrefix}-ecs-cluster-arn"
+      DesiredCount: !Ref CeleryDesiredCount
+      LaunchType: EC2
+      TaskDefinition: !Ref CeleryTask
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets: !Split [",", !ImportValue { "Fn::Sub": "${NamePrefix}-private-subnets" }]
+          SecurityGroups:
+            - !Ref CelerySecurityGroup
+
+Outputs:
+  CapacityProviderName:
+    Value: !Ref EcsCapacityProvider
+    Export:
+      Name: !Sub "${NamePrefix}-ecs-cp-name"

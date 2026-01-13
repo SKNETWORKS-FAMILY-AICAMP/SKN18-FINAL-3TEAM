@@ -35,7 +35,7 @@ if hasattr(settings, 'BASE_DIR'):
 else:
     project_root = Path(__file__).resolve().parent.parent.parent.parent
 
-CHARACTER_IMAGE_PATH = project_root / "frontend" / "react" / "public" / "videos" / "minji&minseok.png"
+CHARACTER_IMAGE_PATH = "https://skn18-3-dev-frontend-533124807326.s3.ap-northeast-2.amazonaws.com/videos/minji%26minseok.png"
 
 
 def generate_thumbnail_prompt(title: str) -> str:
@@ -48,105 +48,43 @@ def generate_thumbnail_prompt(title: str) -> str:
     Returns:
         썸네일 생성 프롬프트
     """
-    prompt = f"""Create a dynamic, engaging thumbnail image for a historical Korean drama video titled "{title}".
+    prompt = f"""Create a dynamic thumbnail image for a historical Korean drama video titled "{title}".
 
-CHARACTER REQUIREMENTS (Inspired by minji&minseok.png reference):
-1. **Character Style - CHIBI/ANIME with Large Heads**:
-   - **Large, round heads** - heads should be disproportionately large compared to bodies (chibi/super deformed style)
-   - **Character options** (choose 1-2 characters based on composition):
-     * **Minji (Girl)**: Long brown hair styled in a **braid hanging down below the shoulders** (not over the shoulder, but hanging down), large round warm brown eyes, expressive face
-     * **Minseok (Boy)**: Short straight black hair with bangs, large dark eyes, expressive face
-   - **Facial features**: Large expressive eyes, tiny dot nose, small mouth
-   - **3D glossy/chibi animation style** - inspired by but not limited to the reference image
-   - **Dynamic, engaging expressions** - can be smiling, surprised, determined, or action-oriented
+MAIN CHARACTERS (Minji & Minseok - 3D chibi style):
+- **3D rendered chibi style** - smooth, polished 3D models with soft curves and glossy finish
+- **EXTREMELY LARGE HEADS, VERY SMALL BODIES** - head-to-body ratio 1:1.5 or 1:2 (2.5 head-to-body ratio)
+- **Large, exaggerated faces** - faces should be very large and dominant with exaggerated proportions
+- **Dynamic, expressive faces** - faces should show dynamic, lively expressions (excitement, curiosity, wonder, joy, surprise) - very expressive and animated
+- **Dynamic, energetic movements** - characters should be in active, dynamic poses (pointing, examining, running, jumping, reaching, interacting with objects) - avoid static poses
+- **Clothing**: Characters should wear clothing appropriate to the story/situation in "{title}" - NOT the same clothes as the reference image (minji&minseok.png). Adapt hanbok or period-appropriate clothing to match the story context and situation
+- **Characters**: Minji (girl with braided brown hair) and/or Minseok (boy with black hair) - choose 1-2 based on composition
 
-2. **Character Proportions & Poses**:
-   - Head-to-body ratio: approximately 1:2 or 1:3 (head is very large)
-   - Small, stout bodies
-   - **DYNAMIC POSES**: Characters should be in action or expressive poses
-     * Running, jumping, pointing, reaching, reading, writing, or other engaging actions
-     * Avoid static standing poses - make it lively and energetic
-   - Characters can be positioned anywhere in the frame (center, left, right, foreground, midground)
-   - One or both characters can appear - composition is flexible
+BACKGROUND CHARACTERS (OPTIONAL - only if needed):
+- **Realistic human proportions ONLY** - head-to-body ratio 1:7 or 1:8 (normal adult proportions)
+- **MUST look like real people** - normal-sized heads and bodies, realistic anatomy (NOT chibi style)
+- **BLURRED/OUT OF FOCUS** - background characters must be blurred or soft-focused
+- **Only include if they add meaningful context** - avoid unnecessary random people
 
-3. **Clothing & Appearance**:
-   - **Traditional Korean clothing (hanbok) is preferred but can be varied**
-   - Clothing can be simplified, stylized, or adapted for the scene
-   - Colors can be adjusted to match the mood and composition
-   - Characters should look polished and appealing (beautified/stylized)
+STORY & COMPOSITION (Related to video title "{title}"):
+- **Visual elements must relate to "{title}"** - include props, objects, settings related to the story
+- **Characters should interact with story elements** - engage with objects/props related to the title
+- **Thumbnail-optimized camera angle** - use camera angle that emphasizes main characters and key objects (dramatic angle, close-up, or dynamic perspective that highlights the focal point)
+- **Main characters and key objects should stand out** - clear focal point, characters and important story elements prominent
+- **16:9 aspect ratio**
 
-4. **Background Characters**:
-   - **Additional background people are welcome** - can include other characters in the scene
-   - **Background characters MUST use DIFFERENT art style**:
-     * Normal human proportions (realistic or semi-realistic)
-     * Standard head-to-body ratio (approximately 1:7 or 1:8)
-     * NOT chibi style - contrast with main characters
-     * Can be in traditional Korean clothing (hanbok) or period-appropriate attire
-   - Background characters should be:
-     * Smaller in size compared to main characters
-     * Less detailed than main characters
-     * Positioned in midground or background
-     * Support the scene but not compete with main characters
-   - Examples: scholars, servants, guards, villagers, court officials, etc.
+SETTING & COLORS:
+- **Joseon Dynasty period** - traditional Korean architecture (palaces, courtyards, traditional houses)
+- **Warm color palette** - warm, inviting, cozy colors throughout
+- **Natural lighting** - soft shadows and gentle lighting
 
-5. **Background Setting**: 
-   - Joseon Dynasty period (16th century Korea)
-   - Historical Korean architecture (palaces, traditional houses, courtyards, or natural settings)
-   - Authentic Joseon Dynasty atmosphere and environment
-   - Background should complement the dynamic character action
-   - Can include background characters in the scene
+CRITICAL - NO TEXT:
+- **ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS ANYWHERE IN THE IMAGE**
+- Books, scrolls, documents must be blank or show only abstract patterns
 
-6. **Composition**:
-   - Thumbnail-style composition (eye-catching, clear focal point)
-   - Dynamic, energetic layout with movement and action
-   - Main characters (Minji/Minseok) can be positioned creatively (not fixed to center)
-   - Background characters add depth and context to the scene
-   - Balanced layout suitable for video thumbnail
-   - 16:9 aspect ratio
-
-7. **Art Style - DUAL STYLE APPROACH**:
-   - **Main characters (Minji/Minseok)**: 
-     * **Chibi/anime style with large heads** - inspired by reference but can be stylized
-     * 3D rendered look with glossy finish OR 2D anime illustration style
-     * Large heads, small bodies (chibi proportions)
-   - **Background characters**:
-     * **Normal human proportions** - realistic or semi-realistic style
-     * Standard head-to-body ratio (1:7 or 1:8)
-     * Can be in same art medium but different proportions
-     * Less detailed, smaller, supporting role
-   - Clean, polished, beautified appearance overall
-   - Bright, vibrant colors
-   - Main character design should be recognizable as Minji/Minseok but can be enhanced/stylized
-
-8. **Color & Lighting**:
-   - Warm, inviting colors suitable for a thumbnail
-   - Good contrast to make the main characters stand out
-   - Dynamic lighting that enhances the action
-   - Bright and clear
-
-9. **Mood**:
-   - Energetic, dynamic, and engaging
-   - Historical but approachable
-   - Action-oriented or expressive
-   - Professional thumbnail quality
-
-CRITICAL - ABSOLUTELY NO TEXT:
-- **ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO CAPTIONS, NO SUBTITLES, NO KOREAN CHARACTERS, NO ENGLISH LETTERS, NO NUMBERS**
-- **NO TEXT ON CLOTHING, NO TEXT ON SIGNS, NO TEXT ON SCROLLS, NO TEXT ON BOOKS**
-- **NO TEXT ANYWHERE IN THE IMAGE - COMPLETELY TEXT-FREE**
-- If books, scrolls, or documents appear, they must be blank or show only abstract patterns/lines
-
-IMPORTANT: 
-- Main characters (Minji/Minseok) should be DYNAMIC and in ACTION - avoid static poses
-- One or both main characters can appear - composition is flexible
-- Main characters can be positioned anywhere - not fixed to center
-- Clothing can vary - traditional hanbok preferred but can be adapted
-- Main characters should be beautified/stylized - don't need to match reference exactly
-- **Main characters: Large heads, chibi proportions - this is CRITICAL**
-- **Background characters: Normal human proportions (1:7 or 1:8 ratio) - DIFFERENT art style**
-- Background characters are optional but welcome - they add depth and context
-- Background should clearly show Joseon Dynasty setting
-- Clear visual distinction between chibi main characters and normal-proportioned background characters
+STYLE REQUIREMENTS:
+- **3D rendered style only** - do NOT use 2D anime illustration style
+- **Consistent 3D rendering** - all main characters use the same 3D technique
+- **Match reference image style** (minji&minseok.png) - smooth, polished, glossy finish
 """
     return prompt
 
@@ -173,21 +111,30 @@ def generate_thumbnail_with_nanobanana(prompt: str, output_path: str) -> str:
     print(f"🖼️ [Thumbnail] Gemini Image API로 썸네일 생성 중...")
     print(f"   모델: gemini-2.5-flash-image")
     
-    # Minji & Minseok 캐릭터 이미지 로드 및 전달
+    # Minji & Minseok 캐릭터 이미지 로드 및 전달 (S3에서 boto3로 직접 읽기)
     character_image_part = None
-    if CHARACTER_IMAGE_PATH.exists():
-        try:
-            with open(CHARACTER_IMAGE_PATH, 'rb') as f:
-                image_bytes = f.read()
-            character_image_part = types.Part.from_bytes(
-                data=image_bytes,
-                mime_type="image/png"
-            )
-            print(f"   ✅ 캐릭터 이미지 로드 완료: {CHARACTER_IMAGE_PATH}")
-        except Exception as e:
-            print(f"   ⚠️ 캐릭터 이미지 로드 실패: {e}")
-    else:
-        print(f"   ⚠️ 캐릭터 이미지 파일을 찾을 수 없습니다: {CHARACTER_IMAGE_PATH}")
+    try:
+        import boto3
+        from urllib.parse import urlparse, unquote
+
+        # S3 URL 파싱
+        parsed_url = urlparse(CHARACTER_IMAGE_PATH)
+        bucket_name = parsed_url.netloc.split('.')[0]  # skn18-3-dev-frontend-533124807326
+        object_key = unquote(parsed_url.path.lstrip('/'))  # videos/minji&minseok.png
+
+        print(f"   📥 캐릭터 이미지 S3 다운로드 중: {bucket_name}/{object_key}")
+
+        s3_client = boto3.client('s3')
+        response = s3_client.get_object(Bucket=bucket_name, Key=object_key)
+        image_bytes = response['Body'].read()
+
+        character_image_part = types.Part.from_bytes(
+            data=image_bytes,
+            mime_type="image/png"
+        )
+        print(f"   ✅ 캐릭터 이미지 S3 다운로드 완료 ({len(image_bytes)} bytes)")
+    except Exception as e:
+        print(f"   ⚠️ 캐릭터 이미지 로드 실패: {e}")
     
     try:
         # 이미지와 텍스트 프롬프트를 함께 전달
@@ -235,52 +182,59 @@ def thumbnail_gen_node(state: GraphState) -> GraphState:
     썸네일 생성 노드
     - 대본의 제목을 기반으로 썸네일 프롬프트 생성
     - nanobanana API를 사용하여 썸네일 이미지 생성
-    - 생성된 썸네일 URL을 state에 저장
+    - S3에 업로드하고 URL을 state에 저장
     """
     print("🖼️ [Thumbnail Node] 썸네일 생성 시작...")
-    
+
     script_json = state.get("scene_script", {})
     title = script_json.get("title", "")
-    
+
     if not title:
         print("⚠️ [Thumbnail] 제목이 없어 썸네일을 생성할 수 없습니다.")
         # 병렬 실행 시 LangGraph 오류 방지: 업데이트하는 키만 반환
         return {
             "thumbnail_url": None,
         }
-    
+
     # 타임스탬프 생성
     current_time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    # 저장할 기본 경로 (Django media/thumbnails)
-    save_dir = os.path.join(settings.MEDIA_ROOT, "thumbnails")
-    os.makedirs(save_dir, exist_ok=True)
-    
+
+    # 임시 저장 경로 (로컬)
+    temp_dir = os.path.join(settings.MEDIA_ROOT, "temp_thumbnails")
+    os.makedirs(temp_dir, exist_ok=True)
+
     # 파일 이름 생성
     query_type = state.get('query_type', 'gen')
     thumbnail_file_name = f"thumbnail_{query_type}_{current_time_str}.png"
-    thumbnail_full_path = os.path.join(save_dir, thumbnail_file_name)
-    
+    temp_full_path = os.path.join(temp_dir, thumbnail_file_name)
+
     try:
         # 1. 썸네일 프롬프트 생성
         thumbnail_prompt = generate_thumbnail_prompt(title)
         print(f"   📝 썸네일 프롬프트 생성 완료 (제목: {title})")
-        
-        # 2. nanobanana API로 썸네일 생성
-        generate_thumbnail_with_nanobanana(thumbnail_prompt, thumbnail_full_path)
-        
-        # 3. URL 생성
-        base_url = settings.MY_SERVER_URL.rstrip('/')
-        media_url = settings.MEDIA_URL.strip('/')
-        thumbnail_url = f"{base_url}/{media_url}/thumbnails/{thumbnail_file_name}"
-        
-        print(f"   ✅ 썸네일 URL 생성: {thumbnail_url}")
-        
+
+        # 2. nanobanana API로 썸네일 생성 (임시 로컬 저장)
+        generate_thumbnail_with_nanobanana(thumbnail_prompt, temp_full_path)
+
+        # 3. S3에 업로드
+        from config.storage_backends import upload_thumbnail
+        from django.core.files import File
+
+        with open(temp_full_path, 'rb') as f:
+            thumbnail_file = File(f, name=thumbnail_file_name)
+            thumbnail_url = upload_thumbnail(thumbnail_file, thumbnail_file_name)
+
+        # 4. 임시 파일 삭제
+        if os.path.exists(temp_full_path):
+            os.remove(temp_full_path)
+
+        print(f"   ✅ 썸네일 S3 업로드 완료: {thumbnail_url}")
+
         # 병렬 실행 시 LangGraph 오류 방지: 업데이트하는 키만 반환
         return {
             "thumbnail_url": thumbnail_url,
         }
-        
+
     except Exception as e:
         print(f"❌ [Thumbnail] 썸네일 생성 실패: {e}")
         import traceback
@@ -289,4 +243,3 @@ def thumbnail_gen_node(state: GraphState) -> GraphState:
         return {
             "thumbnail_url": None,
         }
-

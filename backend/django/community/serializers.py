@@ -3,12 +3,25 @@ from .models import Comment, Reply, Likes
 
 
 class CommentUserSerializer(serializers.Serializer):
-    """댓글/답글 작성자 정보 serializer"""
+    """
+    댓글/답글 작성자 정보 serializer
+    User 객체를 직접 받아서 직렬화
+    """
     id = serializers.IntegerField(read_only=True)
     nickname = serializers.CharField(read_only=True)
     email = serializers.EmailField(read_only=True)
     profile_image = serializers.CharField(read_only=True, allow_null=True)
     display_name = serializers.CharField(read_only=True)
+
+    def to_representation(self, instance):
+        """User 인스턴스를 딕셔너리로 변환"""
+        return {
+            'id': instance.id,
+            'nickname': instance.nickname,
+            'email': instance.email,
+            'profile_image': instance.profile_image,
+            'display_name': instance.display_name,  # User 모델의 @property 사용
+        }
 
 
 class CommentSerializer(serializers.ModelSerializer):

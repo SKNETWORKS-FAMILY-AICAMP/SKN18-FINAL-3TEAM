@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { COLORS } from "../../constants/theme";
 import { getProfileImageUrl } from "../../utils/imageUtils";
 import { UserIcon } from "../common/Icons";
@@ -17,6 +17,14 @@ const Header = ({
   currentPage,
   onNavigate,
 }) => {
+  // 프로필 이미지 로딩 실패 시 fallback 표시를 위한 상태
+  const [imageError, setImageError] = useState(false);
+
+  // user가 변경되면 imageError 초기화
+  useEffect(() => {
+    setImageError(false);
+  }, [user?.profile_image]);
+
   const handleNavClick = (page) => {
     if (onNavigate) {
       onNavigate(page);
@@ -26,6 +34,9 @@ const Header = ({
   const getNavClass = (page) => {
     return currentPage === page ? "active" : "";
   };
+
+  // 프로필 이미지가 유효한지 확인 (이미지가 있고, 로딩 에러가 없는 경우)
+  const hasValidProfileImage = user?.profile_image && !imageError;
 
   return (
     <header className="header">
@@ -91,16 +102,17 @@ const Header = ({
               width: "40px",
               height: "40px",
               borderRadius: "50%",
-              backgroundColor: user?.profile_image
+              backgroundColor: hasValidProfileImage
                 ? "transparent"
                 : COLORS.primary,
-              backgroundImage: user?.profile_image
+              backgroundImage: hasValidProfileImage
                 ? `url(${getProfileImageUrl(user.profile_image)})`
                 : "none",
               backgroundSize: "cover",
               backgroundPosition: "center",
               cursor: "pointer",
               transition: "transform 0.2s ease",
+              overflow: "hidden",
             }}
             onClick={() => {
               setShowUserDropdown(!showUserDropdown);
@@ -112,7 +124,17 @@ const Header = ({
               e.currentTarget.style.transform = "scale(1)";
             }}
           >
-            {!user?.profile_image && (
+            {/* 프로필 이미지 로딩 에러 감지용 숨겨진 img 태그 */}
+            {user?.profile_image && !imageError && (
+              <img
+                src={getProfileImageUrl(user.profile_image)}
+                alt=""
+                style={{ display: "none" }}
+                onError={() => setImageError(true)}
+              />
+            )}
+            {/* 프로필 이미지가 없거나 로딩 실패 시 이니셜 표시 */}
+            {!hasValidProfileImage && (
               <span
                 style={{
                   fontSize: "16px",
@@ -123,7 +145,7 @@ const Header = ({
                 {user?.nickname?.[0] ||
                   user?.display_name?.[0] ||
                   user?.email?.[0]?.toUpperCase() ||
-                  "사용자"}
+                  "U"}
               </span>
             )}
           </div>

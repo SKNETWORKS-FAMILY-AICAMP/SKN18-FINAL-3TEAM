@@ -344,4 +344,29 @@ concept_board/
 
 celery.pid
 
+# AWS 설정 파일
+ecs-params.txt
+ssm-params.yaml
+ssm-values.txt
+
 ##
+# Windows reserved device files
+nul
+
+# AWS SSM params
+infra/aws/cloudformation/params/ssm-values.txt
+
+# AWS 임시 파일들 (루트 경로)
+*-task-def*.json
+*-deployed.json
+container_instances.json
+service_configs.json
+overrides.json
+*-policy.json
+sample_scripts.json
+video_list.json
+tasks.txt
+
+# 백업 파일
+*.backup
+*~

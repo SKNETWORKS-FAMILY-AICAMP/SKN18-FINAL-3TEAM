@@ -1,0 +1,14 @@
+ DjangoSecretKey="your-django-secret-key-here" `
+    PostgresPassword="your-postgres-password" `
+    Neo4jPassword="your-neo4j-password" `
+    Neo4jAuth="neo4j/your-neo4j-password" `
+    FusekiAdminPassword="your-fuseki-password" `
+    BotPassword="your-bot-password" `
+    BotEmail="your-bot-email@example.com" `
+    OpenaiApiKey="sk-proj-your-openai-api-key" `
+    HfApiToken="hf_your-huggingface-token" `
+    LangchainApiKey="lsv2_pt_your-langchain-key" `
+    GeminiApiKey="your-gemini-api-key" `
+    FalKey="your-fal-key" `
+    GoogleOauthClientSecret="your-google-oauth-client-secret" `
+    GoogleOauthClientId="your-google-oauth-client-id.apps.googleusercontent.com"

@@ -1,0 +1,175 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Lambda + EventBridge + S3 integration for scheduled CSV uploads
+
+Parameters:
+  ScheduleExpression:
+    Type: String
+    Default: "rate(5 minutes)"
+    Description: EventBridge schedule expression (e.g., "rate(5 minutes)", "cron(0 12 * * ? *)")
+
+  BucketName:
+    Type: String
+    Default: "my-lambda-csv-bucket0626"
+    Description: S3 bucket name for CSV files (must be globally unique)
+
+Resources:
+  # S3 Bucket for CSV files
+  DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # IAM Role for Lambda
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: lambda-s3-csv-uploader-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3WritePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                Resource: !Sub "${DataBucket.Arn}/*"
+
+  # Lambda Function
+  MyLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: csv-uploader-lambda
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      Environment:
+        Variables:
+          S3_BUCKET_NAME: !Ref BucketName
+      Code:
+        ZipFile: |
+          import json
+          import csv
+          import boto3
+          import os
+          import random
+          from datetime import datetime
+
+          def handler(event, context):
+              """
+              Generate test dummy data, convert to CSV, and upload to S3
+              """
+              bucket_name = os.environ.get('S3_BUCKET_NAME')
+
+              if not bucket_name:
+                  return {
+                      'statusCode': 500,
+                      'body': 'Missing S3_BUCKET_NAME environment variable'
+                  }
+
+              try:
+                  # Generate dummy data (10 records)
+                  data = []
+                  for i in range(10):
+                      data.append({
+                          'id': i + 1,
+                          'timestamp': datetime.now().isoformat(),
+                          'value': round(random.uniform(0, 100), 2),
+                          'status': random.choice(['active', 'inactive', 'pending']),
+                          'category': random.choice(['A', 'B', 'C'])
+                      })
+
+                  print(f'Generated {len(data)} dummy records')
+
+                  # Create CSV file
+                  timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                  filename = f'data_{timestamp}.csv'
+                  filepath = f'/tmp/{filename}'
+
+                  # Write CSV
+                  keys = data[0].keys()
+                  with open(filepath, 'w', newline='', encoding='utf-8') as f:
+                      writer = csv.DictWriter(f, fieldnames=keys)
+                      writer.writeheader()
+                      writer.writerows(data)
+
+                  # Upload to S3
+                  s3_client = boto3.client('s3')
+                  s3_client.upload_file(filepath, bucket_name, filename)
+
+                  print(f'Successfully uploaded {filename} to s3://{bucket_name}/{filename}')
+
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps({
+                          'message': f'Successfully uploaded {filename}',
+                          'bucket': bucket_name,
+                          'key': filename,
+                          'records': len(data)
+                      })
+                  }
+
+              except Exception as e:
+                  error_msg = f'Error: {str(e)}'
+                  print(error_msg)
+                  return {
+                      'statusCode': 500,
+                      'body': error_msg
+                  }
+      Description: Lambda function to upload CSV files to S3 on schedule
+
+  # EventBridge Rule with Schedule
+  EventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: csv-uploader-schedule
+      Description: Trigger Lambda function on schedule to upload CSV to S3
+      ScheduleExpression: !Ref ScheduleExpression
+      State: ENABLED
+      Targets:
+        - Id: LambdaTarget
+          Arn: !GetAtt MyLambdaFunction.Arn
+
+  # Lambda Permission for EventBridge
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref MyLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventRule.Arn
+
+Outputs:
+  BucketName:
+    Description: S3 Bucket for CSV files
+    Value: !Ref DataBucket
+
+  LambdaFunctionArn:
+    Description: Lambda Function ARN
+    Value: !GetAtt MyLambdaFunction.Arn
+
+  EventRuleName:
+    Description: EventBridge Rule Name
+    Value: !Ref EventRule
+
+  ScheduleExpression:
+    Description: Current schedule expression
+    Value: !Ref ScheduleExpression

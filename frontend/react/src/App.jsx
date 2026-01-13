@@ -143,14 +143,9 @@ const App = () => {
           localStorage.clear();
           setIsLoggedIn(false);
           setUser(null);
-          // 강제 새로고침 (프론트엔드 URL로 리다이렉트)
+          // 메인 페이지로 이동 (현재 도메인 유지)
           setTimeout(() => {
-            const frontendUrl =
-              window.location.port === "8000" ||
-              window.location.hostname.includes("8000")
-                ? "http://localhost:3000/"
-                : `${window.location.origin}/`;
-            window.location.href = frontendUrl;
+            window.location.hash = "main";
           }, 100);
         } else {
           // 기타 에러는 콘솔에 표시
