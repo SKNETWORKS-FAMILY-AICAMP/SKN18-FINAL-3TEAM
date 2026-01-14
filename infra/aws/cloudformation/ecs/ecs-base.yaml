@@ -1,0 +1,118 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Base ECS stack: ECS cluster, task roles, log group, service discovery namespace (reuses existing ECR repos)."
+
+Parameters:
+  NamePrefix:
+    Type: String
+    Default: skn18-3-dev
+  LogRetentionDays:
+    Type: Number
+    Default: 14
+    AllowedValues: [1,3,5,7,14,30,60,90,180,365,400,545,731,1827,3653]
+  ServiceDiscoveryNamespace:
+    Type: String
+    Default: skn18.local
+
+Resources:
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${NamePrefix}-cluster"
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+
+  EcsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${NamePrefix}"
+      RetentionInDays: !Ref LogRetentionDays
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: !Sub "${NamePrefix}-ssm-access"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [ "ssm:GetParameters" ]
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${NamePrefix}/*"
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${NamePrefix}-s3-access"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::${NamePrefix}-videos"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-videos/*"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-final-videos"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-final-videos/*"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-temp"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-temp/*"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-thumbnails"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-thumbnails/*"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-profiles"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-profiles/*"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-scripts-${AWS::AccountId}"
+                  - !Sub "arn:aws:s3:::${NamePrefix}-scripts-${AWS::AccountId}/*"
+
+  ServiceDiscoveryNamespaceResource:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: !Ref ServiceDiscoveryNamespace
+      Vpc: !ImportValue
+        Fn::Sub: "${NamePrefix}-vpc-id"
+
+Outputs:
+  EcsClusterName:
+    Value: !Ref EcsCluster
+    Export:
+      Name: !Sub "${NamePrefix}-ecs-cluster-name"
+  EcsClusterArn:
+    Value: !GetAtt EcsCluster.Arn
+    Export:
+      Name: !Sub "${NamePrefix}-ecs-cluster-arn"
+  TaskExecutionRoleArn:
+    Value: !GetAtt TaskExecutionRole.Arn
+    Export:
+      Name: !Sub "${NamePrefix}-ecs-execution-role-arn"
+  TaskRoleArn:
+    Value: !GetAtt TaskRole.Arn
+    Export:
+      Name: !Sub "${NamePrefix}-ecs-task-role-arn"
+  LogGroupName:
+    Value: !Ref EcsLogGroup
+    Export:
+      Name: !Sub "${NamePrefix}-ecs-log-group"
+  ServiceDiscoveryNamespaceId:
+    Value: !Ref ServiceDiscoveryNamespaceResource
+    Export:
+      Name: !Sub "${NamePrefix}-sd-namespace-id"

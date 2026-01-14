@@ -1,0 +1,245 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Lambda function to handle GitHub webhooks and trigger ECS service deployments"
+
+Parameters:
+  NamePrefix:
+    Type: String
+    Default: skn18-3-dev
+
+  EcsClusterName:
+    Type: String
+    Default: skn18-3-dev-cluster
+
+  GitHubWebhookSecret:
+    Type: String
+    NoEcho: true
+    Description: "Secret token for GitHub webhook verification"
+
+Resources:
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${NamePrefix}-github-webhook-lambda-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: !Sub "${NamePrefix}-ecs-update-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:UpdateService
+                  - ecs:DescribeServices
+                  - ecs:RegisterTaskDefinition
+                  - ecs:DescribeTaskDefinition
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${NamePrefix}-github-webhook:*"
+
+  # Lambda Function
+  GitHubWebhookLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${NamePrefix}-github-webhook"
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 60
+      Environment:
+        Variables:
+          ECS_CLUSTER: !Ref EcsClusterName
+          GITHUB_WEBHOOK_SECRET: !Ref GitHubWebhookSecret
+          AWS_REGION: !Ref AWS::Region
+      Code:
+        ZipFile: |
+          import json
+          import os
+          import hashlib
+          import hmac
+          import boto3
+          from typing import Dict, List, Any
+
+          ecs_client = boto3.client('ecs')
+
+          # 서비스 매핑: GitHub workflow에서 전달하는 서비스 이름
+          SERVICE_MAPPING = {
+              'web': 'skn18-3-dev-web',
+              'celery': 'skn18-3-dev-celery',
+              'all': ['skn18-3-dev-web', 'skn18-3-dev-celery']
+          }
+
+          def verify_signature(payload: bytes, signature: str, secret: str) -> bool:
+              """GitHub webhook signature 검증"""
+              if not signature:
+                  return False
+
+              expected_signature = 'sha256=' + hmac.new(
+                  secret.encode('utf-8'),
+                  payload,
+                  hashlib.sha256
+              ).hexdigest()
+
+              return hmac.compare_digest(expected_signature, signature)
+
+          def update_ecs_service(cluster: str, service: str) -> Dict[str, Any]:
+              """ECS 서비스 강제 재배포"""
+              try:
+                  response = ecs_client.update_service(
+                      cluster=cluster,
+                      service=service,
+                      forceNewDeployment=True
+                  )
+                  return {
+                      'success': True,
+                      'service': service,
+                      'message': f'Successfully triggered deployment for {service}'
+                  }
+              except Exception as e:
+                  return {
+                      'success': False,
+                      'service': service,
+                      'error': str(e)
+                  }
+
+          def lambda_handler(event, context):
+              """Lambda handler for GitHub webhook"""
+
+              # 환경 변수
+              cluster = os.environ.get('ECS_CLUSTER')
+              webhook_secret = os.environ.get('GITHUB_WEBHOOK_SECRET')
+
+              print(f"Received event: {json.dumps(event)}")
+
+              # API Gateway로부터 받은 요청
+              body = event.get('body', '{}')
+              headers = event.get('headers', {})
+
+              # Signature 검증
+              signature = headers.get('X-Hub-Signature-256', '')
+              if not verify_signature(body.encode('utf-8'), signature, webhook_secret):
+                  return {
+                      'statusCode': 401,
+                      'body': json.dumps({'error': 'Invalid signature'})
+                  }
+
+              # Payload 파싱
+              try:
+                  payload = json.loads(body)
+              except json.JSONDecodeError:
+                  return {
+                      'statusCode': 400,
+                      'body': json.dumps({'error': 'Invalid JSON'})
+                  }
+
+              # workflow_dispatch 이벤트에서 inputs 추출
+              inputs = payload.get('inputs', {})
+              service_input = inputs.get('service', 'all')
+
+              print(f"Requested service: {service_input}")
+
+              # 서비스 목록 결정
+              services_to_update = []
+              if service_input == 'all':
+                  services_to_update = SERVICE_MAPPING['all']
+              elif service_input in SERVICE_MAPPING:
+                  services_to_update = [SERVICE_MAPPING[service_input]]
+              else:
+                  return {
+                      'statusCode': 400,
+                      'body': json.dumps({'error': f'Unknown service: {service_input}'})
+                  }
+
+              # ECS 서비스 업데이트
+              results = []
+              for service in services_to_update:
+                  result = update_ecs_service(cluster, service)
+                  results.append(result)
+                  print(f"Update result for {service}: {result}")
+
+              # 결과 반환
+              success_count = sum(1 for r in results if r['success'])
+
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps({
+                      'message': f'Updated {success_count}/{len(results)} services',
+                      'results': results
+                  })
+              }
+
+  # API Gateway
+  ApiGateway:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub "${NamePrefix}-github-webhook-api"
+      ProtocolType: HTTP
+      Description: "API Gateway for GitHub webhook"
+
+  ApiGatewayIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ApiGateway
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt GitHubWebhookLambda.Arn
+      PayloadFormatVersion: "2.0"
+
+  ApiGatewayRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ApiGateway
+      RouteKey: "POST /webhook"
+      Target: !Sub "integrations/${ApiGatewayIntegration}"
+
+  ApiGatewayStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref ApiGateway
+      StageName: "$default"
+      AutoDeploy: true
+
+  # Lambda Permission for API Gateway
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GitHubWebhookLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*"
+
+  # CloudWatch Log Group
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${NamePrefix}-github-webhook"
+      RetentionInDays: 7
+
+Outputs:
+  WebhookUrl:
+    Description: "GitHub webhook URL"
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/webhook"
+    Export:
+      Name: !Sub "${NamePrefix}-github-webhook-url"
+
+  LambdaFunctionArn:
+    Description: "Lambda function ARN"
+    Value: !GetAtt GitHubWebhookLambda.Arn

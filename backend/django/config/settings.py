@@ -147,6 +147,7 @@ INSTALLED_APPS = [
     'activity',      # 검색 + 시청 기록
     'community',     # 댓글 + 답글 + 좋아요
     'chatbot',       # 챗봇
+    'game',          # MinjiRun 게임
 ]
 
 SITE_ID = 1
@@ -233,7 +234,7 @@ CACHES = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=120),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -287,6 +288,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # django-allauth 설정
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'https'  # OAuth redirect URI를 HTTPS로 생성
 SOCIALACCOUNT_LOGIN_ON_GET = True  # 중간 확인 페이지 없이 바로 Google 로그인으로 이동
 ACCOUNT_EMAIL_VERIFICATION = 'none'  # 이메일 인증 건너뛰기 (소셜 로그인이므로 불필요)
 SOCIALACCOUNT_AUTO_SIGNUP = True  # 소셜 로그인 시 자동 가입
@@ -306,6 +308,12 @@ ACCOUNT_EMAIL_REQUIRED = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://d2lr1p20b7dwp0.cloudfront.net",  # CloudFront Distribution
+    "http://www.histok.info",
+    "https://www.histok.info",
+    "http://histok.info",
+    "https://histok.info",
+    "https://api.histok.info",  # Backend API subdomain
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -333,17 +341,20 @@ CORS_EXPOSE_HEADERS = ['Content-Type', 'Content-Length', 'Accept-Ranges', 'Conte
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://d2lr1p20b7dwp0.cloudfront.net",  # CloudFront Distribution
+    "http://www.histok.info",
+    "https://www.histok.info",
+    "http://histok.info",
+    "https://histok.info",
+    "https://api.histok.info",  # Backend API subdomain
 ]
 
 # Google OAuth 스코프 설정
 
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
-        'APP': {
-            'client_id': os.getenv('GOOGLE_OAUTH_CLIENT_ID', ''),
-            'secret': os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', ''),
-            'key': ''
-        },
+        # APP 설정을 제거하고 데이터베이스의 Social App만 사용
+        # (settings.py의 APP과 DB의 Social App이 중복으로 인식되는 문제 방지)
         'SCOPE': [
             'profile',
             'email',
@@ -383,3 +394,79 @@ if sys.platform == "darwin":  # macOS
     CELERY_WORKER_POOL = "solo"  # 또는 "threads"
 else:
     CELERY_WORKER_POOL = "prefork"  # Linux에서는 prefork 사용 가능
+
+# ------------------------------------------------------------------------
+# HTTPS/SSL Settings for Production (ALB behind HTTPS)
+# ------------------------------------------------------------------------
+# ALB에서 HTTPS로 받고 HTTP로 백엔드에 전달하는 경우
+# Django가 HTTPS를 인식하도록 설정
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# X-Forwarded-Host 헤더 신뢰 (ALB가 원래 호스트 전달)
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+
+# ------------------------------------------------------------------------
+# AWS S3 Storage Settings
+# ------------------------------------------------------------------------
+# S3 사용 여부 (환경변수로 제어, 기본값은 로컬 스토리지 사용)
+USE_S3 = os.getenv('USE_S3', 'False').lower() == 'true'
+
+if USE_S3:
+    # S3 버킷 이름
+    AWS_STORAGE_BUCKET_NAME_VIDEOS = os.getenv('AWS_S3_BUCKET_VIDEOS', 'skn18-3-dev-videos')
+    AWS_STORAGE_BUCKET_NAME_FINAL_VIDEOS = os.getenv('AWS_S3_BUCKET_FINAL_VIDEOS', 'skn18-3-dev-final-videos')
+    AWS_STORAGE_BUCKET_NAME_THUMBNAILS = os.getenv('AWS_S3_BUCKET_THUMBNAILS', 'skn18-3-dev-thumbnails')
+    AWS_STORAGE_BUCKET_NAME_PROFILES = os.getenv('AWS_S3_BUCKET_PROFILES', 'skn18-3-dev-profiles')
+
+    # AWS 자격 증명 (ECS Task Role 사용 시 불필요, 로컬 테스트용)
+    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+
+    # S3 설정
+    AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION', 'ap-northeast-2')
+    AWS_S3_FILE_OVERWRITE = False  # 같은 이름 파일 덮어쓰기 방지
+    AWS_DEFAULT_ACL = None  # ACL 비활성화 (버킷 정책으로 관리)
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+    AWS_QUERYSTRING_AUTH = False  # URL에 인증 쿼리스트링 제거 (public 버킷용)
+
+    # S3 URL 설정
+    AWS_S3_CUSTOM_DOMAIN_VIDEOS = f'{AWS_STORAGE_BUCKET_NAME_VIDEOS}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
+    AWS_S3_CUSTOM_DOMAIN_THUMBNAILS = f'{AWS_STORAGE_BUCKET_NAME_THUMBNAILS}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
+    AWS_S3_CUSTOM_DOMAIN_PROFILES = f'{AWS_STORAGE_BUCKET_NAME_PROFILES}.s3.{AWS_S3_REGION_NAME}.amazonaws.com'
+
+    # 기본 스토리지를 S3로 설정 (프로필 이미지용)
+    STORAGES = {
+        'default': {
+            'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
+            'OPTIONS': {
+                'bucket_name': AWS_STORAGE_BUCKET_NAME_PROFILES,
+                'location': '',  # 버킷 루트에 저장
+            },
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+        # 커스텀 스토리지 (영상, 썸네일용)
+        'videos': {
+            'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
+            'OPTIONS': {
+                'bucket_name': AWS_STORAGE_BUCKET_NAME_VIDEOS,
+                'location': '',
+            },
+        },
+        'thumbnails': {
+            'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
+            'OPTIONS': {
+                'bucket_name': AWS_STORAGE_BUCKET_NAME_THUMBNAILS,
+                'location': '',
+            },
+        },
+    }
+
+    # Media URL을 S3 URL로 변경
+    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN_PROFILES}/'
+
+    # storages 앱 추가
+    if 'storages' not in INSTALLED_APPS:
+        INSTALLED_APPS.append('storages')

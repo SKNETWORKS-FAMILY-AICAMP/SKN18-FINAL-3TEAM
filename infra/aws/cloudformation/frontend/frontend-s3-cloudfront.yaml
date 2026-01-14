@@ -1,0 +1,169 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFront + S3 for React Frontend
+
+Parameters:
+  NamePrefix:
+    Type: String
+    Default: skn18-3-dev
+    Description: Prefix for resource names
+
+  Environment:
+    Type: String
+    Default: dev
+    Description: Environment name
+
+Resources:
+  # 1. S3 Bucket for Frontend Static Files
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${NamePrefix}-frontend-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${NamePrefix}-frontend-bucket'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # 2. CloudFront Origin Access Control (OAC)
+  CloudFrontOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${NamePrefix}-frontend-oac'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+        Description: OAC for frontend S3 bucket
+
+  # 3. CloudFront Distribution
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Comment: !Sub '${NamePrefix} Frontend Distribution'
+        PriceClass: PriceClass_200
+        Aliases:
+          - histok.info
+          - www.histok.info
+        ViewerCertificate:
+          AcmCertificateArn: arn:aws:acm:us-east-1:533124807326:certificate/cfdcc6a3-7841-4a9a-bc33-73c39ac3d768
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !Ref CloudFrontOAC
+            S3OriginConfig: {}
+
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          DefaultTTL: 3600
+          MaxTTL: 86400
+          MinTTL: 0
+
+        CacheBehaviors:
+          # config.js - Short cache for quick updates
+          - PathPattern: /config.js
+            TargetOriginId: S3Origin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            ForwardedValues:
+              QueryString: false
+              Cookies:
+                Forward: none
+            DefaultTTL: 60
+            MaxTTL: 300
+            MinTTL: 0
+
+          # assets - Long cache (hash-based cache busting)
+          - PathPattern: /assets/*
+            TargetOriginId: S3Origin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            ForwardedValues:
+              QueryString: false
+              Cookies:
+                Forward: none
+            DefaultTTL: 31536000
+            MaxTTL: 31536000
+            MinTTL: 31536000
+
+        CustomErrorResponses:
+          # SPA routing support - redirect 404 to index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+          # Handle 403 from S3
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+
+      Tags:
+        - Key: Name
+          Value: !Sub '${NamePrefix}-frontend-distribution'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # 4. S3 Bucket Policy - Allow CloudFront OAC
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowCloudFrontOAC
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub '${FrontendBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
+
+Outputs:
+  CloudFrontDistributionId:
+    Description: CloudFront Distribution ID
+    Value: !Ref CloudFrontDistribution
+    Export:
+      Name: !Sub '${NamePrefix}-cloudfront-distribution-id'
+
+  CloudFrontDomainName:
+    Description: CloudFront Domain Name (add to Django CORS settings)
+    Value: !GetAtt CloudFrontDistribution.DomainName
+    Export:
+      Name: !Sub '${NamePrefix}-cloudfront-domain-name'
+
+  S3BucketName:
+    Description: S3 Bucket Name for deployment
+    Value: !Ref FrontendBucket
+    Export:
+      Name: !Sub '${NamePrefix}-frontend-bucket-name'
+
+  WebsiteURL:
+    Description: Frontend HTTPS URL
+    Value: !Sub 'https://${CloudFrontDistribution.DomainName}'
+    Export:
+      Name: !Sub '${NamePrefix}-frontend-url'

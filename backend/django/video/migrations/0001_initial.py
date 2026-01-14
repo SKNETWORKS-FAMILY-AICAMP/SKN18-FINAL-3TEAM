@@ -63,8 +63,12 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('title', models.CharField(max_length=255, verbose_name='영상 제목')),
+                ('video_url', models.TextField(blank=True, null=True, verbose_name='영상 URL')),
+                ('thumbnail_url', models.TextField(blank=True, null=True, verbose_name='썸네일 URL')),
                 ('upload_date', models.DateTimeField(auto_now_add=True, verbose_name='업로드일')),
                 ('tags', django.contrib.postgres.fields.ArrayField(base_field=models.TextField(), blank=True, null=True, size=None, verbose_name='태그')),
+                ('video_keyword', models.TextField(blank=True, null=True, verbose_name='영상 키워드 (쉼표 구분)')),
+                ('recommended_keyword', models.TextField(blank=True, null=True, verbose_name='추천 키워드 (쉼표 구분)')),
                 ('likes_count', models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='좋아요 수')),
                 ('comments_count', models.IntegerField(default=0, validators=[django.core.validators.MinValueValidator(0)], verbose_name='댓글 수')),
             ],

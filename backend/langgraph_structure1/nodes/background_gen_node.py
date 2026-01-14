@@ -72,8 +72,8 @@ def background_gen_node(state: GraphState) -> GraphState:
     # 타임스탬프 (배경 파일 이름용)
     current_time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # 저장할 기본 경로 (Django media/backgrounds)
-    save_dir = os.path.join(settings.MEDIA_ROOT, "backgrounds")
+    # 임시 저장 경로 (로컬 → S3 업로드 후 삭제)
+    save_dir = os.path.join(settings.MEDIA_ROOT, "temp_backgrounds")
     os.makedirs(save_dir, exist_ok=True)
     
     for i, scene in enumerate(scenes):
@@ -120,19 +120,35 @@ def background_gen_node(state: GraphState) -> GraphState:
             )
 
             # ---------------------------------------------------------
-            # [단계 3] URL 등록
+            # [단계 3] S3에 업로드 및 URL 등록
             # ---------------------------------------------------------
-            base_url = settings.MY_SERVER_URL.rstrip('/')
-            media_url = settings.MEDIA_URL.strip('/')
-            
+            from config.storage_backends import upload_video
+            from django.core.files import File
+
+            final_url = ""
             if result_video and os.path.exists(result_video):
-                # 영상 성공 시
-                final_url = f"{base_url}/{media_url}/backgrounds/{video_file_name}"
-                print(f"      ✅ 영상 URL 적용: {final_url}")
+                # 영상 성공 시 S3에 업로드
+                print(f"      📤 영상 S3 업로드 중...")
+                with open(result_video, 'rb') as f:
+                    video_file = File(f, name=video_file_name)
+                    final_url = upload_video(video_file, video_file_name)
+                print(f"      ✅ 영상 S3 업로드 완료: {final_url}")
+
+                # 임시 파일 삭제
+                if os.path.exists(result_video):
+                    os.remove(result_video)
             else:
-                # 영상 실패 시
-                final_url = f"{base_url}/{media_url}/backgrounds/{image_file_name}"
-                print(f"      ⚠️ 영상 실패, 이미지 URL 적용: {final_url}")
+                # 영상 실패 시 이미지만 S3에 업로드
+                print(f"      📤 이미지 S3 업로드 중...")
+                with open(image_full_path, 'rb') as f:
+                    # 이미지는 비디오 버킷에 업로드 (배경 이미지)
+                    image_file = File(f, name=image_file_name)
+                    final_url = upload_video(image_file, image_file_name)
+                print(f"      ⚠️ 영상 실패, 이미지 S3 업로드 완료: {final_url}")
+
+            # 임시 이미지 파일 삭제
+            if os.path.exists(image_full_path):
+                os.remove(image_full_path)
 
             # JSON 업데이트
             scene["location"] = final_url

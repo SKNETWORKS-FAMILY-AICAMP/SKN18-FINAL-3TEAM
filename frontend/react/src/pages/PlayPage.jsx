@@ -1,9 +1,13 @@
 /**
  * 놀이 페이지
- * 추후 WebGL 게임이 들어갈 예정
+ * MinjiRun WebGL 게임
  */
 
 const PlayPage = ({ onNavigate }) => {
+  // API URL 가져오기
+  const apiUrl = window.ENV?.API_URL || 'https://api.histok.info';
+  const gameUrl = `${apiUrl}/game/minjirun/`;
+
   return (
     <div
       style={{
@@ -11,16 +15,21 @@ const PlayPage = ({ onNavigate }) => {
         height: "calc(100vh - 76px)",
         backgroundColor: "#000000",
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        color: "#ffffff",
-        fontSize: "24px",
       }}
     >
-      <div style={{ textAlign: "center" }}>
-        <h1 style={{ marginBottom: "20px" }}>놀이 페이지</h1>
-        <p style={{ opacity: 0.7 }}>WebGL 게임이 곧 추가될 예정입니다.</p>
-      </div>
+      <iframe
+        src={gameUrl}
+        style={{
+          width: "100%",
+          height: "100%",
+          border: "none",
+        }}
+        title="MinjiRun Game"
+        allow="fullscreen"
+      />
     </div>
   );
 };

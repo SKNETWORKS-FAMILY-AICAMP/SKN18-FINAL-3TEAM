@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ game_title }}</title>
+    {% load static %}
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a1a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        #unity-container {
+            width: 1280px;
+            height: 720px;
+            background: #231F20;
+            position: relative;
+        }
+
+        #unity-canvas {
+            width: 100%;
+            height: 100%;
+            background: #231F20;
+        }
+
+        #unity-loading-bar {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+
+        #unity-progress-bar-empty {
+            width: 400px;
+            height: 18px;
+            margin-top: 10px;
+            background: url('{% static "game/webgl/TemplateData/progress-bar-empty-dark.png" %}') no-repeat center;
+        }
+
+        #unity-progress-bar-full {
+            width: 0%;
+            height: 18px;
+            margin-top: 10px;
+            background: url('{% static "game/webgl/TemplateData/progress-bar-full-dark.png" %}') no-repeat center;
+        }
+
+        #unity-footer {
+            margin-top: 20px;
+            text-align: center;
+            color: #ccc;
+        }
+
+        #unity-fullscreen-button {
+            width: 38px;
+            height: 38px;
+            background: url('{% static "game/webgl/TemplateData/fullscreen-button.png" %}') no-repeat center;
+            background-size: contain;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            margin: 10px;
+        }
+
+        #unity-fullscreen-button:hover {
+            filter: brightness(1.2);
+        }
+
+        .unity-mobile #unity-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        h1 {
+            color: #fff;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            text-align: center;
+        }
+
+        @media (max-width: 1280px) {
+            #unity-container {
+                width: 100%;
+                height: auto;
+                aspect-ratio: 16/9;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>{{ game_title }}</h1>
+
+    <div id="unity-container" class="unity-desktop">
+        <canvas id="unity-canvas"></canvas>
+        <div id="unity-loading-bar">
+            <div id="unity-logo"></div>
+            <div id="unity-progress-bar-empty">
+                <div id="unity-progress-bar-full"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="unity-footer">
+        <button id="unity-fullscreen-button" onclick="unityInstance.SetFullscreen(1)"></button>
+        <p>키보드 화살표 또는 WASD로 이동, 스페이스바로 점프</p>
+    </div>
+
+    <script src="{% static 'game/webgl/Build/webgl.loader.js' %}"></script>
+    <script>
+        var buildUrl = "{% static 'game/webgl/Build' %}";
+        var loaderUrl = buildUrl + "/webgl.loader.js";
+        var config = {
+            dataUrl: buildUrl + "/webgl.data.unityweb",
+            frameworkUrl: buildUrl + "/webgl.framework.js.unityweb",
+            codeUrl: buildUrl + "/webgl.wasm.unityweb",
+            streamingAssetsUrl: "StreamingAssets",
+            companyName: "SKN18-FINAL-3TEAM",
+            productName: "MinjiRun",
+            productVersion: "1.0.0",
+        };
+
+        var container = document.querySelector("#unity-container");
+        var canvas = document.querySelector("#unity-canvas");
+        var loadingBar = document.querySelector("#unity-loading-bar");
+        var progressBarFull = document.querySelector("#unity-progress-bar-full");
+        var fullscreenButton = document.querySelector("#unity-fullscreen-button");
+
+        loadingBar.style.display = "block";
+
+        var unityInstance = null;
+
+        createUnityInstance(canvas, config, (progress) => {
+            progressBarFull.style.width = 100 * progress + "%";
+        }).then((instance) => {
+            unityInstance = instance;
+            loadingBar.style.display = "none";
+            fullscreenButton.style.display = "block";
+        }).catch((message) => {
+            alert("게임 로딩 실패: " + message);
+        });
+    </script>
+</body>
+</html>

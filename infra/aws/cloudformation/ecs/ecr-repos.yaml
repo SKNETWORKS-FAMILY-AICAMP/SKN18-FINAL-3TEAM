@@ -1,0 +1,159 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "ECR repositories for Docker images"
+
+Parameters:
+  NamePrefix:
+    Type: String
+    Default: skn18-3-dev
+
+Resources:
+  WebRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${NamePrefix}-web"
+      ImageScanningConfiguration:
+        ScanOnPush: false
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  PostgresRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${NamePrefix}-postgres"
+      ImageScanningConfiguration:
+        ScanOnPush: false
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 5 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  Neo4jRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${NamePrefix}-neo4j"
+      ImageScanningConfiguration:
+        ScanOnPush: false
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 5 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  FusekiRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${NamePrefix}-fuseki"
+      ImageScanningConfiguration:
+        ScanOnPush: false
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 5 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  RedisRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${NamePrefix}-redis"
+      ImageScanningConfiguration:
+        ScanOnPush: false
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 5 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 5
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+Outputs:
+  WebRepositoryUri:
+    Value: !GetAtt WebRepository.RepositoryUri
+    Export:
+      Name: !Sub "${NamePrefix}-web-repo-uri"
+
+  PostgresRepositoryUri:
+    Value: !GetAtt PostgresRepository.RepositoryUri
+    Export:
+      Name: !Sub "${NamePrefix}-postgres-repo-uri"
+
+  Neo4jRepositoryUri:
+    Value: !GetAtt Neo4jRepository.RepositoryUri
+    Export:
+      Name: !Sub "${NamePrefix}-neo4j-repo-uri"
+
+  FusekiRepositoryUri:
+    Value: !GetAtt FusekiRepository.RepositoryUri
+    Export:
+      Name: !Sub "${NamePrefix}-fuseki-repo-uri"
+
+  RedisRepositoryUri:
+    Value: !GetAtt RedisRepository.RepositoryUri
+    Export:
+      Name: !Sub "${NamePrefix}-redis-repo-uri"

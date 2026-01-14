@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "S3 buckets for video storage, thumbnails, profiles, scripts, and temporary files"
+
+Parameters:
+  NamePrefix:
+    Type: String
+    Default: skn18-3-dev
+
+Resources:
+  # 비디오 저장 버킷 (원본)
+  VideosBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${NamePrefix}-videos"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+            AllowedOrigins: ["*"]
+            MaxAge: 3000
+
+  VideosBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref VideosBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${VideosBucket.Arn}/*"
+
+  # 최종 비디오 저장 버킷
+  FinalVideosBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${NamePrefix}-final-videos"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+            AllowedOrigins: ["*"]
+            MaxAge: 3000
+
+  FinalVideosBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FinalVideosBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${FinalVideosBucket.Arn}/*"
+
+  # 썸네일 저장 버킷
+  ThumbnailsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${NamePrefix}-thumbnails"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+            AllowedOrigins: ["*"]
+            MaxAge: 3000
+
+  ThumbnailsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ThumbnailsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${ThumbnailsBucket.Arn}/*"
+
+  # 프로필 이미지 저장 버킷
+  ProfilesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${NamePrefix}-profiles"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+            AllowedOrigins: ["*"]
+            MaxAge: 3000
+
+  ProfilesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ProfilesBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${ProfilesBucket.Arn}/*"
+
+  # 스크립트 저장 버킷 (RunPod 등 외부 서비스용)
+  ScriptsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${NamePrefix}-scripts-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+            AllowedOrigins: ["*"]
+            MaxAge: 3000
+
+  # 임시 파일 저장 버킷
+  TempBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${NamePrefix}-temp"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldTempFiles
+            Status: Enabled
+            ExpirationInDays: 7
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+            AllowedOrigins: ["*"]
+            MaxAge: 3000
+
+Outputs:
+  VideosBucketName:
+    Value: !Ref VideosBucket
+    Export:
+      Name: !Sub "${NamePrefix}-videos-bucket"
+
+  FinalVideosBucketName:
+    Value: !Ref FinalVideosBucket
+    Export:
+      Name: !Sub "${NamePrefix}-final-videos-bucket"
+
+  ThumbnailsBucketName:
+    Value: !Ref ThumbnailsBucket
+    Export:
+      Name: !Sub "${NamePrefix}-thumbnails-bucket"
+
+  ProfilesBucketName:
+    Value: !Ref ProfilesBucket
+    Export:
+      Name: !Sub "${NamePrefix}-profiles-bucket"
+
+  ScriptsBucketName:
+    Value: !Ref ScriptsBucket
+    Export:
+      Name: !Sub "${NamePrefix}-scripts-bucket"
+
+  TempBucketName:
+    Value: !Ref TempBucket
+    Export:
+      Name: !Sub "${NamePrefix}-temp-bucket"

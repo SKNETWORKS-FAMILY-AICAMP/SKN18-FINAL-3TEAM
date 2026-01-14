@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
                 ('last_login', models.DateTimeField(blank=True, null=True, verbose_name='last login')),
                 ('is_superuser', models.BooleanField(default=False, help_text='Designates that this user has all permissions without explicitly assigning them.', verbose_name='superuser status')),
                 ('nickname', models.CharField(blank=True, max_length=30, null=True, unique=True, verbose_name='닉네임')),
-                ('profile_image', models.CharField(blank=True, max_length=100, null=True, verbose_name='프로필 이미지 URL')),
+                ('profile_image', models.TextField(blank=True, null=True, verbose_name='프로필 이미지 URL')),
                 ('sign_up_date', models.DateTimeField(auto_now_add=True, verbose_name='가입일')),
                 ('email', models.EmailField(max_length=255, unique=True, verbose_name='이메일')),
                 ('permission', models.CharField(choices=[('user', 'User'), ('admin', 'Admin')], default='user', max_length=50, verbose_name='권한')),

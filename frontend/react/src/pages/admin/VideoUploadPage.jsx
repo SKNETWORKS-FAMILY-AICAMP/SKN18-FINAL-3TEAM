@@ -86,7 +86,7 @@ const VideoUploadPage = () => {
           formData.append("tags[]", tag.trim());
         });
 
-        response = await fetch("http://localhost:8000/api/video/upload/", {
+        response = await fetch(`${window.ENV?.API_URL || "http://localhost:8000"}/api/video/upload/`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -111,7 +111,7 @@ const VideoUploadPage = () => {
           tagArray.forEach((tag) => {
             formData.append("tags[]", tag.trim());
           });
-          response = await fetch("http://localhost:8000/api/video/upload/", {
+          response = await fetch(`${window.ENV?.API_URL || "http://localhost:8000"}/api/video/upload/`, {
             method: "POST",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -119,7 +119,7 @@ const VideoUploadPage = () => {
             body: formData,
           });
         } else {
-          response = await fetch("http://localhost:8000/api/video/upload/", {
+          response = await fetch(`${window.ENV?.API_URL || "http://localhost:8000"}/api/video/upload/`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

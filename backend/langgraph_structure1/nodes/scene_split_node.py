@@ -25,7 +25,29 @@ def scene_split_node(state: GraphState) -> GraphState:
     SYSTEM:
     You are a legendary Comedy Writer for a 'Manzai' (Stand-up Comedy) show about Korean History.
     Your goal is to convert the [History Explanation] into a HILARIOUS dialogue script (JSON).
-    
+
+    [TITLE GENERATION RULES - VERY IMPORTANT]
+    - The "title" MUST be based on the core topic of the [History Explanation].
+    - Do NOT invent fantasy concepts that do not exist in the original explanation.
+    - The title should be:
+    1. A concise summary of the historical topic
+    2. Written in a YouTube-style, click-worthy tone
+    - Allowed techniques:
+    - Mild exaggeration
+    - Rhetorical questions
+    - Modern YouTube phrasing
+    - NOT allowed:
+    - Completely fictional objects
+    - Overly abstract metaphors unrelated to the history topic
+
+    Replace:
+    "King Sejong invented Hangul."
+
+    With:
+    - “A King Created a Language for His People.”
+    - “King Sejong Gave His People a New Way to Speak.”
+    - “This Is How a King Changed the Voice of a Nation.”
+
     [CHARACTERS]
     1. **Minji (The Boss / Boke)**: 
        - A Joseon Dynasty Aristocrat (Yangban). Extremely arrogant.
@@ -53,7 +75,7 @@ def scene_split_node(state: GraphState) -> GraphState:
     [ONE-SHOT EXAMPLE (COPY THIS STYLE!)]
     Topic: "Smartphone"
     {{
-      "title": "The Magic Stone",
+      "title": "",
       "scenes": [
         {{
           "scene_id": 1,
@@ -115,3 +137,12 @@ def scene_split_node(state: GraphState) -> GraphState:
         "scene_script": script_json,
         "scenes": scenes,
     }
+
+if __name__ == "__main__":
+    # 테스트용 메인 함수
+    test_state = GraphState({
+        "tone_corrected_answer": "The Imjin War was a conflict in which Japan invaded Joseon from 1592 to 1598. The war began as external expansionist ambitions intersected with internal political and social divisions within Joseon. The fundamental causes are commonly identified as Japan’s aggressive expansionist intentions and the weakening of Joseon’s defensive capabilities due to internal fragmentation. This background invited foreign intervention on the Korean Peninsula and has remained a central focus of historical discussions regarding the structural causes of the war’s outbreak. During the course of the war, the role of the Joseon navy was particularly significant. Admiral Yi Sun-sin led the navy to numerous victories, which had a profound impact on the overall direction of the war. Sustained naval successes disrupted the enemy’s operational capabilities and are widely regarded as a primary reason why Joseon was able to overcome several critical crises during the conflict. As the war continued for several years, achievements in naval battles emerged as a key variable influencing shifts in momentum and turning points in the war. The Imjin War demonstrated that Japanese expansionism posed a tangible threat to the Korean Peninsula and clearly revealed how internal divisions could weaken a state’s ability to respond to crises. Furthermore, the importance of military and strategic competence displayed during the war became an enduring historical lesson. The experiences of this period are evaluated as a significant event in Korean history, underscoring the necessity of national security and internal unity.",
+        "asset_context": "Available Actions: Idle, Walk, Run, Victory, Defeat, Cheer, Surprise, HeadShake, Attack, Dying"
+    })
+    result_state = scene_split_node(test_state)
+    print(json.dumps(result_state.get("scene_script", {}), indent=2, ensure_ascii=False))

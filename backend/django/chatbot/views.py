@@ -519,7 +519,6 @@ class ChatQuestionView(APIView):
                             request.session.modified = True
 
                         # 🎯 사용자 선택 완료 이벤트 전송
-                        import time
                         user_selection_event = {
                             "event": "user_selection_completed",
                             "title": "사용자 선택 완료",
@@ -593,8 +592,6 @@ class ChatQuestionView(APIView):
                                 }
 
                             # data 필드 정리
-                            import time
-
                             # 이미 data 필드가 있으면 그대로 사용, 없으면 생성
                             if "data" in event_data:
                                 data_fields = event_data.get("data", {})
@@ -643,11 +640,9 @@ class ChatQuestionView(APIView):
                     async def run_langgraph():
                         nonlocal ai_response
                         try:
-                            # 동기 모드로 실행하여 예외 처리 개선
+                            # 비동기 모드로 실행 (hybrid_node가 async def이므로 ainvoke 사용)
                             try:
-                                final_state = await asyncio.get_event_loop().run_in_executor(
-                                    None, app.invoke, invoke_params
-                                )
+                                final_state = await app.ainvoke(invoke_params)
                                 
                                 ai_response = final_state.get("final_answer", "") or fallback_answer
                                 
@@ -736,8 +731,17 @@ class ChatQuestionView(APIView):
                     
                     # 스트리밍 청크 전송
                     chunk_sent = 0
+                    last_heartbeat_time = time.time()
+                    heartbeat_interval = 30  # 30초마다 heartbeat 전송
+
                     while True:
                         try:
+                            # CloudFront timeout 방지를 위한 heartbeat
+                            current_time = time.time()
+                            if current_time - last_heartbeat_time > heartbeat_interval:
+                                yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+                                last_heartbeat_time = current_time
+
                             # 큐에서 항목 가져오기 (타임아웃 0.1초)
                             try:
                                 item = await asyncio.wait_for(stream_queue.get(), timeout=0.1)

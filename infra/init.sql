@@ -93,9 +93,3 @@ CREATE TABLE IF NOT EXISTS search_history (
 
 -- 7. 인덱스 생성
 CREATE INDEX IF NOT EXISTS korean_history_embedding_idx ON korean_history USING hnsw (embedding vector_cosine_ops);
-
--- 8. 초기 데이터 삽입 (문법 오류 수정)
-INSERT INTO video (title, video_url, tags, likes_count, comments_count, thumbnail_url)
-VALUES 
-    ('임진왜란_짧동', 'http://localhost:3000//videos/selected_scene_2_video.mp4', ARRAY['임진왜란', '역사', '전쟁'], 0, 0, '/thumbnail_images/imjin.png')
-ON CONFLICT DO NOTHING;
